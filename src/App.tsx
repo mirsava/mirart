@@ -12,6 +12,9 @@ import Checkout from './pages/Checkout';
 import OrderSuccess from './pages/OrderSuccess';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import ArtistSignup from './pages/ArtistSignup';
+import ArtistSignin from './pages/ArtistSignin';
+import ArtistDashboard from './pages/ArtistDashboard';
 
 function App(): JSX.Element {
   return (
@@ -40,6 +43,9 @@ function AppContent(): JSX.Element {
             <Route path="/order-success" element={<OrderSuccess />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/artist-signup" element={<ArtistSignup />} />
+            <Route path="/artist-signin" element={<ArtistSignin />} />
+            <Route path="/artist-dashboard" element={<ArtistDashboard />} />
           </Routes>
         </Layout>
       </Router>

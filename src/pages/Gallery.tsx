@@ -13,7 +13,7 @@ import {
   Stack,
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
-import { paintings } from '../data/paintings';
+import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
 
 const Gallery: React.FC = () => {
@@ -21,9 +21,9 @@ const Gallery: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [sortBy, setSortBy] = useState<string>('title');
 
-  const categories = ['All', ...new Set(paintings.map(p => p.category))];
+  const categories = ['All', ...new Set(artworks.map(p => p.category))];
 
-  const filteredPaintings = paintings
+  const filteredPaintings = artworks
     .filter(painting => {
       const matchesSearch = painting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            painting.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -58,8 +58,8 @@ const Gallery: React.FC = () => {
             Art Gallery
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '600px', mx: 'auto' }}>
-            Browse our complete collection of original paintings. Use filters to find
-            the perfect piece for your space.
+            Browse our complete collection of original paintings and handcrafted woodworking pieces from talented artists. 
+            Use filters to find the perfect piece for your space.
           </Typography>
         </Box>
 
@@ -68,7 +68,7 @@ const Gallery: React.FC = () => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                placeholder="Search paintings..."
+                placeholder="Search artwork..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
@@ -117,7 +117,7 @@ const Gallery: React.FC = () => {
 
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary">
-            Showing {filteredPaintings.length} of {paintings.length} paintings
+            Showing {filteredPaintings.length} of {artworks.length} pieces
             {selectedCategory !== 'All' && ` in ${selectedCategory}`}
             {searchTerm && ` matching "${searchTerm}"`}
           </Typography>
@@ -126,7 +126,7 @@ const Gallery: React.FC = () => {
         {filteredPaintings.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              No paintings found
+              No artwork found
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Try adjusting your search criteria or browse all categories

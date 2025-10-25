@@ -18,7 +18,7 @@ import {
   FavoriteBorder as FavoriteBorderIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
-import { paintings } from '../data/paintings';
+import { artworks } from '../data/paintings';
 import { useCart } from '../contexts/CartContext';
 
 const PaintingDetail: React.FC = () => {
@@ -26,7 +26,7 @@ const PaintingDetail: React.FC = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
 
-  const painting = paintings.find(p => p.id === parseInt(id || '0'));
+  const painting = artworks.find(p => p.id === parseInt(id || '0'));
 
   if (!painting) {
     return (

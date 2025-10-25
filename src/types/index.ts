@@ -1,18 +1,29 @@
-export interface Painting {
+export interface Artwork {
   id: number;
   title: string;
   artist: string;
   price: number;
   image: string;
   description: string;
-  category: string;
+  category: 'Painting' | 'Woodworking';
+  subcategory: string;
   dimensions: string;
   medium: string;
   year: number;
   inStock: boolean;
 }
 
-export interface CartItem extends Painting {
+export interface Painting extends Artwork {
+  category: 'Painting';
+  subcategory: string;
+}
+
+export interface Woodworking extends Artwork {
+  category: 'Woodworking';
+  subcategory: string;
+}
+
+export interface CartItem extends Artwork {
   quantity: number;
 }
 

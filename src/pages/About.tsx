@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import {
   Palette as PaletteIcon,
-  Brush as BrushIcon,
+  Build as BuildIcon,
   Star as StarIcon,
 } from '@mui/icons-material';
 
@@ -23,13 +23,13 @@ const About: React.FC = () => {
       description: 'Artists keep 85% of their sales, ensuring fair compensation for their creative work.',
     },
     {
-      icon: <BrushIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
+      icon: <BuildIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
       title: 'Curated Quality',
       description: 'Each piece is carefully selected to ensure the highest quality and artistic excellence.',
     },
     {
       icon: <StarIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
-      title: 'Global Marketplace',
+      title: 'Global Community',
       description: 'Connect with artists worldwide and discover unique pieces from diverse cultures.',
     },
   ];
@@ -39,12 +39,11 @@ const About: React.FC = () => {
       <Container maxWidth="lg">
         <Box sx={{ textAlign: 'center', mb: 8 }}>
           <Typography variant="h3" component="h1" gutterBottom>
-            About MirArt
+            About Our Marketplace
           </Typography>
           <Typography variant="h6" color="text.secondary" sx={{ maxWidth: '800px', mx: 'auto' }}>
-            MirArt is a curated marketplace connecting artists with art lovers worldwide. 
-            We showcase original paintings from talented creators while providing a platform 
-            for artists to sell their work with competitive commission rates.
+            We're a community-driven marketplace connecting talented artists with art lovers worldwide. 
+            Our platform makes it easy for artists to sell their work and for collectors to discover unique pieces.
           </Typography>
         </Box>
 
@@ -63,22 +62,22 @@ const About: React.FC = () => {
           <Grid item xs={12} md={6}>
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <Typography variant="h4" component="h2" gutterBottom>
-                Our Story
+                Our Mission
               </Typography>
               <Typography variant="body1" paragraph>
-                Founded in 2023, MirArt began as a passion project to create a fair marketplace for artists. 
-                Our founder, an artist and art enthusiast, recognized the need for a platform that gives 
-                artists control over their work while connecting them with art lovers worldwide.
+                We believe that art has the power to transform spaces and inspire emotions. Our marketplace 
+                was created to support artists by providing them with a platform to showcase and sell their 
+                work while connecting them with art lovers who appreciate authentic, handmade pieces.
               </Typography>
               <Typography variant="body1" paragraph>
-                Today, we work with talented artists from around the globe, offering them a platform to 
-                showcase their work with competitive commission rates. Artists keep 85% of their sales, 
-                ensuring they're fairly compensated for their creativity and hard work.
+                We're committed to fair compensation for artists, with a transparent fee structure that 
+                allows creators to keep 85% of their sales. Our platform handles the technical aspects 
+                of selling art, so artists can focus on what they do best - creating.
               </Typography>
               <Typography variant="body1">
-                We're committed to supporting artists while providing customers with authentic, 
-                meaningful pieces that will be treasured for generations. Our curated approach ensures 
-                quality while giving artists the exposure they deserve.
+                Whether you're an established artist or just starting out, our community welcomes creators 
+                of all levels. We provide the tools and support needed to successfully sell your artwork 
+                in a global marketplace.
               </Typography>
             </Box>
           </Grid>
@@ -86,7 +85,7 @@ const About: React.FC = () => {
 
         <Box sx={{ textAlign: 'center', mb: 6 }}>
           <Typography variant="h4" component="h2" gutterBottom>
-            Why Choose MirArt?
+            Why Choose Our Marketplace?
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '600px', mx: 'auto', mb: 4 }}>
             We're dedicated to supporting both artists and art lovers with these key benefits:

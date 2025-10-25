@@ -18,25 +18,23 @@ import {
 } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
-  Star as StarIcon,
-  TrendingUp as TrendingIcon,
-  Palette as PaletteIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { paintings } from '../data/paintings';
+import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const featuredPaintings = paintings.slice(0, 6);
+  const featuredPaintings = artworks.filter(item => item.category === 'Painting').slice(0, 3);
+  const featuredWoodworking = artworks.filter(item => item.category === 'Woodworking').slice(0, 3);
   const [currentImage, setCurrentImage] = useState<number>(0);
 
   const heroImages = [
     'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=1200&h=800&fit=crop',
-    'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1200&h=800&fit=crop',
-    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=1200&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=800&fit=crop',
   ];
 
   useEffect(() => {
@@ -46,22 +44,18 @@ const Home: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const stats = [
-    { label: 'Original Artworks', value: '500+', icon: <PaletteIcon /> },
-    { label: 'Happy Customers', value: '2.5K+', icon: <StarIcon /> },
-    { label: 'Featured Artists', value: '50+', icon: <TrendingIcon /> },
-  ];
 
   return (
     <Box>
       <Box
         sx={{
           position: 'relative',
-          height: { xs: 'calc(70vh - 45px)', md: 'calc(63vh - 45px)' },
-          minHeight: 350,
+          height: { xs: 'calc(80vh - 45px)', md: 'calc(75vh - 45px)' },
+          minHeight: 500,
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         }}
       >
         <Box
@@ -82,7 +76,7 @@ const Home: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.6) 100%)',
+              background: 'linear-gradient(135deg, rgba(102,126,234,0.8) 0%, rgba(118,75,162,0.8) 100%)',
             },
           }}
         />
@@ -92,31 +86,45 @@ const Home: React.FC = () => {
             <Grid item xs={12} md={6}>
               <Fade in={true} timeout={1000}>
                 <Box>
-                  <Chip
-                    label="Premium Art Gallery"
-                    color="primary"
-                    sx={{ 
-                      mb: 3, 
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      color: 'white',
-                      backdropFilter: 'blur(10px)',
-                    }}
-                  />
+                  <Box sx={{ mb: 4 }}>
+                    <Chip
+                      label="Art Marketplace"
+                      sx={{ 
+                        mb: 2, 
+                        bgcolor: 'rgba(255,255,255,0.15)',
+                        color: 'white',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        fontWeight: 500,
+                        fontSize: '0.9rem',
+                        px: 2,
+                        py: 1,
+                      }}
+                    />
+                  </Box>
                   <Typography
-                    variant={isMobile ? 'h3' : 'h2'}
+                    variant={isMobile ? 'h2' : 'h1'}
                     component="h1"
                     gutterBottom
                     sx={{ 
                       fontWeight: 700, 
                       mb: 3,
                       color: 'white',
-                      textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                      textShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                      fontSize: { xs: '2.5rem', md: '3.5rem' },
+                      lineHeight: 1.1,
                     }}
                   >
                     Discover
                     <br />
-                    <Box component="span" sx={{ color: 'primary.light' }}>
-                      Extraordinary Art
+                    <Box component="span" sx={{ 
+                      background: 'linear-gradient(45deg, #ffd700, #ffed4e)',
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      display: 'inline-block',
+                    }}>
+                      Handmade Art
                     </Box>
                   </Typography>
                   <Typography
@@ -124,61 +132,67 @@ const Home: React.FC = () => {
                     component="p"
                     sx={{ 
                       mb: 4, 
-                      opacity: 0.9, 
-                      maxWidth: '500px',
+                      opacity: 0.95, 
+                      maxWidth: '520px',
                       color: 'white',
-                      textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                      textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                      fontWeight: 300,
+                      lineHeight: 1.6,
                     }}
                   >
-                    A curated marketplace where artists showcase their original works.
-                    Discover unique paintings from talented creators worldwide.
+                    A marketplace for original paintings and handcrafted woodworking. 
+                    Buy from talented artists or sell your own creations.
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 4 }}>
+                  <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 4, alignItems: 'center' }}>
                     <Button
                       variant="contained"
                       size="large"
                       sx={{
-                        bgcolor: 'primary.main',
+                        bgcolor: 'rgba(255,255,255,0.2)',
                         color: 'white',
-                        px: 4,
-                        py: 1.5,
-                        borderRadius: 3,
+                        px: 5,
+                        py: 2,
+                        borderRadius: 4,
                         textTransform: 'none',
                         fontWeight: 600,
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                        fontSize: '1.1rem',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid rgba(255,255,255,0.3)',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
                         '&:hover': {
-                          bgcolor: 'primary.dark',
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+                          bgcolor: 'rgba(255,255,255,0.3)',
+                          transform: 'translateY(-3px)',
+                          boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
                         },
-                        transition: 'all 0.3s ease',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
                       onClick={() => navigate('/gallery')}
                     >
-                      Explore Gallery
+                      Browse Artwork
                     </Button>
                     <Button
                       variant="outlined"
                       size="large"
                       sx={{
-                        borderColor: 'white',
+                        borderColor: 'rgba(255,255,255,0.5)',
                         color: 'white',
-                        px: 4,
-                        py: 1.5,
-                        borderRadius: 3,
+                        px: 5,
+                        py: 2,
+                        borderRadius: 4,
                         textTransform: 'none',
                         fontWeight: 600,
-                        backdropFilter: 'blur(10px)',
+                        fontSize: '1.1rem',
+                        backdropFilter: 'blur(20px)',
                         '&:hover': {
                           borderColor: 'white',
                           bgcolor: 'rgba(255,255,255,0.1)',
-                          transform: 'translateY(-2px)',
+                          transform: 'translateY(-3px)',
                         },
-                        transition: 'all 0.3s ease',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
-                      onClick={() => navigate('/about')}
+                      onClick={() => navigate('/artist-signup')}
                     >
-                      Learn More
+                      Sell Your Art
                     </Button>
                   </Box>
                 </Box>
@@ -187,67 +201,53 @@ const Home: React.FC = () => {
             
             <Grid item xs={12} md={6}>
               <Slide direction="left" in={true} timeout={1200}>
-                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                  <Card
-                    sx={{
-                      maxWidth: 400,
-                      bgcolor: 'rgba(255,255,255,0.1)',
-                      backdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      borderRadius: 4,
-                      overflow: 'hidden',
-                      boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                    }}
-                  >
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, alignItems: 'center' }}>
                     <Box
                       sx={{
-                        height: 300,
+                        width: { xs: 200, md: 250 },
+                        height: { xs: 200, md: 250 },
+                        borderRadius: 4,
                         backgroundImage: `url(${heroImages[(currentImage + 1) % heroImages.length]})`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         position: 'relative',
-                      }}
-                    >
-                      <Box
-                        sx={{
+                        overflow: 'hidden',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        '&::before': {
+                          content: '""',
                           position: 'absolute',
-                          bottom: 0,
+                          top: 0,
                           left: 0,
                           right: 0,
-                          p: 3,
-                          background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                        }}
-                      >
-                        <Typography variant="h6" color="white" fontWeight="600">
-                          Artist Marketplace
-                        </Typography>
-                        <Typography variant="body2" color="rgba(255,255,255,0.8)">
-                          Featuring works from talented artists
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <CardContent sx={{ p: 3 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box>
-                          <Typography variant="h6" color="white" fontWeight="600">
-                            Commission-Based Sales
-                          </Typography>
-                          <Typography variant="body2" color="rgba(255,255,255,0.7)">
-                            Artists earn 85% of sales
-                          </Typography>
-                        </Box>
-                        <IconButton
-                          sx={{
-                            bgcolor: 'primary.main',
-                            color: 'white',
-                            '&:hover': { bgcolor: 'primary.dark' },
-                          }}
-                        >
-                          <PlayIcon />
-                        </IconButton>
-                      </Box>
-                    </CardContent>
-                  </Card>
+                          bottom: 0,
+                          background: 'linear-gradient(135deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%)',
+                        },
+                      }}
+                    />
+                    <Box
+                      sx={{
+                        width: { xs: 200, md: 250 },
+                        height: { xs: 200, md: 250 },
+                        borderRadius: 4,
+                        backgroundImage: `url(${heroImages[(currentImage + 2) % heroImages.length]})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'linear-gradient(135deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%)',
+                        },
+                      }}
+                    />
+                  </Box>
                 </Box>
               </Slide>
             </Grid>
@@ -261,21 +261,23 @@ const Home: React.FC = () => {
             left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex',
-            gap: 1,
+            gap: 2,
+            alignItems: 'center',
           }}
         >
           {heroImages.map((_, index) => (
             <Box
               key={index}
               sx={{
-                width: 12,
+                width: index === currentImage ? 32 : 12,
                 height: 12,
-                borderRadius: '50%',
-                bgcolor: index === currentImage ? 'white' : 'rgba(255,255,255,0.3)',
+                borderRadius: 6,
+                bgcolor: index === currentImage ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease',
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.7)',
+                  bgcolor: 'rgba(255,255,255,0.8)',
+                  transform: 'scale(1.1)',
                 },
               }}
               onClick={() => setCurrentImage(index)}
@@ -284,52 +286,6 @@ const Home: React.FC = () => {
         </Box>
       </Box>
 
-      <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
-        <Container maxWidth="lg">
-          <Grid container spacing={4}>
-            {stats.map((stat, index) => (
-              <Grid item xs={12} sm={4} key={index}>
-                <Fade in={true} timeout={1000 + index * 200}>
-                  <Card
-                    sx={{
-                      textAlign: 'center',
-                      p: 4,
-                      borderRadius: 3,
-                      bgcolor: 'background.paper',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-                      },
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
-                    <Avatar
-                      sx={{
-                        width: 60,
-                        height: 60,
-                        bgcolor: 'primary.main',
-                        mx: 'auto',
-                        mb: 2,
-                      }}
-                    >
-                      {stat.icon}
-                    </Avatar>
-                    <Typography variant="h4" component="div" fontWeight="bold" color="primary.main" gutterBottom>
-                      {stat.value}
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                      {stat.label}
-                    </Typography>
-                  </Card>
-                </Fade>
-              </Grid>
-            ))}
-          </Grid>
-        </Container>
-      </Box>
 
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Box sx={{ textAlign: 'center', mb: 6 }}>
@@ -337,8 +293,7 @@ const Home: React.FC = () => {
             Featured Paintings
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '600px', mx: 'auto' }}>
-            Handpicked selections from our collection, showcasing the finest
-            original artworks available for purchase.
+            Discover original paintings from talented artists in our community.
           </Typography>
         </Box>
 
@@ -354,6 +309,24 @@ const Home: React.FC = () => {
           <Button
             variant="contained"
             size="large"
+            sx={{
+              bgcolor: 'primary.main',
+              color: 'white',
+              px: 4,
+              py: 1.5,
+              borderRadius: 3,
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'primary.dark',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
+              },
+              '&:focus': {
+                bgcolor: 'primary.dark',
+              },
+              transition: 'all 0.3s ease',
+            }}
             onClick={() => navigate('/gallery')}
           >
             View All Paintings
@@ -363,16 +336,64 @@ const Home: React.FC = () => {
 
       <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
         <Container maxWidth="lg">
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Typography variant="h4" component="h2" gutterBottom>
+              Featured Woodworking
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '600px', mx: 'auto' }}>
+              Handcrafted woodworking pieces from skilled artisans in our marketplace.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={4}>
+            {featuredWoodworking.map((item) => (
+              <Grid item xs={12} sm={6} md={4} key={item.id}>
+                <PaintingCard painting={item} />
+              </Grid>
+            ))}
+          </Grid>
+
+          <Box sx={{ textAlign: 'center', mt: 6 }}>
+            <Button
+              variant="contained"
+              size="large"
+              sx={{
+                bgcolor: 'primary.main',
+                color: 'white',
+                px: 4,
+                py: 1.5,
+                borderRadius: 3,
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
+                },
+                '&:focus': {
+                  bgcolor: 'primary.dark',
+                },
+                transition: 'all 0.3s ease',
+              }}
+              onClick={() => navigate('/gallery')}
+            >
+              View All Woodworking
+            </Button>
+          </Box>
+        </Container>
+      </Box>
+
+      <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
+        <Container maxWidth="lg">
           <Grid container spacing={6} alignItems="center">
             <Grid item xs={12} md={6}>
               <Typography variant="h4" component="h2" gutterBottom>
-                Why Choose MirArt?
+                Join Our Community
               </Typography>
               <Typography variant="body1" color="text.secondary" paragraph>
-                We believe that art has the power to transform spaces and inspire
-                emotions. Our carefully curated collection features original paintings
-                from talented artists, each piece authenticated and ready to grace
-                your home or office.
+                Whether you're an artist looking to sell your work or an art lover seeking 
+                unique pieces, our marketplace connects creators with collectors. Join our 
+                growing community of talented artists and art enthusiasts.
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -385,7 +406,7 @@ const Home: React.FC = () => {
                     }}
                   />
                   <Typography variant="body2">
-                    Original artwork with certificates of authenticity
+                    Artists keep 85% of their sales
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -398,7 +419,7 @@ const Home: React.FC = () => {
                     }}
                   />
                   <Typography variant="body2">
-                    Secure packaging and worldwide shipping
+                    Easy listing and management tools
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -411,7 +432,7 @@ const Home: React.FC = () => {
                     }}
                   />
                   <Typography variant="body2">
-                    30-day return policy for your peace of mind
+                    Secure payments and worldwide shipping
                   </Typography>
                 </Box>
               </Box>
