@@ -9,7 +9,6 @@ import {
   Button,
   Chip,
   Avatar,
-  Divider,
   Paper,
   Tab,
   Tabs,
@@ -28,7 +27,10 @@ import {
   AttachMoney as MoneyIcon,
   ShoppingCart as CartIcon,
   Person as PersonIcon,
+  Logout as LogoutIcon,
 } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -53,10 +55,21 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const ArtistDashboard: React.FC = () => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      // Silently handle sign out errors
+    }
   };
 
   // Mock data - in a real app, this would come from an API
@@ -81,13 +94,23 @@ const ArtistDashboard: React.FC = () => {
   return (
     <Box sx={{ py: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
       <Container maxWidth="lg">
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Artist Dashboard
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Manage your listings, track sales, and grow your art business.
-          </Typography>
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Welcome back, {user?.name || 'Artist'}!
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Manage your listings, track sales, and grow your art business.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            startIcon={<LogoutIcon />}
+            onClick={handleSignOut}
+            sx={{ ml: 2 }}
+          >
+            Sign Out
+          </Button>
         </Box>
 
         {/* Stats Overview */}

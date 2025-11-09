@@ -18,11 +18,13 @@ import {
   Person as PersonIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const ArtistSignin: React.FC = () => {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [formData, setFormData] = useState({
-    email: '',
+    usernameOrEmail: '',
     password: '',
     rememberMe: false,
   });
@@ -49,10 +51,8 @@ const ArtistSignin: React.FC = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+    if (!formData.usernameOrEmail.trim()) {
+      newErrors.usernameOrEmail = 'Username or email is required';
     }
     
     if (!formData.password) {
@@ -72,18 +72,10 @@ const ArtistSignin: React.FC = () => {
     setLoginError('');
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // In a real app, you would authenticate with your backend
-      console.log('Artist signin data:', formData);
-      
-      // For demo purposes, accept any email/password combination
-      // In production, this would validate against your database
+      await signIn(formData.usernameOrEmail, formData.password);
       navigate('/artist-dashboard');
-    } catch (error) {
-      console.error('Signin error:', error);
-      setLoginError('Invalid email or password. Please try again.');
+    } catch (error: any) {
+      setLoginError(error.message || 'Invalid username/email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -128,12 +120,12 @@ const ArtistSignin: React.FC = () => {
             <Box sx={{ mb: 3 }}>
               <TextField
                 fullWidth
-                label="Email Address"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange('email')}
-                error={!!errors.email}
-                helperText={errors.email}
+                label="Username or Email"
+                type="text"
+                value={formData.usernameOrEmail}
+                onChange={handleInputChange('usernameOrEmail')}
+                error={!!errors.usernameOrEmail}
+                helperText={errors.usernameOrEmail || 'Enter your username or email address'}
                 required
                 InputProps={{
                   startAdornment: <EmailIcon sx={{ mr: 1, color: 'text.secondary' }} />,
@@ -169,10 +161,7 @@ const ArtistSignin: React.FC = () => {
               <Link 
                 component="button" 
                 variant="body2"
-                onClick={() => {
-                  // In a real app, this would trigger password reset flow
-                  alert('Password reset functionality would be implemented here');
-                }}
+                onClick={() => navigate('/forgot-password')}
                 sx={{ textDecoration: 'none' }}
               >
                 Forgot password?

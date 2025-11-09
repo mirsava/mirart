@@ -15,6 +15,7 @@ import {
   FormControlLabel,
   Checkbox,
   Divider,
+  CircularProgress,
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -23,10 +24,13 @@ import {
   Business as BusinessIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const ArtistSignup: React.FC = () => {
   const navigate = useNavigate();
+  const { signUp } = useAuth();
   const [formData, setFormData] = useState({
+    username: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -42,6 +46,7 @@ const ArtistSignup: React.FC = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   const specialties = [
     'Painting',
@@ -90,6 +95,9 @@ const ArtistSignup: React.FC = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
+    if (!formData.username.trim()) newErrors.username = 'Username is required';
+    else if (formData.username.length < 3) newErrors.username = 'Username must be at least 3 characters';
+    else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) newErrors.username = 'Username can only contain letters, numbers, and underscores';
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
@@ -114,16 +122,31 @@ const ArtistSignup: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const attributes: Record<string, string> = {
+        name: `${formData.firstName} ${formData.lastName}`,
+        given_name: formData.firstName,
+        family_name: formData.lastName,
+        // Custom attributes need to be configured in Cognito User Pool first
+        // For now, we'll only use standard attributes
+        // Additional profile data can be stored in a separate database/API later
+      };
+
+      // Only add phone number if it's provided and properly formatted
+      if (formData.phone && formData.phone.trim() !== '') {
+        // Format phone number for Cognito (E.164 format)
+        let formattedPhone = formData.phone.trim();
+        if (!formattedPhone.startsWith('+')) {
+          // Add +1 for US numbers if no country code provided
+          formattedPhone = '+1' + formattedPhone.replace(/\D/g, '');
+        }
+        attributes.phone_number = formattedPhone;
+      }
+
+      await signUp(formData.email, formData.password, attributes, formData.username);
       
-      // In a real app, you would send this data to your backend
-      console.log('Artist signup data:', formData);
-      
-      // Redirect to success page or dashboard
-      navigate('/artist-dashboard');
-    } catch (error) {
-      console.error('Signup error:', error);
+      setSignupSuccess(true);
+    } catch (error: any) {
+      setErrors({ general: error.message || 'Signup failed. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -165,8 +188,46 @@ const ArtistSignup: React.FC = () => {
             </Grid>
           </Box>
 
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={3}>
+          {signupSuccess ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Alert severity="success" sx={{ mb: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Account Created Successfully!
+                </Typography>
+                <Typography variant="body2">
+                  Please check your email for a confirmation code to verify your account.
+                </Typography>
+              </Alert>
+              <Button
+                variant="contained"
+                onClick={() => navigate('/confirm-signup', { 
+                  state: { 
+                    email: formData.email,
+                    username: formData.username 
+                  } 
+                })}
+                sx={{ px: 4 }}
+              >
+                Verify Email
+              </Button>
+              <Box sx={{ mt: 2 }}>
+                <Button
+                  variant="text"
+                  onClick={() => navigate('/artist-signin')}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Go to Sign In
+                </Button>
+              </Box>
+            </Box>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              {errors.general && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                  {errors.general}
+                </Alert>
+              )}
+              <Grid container spacing={3}>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -199,6 +260,21 @@ const ArtistSignup: React.FC = () => {
                   error={!!errors.email}
                   helperText={errors.email}
                   required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Username"
+                  value={formData.username}
+                  onChange={handleInputChange('username')}
+                  error={!!errors.username}
+                  helperText={errors.username || 'Choose a unique username (letters, numbers, and underscores only)'}
+                  required
+                  inputProps={{
+                    pattern: '[a-zA-Z0-9_]+',
+                    minLength: 3,
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -239,9 +315,11 @@ const ArtistSignup: React.FC = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Phone Number"
+                  label="Phone Number (optional)"
                   value={formData.phone}
                   onChange={handleInputChange('phone')}
+                  placeholder="+1 (555) 123-4567"
+                  helperText="Include country code (e.g., +1 for US)"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -343,6 +421,9 @@ const ArtistSignup: React.FC = () => {
                 <Typography variant="body2">
                   <strong>Platform Fee:</strong> 15% commission on sales (you keep 85%)
                 </Typography>
+                <Typography variant="body2" sx={{ mt: 1, fontSize: '0.85rem' }}>
+                  <strong>Note:</strong> Your profile information (business name, specialties, etc.) will be saved to your account after verification.
+                </Typography>
               </Alert>
               
               <Button
@@ -367,7 +448,8 @@ const ArtistSignup: React.FC = () => {
                 </Button>
               </Typography>
             </Box>
-          </form>
+            </form>
+          )}
         </Paper>
       </Container>
     </Box>

@@ -3,6 +3,8 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider as CustomThemeProvider, useTheme } from './contexts/ThemeContext';
 import { CartProvider } from './contexts/CartContext';
+import { AuthProvider } from './contexts/AuthContext';
+import './aws-config';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Gallery from './pages/Gallery';
@@ -15,13 +17,18 @@ import Contact from './pages/Contact';
 import ArtistSignup from './pages/ArtistSignup';
 import ArtistSignin from './pages/ArtistSignin';
 import ArtistDashboard from './pages/ArtistDashboard';
+import ForgotPassword from './pages/ForgotPassword';
+import ConfirmSignup from './pages/ConfirmSignup';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App(): JSX.Element {
   return (
     <CustomThemeProvider>
-      <CartProvider>
-        <AppContent />
-      </CartProvider>
+      <AuthProvider>
+        <CartProvider>
+          <AppContent />
+        </CartProvider>
+      </AuthProvider>
     </CustomThemeProvider>
   );
 }
@@ -45,7 +52,16 @@ function AppContent(): JSX.Element {
             <Route path="/contact" element={<Contact />} />
             <Route path="/artist-signup" element={<ArtistSignup />} />
             <Route path="/artist-signin" element={<ArtistSignin />} />
-            <Route path="/artist-dashboard" element={<ArtistDashboard />} />
+            <Route path="/confirm-signup" element={<ConfirmSignup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route 
+              path="/artist-dashboard" 
+              element={
+                <ProtectedRoute requiredUserType="artist">
+                  <ArtistDashboard />
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
         </Layout>
       </Router>

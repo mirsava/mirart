@@ -10,6 +10,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  ListItemIcon,
   Box,
   useMediaQuery,
   useTheme,
@@ -18,6 +19,8 @@ import {
   Fade,
   Menu,
   MenuItem,
+  Avatar,
+  Divider,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -28,10 +31,12 @@ import {
   Close as CloseIcon,
   ExpandMore as ExpandMoreIcon,
   Person as PersonIcon,
+  Logout as LogoutIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { useCart } from '../contexts/CartContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -39,9 +44,11 @@ const Header: React.FC = () => {
   const theme = useTheme();
   const { isDarkMode, toggleTheme } = useCustomTheme();
   const { getTotalItems } = useCart();
+  const { user, signOut, isAuthenticated } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
+  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const menuItems = [
@@ -51,10 +58,14 @@ const Header: React.FC = () => {
     { label: 'Contact', path: '/contact' },
   ];
 
-  const artistMenuItems = [
-    { label: 'Sell Art', path: '/artist-signup' },
-    { label: 'Artist Sign In', path: '/artist-signin' },
-  ];
+  const artistMenuItems = isAuthenticated
+    ? [
+        { label: 'My Dashboard', path: '/artist-dashboard' },
+      ]
+    : [
+        { label: 'Sell Art', path: '/artist-signup' },
+        { label: 'Artist Sign In', path: '/artist-signin' },
+      ];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -84,6 +95,24 @@ const Header: React.FC = () => {
   const handleArtistMenuClick = (path: string): void => {
     navigate(path);
     handleArtistMenuClose();
+  };
+
+  const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>): void => {
+    setUserMenuAnchor(event.currentTarget);
+  };
+
+  const handleUserMenuClose = (): void => {
+    setUserMenuAnchor(null);
+  };
+
+  const handleSignOut = async (): Promise<void> => {
+    try {
+      await signOut();
+      handleUserMenuClose();
+      navigate('/');
+    } catch (error) {
+      // Silently handle sign out errors
+    }
   };
 
   const drawer = (
@@ -125,30 +154,103 @@ const Header: React.FC = () => {
             />
           </ListItem>
         ))}
-        <Box sx={{ my: 2, borderTop: 1, borderColor: 'divider' }} />
-        {artistMenuItems.map((item) => (
-          <ListItem 
-            key={item.label} 
-            onClick={() => handleNavigation(item.path)}
-            sx={{
-              borderRadius: 2,
-              mb: 1,
-              cursor: 'pointer',
-              bgcolor: location.pathname === item.path ? 'primary.main' : 'transparent',
-              color: location.pathname === item.path ? 'white' : 'inherit',
-              '&:hover': {
-                bgcolor: location.pathname === item.path ? 'primary.dark' : 'action.hover',
-              },
-            }}
-          >
-            <ListItemText 
-              primary={item.label}
-              primaryTypographyProps={{
-                fontWeight: location.pathname === item.path ? 600 : 400,
+        
+        {!isAuthenticated && (
+          <>
+            <Box sx={{ my: 2, borderTop: 1, borderColor: 'divider' }} />
+            {artistMenuItems.map((item) => (
+              <ListItem 
+                key={item.label} 
+                onClick={() => handleNavigation(item.path)}
+                sx={{
+                  borderRadius: 2,
+                  mb: 1,
+                  cursor: 'pointer',
+                  bgcolor: location.pathname === item.path ? 'primary.main' : 'transparent',
+                  color: location.pathname === item.path ? 'white' : 'inherit',
+                  '&:hover': {
+                    bgcolor: location.pathname === item.path ? 'primary.dark' : 'action.hover',
+                  },
+                }}
+              >
+                <ListItemText 
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    fontWeight: location.pathname === item.path ? 600 : 400,
+                  }}
+                />
+              </ListItem>
+            ))}
+          </>
+        )}
+        
+        {isAuthenticated && user && (
+          <>
+            <Box sx={{ my: 2, borderTop: 1, borderColor: 'divider' }} />
+            <Box sx={{ px: 2, py: 2, bgcolor: 'action.hover', borderRadius: 2, mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                <Avatar sx={{ bgcolor: 'primary.main' }}>
+                  {user.name?.charAt(0).toUpperCase() || user.id?.charAt(0).toUpperCase() || 'U'}
+                </Avatar>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    {user.name || 'User'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.75rem">
+                    @{user.id || 'username'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+            <ListItem 
+              onClick={() => {
+                handleNavigation('/artist-dashboard');
+                handleDrawerToggle();
               }}
-            />
-          </ListItem>
-        ))}
+              sx={{
+                borderRadius: 2,
+                mb: 1,
+                cursor: 'pointer',
+                bgcolor: location.pathname === '/artist-dashboard' ? 'primary.main' : 'transparent',
+                color: location.pathname === '/artist-dashboard' ? 'white' : 'inherit',
+                '&:hover': {
+                  bgcolor: location.pathname === '/artist-dashboard' ? 'primary.dark' : 'action.hover',
+                },
+              }}
+            >
+              <ListItemIcon>
+                <PersonIcon />
+              </ListItemIcon>
+              <ListItemText 
+                primary="My Dashboard"
+                primaryTypographyProps={{
+                  fontWeight: location.pathname === '/artist-dashboard' ? 600 : 400,
+                }}
+              />
+            </ListItem>
+            <ListItem 
+              onClick={async () => {
+                await handleSignOut();
+                handleDrawerToggle();
+              }}
+              sx={{
+                borderRadius: 2,
+                mb: 1,
+                cursor: 'pointer',
+                color: 'error.main',
+                '&:hover': {
+                  bgcolor: 'error.light',
+                  color: 'white',
+                },
+              }}
+            >
+              <ListItemIcon>
+                <LogoutIcon />
+              </ListItemIcon>
+              <ListItemText primary="Sign Out" />
+            </ListItem>
+          </>
+        )}
       </List>
     </Box>
   );
@@ -252,30 +354,58 @@ const Header: React.FC = () => {
                     </Button>
                   ))}
                   
-                  <Button
-                    onClick={handleArtistMenuOpen}
-                    endIcon={<ExpandMoreIcon />}
-                    sx={{
-                      color: isDarkMode ? 'white' : 'text.primary',
-                      fontWeight: 500,
-                      position: 'relative',
-                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
-                      borderRadius: 2,
-                      px: 2,
-                      py: 1,
-                      '&:hover': {
-                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
-                      },
-                    }}
-                  >
-                    <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
-                    Artists
-                  </Button>
+                  {!isAuthenticated && (
+                    <Button
+                      onClick={handleArtistMenuOpen}
+                      endIcon={<ExpandMoreIcon />}
+                      sx={{
+                        color: isDarkMode ? 'white' : 'text.primary',
+                        fontWeight: 500,
+                        position: 'relative',
+                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1,
+                        '&:hover': {
+                          bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                        },
+                      }}
+                    >
+                      <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
+                      Artists
+                    </Button>
+                  )}
                 </Box>
               </Fade>
             )}
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {isAuthenticated && user ? (
+                <>
+                  <Button
+                    onClick={handleUserMenuOpen}
+                    startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main' }}>
+                      {user.name?.charAt(0).toUpperCase() || user.id?.charAt(0).toUpperCase() || 'U'}
+                    </Avatar>}
+                    endIcon={<ExpandMoreIcon />}
+                    sx={{
+                      color: isDarkMode ? 'white' : 'text.primary',
+                      fontWeight: 500,
+                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                      borderRadius: 2,
+                      px: 2,
+                      py: 0.5,
+                      textTransform: 'none',
+                      '&:hover': {
+                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                      },
+                    }}
+                  >
+                    {user.name || user.id || 'User'}
+                  </Button>
+                </>
+              ) : null}
+              
               <IconButton 
                 onClick={toggleTheme}
                 sx={{ 
@@ -354,6 +484,57 @@ const Header: React.FC = () => {
         >
           <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
           Artist Sign In
+        </MenuItem>
+      </Menu>
+
+      <Menu
+        anchorEl={userMenuAnchor}
+        open={Boolean(userMenuAnchor)}
+        onClose={handleUserMenuClose}
+        PaperProps={{
+          sx: {
+            mt: 1,
+            minWidth: 220,
+            borderRadius: 2,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <Box sx={{ px: 2, py: 1.5 }}>
+          <Typography variant="subtitle2" fontWeight={600}>
+            {user?.name || 'User'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            @{user?.id || 'username'}
+          </Typography>
+        </Box>
+        <Divider />
+        <MenuItem 
+          onClick={() => {
+            handleUserMenuClose();
+            navigate('/artist-dashboard');
+          }}
+          sx={{ 
+            py: 1.5,
+            px: 2,
+            '&:hover': { bgcolor: 'primary.light', color: 'white' },
+          }}
+        >
+          <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
+          My Dashboard
+        </MenuItem>
+        <MenuItem 
+          onClick={handleSignOut}
+          sx={{ 
+            py: 1.5,
+            px: 2,
+            '&:hover': { bgcolor: 'error.light', color: 'white' },
+          }}
+        >
+          <LogoutIcon sx={{ mr: 2, fontSize: 20 }} />
+          Sign Out
         </MenuItem>
       </Menu>
 
