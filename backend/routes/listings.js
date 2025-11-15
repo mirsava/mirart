@@ -139,11 +139,21 @@ router.get('/:id', async (req, res) => {
           if (!imageUrlsStr || imageUrlsStr === 'null' || imageUrlsStr === '') {
             return null;
           } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
-            return JSON.parse(imageUrlsStr);
+            let parsed = JSON.parse(imageUrlsStr);
+            // Fix: If the parsed result is an array with a single comma-separated string, split it
+            if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string' && parsed[0].includes(',')) {
+              parsed = parsed[0].split(',').map(url => url.trim()).filter(url => url);
+            }
+            return parsed;
           } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
             return [imageUrlsStr];
           } else {
-            return JSON.parse(imageUrlsStr);
+            let parsed = JSON.parse(imageUrlsStr);
+            // Fix: If the parsed result is an array with a single comma-separated string, split it
+            if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string' && parsed[0].includes(',')) {
+              parsed = parsed[0].split(',').map(url => url.trim()).filter(url => url);
+            }
+            return parsed;
           }
         } catch (parseError) {
           console.error('Error parsing image_urls JSON:', parseError);
@@ -453,10 +463,18 @@ router.put('/:id', async (req, res) => {
           parsedImageUrls = null;
         } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
           parsedImageUrls = JSON.parse(imageUrlsStr);
+          // Fix: If the parsed result is an array with a single comma-separated string, split it
+          if (Array.isArray(parsedImageUrls) && parsedImageUrls.length === 1 && typeof parsedImageUrls[0] === 'string' && parsedImageUrls[0].includes(',')) {
+            parsedImageUrls = parsedImageUrls[0].split(',').map(url => url.trim()).filter(url => url);
+          }
         } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
           parsedImageUrls = [imageUrlsStr];
         } else {
           parsedImageUrls = JSON.parse(imageUrlsStr);
+          // Fix: If the parsed result is an array with a single comma-separated string, split it
+          if (Array.isArray(parsedImageUrls) && parsedImageUrls.length === 1 && typeof parsedImageUrls[0] === 'string' && parsedImageUrls[0].includes(',')) {
+            parsedImageUrls = parsedImageUrls[0].split(',').map(url => url.trim()).filter(url => url);
+          }
         }
       } catch (parseError) {
         console.error('Error parsing image_urls JSON:', parseError);

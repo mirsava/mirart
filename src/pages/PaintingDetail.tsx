@@ -324,9 +324,9 @@ const PaintingDetail: React.FC = () => {
                       key={index}
                       onClick={() => setCurrentImageIndex(index)}
                       sx={{
-                        minWidth: 80,
-                        width: 80,
-                        height: 80,
+                        minWidth: 60,
+                        width: 60,
+                        height: 60,
                         borderRadius: 1,
                         overflow: 'hidden',
                         cursor: 'pointer',

@@ -51,6 +51,7 @@ const EditListing: React.FC = () => {
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
   const [hadOriginalImages, setHadOriginalImages] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const categories = [
     'Painting',
@@ -72,23 +73,24 @@ const EditListing: React.FC = () => {
     }
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
     const baseUrl = API_BASE_URL.replace('/api', '');
-    return baseUrl + url;
+    // Ensure URL starts with / if it doesn't already
+    const normalizedUrl = url.startsWith('/') ? url : '/' + url;
+    return baseUrl + normalizedUrl;
   };
 
-  useEffect(() => {
-    const fetchListing = async () => {
-      if (!id) {
-        setError('Invalid listing ID');
-        setFetching(false);
-        return;
-      }
+  const fetchListing = async () => {
+    if (!id) {
+      setError('Invalid listing ID');
+      setFetching(false);
+      return;
+    }
 
-      setFetching(true);
-      setError(null);
+    setFetching(true);
+    setError(null);
 
-      try {
-        const listing = await apiService.getListing(parseInt(id));
-        
+    try {
+      const listing = await apiService.getListing(parseInt(id));
+      
         setFormData({
           title: listing.title || '',
           description: listing.description || '',
@@ -100,35 +102,49 @@ const EditListing: React.FC = () => {
           dimensions: listing.dimensions || '',
           medium: listing.medium || '',
           year: listing.year?.toString() || '',
-          in_stock: listing.in_stock !== undefined ? listing.in_stock : true,
+          in_stock: listing.in_stock !== undefined ? Boolean(listing.in_stock) : true,
           status: listing.status || 'draft',
           shipping_info: listing.shipping_info || '',
           returns_info: listing.returns_info || '',
         });
 
-        const allImages = [];
-        const existingUrls = [];
-        if (listing.primary_image_url) {
-          const url = listing.primary_image_url;
-          allImages.push(getImageUrl(url));
-          existingUrls.push(url);
-        }
-        if (listing.image_urls && listing.image_urls.length > 0) {
-          listing.image_urls.forEach(url => {
+      const allImages = [];
+      const existingUrls = [];
+      
+      if (listing.primary_image_url) {
+        const url = listing.primary_image_url;
+        allImages.push(getImageUrl(url));
+        existingUrls.push(url);
+      }
+      if (listing.image_urls && Array.isArray(listing.image_urls) && listing.image_urls.length > 0) {
+        listing.image_urls.forEach((url) => {
+          // Handle case where URL might be a comma-separated string
+          if (typeof url === 'string' && url.includes(',')) {
+            // Split comma-separated string into individual URLs
+            const splitUrls = url.split(',').map(u => u.trim()).filter(u => u);
+            splitUrls.forEach(splitUrl => {
+              allImages.push(getImageUrl(splitUrl));
+              existingUrls.push(splitUrl);
+            });
+          } else {
             allImages.push(getImageUrl(url));
             existingUrls.push(url);
-          });
-        }
-        setImagePreviews(allImages);
-        setExistingImageUrls(existingUrls);
-        setHadOriginalImages(existingUrls.length > 0 || (listing.image_urls && listing.image_urls.length > 0));
-      } catch (err: any) {
-        setError(err.message || 'Failed to load listing');
-      } finally {
-        setFetching(false);
+          }
+        });
       }
-    };
+      
+      setImagePreviews(allImages);
+      setExistingImageUrls(existingUrls);
+      setImageFiles([]);
+      setHadOriginalImages(existingUrls.length > 0 || (listing.image_urls && listing.image_urls.length > 0));
+    } catch (err: any) {
+      setError(err.message || 'Failed to load listing');
+    } finally {
+      setFetching(false);
+    }
+  };
 
+  useEffect(() => {
     fetchListing();
   }, [id]);
 
@@ -155,16 +171,20 @@ const EditListing: React.FC = () => {
     }));
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const newFiles = Array.from(files);
-    const totalFiles = imageFiles.length + imagePreviews.length + newFiles.length;
+  const processFiles = async (files: File[]) => {
+    const filteredFiles = files.filter(file => file.type.startsWith('image/'));
     
-    if (totalFiles > 10) {
-      setError('Maximum 10 images allowed');
-      e.target.value = '';
+    if (filteredFiles.length === 0) {
+      setError('Please select image files only');
+      return;
+    }
+
+    const newFiles = Array.from(filteredFiles);
+    const currentTotal = imagePreviews.length;
+    const totalAfterAdd = currentTotal + newFiles.length;
+    
+    if (totalAfterAdd > 10) {
+      setError(`You can only add ${10 - currentTotal} more image(s)`);
       return;
     }
 
@@ -179,7 +199,43 @@ const EditListing: React.FC = () => {
     const newPreviews = await Promise.all(previewPromises);
     setImageFiles((prev) => [...prev, ...newFiles]);
     setImagePreviews((prev) => [...prev, ...newPreviews]);
+    setError(null);
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    await processFiles(Array.from(files));
     e.target.value = '';
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (imagePreviews.length >= 10) {
+      setError('Maximum 10 images allowed');
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    await processFiles(files);
   };
 
   const removeImage = (index: number) => {
@@ -274,7 +330,24 @@ const EditListing: React.FC = () => {
         uploadedImageUrls = await uploadImages();
       }
 
-      const allImageUrls = [...existingImageUrls, ...uploadedImageUrls];
+      const normalizeUrl = (url: string): string => {
+        if (!url) return url;
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+          const baseUrl = API_BASE_URL.replace('/api', '');
+          if (url.startsWith(baseUrl)) {
+            const relativeUrl = url.replace(baseUrl, '');
+            // Ensure it starts with /
+            return relativeUrl.startsWith('/') ? relativeUrl : '/' + relativeUrl;
+          }
+          // If it's an absolute URL but not from our server, return as-is
+          return url;
+        }
+        // If it's already a relative URL, ensure it starts with /
+        return url.startsWith('/') ? url : '/' + url;
+      };
+
+      const allImageUrls = [...existingImageUrls, ...uploadedImageUrls].map(normalizeUrl);
       const primaryImage = allImageUrls.length > 0 ? allImageUrls[0] : null;
       const additionalImages = allImageUrls.length > 1 ? allImageUrls.slice(1) : [];
       
@@ -299,7 +372,7 @@ const EditListing: React.FC = () => {
       }
 
       await apiService.updateListing(parseInt(id), listingData);
-      navigate('/artist-dashboard');
+      await fetchListing();
     } catch (err: any) {
       setError(err.message || 'Failed to update listing. Please try again.');
     } finally {
@@ -417,41 +490,89 @@ const EditListing: React.FC = () => {
                 <Typography variant="subtitle2" gutterBottom>
                   Images ({imagePreviews.length}/10)
                 </Typography>
-                <input
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  id="image-upload"
-                  multiple
-                  type="file"
-                  onChange={handleImageChange}
-                  disabled={imagePreviews.length >= 10 || uploadingImages}
-                />
-                <label htmlFor="image-upload">
-                  <Button
-                    variant="outlined"
-                    component="span"
-                    startIcon={<AddIcon />}
+                <Box
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  sx={{
+                    border: '2px dashed',
+                    borderColor: isDragging ? 'primary.main' : 'divider',
+                    borderRadius: 2,
+                    p: 4,
+                    textAlign: 'center',
+                    bgcolor: isDragging ? 'action.hover' : 'transparent',
+                    transition: 'all 0.2s ease-in-out',
+                    cursor: imagePreviews.length >= 10 || uploadingImages ? 'not-allowed' : 'pointer',
+                    mb: 2,
+                    '&:hover': {
+                      borderColor: imagePreviews.length >= 10 || uploadingImages ? 'divider' : 'primary.main',
+                      bgcolor: imagePreviews.length >= 10 || uploadingImages ? 'transparent' : 'action.hover',
+                    },
+                  }}
+                >
+                  <input
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    id="image-upload"
+                    multiple
+                    type="file"
+                    onChange={handleImageChange}
                     disabled={imagePreviews.length >= 10 || uploadingImages}
-                    sx={{ mb: 2 }}
+                  />
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 2,
+                    }}
                   >
-                    Add Images
-                  </Button>
-                </label>
+                    <Typography
+                      variant="body1"
+                      color={isDragging ? 'primary.main' : 'text.secondary'}
+                      sx={{ fontWeight: isDragging ? 600 : 400 }}
+                    >
+                      {isDragging
+                        ? 'Drop images here'
+                        : imagePreviews.length === 0
+                        ? 'Drag and drop images here, or click to browse'
+                        : `Drag and drop more images here, or click to browse (${imagePreviews.length}/10)`}
+                    </Typography>
+                    <label htmlFor="image-upload">
+                      <Button
+                        variant="outlined"
+                        component="span"
+                        startIcon={<AddIcon />}
+                        disabled={imagePreviews.length >= 10 || uploadingImages}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {imagePreviews.length >= 10 ? 'Maximum 10 images' : `Browse Files`}
+                      </Button>
+                    </label>
+                  </Box>
+                </Box>
 
                 {imagePreviews.length > 0 && (
-                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 1.5,
+                      mt: 1,
+                    }}
+                  >
                     {imagePreviews.map((preview, index) => (
-                      <Grid item xs={6} sm={4} md={3} key={index}>
-                        <Box
-                          sx={{
-                            position: 'relative',
-                            width: '100%',
-                            paddingTop: '100%',
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                            bgcolor: 'background.paper',
-                          }}
-                        >
+                      <Box
+                        key={index}
+                        sx={{
+                          position: 'relative',
+                          width: { xs: 'calc(50% - 6px)', sm: 'calc(33.333% - 10px)', md: 'calc(20% - 12px)' },
+                          paddingTop: { xs: 'calc(50% - 6px)', sm: 'calc(33.333% - 10px)', md: 'calc(20% - 12px)' },
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          bgcolor: 'background.paper',
+                        }}
+                      >
                           <Box
                             component="img"
                             src={preview}
@@ -482,10 +603,9 @@ const EditListing: React.FC = () => {
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
-                        </Box>
-                      </Grid>
+                      </Box>
                     ))}
-                  </Grid>
+                  </Box>
                 )}
                 
                 {uploadingImages && (

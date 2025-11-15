@@ -47,6 +47,7 @@ const CreateListing: React.FC = () => {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const categories = [
     'Painting',
@@ -84,16 +85,20 @@ const CreateListing: React.FC = () => {
     }));
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const newFiles = Array.from(files);
-    const totalFiles = imageFiles.length + newFiles.length;
+  const processFiles = async (files: File[]) => {
+    const filteredFiles = files.filter(file => file.type.startsWith('image/'));
     
-    if (totalFiles > 10) {
-      setError('Maximum 10 images allowed');
-      e.target.value = ''; // Reset input
+    if (filteredFiles.length === 0) {
+      setError('Please select image files only');
+      return;
+    }
+
+    const newFiles = Array.from(filteredFiles);
+    const currentTotal = imageFiles.length;
+    const totalAfterAdd = currentTotal + newFiles.length;
+    
+    if (totalAfterAdd > 10) {
+      setError(`You can only add ${10 - currentTotal} more image(s)`);
       return;
     }
 
@@ -112,9 +117,45 @@ const CreateListing: React.FC = () => {
     
     setImageFiles((prev) => [...prev, ...newFiles]);
     setImagePreviews((prev) => [...prev, ...newPreviews]);
+    setError(null);
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    await processFiles(Array.from(files));
     
     // Reset input to allow selecting the same file again
     e.target.value = '';
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (imageFiles.length >= 10) {
+      setError('Maximum 10 images allowed');
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    await processFiles(files);
   };
 
   const removeImage = (index: number) => {
@@ -311,7 +352,26 @@ const CreateListing: React.FC = () => {
                 <Typography variant="subtitle2" gutterBottom>
                   Artwork Photos (up to 10 images)
                 </Typography>
-                <Box sx={{ mb: 2 }}>
+                <Box
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  sx={{
+                    border: '2px dashed',
+                    borderColor: isDragging ? 'primary.main' : 'divider',
+                    borderRadius: 2,
+                    p: 4,
+                    textAlign: 'center',
+                    bgcolor: isDragging ? 'action.hover' : 'transparent',
+                    transition: 'all 0.2s ease-in-out',
+                    cursor: imageFiles.length >= 10 || uploadingImages ? 'not-allowed' : 'pointer',
+                    mb: 2,
+                    '&:hover': {
+                      borderColor: imageFiles.length >= 10 || uploadingImages ? 'divider' : 'primary.main',
+                      bgcolor: imageFiles.length >= 10 || uploadingImages ? 'transparent' : 'action.hover',
+                    },
+                  }}
+                >
                   <input
                     accept="image/*"
                     style={{ display: 'none' }}
@@ -321,35 +381,61 @@ const CreateListing: React.FC = () => {
                     onChange={handleImageChange}
                     disabled={imageFiles.length >= 10 || uploadingImages}
                   />
-                  <label htmlFor="image-upload">
-                    <Button
-                      variant="outlined"
-                      component="span"
-                      startIcon={<AddIcon />}
-                      disabled={imageFiles.length >= 10 || uploadingImages}
-                      sx={{ mb: 2 }}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 2,
+                    }}
+                  >
+                    <Typography
+                      variant="body1"
+                      color={isDragging ? 'primary.main' : 'text.secondary'}
+                      sx={{ fontWeight: isDragging ? 600 : 400 }}
                     >
-                      {imageFiles.length >= 10 ? 'Maximum 10 images' : `Add Images (${imageFiles.length}/10)`}
-                    </Button>
-                  </label>
+                      {isDragging
+                        ? 'Drop images here'
+                        : imageFiles.length === 0
+                        ? 'Drag and drop images here, or click to browse'
+                        : `Drag and drop more images here, or click to browse (${imageFiles.length}/10)`}
+                    </Typography>
+                    <label htmlFor="image-upload">
+                      <Button
+                        variant="outlined"
+                        component="span"
+                        startIcon={<AddIcon />}
+                        disabled={imageFiles.length >= 10 || uploadingImages}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {imageFiles.length >= 10 ? 'Maximum 10 images' : `Browse Files`}
+                      </Button>
+                    </label>
+                  </Box>
                 </Box>
                 
                 {imagePreviews.length > 0 && (
-                  <Grid container spacing={2}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 1.5,
+                    }}
+                  >
                     {imagePreviews.map((preview, index) => (
-                      <Grid item xs={6} sm={4} md={3} key={index}>
-                        <Box
-                          sx={{
-                            position: 'relative',
-                            width: '100%',
-                            paddingTop: '100%', // 1:1 aspect ratio
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            overflow: 'hidden',
-                            bgcolor: 'background.paper',
-                          }}
-                        >
+                      <Box
+                        key={index}
+                        sx={{
+                          position: 'relative',
+                          width: { xs: 'calc(50% - 6px)', sm: 'calc(33.333% - 10px)', md: 'calc(20% - 12px)' },
+                          paddingTop: { xs: 'calc(50% - 6px)', sm: 'calc(33.333% - 10px)', md: 'calc(20% - 12px)' },
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          bgcolor: 'background.paper',
+                        }}
+                      >
                           <Box
                             component="img"
                             src={preview}
@@ -380,10 +466,9 @@ const CreateListing: React.FC = () => {
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
-                        </Box>
-                      </Grid>
+                      </Box>
                     ))}
-                  </Grid>
+                  </Box>
                 )}
                 
                 {uploadingImages && (
