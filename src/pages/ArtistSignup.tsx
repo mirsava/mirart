@@ -25,6 +25,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import apiService from '../services/api';
 
 const ArtistSignup: React.FC = () => {
   const navigate = useNavigate();
@@ -143,6 +144,25 @@ const ArtistSignup: React.FC = () => {
       }
 
       await signUp(formData.email, formData.password, attributes, formData.username);
+      
+      // Save user data to database (non-blocking)
+      try {
+        await apiService.createOrUpdateUser({
+          cognito_username: formData.username,
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          business_name: formData.businessName,
+          phone: formData.phone || null,
+          country: formData.country,
+          website: formData.website || null,
+          specialties: formData.specialties,
+          experience_level: formData.experience,
+        });
+      } catch (dbError) {
+        // Don't fail signup if database save fails - can be saved later
+        // User data can be saved after email confirmation
+      }
       
       setSignupSuccess(true);
     } catch (error: any) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -31,6 +31,8 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import apiService, { DashboardData, Listing, Order } from '../services/api';
+import { CircularProgress, Alert } from '@mui/material';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -58,6 +60,47 @@ const ArtistDashboard: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [artistStats, setArtistStats] = useState({
+    totalListings: 0,
+    totalSales: 0,
+    totalRevenue: 0,
+    pendingOrders: 0,
+  });
+  const [recentListings, setRecentListings] = useState<Listing[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchDashboardData();
+    }
+  }, [user?.id]);
+
+  const fetchDashboardData = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data: DashboardData = await apiService.getDashboardData(user.id);
+      setArtistStats(data.stats);
+      setRecentListings(data.recentListings || []);
+      setRecentOrders(data.recentOrders || []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load dashboard data');
+      // Set default values on error
+      setArtistStats({
+        totalListings: 0,
+        totalSales: 0,
+        totalRevenue: 0,
+        pendingOrders: 0,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -71,25 +114,6 @@ const ArtistDashboard: React.FC = () => {
       // Silently handle sign out errors
     }
   };
-
-  // Mock data - in a real app, this would come from an API
-  const artistStats = {
-    totalListings: 12,
-    totalSales: 8,
-    totalRevenue: 2450,
-    pendingOrders: 2,
-  };
-
-  const recentListings = [
-    { id: 1, title: 'Sunset Over Mountains', price: 450, status: 'Active', views: 24 },
-    { id: 2, title: 'Ocean Waves', price: 380, status: 'Active', views: 18 },
-    { id: 3, title: 'Forest Path', price: 320, status: 'Sold', views: 31 },
-  ];
-
-  const recentOrders = [
-    { id: 1, customer: 'John Smith', item: 'Forest Path', amount: 320, date: '2024-01-15' },
-    { id: 2, customer: 'Sarah Johnson', item: 'Mountain View', amount: 450, date: '2024-01-12' },
-  ];
 
   return (
     <Box sx={{ py: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
@@ -113,8 +137,20 @@ const ArtistDashboard: React.FC = () => {
           </Button>
         </Box>
 
-        {/* Stats Overview */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            {/* Stats Overview */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent>
@@ -205,7 +241,22 @@ const ArtistDashboard: React.FC = () => {
             </Box>
             
             <Grid container spacing={3}>
-              {recentListings.map((listing) => (
+              {recentListings.length === 0 ? (
+                <Grid item xs={12}>
+                  <Paper sx={{ p: 4, textAlign: 'center' }}>
+                    <Typography variant="h6" gutterBottom>
+                      No listings yet
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Start selling your art by creating your first listing
+                    </Typography>
+                    <Button variant="contained" startIcon={<AddIcon />}>
+                      Add New Listing
+                    </Button>
+                  </Paper>
+                </Grid>
+              ) : (
+                recentListings.map((listing) => (
                 <Grid item xs={12} sm={6} md={4} key={listing.id}>
                   <Card>
                     <CardContent>
@@ -214,8 +265,8 @@ const ArtistDashboard: React.FC = () => {
                           {listing.title}
                         </Typography>
                         <Chip 
-                          label={listing.status} 
-                          color={listing.status === 'Active' ? 'success' : 'default'}
+                          label={listing.status === 'active' ? 'Active' : listing.status} 
+                          color={listing.status === 'active' ? 'success' : 'default'}
                           size="small"
                         />
                       </Box>
@@ -239,7 +290,8 @@ const ArtistDashboard: React.FC = () => {
                     </CardContent>
                   </Card>
                 </Grid>
-              ))}
+                ))
+              )}
             </Grid>
           </TabPanel>
 
@@ -248,22 +300,31 @@ const ArtistDashboard: React.FC = () => {
               Recent Orders
             </Typography>
             <List>
-              {recentOrders.map((order) => (
-                <ListItem key={order.id} divider>
-                  <ListItemIcon>
-                    <Avatar sx={{ bgcolor: 'primary.main' }}>
-                      <CartIcon />
-                    </Avatar>
-                  </ListItemIcon>
+              {recentOrders.length === 0 ? (
+                <ListItem>
                   <ListItemText
-                    primary={order.item}
-                    secondary={`Sold to ${order.customer} on ${order.date}`}
+                    primary="No orders yet"
+                    secondary="Your orders will appear here once customers make purchases"
                   />
-                  <Typography variant="h6" color="primary">
-                    ${order.amount}
-                  </Typography>
                 </ListItem>
-              ))}
+              ) : (
+                recentOrders.map((order) => (
+                  <ListItem key={order.id} divider>
+                    <ListItemIcon>
+                      <Avatar sx={{ bgcolor: 'primary.main' }}>
+                        <CartIcon />
+                      </Avatar>
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={order.listing_title || 'Artwork'}
+                      secondary={`Sold to ${order.buyer_email || 'Customer'} on ${new Date(order.created_at).toLocaleDateString()}`}
+                    />
+                    <Typography variant="h6" color="primary">
+                      ${order.artist_earnings || order.total_price}
+                    </Typography>
+                  </ListItem>
+                ))
+              )}
             </List>
           </TabPanel>
 
@@ -291,6 +352,8 @@ const ArtistDashboard: React.FC = () => {
             </Paper>
           </TabPanel>
         </Paper>
+          </>
+        )}
       </Container>
     </Box>
   );

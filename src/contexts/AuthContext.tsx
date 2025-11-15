@@ -9,6 +9,7 @@ import {
   resetPassword,
   confirmResetPassword
 } from 'aws-amplify/auth';
+import apiService, { User as ApiUser } from '../services/api';
 
 interface User {
   id: string;
@@ -64,13 +65,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Users signing up through artist signup should be treated as artists
         const userType = userAttributesObj['custom:user_type'] as 'artist' | 'buyer' | 'admin' || 'artist';
         
-        setUser({
-          id: cognitoUser.username,
-          email: userAttributesObj.email || '',
-          name: userAttributesObj.name || userAttributesObj.given_name + ' ' + userAttributesObj.family_name,
-          userType: userType,
-          attributes: userAttributesObj,
-        });
+        // Try to fetch user data from database
+        try {
+          const dbUser: ApiUser = await apiService.getUser(cognitoUser.username);
+          setUser({
+            id: cognitoUser.username,
+            email: userAttributesObj.email || dbUser.email || '',
+            name: dbUser.first_name && dbUser.last_name 
+              ? `${dbUser.first_name} ${dbUser.last_name}`
+              : userAttributesObj.name || (userAttributesObj.given_name ? `${userAttributesObj.given_name} ${userAttributesObj.family_name || ''}`.trim() : ''),
+            userType: userType,
+            attributes: { ...userAttributesObj, ...dbUser } as Record<string, any>,
+          });
+        } catch (dbError) {
+          // If user doesn't exist in DB yet, use Cognito data only
+          setUser({
+            id: cognitoUser.username,
+            email: userAttributesObj.email || '',
+            name: userAttributesObj.name || (userAttributesObj.given_name ? `${userAttributesObj.given_name} ${userAttributesObj.family_name || ''}`.trim() : ''),
+            userType: userType,
+            attributes: userAttributesObj,
+          });
+        }
       }
     } catch (error) {
       setUser(null);
@@ -116,7 +132,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const handleResendConfirmationCode = async (email: string) => {
+  const handleResendConfirmationCode = async (_email: string) => {
     try {
       // In AWS Amplify v6, resending confirmation codes requires backend support
       // or using AWS SDK directly. For now, we'll show a helpful error message.
