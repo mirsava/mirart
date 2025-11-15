@@ -50,12 +50,12 @@ const Home: React.FC = () => {
       <Box
         sx={{
           position: 'relative',
-          height: { xs: 'calc(80vh - 45px)', md: 'calc(75vh - 45px)' },
-          minHeight: 500,
+          height: { xs: 'calc(85vh - 45px)', md: 'calc(90vh - 45px)' },
+          minHeight: 600,
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f5f5f5 50%, #e8e8e8 100%)',
         }}
       >
         <Box
@@ -69,6 +69,7 @@ const Home: React.FC = () => {
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             transition: 'opacity 1s ease-in-out',
+            transform: 'scale(1.05)',
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -76,10 +77,464 @@ const Home: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'linear-gradient(135deg, rgba(102,126,234,0.8) 0%, rgba(118,75,162,0.8) 100%)',
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.5) 100%)',
             },
           }}
         />
+        
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: 'none',
+            overflow: 'hidden',
+            zIndex: 1,
+          }}
+        >
+          {/* Top-left red circle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '3%',
+              left: '5%',
+              width: '600px',
+              height: '600px',
+              borderRadius: '50%',
+              bgcolor: 'rgba(198,40,40,0.4)',
+              filter: 'blur(60px)',
+            }}
+          />
+          
+          {/* Top-left teal triangle (cut off) */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '-5%',
+              left: '-8%',
+              width: '550px',
+              height: '550px',
+              bgcolor: 'rgba(0,151,167,0.32)',
+              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              transform: 'rotate(25deg)',
+              filter: 'blur(63px)',
+            }}
+          />
+          
+          {/* Top-left red hexagon (cut off) */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '1%',
+              left: '-12%',
+              width: '520px',
+              height: '520px',
+              bgcolor: 'rgba(198,40,40,0.3)',
+              clipPath: 'polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%)',
+              filter: 'blur(62px)',
+              transform: 'rotate(15deg)',
+            }}
+          />
+          
+          {/* Top-left teal triangle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '8%',
+              left: '2%',
+              width: '480px',
+              height: '480px',
+              bgcolor: 'rgba(0,151,167,0.28)',
+              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              transform: 'rotate(-20deg)',
+              filter: 'blur(61px)',
+            }}
+          />
+          
+          {/* Top-left red hexagon */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '12%',
+              left: '8%',
+              width: '500px',
+              height: '500px',
+              bgcolor: 'rgba(198,40,40,0.26)',
+              clipPath: 'polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%)',
+              filter: 'blur(64px)',
+              transform: 'rotate(45deg)',
+            }}
+          />
+          
+          {/* Top-left teal triangle (cut off top) */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '-3%',
+              left: '15%',
+              width: '460px',
+              height: '460px',
+              bgcolor: 'rgba(0,151,167,0.3)',
+              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              transform: 'rotate(35deg)',
+              filter: 'blur(63px)',
+            }}
+          />
+          
+          {/* Top-left red hexagon (cut off) */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '5%',
+              left: '-5%',
+              width: '490px',
+              height: '490px',
+              bgcolor: 'rgba(198,40,40,0.28)',
+              clipPath: 'polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%)',
+              filter: 'blur(65px)',
+              transform: 'rotate(-30deg)',
+            }}
+          />
+          
+          {/* Top-center teal square */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '5%',
+              left: '45%',
+              width: '580px',
+              height: '580px',
+              bgcolor: 'rgba(0,151,167,0.32)',
+              transform: 'rotate(45deg)',
+              filter: 'blur(65px)',
+            }}
+          />
+          
+          {/* Top-right red triangle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '4%',
+              right: '8%',
+              width: '600px',
+              height: '600px',
+              bgcolor: 'rgba(198,40,40,0.32)',
+              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              filter: 'blur(62px)',
+              transform: 'rotate(60deg)',
+            }}
+          />
+          
+          {/* Upper-left red triangle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '12%',
+              left: '-2%',
+              width: 0,
+              height: 0,
+              borderLeft: '300px solid transparent',
+              borderRight: '300px solid transparent',
+              borderBottom: '500px solid rgba(198,40,40,0.3)',
+              filter: 'blur(60px)',
+              transform: 'rotate(30deg)',
+            }}
+          />
+          
+          {/* Upper-center teal circle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '20%',
+              left: '50%',
+              width: '520px',
+              height: '520px',
+              borderRadius: '50%',
+              bgcolor: 'rgba(0,151,167,0.38)',
+              filter: 'blur(62px)',
+            }}
+          />
+          
+          {/* Upper-right red rounded square */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '18%',
+              right: '15%',
+              width: '540px',
+              height: '540px',
+              bgcolor: 'rgba(198,40,40,0.28)',
+              borderRadius: '70px',
+              transform: 'rotate(-20deg)',
+              filter: 'blur(63px)',
+            }}
+          />
+          
+          {/* Mid-left teal rounded square */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '35%',
+              left: '12%',
+              width: '500px',
+              height: '500px',
+              bgcolor: 'rgba(0,151,167,0.3)',
+              borderRadius: '60px',
+              transform: 'rotate(25deg)',
+              filter: 'blur(63px)',
+            }}
+          />
+          
+          {/* Mid-center red circle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '42%',
+              left: '48%',
+              width: '480px',
+              height: '480px',
+              borderRadius: '50%',
+              bgcolor: 'rgba(198,40,40,0.36)',
+              filter: 'blur(63px)',
+            }}
+          />
+          
+          {/* Mid-right teal pentagon */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '38%',
+              right: '10%',
+              width: '490px',
+              height: '490px',
+              bgcolor: 'rgba(0,151,167,0.29)',
+              clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
+              filter: 'blur(66px)',
+              transform: 'rotate(-45deg)',
+            }}
+          />
+          
+          {/* Lower-left red square */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '55%',
+              left: '8%',
+              width: '550px',
+              height: '550px',
+              bgcolor: 'rgba(198,40,40,0.32)',
+              transform: 'rotate(45deg)',
+              filter: 'blur(65px)',
+            }}
+          />
+          
+          {/* Lower-center teal triangle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '58%',
+              left: '52%',
+              width: '530px',
+              height: '530px',
+              bgcolor: 'rgba(0,151,167,0.26)',
+              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              filter: 'blur(64px)',
+              transform: 'rotate(-15deg)',
+            }}
+          />
+          
+          {/* Lower-right red rounded square */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '60%',
+              right: '12%',
+              width: '580px',
+              height: '580px',
+              bgcolor: 'rgba(198,40,40,0.33)',
+              borderRadius: '80px',
+              transform: 'rotate(-20deg)',
+              filter: 'blur(65px)',
+            }}
+          />
+          
+          {/* Upper-left-center red rounded square */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '15%',
+              left: '25%',
+              width: '510px',
+              height: '510px',
+              bgcolor: 'rgba(198,40,40,0.25)',
+              borderRadius: '50px',
+              transform: 'rotate(-30deg)',
+              filter: 'blur(60px)',
+            }}
+          />
+          
+          {/* Mid-left-center teal circle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '48%',
+              left: '28%',
+              width: '470px',
+              height: '470px',
+              borderRadius: '50%',
+              bgcolor: 'rgba(0,151,167,0.35)',
+              filter: 'blur(63px)',
+            }}
+          />
+          
+          {/* Mid-right-center red rounded square */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              right: '28%',
+              width: '460px',
+              height: '460px',
+              bgcolor: 'rgba(198,40,40,0.25)',
+              borderRadius: '60px',
+              transform: 'rotate(35deg)',
+              filter: 'blur(61px)',
+            }}
+          />
+          
+          {/* Bottom-right teal triangle (off-screen) */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: '12%',
+              right: '-2%',
+              width: '500px',
+              height: '500px',
+              bgcolor: 'rgba(0,151,167,0.3)',
+              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              filter: 'blur(62px)',
+              transform: 'rotate(-60deg)',
+            }}
+          />
+          
+          {/* Upper-right-center red circle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '22%',
+              right: '38%',
+              width: '490px',
+              height: '490px',
+              borderRadius: '50%',
+              bgcolor: 'rgba(198,40,40,0.34)',
+              filter: 'blur(61px)',
+            }}
+          />
+          
+          {/* Bottom-center-left teal rounded square */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: '18%',
+              left: '20%',
+              width: '480px',
+              height: '480px',
+              bgcolor: 'rgba(0,151,167,0.31)',
+              borderRadius: '65px',
+              transform: 'rotate(40deg)',
+              filter: 'blur(62px)',
+            }}
+          />
+          
+          {/* Mid-center-right red octagon */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '32%',
+              right: '42%',
+              width: '550px',
+              height: '550px',
+              bgcolor: 'rgba(198,40,40,0.3)',
+              clipPath: 'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)',
+              filter: 'blur(68px)',
+              transform: 'rotate(15deg)',
+            }}
+          />
+          
+          {/* Bottom-left teal rounded square */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: '8%',
+              left: '-1%',
+              width: '520px',
+              height: '520px',
+              bgcolor: 'rgba(0,151,167,0.29)',
+              borderRadius: '70px',
+              transform: 'rotate(-25deg)',
+              filter: 'blur(64px)',
+            }}
+          />
+          
+          {/* Bottom-center-right red triangle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: '10%',
+              right: '35%',
+              width: '500px',
+              height: '500px',
+              bgcolor: 'rgba(198,40,40,0.27)',
+              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              filter: 'blur(62px)',
+              transform: 'rotate(20deg)',
+            }}
+          />
+          
+          {/* Bottom-center teal circle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: '15%',
+              left: '50%',
+              width: '550px',
+              height: '550px',
+              borderRadius: '50%',
+              bgcolor: 'rgba(0,151,167,0.37)',
+              filter: 'blur(65px)',
+            }}
+          />
+          
+          {/* Top-right teal circle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '10%',
+              right: '25%',
+              width: '500px',
+              height: '500px',
+              borderRadius: '50%',
+              bgcolor: 'rgba(0,151,167,0.36)',
+              filter: 'blur(62px)',
+            }}
+          />
+          
+          {/* Mid-right red circle */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '55%',
+              right: '20%',
+              width: '520px',
+              height: '520px',
+              borderRadius: '50%',
+              bgcolor: 'rgba(198,40,40,0.35)',
+              filter: 'blur(64px)',
+            }}
+          />
+        </Box>
         
         <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
           <Grid container spacing={6} alignItems="center">
@@ -91,14 +546,15 @@ const Home: React.FC = () => {
                       label="Art Marketplace"
                       sx={{ 
                         mb: 2, 
-                        bgcolor: 'rgba(255,255,255,0.15)',
+                        bgcolor: 'rgba(198,40,40,0.2)',
                         color: 'white',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255,255,255,0.2)',
+                        border: '1px solid rgba(198,40,40,0.4)',
+                        backdropFilter: 'blur(10px)',
                         fontWeight: 500,
-                        fontSize: '0.9rem',
+                        fontSize: '0.85rem',
                         px: 2,
-                        py: 1,
+                        py: 0.5,
+                        letterSpacing: '0.5px',
                       }}
                     />
                   </Box>
@@ -107,62 +563,59 @@ const Home: React.FC = () => {
                     component="h1"
                     gutterBottom
                     sx={{ 
-                      fontWeight: 700, 
+                      fontWeight: 300, 
                       mb: 3,
                       color: 'white',
-                      textShadow: '0 4px 8px rgba(0,0,0,0.3)',
-                      fontSize: { xs: '2.5rem', md: '3.5rem' },
+                      fontSize: { xs: '3rem', md: '4.5rem' },
                       lineHeight: 1.1,
+                      letterSpacing: '-0.02em',
+                      textShadow: '0 2px 8px rgba(0,0,0,0.3)',
                     }}
                   >
                     Discover
                     <br />
                     <Box component="span" sx={{ 
-                      background: 'linear-gradient(45deg, #ffd700, #ffed4e)',
-                      backgroundClip: 'text',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      display: 'inline-block',
+                      fontWeight: 400,
+                      color: '#ef5350',
                     }}>
                       Handmade Art
                     </Box>
                   </Typography>
                   <Typography
-                    variant={isMobile ? 'h6' : 'h5'}
+                    variant={isMobile ? 'body1' : 'h6'}
                     component="p"
                     sx={{ 
-                      mb: 4, 
-                      opacity: 0.95, 
+                      mb: 5, 
                       maxWidth: '520px',
-                      color: 'white',
-                      textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                      color: 'rgba(255,255,255,0.95)',
                       fontWeight: 300,
-                      lineHeight: 1.6,
+                      lineHeight: 1.7,
+                      fontSize: { xs: '1rem', md: '1.25rem' },
+                      textShadow: '0 1px 4px rgba(0,0,0,0.3)',
                     }}
                   >
-                    A marketplace for original paintings and handcrafted woodworking. 
-                    Buy from talented artists or sell your own creations.
+                    A curated marketplace for original paintings and handcrafted woodworking. 
+                    Connect with talented artists and discover unique creations.
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 4, alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', gap: 2.5, flexWrap: 'wrap', mb: 4, alignItems: 'center' }}>
                     <Button
                       variant="contained"
                       size="large"
                       sx={{
-                        bgcolor: 'rgba(255,255,255,0.2)',
+                        bgcolor: 'primary.main',
                         color: 'white',
                         px: 5,
                         py: 2,
-                        borderRadius: 4,
+                        borderRadius: 2,
                         textTransform: 'none',
-                        fontWeight: 600,
-                        fontSize: '1.1rem',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255,255,255,0.3)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                        fontWeight: 500,
+                        fontSize: '1rem',
+                        letterSpacing: '0.5px',
+                        boxShadow: '0 4px 20px rgba(198,40,40,0.25)',
                         '&:hover': {
-                          bgcolor: 'rgba(255,255,255,0.3)',
-                          transform: 'translateY(-3px)',
-                          boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
+                          bgcolor: 'primary.dark',
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 30px rgba(198,40,40,0.35)',
                         },
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
@@ -175,18 +628,24 @@ const Home: React.FC = () => {
                       size="large"
                       sx={{
                         borderColor: 'rgba(255,255,255,0.5)',
+                        borderWidth: 1.5,
                         color: 'white',
                         px: 5,
                         py: 2,
-                        borderRadius: 4,
+                        borderRadius: 2,
                         textTransform: 'none',
-                        fontWeight: 600,
-                        fontSize: '1.1rem',
-                        backdropFilter: 'blur(20px)',
+                        fontWeight: 500,
+                        fontSize: '1rem',
+                        letterSpacing: '0.5px',
+                        bgcolor: 'rgba(255,255,255,0.1)',
+                        backdropFilter: 'blur(10px)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
                         '&:hover': {
                           borderColor: 'white',
-                          bgcolor: 'rgba(255,255,255,0.1)',
-                          transform: 'translateY(-3px)',
+                          bgcolor: 'rgba(255,255,255,0.2)',
+                          color: 'white',
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
                         },
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
@@ -221,7 +680,7 @@ const Home: React.FC = () => {
                           left: 0,
                           right: 0,
                           bottom: 0,
-                          background: 'linear-gradient(135deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%)',
+                          background: 'linear-gradient(135deg, rgba(198,40,40,0.08) 0%, rgba(0,151,167,0.08) 100%)',
                         },
                       }}
                     />
@@ -243,7 +702,7 @@ const Home: React.FC = () => {
                           left: 0,
                           right: 0,
                           bottom: 0,
-                          background: 'linear-gradient(135deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%)',
+                          background: 'linear-gradient(135deg, rgba(198,40,40,0.08) 0%, rgba(0,151,167,0.08) 100%)',
                         },
                       }}
                     />
@@ -272,11 +731,11 @@ const Home: React.FC = () => {
                 width: index === currentImage ? 32 : 12,
                 height: 12,
                 borderRadius: 6,
-                bgcolor: index === currentImage ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)',
+                bgcolor: index === currentImage ? 'primary.main' : (index % 2 === 0 ? 'rgba(198,40,40,0.3)' : 'rgba(0,151,167,0.3)'),
                 cursor: 'pointer',
                 transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.8)',
+                  bgcolor: index === currentImage ? 'primary.dark' : (index % 2 === 0 ? 'rgba(198,40,40,0.5)' : 'rgba(0,151,167,0.5)'),
                   transform: 'scale(1.1)',
                 },
               }}
