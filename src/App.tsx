@@ -18,6 +18,7 @@ import ArtistSignup from './pages/ArtistSignup';
 import ArtistSignin from './pages/ArtistSignin';
 import ArtistDashboard from './pages/ArtistDashboard';
 import CreateListing from './pages/CreateListing';
+import EditListing from './pages/EditListing';
 import ForgotPassword from './pages/ForgotPassword';
 import ConfirmSignup from './pages/ConfirmSignup';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -68,6 +69,14 @@ function AppContent(): JSX.Element {
               element={
                 <ProtectedRoute requiredUserType="artist">
                   <CreateListing />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/edit-listing/:id" 
+              element={
+                <ProtectedRoute requiredUserType="artist">
+                  <EditListing />
                 </ProtectedRoute>
               } 
             />

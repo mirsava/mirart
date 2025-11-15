@@ -37,8 +37,8 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import apiService, { DashboardData, Listing, Order } from '../services/api';
-import { CircularProgress, Alert } from '@mui/material';
+import apiService, { DashboardData, Listing, Order, User } from '../services/api';
+import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField } from '@mui/material';
 
 const getImageUrl = (url?: string): string | undefined => {
   if (!url) return undefined;
@@ -89,12 +89,30 @@ const ArtistDashboard: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<Listing | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [profileData, setProfileData] = useState<User | null>(null);
+  const [profileFormData, setProfileFormData] = useState({
+    firstName: '',
+    lastName: '',
+    businessName: '',
+    phone: '',
+    country: '',
+    website: '',
+    specialties: [] as string[],
+    experience: '',
+    bio: '',
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
+      if (tabValue === 3) {
+        fetchProfile();
+      }
     }
-  }, [user?.id]);
+  }, [user?.id, tabValue]);
 
   const fetchDashboardData = async () => {
     if (!user?.id) return;
@@ -118,6 +136,91 @@ const ArtistDashboard: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProfile = async () => {
+    if (!user?.id) return;
+
+    try {
+      const data = await apiService.getUser(user.id);
+      setProfileData(data);
+      setProfileFormData({
+        firstName: data.first_name || '',
+        lastName: data.last_name || '',
+        businessName: data.business_name || '',
+        phone: data.phone || '',
+        country: data.country || '',
+        website: data.website || '',
+        specialties: data.specialties ? (typeof data.specialties === 'string' ? JSON.parse(data.specialties) : data.specialties) : [],
+        experience: data.experience_level || '',
+        bio: data.bio || '',
+      });
+    } catch (err: any) {
+      setProfileError(err.message || 'Failed to load profile');
+    }
+  };
+
+  const handleProfileInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setProfileFormData(prev => ({
+      ...prev,
+      [field]: event.target.value,
+    }));
+    if (profileError) setProfileError(null);
+    if (profileSuccess) setProfileSuccess(false);
+  };
+
+  const handleSpecialtyChange = (specialty: string) => {
+    setProfileFormData(prev => ({
+      ...prev,
+      specialties: prev.specialties.includes(specialty)
+        ? prev.specialties.filter(s => s !== specialty)
+        : [...prev.specialties, specialty],
+    }));
+  };
+
+  const handleProfileSelectChange = (event: any) => {
+    setProfileFormData(prev => ({
+      ...prev,
+      [event.target.name]: event.target.value,
+    }));
+  };
+
+  const handleProfileSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!user?.id) {
+      setProfileError('You must be logged in to update your profile');
+      return;
+    }
+
+    setSavingProfile(true);
+    setProfileError(null);
+    setProfileSuccess(false);
+
+    try {
+      await apiService.updateUser(user.id, {
+        first_name: profileFormData.firstName,
+        last_name: profileFormData.lastName,
+        business_name: profileFormData.businessName,
+        phone: profileFormData.phone || null,
+        country: profileFormData.country,
+        website: profileFormData.website || null,
+        specialties: profileFormData.specialties,
+        experience_level: profileFormData.experience,
+        bio: profileFormData.bio || null,
+      });
+
+      setProfileSuccess(true);
+      await fetchProfile();
+      
+      setTimeout(() => {
+        setProfileSuccess(false);
+      }, 3000);
+    } catch (err: any) {
+      setProfileError(err.message || 'Failed to update profile');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -380,10 +483,24 @@ const ArtistDashboard: React.FC = () => {
                         {listing.views} views
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton size="small">
+                        <IconButton 
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/edit-listing/${listing.id}`);
+                          }}
+                          title="Edit listing"
+                        >
                           <EditIcon />
                         </IconButton>
-                        <IconButton size="small">
+                        <IconButton 
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/painting/${listing.id}`);
+                          }}
+                          title="View listing"
+                        >
                           <VisibilityIcon />
                         </IconButton>
                         <IconButton 
@@ -393,6 +510,7 @@ const ArtistDashboard: React.FC = () => {
                             e.stopPropagation();
                             handleDeleteClick(listing);
                           }}
+                          title="Delete listing"
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -454,11 +572,154 @@ const ArtistDashboard: React.FC = () => {
             <Typography variant="h6" gutterBottom>
               Artist Profile
             </Typography>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="body1" color="text.secondary">
-                Profile management coming soon! Update your bio, portfolio, 
-                and contact information.
-              </Typography>
+
+            {profileError && (
+              <Alert severity="error" sx={{ mb: 3 }} onClose={() => setProfileError(null)}>
+                {profileError}
+              </Alert>
+            )}
+
+            {profileSuccess && (
+              <Alert severity="success" sx={{ mb: 3 }} onClose={() => setProfileSuccess(false)}>
+                Profile updated successfully!
+              </Alert>
+            )}
+
+            <Paper sx={{ p: 4 }}>
+              <form onSubmit={handleProfileSubmit}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="First Name"
+                      value={profileFormData.firstName}
+                      onChange={handleProfileInputChange('firstName')}
+                      required
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Last Name"
+                      value={profileFormData.lastName}
+                      onChange={handleProfileInputChange('lastName')}
+                      required
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Email"
+                      value={profileData?.email || user?.email || ''}
+                      disabled
+                      helperText="Email cannot be changed"
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Business/Studio Name"
+                      value={profileFormData.businessName}
+                      onChange={handleProfileInputChange('businessName')}
+                      required
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Phone"
+                      value={profileFormData.phone}
+                      onChange={handleProfileInputChange('phone')}
+                      placeholder="+1234567890"
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Country"
+                      value={profileFormData.country}
+                      onChange={handleProfileInputChange('country')}
+                      required
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Website"
+                      value={profileFormData.website}
+                      onChange={handleProfileInputChange('website')}
+                      placeholder="https://yourwebsite.com"
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Experience Level</InputLabel>
+                      <Select
+                        name="experience"
+                        value={profileFormData.experience}
+                        onChange={handleProfileSelectChange}
+                        label="Experience Level"
+                      >
+                        <MenuItem value="Just starting out">Just starting out</MenuItem>
+                        <MenuItem value="1-2 years">1-2 years</MenuItem>
+                        <MenuItem value="3-5 years">3-5 years</MenuItem>
+                        <MenuItem value="6-10 years">6-10 years</MenuItem>
+                        <MenuItem value="10+ years">10+ years</MenuItem>
+                        <MenuItem value="Professional">Professional</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Specialties
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {['Painting', 'Woodworking', 'Sculpture', 'Photography', 'Digital Art', 'Ceramics', 'Textiles', 'Jewelry', 'Mixed Media', 'Other'].map((specialty) => (
+                        <Chip
+                          key={specialty}
+                          label={specialty}
+                          onClick={() => handleSpecialtyChange(specialty)}
+                          color={profileFormData.specialties.includes(specialty) ? 'primary' : 'default'}
+                          variant={profileFormData.specialties.includes(specialty) ? 'filled' : 'outlined'}
+                        />
+                      ))}
+                    </Box>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={4}
+                      label="Bio"
+                      value={profileFormData.bio}
+                      onChange={handleProfileInputChange('bio')}
+                      placeholder="Tell us about yourself and your artistic journey..."
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={savingProfile}
+                        startIcon={savingProfile ? <CircularProgress size={20} /> : <EditIcon />}
+                      >
+                        {savingProfile ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </form>
             </Paper>
           </TabPanel>
         </Paper>

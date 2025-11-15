@@ -38,6 +38,8 @@ export interface Listing {
   updated_at: string;
   artist_name?: string;
   cognito_username?: string;
+  shipping_info?: string;
+  returns_info?: string;
 }
 
 export interface Order {

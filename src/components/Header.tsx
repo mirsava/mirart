@@ -32,6 +32,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   Person as PersonIcon,
   Logout as LogoutIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
@@ -61,6 +62,7 @@ const Header: React.FC = () => {
   const artistMenuItems = isAuthenticated
     ? [
         { label: 'My Dashboard', path: '/artist-dashboard' },
+        { label: 'Create Listing', path: '/create-listing' },
       ]
     : [
         { label: 'Sell Art', path: '/artist-signup' },
@@ -383,6 +385,18 @@ const Header: React.FC = () => {
               {isAuthenticated && user ? (
                 <>
                   <Button
+                    variant="contained"
+                    onClick={() => navigate('/create-listing')}
+                    startIcon={<AddIcon />}
+                    sx={{
+                      mr: 1,
+                      textTransform: 'none',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Create Listing
+                  </Button>
+                  <Button
                     onClick={handleUserMenuOpen}
                     startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main' }}>
                       {user.name?.charAt(0).toUpperCase() || user.id?.charAt(0).toUpperCase() || 'U'}
@@ -525,6 +539,7 @@ const Header: React.FC = () => {
           <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
           My Dashboard
         </MenuItem>
+        <Divider />
         <MenuItem 
           onClick={handleSignOut}
           sx={{ 

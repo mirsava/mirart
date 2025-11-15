@@ -134,15 +134,29 @@ router.get('/:cognitoUsername', async (req, res) => {
         totalViews: totalViews[0].total_views || 0,
       },
       recentListings: recentListings.map(listing => {
-        let parsedImageUrls = null;
-        if (listing.image_urls) {
-          try {
-            parsedImageUrls = JSON.parse(listing.image_urls);
-          } catch (parseError) {
-            console.error('Error parsing image_urls JSON:', parseError);
-            parsedImageUrls = null;
+          let parsedImageUrls = null;
+          if (listing.image_urls && listing.image_urls !== 'null' && listing.image_urls !== '') {
+            try {
+              const imageUrlsStr = String(listing.image_urls).trim();
+              if (!imageUrlsStr || imageUrlsStr === 'null' || imageUrlsStr === '') {
+                parsedImageUrls = null;
+              } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
+                parsedImageUrls = JSON.parse(imageUrlsStr);
+              } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
+                parsedImageUrls = [imageUrlsStr];
+              } else {
+                parsedImageUrls = JSON.parse(imageUrlsStr);
+              }
+            } catch (parseError) {
+              console.error('Error parsing image_urls JSON:', parseError);
+              const imageUrlsStr = String(listing.image_urls).trim();
+              if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
+                parsedImageUrls = [imageUrlsStr];
+              } else {
+                parsedImageUrls = null;
+              }
+            }
           }
-        }
         return {
           ...listing,
           price: parseFloat(listing.price),

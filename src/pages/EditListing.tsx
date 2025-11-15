@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -19,14 +19,16 @@ import {
   Chip,
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 
-const CreateListing: React.FC = () => {
+const EditListing: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -46,6 +48,8 @@ const CreateListing: React.FC = () => {
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
+  const [hadOriginalImages, setHadOriginalImages] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
 
   const categories = [
@@ -60,6 +64,73 @@ const CreateListing: React.FC = () => {
     'Mixed Media',
     'Other',
   ];
+
+  const getImageUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return baseUrl + url;
+  };
+
+  useEffect(() => {
+    const fetchListing = async () => {
+      if (!id) {
+        setError('Invalid listing ID');
+        setFetching(false);
+        return;
+      }
+
+      setFetching(true);
+      setError(null);
+
+      try {
+        const listing = await apiService.getListing(parseInt(id));
+        
+        setFormData({
+          title: listing.title || '',
+          description: listing.description || '',
+          category: listing.category || 'Painting',
+          subcategory: listing.subcategory || '',
+          price: listing.price?.toString() || '',
+          primary_image_url: listing.primary_image_url || '',
+          image_urls: listing.image_urls || [],
+          dimensions: listing.dimensions || '',
+          medium: listing.medium || '',
+          year: listing.year?.toString() || '',
+          in_stock: listing.in_stock !== undefined ? listing.in_stock : true,
+          status: listing.status || 'draft',
+          shipping_info: listing.shipping_info || '',
+          returns_info: listing.returns_info || '',
+        });
+
+        const allImages = [];
+        const existingUrls = [];
+        if (listing.primary_image_url) {
+          const url = listing.primary_image_url;
+          allImages.push(getImageUrl(url));
+          existingUrls.push(url);
+        }
+        if (listing.image_urls && listing.image_urls.length > 0) {
+          listing.image_urls.forEach(url => {
+            allImages.push(getImageUrl(url));
+            existingUrls.push(url);
+          });
+        }
+        setImagePreviews(allImages);
+        setExistingImageUrls(existingUrls);
+        setHadOriginalImages(existingUrls.length > 0 || (listing.image_urls && listing.image_urls.length > 0));
+      } catch (err: any) {
+        setError(err.message || 'Failed to load listing');
+      } finally {
+        setFetching(false);
+      }
+    };
+
+    fetchListing();
+  }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -89,41 +160,52 @@ const CreateListing: React.FC = () => {
     if (!files || files.length === 0) return;
 
     const newFiles = Array.from(files);
-    const totalFiles = imageFiles.length + newFiles.length;
+    const totalFiles = imageFiles.length + imagePreviews.length + newFiles.length;
     
     if (totalFiles > 10) {
       setError('Maximum 10 images allowed');
-      e.target.value = ''; // Reset input
+      e.target.value = '';
       return;
     }
 
-    // Create previews using Promise.all
     const previewPromises = newFiles.map((file) => {
       return new Promise<string>((resolve) => {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          resolve(reader.result as string);
-        };
+        reader.onload = (e) => resolve(e.target?.result as string);
         reader.readAsDataURL(file);
       });
     });
 
     const newPreviews = await Promise.all(previewPromises);
-    
     setImageFiles((prev) => [...prev, ...newFiles]);
     setImagePreviews((prev) => [...prev, ...newPreviews]);
-    
-    // Reset input to allow selecting the same file again
     e.target.value = '';
   };
 
   const removeImage = (index: number) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
-    setFormData((prev) => ({
-      ...prev,
-      image_urls: prev.image_urls.filter((_, i) => i !== index),
-    }));
+    const newPreviews = [...imagePreviews];
+    const newExistingUrls = [...existingImageUrls];
+    
+    if (index < existingImageUrls.length) {
+      const removedUrl = existingImageUrls[index];
+      newExistingUrls.splice(index, 1);
+      setExistingImageUrls(newExistingUrls);
+      
+      if (index === 0 && formData.primary_image_url === removedUrl) {
+        setFormData(prev => ({ ...prev, primary_image_url: '' }));
+      } else if (formData.image_urls && formData.image_urls.includes(removedUrl)) {
+        const newImageUrls = formData.image_urls.filter(url => url !== removedUrl);
+        setFormData(prev => ({ ...prev, image_urls: newImageUrls }));
+      }
+    } else {
+      const fileIndex = index - existingImageUrls.length;
+      const newFiles = [...imageFiles];
+      newFiles.splice(fileIndex, 1);
+      setImageFiles(newFiles);
+    }
+    
+    newPreviews.splice(index, 1);
+    setImagePreviews(newPreviews);
   };
 
   const uploadImages = async (): Promise<string[]> => {
@@ -136,8 +218,7 @@ const CreateListing: React.FC = () => {
     });
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/upload/images`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/upload/images`, {
         method: 'POST',
         body: formData,
       });
@@ -147,11 +228,27 @@ const CreateListing: React.FC = () => {
       }
 
       const data = await response.json();
-      return data.files.map((file: any) => {
-        // Convert relative URL to absolute URL
-        const baseUrl = API_BASE_URL.replace('/api', '');
-        return baseUrl + file.url;
-      });
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const baseUrl = API_BASE_URL.replace('/api', '');
+      
+      if (data.files && Array.isArray(data.files)) {
+        return data.files.map((file: any) => {
+          const url = file.url || file.path || file;
+          if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+            return url;
+          }
+          return baseUrl + url;
+        });
+      }
+      if (data.urls && Array.isArray(data.urls)) {
+        return data.urls.map((url: string) => {
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            return url;
+          }
+          return baseUrl + url;
+        });
+      }
+      return [];
     } catch (error) {
       console.error('Error uploading images:', error);
       throw error;
@@ -163,8 +260,8 @@ const CreateListing: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user?.id) {
-      setError('You must be logged in to create a listing');
+    if (!user?.id || !id) {
+      setError('You must be logged in to edit a listing');
       return;
     }
 
@@ -172,25 +269,22 @@ const CreateListing: React.FC = () => {
     setError(null);
 
     try {
-      // Upload images first
       let uploadedImageUrls: string[] = [];
       if (imageFiles.length > 0) {
         uploadedImageUrls = await uploadImages();
       }
 
-      // Use first image as primary image, rest go to image_urls
-      const primaryImage = uploadedImageUrls.length > 0 ? uploadedImageUrls[0] : (formData.primary_image_url || undefined);
-      const additionalImages = uploadedImageUrls.length > 1 ? uploadedImageUrls.slice(1) : [];
+      const allImageUrls = [...existingImageUrls, ...uploadedImageUrls];
+      const primaryImage = allImageUrls.length > 0 ? allImageUrls[0] : null;
+      const additionalImages = allImageUrls.length > 1 ? allImageUrls.slice(1) : [];
       
-      const listingData = {
-        cognito_username: user.id,
+      const listingData: any = {
         title: formData.title,
         description: formData.description || undefined,
         category: formData.category,
         subcategory: formData.subcategory || undefined,
         price: parseFloat(formData.price),
         primary_image_url: primaryImage,
-        image_urls: additionalImages.length > 0 ? additionalImages : undefined,
         dimensions: formData.dimensions || undefined,
         medium: formData.medium || undefined,
         year: formData.year ? parseInt(formData.year) : undefined,
@@ -199,25 +293,37 @@ const CreateListing: React.FC = () => {
         shipping_info: formData.shipping_info || undefined,
         returns_info: formData.returns_info || undefined,
       };
+      
+      if (hadOriginalImages || uploadedImageUrls.length > 0 || additionalImages.length > 0) {
+        listingData.image_urls = additionalImages;
+      }
 
-      await apiService.createListing(listingData);
+      await apiService.updateListing(parseInt(id), listingData);
       navigate('/artist-dashboard');
     } catch (err: any) {
-      setError(err.message || 'Failed to create listing. Please try again.');
+      setError(err.message || 'Failed to update listing. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (fetching) {
+    return (
+      <Box sx={{ py: 8, minHeight: '100vh', bgcolor: 'background.default', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ py: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
       <Container maxWidth="md">
         <Paper sx={{ p: 4 }}>
           <Typography variant="h4" component="h1" gutterBottom>
-            Create New Listing
+            Edit Listing
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-            Add a new artwork listing to your portfolio
+            Update your artwork listing
           </Typography>
 
           {error && (
@@ -309,43 +415,39 @@ const CreateListing: React.FC = () => {
 
               <Grid item xs={12}>
                 <Typography variant="subtitle2" gutterBottom>
-                  Artwork Photos (up to 10 images)
+                  Images ({imagePreviews.length}/10)
                 </Typography>
-                <Box sx={{ mb: 2 }}>
-                  <input
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    id="image-upload"
-                    multiple
-                    type="file"
-                    onChange={handleImageChange}
-                    disabled={imageFiles.length >= 10 || uploadingImages}
-                  />
-                  <label htmlFor="image-upload">
-                    <Button
-                      variant="outlined"
-                      component="span"
-                      startIcon={<AddIcon />}
-                      disabled={imageFiles.length >= 10 || uploadingImages}
-                      sx={{ mb: 2 }}
-                    >
-                      {imageFiles.length >= 10 ? 'Maximum 10 images' : `Add Images (${imageFiles.length}/10)`}
-                    </Button>
-                  </label>
-                </Box>
-                
+                <input
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  id="image-upload"
+                  multiple
+                  type="file"
+                  onChange={handleImageChange}
+                  disabled={imagePreviews.length >= 10 || uploadingImages}
+                />
+                <label htmlFor="image-upload">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<AddIcon />}
+                    disabled={imagePreviews.length >= 10 || uploadingImages}
+                    sx={{ mb: 2 }}
+                  >
+                    Add Images
+                  </Button>
+                </label>
+
                 {imagePreviews.length > 0 && (
-                  <Grid container spacing={2}>
+                  <Grid container spacing={2} sx={{ mt: 1 }}>
                     {imagePreviews.map((preview, index) => (
                       <Grid item xs={6} sm={4} md={3} key={index}>
                         <Box
                           sx={{
                             position: 'relative',
                             width: '100%',
-                            paddingTop: '100%', // 1:1 aspect ratio
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 1,
+                            paddingTop: '100%',
+                            borderRadius: 2,
                             overflow: 'hidden',
                             bgcolor: 'background.paper',
                           }}
@@ -489,7 +591,7 @@ const CreateListing: React.FC = () => {
                     disabled={loading || uploadingImages}
                     startIcon={loading ? <CircularProgress size={20} /> : null}
                   >
-                    {loading ? 'Creating...' : uploadingImages ? 'Uploading...' : 'Create Listing'}
+                    {loading ? 'Updating...' : uploadingImages ? 'Uploading...' : 'Update Listing'}
                   </Button>
                 </Box>
               </Grid>
@@ -501,5 +603,5 @@ const CreateListing: React.FC = () => {
   );
 };
 
-export default CreateListing;
+export default EditListing;
 

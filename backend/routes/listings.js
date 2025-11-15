@@ -59,11 +59,37 @@ router.get('/', async (req, res) => {
     const [rows] = await pool.execute(query, params);
     
     // Parse JSON fields
-    const listings = rows.map(listing => ({
-      ...listing,
-      price: parseFloat(listing.price),
-      image_urls: listing.image_urls ? JSON.parse(listing.image_urls) : null
-    }));
+    const listings = rows.map(listing => {
+      let parsedImageUrls = null;
+      if (listing.image_urls && listing.image_urls !== 'null' && listing.image_urls !== '') {
+        try {
+          const imageUrlsStr = String(listing.image_urls).trim();
+          if (!imageUrlsStr || imageUrlsStr === 'null' || imageUrlsStr === '') {
+            parsedImageUrls = null;
+          } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
+            parsedImageUrls = JSON.parse(imageUrlsStr);
+          } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
+            parsedImageUrls = [imageUrlsStr];
+          } else {
+            parsedImageUrls = JSON.parse(imageUrlsStr);
+          }
+        } catch (parseError) {
+          console.error('Error parsing image_urls JSON:', parseError);
+          const imageUrlsStr = String(listing.image_urls).trim();
+          if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
+            parsedImageUrls = [imageUrlsStr];
+          } else {
+            parsedImageUrls = null;
+          }
+        }
+      }
+      
+      return {
+        ...listing,
+        price: parseFloat(listing.price),
+        image_urls: parsedImageUrls
+      };
+    });
     
     res.json(listings);
   } catch (error) {
@@ -106,7 +132,28 @@ router.get('/:id', async (req, res) => {
     res.json({
       ...rows[0],
       price: parseFloat(rows[0].price),
-      image_urls: rows[0].image_urls ? JSON.parse(rows[0].image_urls) : null
+      image_urls: (() => {
+        if (!rows[0].image_urls || rows[0].image_urls === 'null' || rows[0].image_urls === '') return null;
+        try {
+          const imageUrlsStr = String(rows[0].image_urls).trim();
+          if (!imageUrlsStr || imageUrlsStr === 'null' || imageUrlsStr === '') {
+            return null;
+          } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
+            return JSON.parse(imageUrlsStr);
+          } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
+            return [imageUrlsStr];
+          } else {
+            return JSON.parse(imageUrlsStr);
+          }
+        } catch (parseError) {
+          console.error('Error parsing image_urls JSON:', parseError);
+          const imageUrlsStr = String(rows[0].image_urls).trim();
+          if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
+            return [imageUrlsStr];
+          }
+          return null;
+        }
+      })()
     });
   } catch (error) {
     console.error('Error fetching listing:', error);
@@ -204,11 +251,13 @@ router.post('/', async (req, res) => {
       }
     }
     
+    const { shipping_info, returns_info } = req.body;
+    
     const [result] = await pool.execute(
       `INSERT INTO listings (
         user_id, title, description, category, subcategory, 
-        price, primary_image_url, image_urls, dimensions, medium, year, in_stock, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        price, primary_image_url, image_urls, dimensions, medium, year, in_stock, status, shipping_info, returns_info
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user_id, 
         title, 
@@ -222,7 +271,9 @@ router.post('/', async (req, res) => {
         medium || null, 
         year && year.toString().trim() !== '' ? parseInt(year) : null, 
         in_stock !== undefined ? Boolean(in_stock) : true, 
-        status || 'draft'
+        status || 'draft',
+        (shipping_info && shipping_info.trim()) || null,
+        (returns_info && returns_info.trim()) || null
       ]
     );
     
@@ -266,10 +317,22 @@ router.post('/', async (req, res) => {
     let parsedImageUrls = null;
     if (newListing[0].image_urls) {
       try {
-        parsedImageUrls = JSON.parse(newListing[0].image_urls);
+        const imageUrlsStr = String(newListing[0].image_urls).trim();
+        if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
+          parsedImageUrls = JSON.parse(imageUrlsStr);
+        } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
+          parsedImageUrls = [imageUrlsStr];
+        } else {
+          parsedImageUrls = JSON.parse(imageUrlsStr);
+        }
       } catch (parseError) {
         console.error('Error parsing image_urls JSON:', parseError);
-        parsedImageUrls = null;
+        const imageUrlsStr = String(newListing[0].image_urls).trim();
+        if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
+          parsedImageUrls = [imageUrlsStr];
+        } else {
+          parsedImageUrls = null;
+        }
       }
     }
     
@@ -338,6 +401,8 @@ router.put('/:id', async (req, res) => {
     const updateFields = [];
     const updateValues = [];
     
+    const { shipping_info, returns_info } = req.body;
+    
     if (title !== undefined) { updateFields.push('title = ?'); updateValues.push(title); }
     if (description !== undefined) { updateFields.push('description = ?'); updateValues.push(description); }
     if (category !== undefined) { updateFields.push('category = ?'); updateValues.push(category); }
@@ -350,6 +415,8 @@ router.put('/:id', async (req, res) => {
     if (year !== undefined) { updateFields.push('year = ?'); updateValues.push(year); }
     if (in_stock !== undefined) { updateFields.push('in_stock = ?'); updateValues.push(in_stock); }
     if (status !== undefined) { updateFields.push('status = ?'); updateValues.push(status); }
+    if (shipping_info !== undefined) { updateFields.push('shipping_info = ?'); updateValues.push((shipping_info && shipping_info.trim()) || null); }
+    if (returns_info !== undefined) { updateFields.push('returns_info = ?'); updateValues.push((returns_info && returns_info.trim()) || null); }
     
     updateValues.push(id);
     
@@ -378,10 +445,34 @@ router.put('/:id', async (req, res) => {
       [id]
     );
     
+    let parsedImageUrls = null;
+    if (updated[0].image_urls && updated[0].image_urls !== 'null' && updated[0].image_urls !== '') {
+      try {
+        const imageUrlsStr = String(updated[0].image_urls).trim();
+        if (!imageUrlsStr || imageUrlsStr === 'null' || imageUrlsStr === '') {
+          parsedImageUrls = null;
+        } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
+          parsedImageUrls = JSON.parse(imageUrlsStr);
+        } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
+          parsedImageUrls = [imageUrlsStr];
+        } else {
+          parsedImageUrls = JSON.parse(imageUrlsStr);
+        }
+      } catch (parseError) {
+        console.error('Error parsing image_urls JSON:', parseError);
+        const imageUrlsStr = String(updated[0].image_urls).trim();
+        if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
+          parsedImageUrls = [imageUrlsStr];
+        } else {
+          parsedImageUrls = null;
+        }
+      }
+    }
+    
     res.json({
       ...updated[0],
       price: parseFloat(updated[0].price),
-      image_urls: updated[0].image_urls ? JSON.parse(updated[0].image_urls) : null
+      image_urls: parsedImageUrls
     });
   } catch (error) {
     console.error('Error updating listing:', error);
@@ -420,16 +511,19 @@ router.delete('/:id', async (req, res) => {
     }
     
     // Add additional images
-    if (listing[0].image_urls) {
+    if (listing[0].image_urls && listing[0].image_urls !== 'null' && listing[0].image_urls !== '') {
       try {
-        const imageUrls = JSON.parse(listing[0].image_urls);
-        if (Array.isArray(imageUrls)) {
-          imageUrls.forEach(url => {
-            const imagePath = extractFilePath(url, uploadsDir);
-            if (imagePath) {
-              filesToDelete.push(imagePath);
-            }
-          });
+        const imageUrlsStr = String(listing[0].image_urls).trim();
+        if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '') {
+          const imageUrls = JSON.parse(imageUrlsStr);
+          if (Array.isArray(imageUrls)) {
+            imageUrls.forEach(url => {
+              const imagePath = extractFilePath(url, uploadsDir);
+              if (imagePath) {
+                filesToDelete.push(imagePath);
+              }
+            });
+          }
         }
       } catch (parseError) {
         console.error('Error parsing image_urls JSON:', parseError);

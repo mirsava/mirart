@@ -169,7 +169,7 @@ const Home: React.FC = () => {
               width: '600px',
               height: '600px',
               borderRadius: '50%',
-              bgcolor: 'rgba(198,40,40,0.4)',
+              bgcolor: 'rgba(26,35,126,0.4)',
               filter: 'blur(60px)',
             }}
           />
@@ -182,7 +182,7 @@ const Home: React.FC = () => {
               left: '-8%',
               width: '550px',
               height: '550px',
-              bgcolor: 'rgba(0,151,167,0.32)',
+              bgcolor: 'rgba(83,75,174,0.32)',
               clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
               transform: 'rotate(25deg)',
               filter: 'blur(63px)',
@@ -197,7 +197,7 @@ const Home: React.FC = () => {
               left: '-12%',
               width: '520px',
               height: '520px',
-              bgcolor: 'rgba(198,40,40,0.3)',
+              bgcolor: 'rgba(26,35,126,0.3)',
               clipPath: 'polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%)',
               filter: 'blur(62px)',
               transform: 'rotate(15deg)',
@@ -212,7 +212,7 @@ const Home: React.FC = () => {
               left: '2%',
               width: '480px',
               height: '480px',
-              bgcolor: 'rgba(0,151,167,0.28)',
+              bgcolor: 'rgba(83,75,174,0.28)',
               clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
               transform: 'rotate(-20deg)',
               filter: 'blur(61px)',
@@ -227,7 +227,7 @@ const Home: React.FC = () => {
               left: '8%',
               width: '500px',
               height: '500px',
-              bgcolor: 'rgba(198,40,40,0.26)',
+              bgcolor: 'rgba(26,35,126,0.26)',
               clipPath: 'polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%)',
               filter: 'blur(64px)',
               transform: 'rotate(45deg)',
@@ -242,7 +242,7 @@ const Home: React.FC = () => {
               left: '15%',
               width: '460px',
               height: '460px',
-              bgcolor: 'rgba(0,151,167,0.3)',
+              bgcolor: 'rgba(83,75,174,0.3)',
               clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
               transform: 'rotate(35deg)',
               filter: 'blur(63px)',
@@ -257,7 +257,7 @@ const Home: React.FC = () => {
               left: '-5%',
               width: '490px',
               height: '490px',
-              bgcolor: 'rgba(198,40,40,0.28)',
+              bgcolor: 'rgba(26,35,126,0.28)',
               clipPath: 'polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%)',
               filter: 'blur(65px)',
               transform: 'rotate(-30deg)',
@@ -272,7 +272,7 @@ const Home: React.FC = () => {
               left: '45%',
               width: '580px',
               height: '580px',
-              bgcolor: 'rgba(0,151,167,0.32)',
+              bgcolor: 'rgba(83,75,174,0.32)',
               transform: 'rotate(45deg)',
               filter: 'blur(65px)',
             }}
@@ -286,7 +286,7 @@ const Home: React.FC = () => {
               right: '8%',
               width: '600px',
               height: '600px',
-              bgcolor: 'rgba(198,40,40,0.32)',
+              bgcolor: 'rgba(26,35,126,0.32)',
               clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
               filter: 'blur(62px)',
               transform: 'rotate(60deg)',
@@ -303,7 +303,7 @@ const Home: React.FC = () => {
               height: 0,
               borderLeft: '300px solid transparent',
               borderRight: '300px solid transparent',
-              borderBottom: '500px solid rgba(198,40,40,0.3)',
+              borderBottom: '500px solid rgba(26,35,126,0.3)',
               filter: 'blur(60px)',
               transform: 'rotate(30deg)',
             }}
@@ -318,7 +318,7 @@ const Home: React.FC = () => {
               width: '520px',
               height: '520px',
               borderRadius: '50%',
-              bgcolor: 'rgba(0,151,167,0.38)',
+              bgcolor: 'rgba(83,75,174,0.38)',
               filter: 'blur(62px)',
             }}
           />
@@ -331,7 +331,7 @@ const Home: React.FC = () => {
               right: '15%',
               width: '540px',
               height: '540px',
-              bgcolor: 'rgba(198,40,40,0.28)',
+              bgcolor: 'rgba(26,35,126,0.28)',
               borderRadius: '70px',
               transform: 'rotate(-20deg)',
               filter: 'blur(63px)',
@@ -346,7 +346,7 @@ const Home: React.FC = () => {
               left: '12%',
               width: '500px',
               height: '500px',
-              bgcolor: 'rgba(0,151,167,0.3)',
+              bgcolor: 'rgba(83,75,174,0.3)',
               borderRadius: '60px',
               transform: 'rotate(25deg)',
               filter: 'blur(63px)',
@@ -362,7 +362,7 @@ const Home: React.FC = () => {
               width: '480px',
               height: '480px',
               borderRadius: '50%',
-              bgcolor: 'rgba(198,40,40,0.36)',
+              bgcolor: 'rgba(26,35,126,0.36)',
               filter: 'blur(63px)',
             }}
           />
@@ -375,7 +375,7 @@ const Home: React.FC = () => {
               right: '10%',
               width: '490px',
               height: '490px',
-              bgcolor: 'rgba(0,151,167,0.29)',
+              bgcolor: 'rgba(83,75,174,0.29)',
               clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
               filter: 'blur(66px)',
               transform: 'rotate(-45deg)',
@@ -390,7 +390,7 @@ const Home: React.FC = () => {
               left: '8%',
               width: '550px',
               height: '550px',
-              bgcolor: 'rgba(198,40,40,0.32)',
+              bgcolor: 'rgba(26,35,126,0.32)',
               transform: 'rotate(45deg)',
               filter: 'blur(65px)',
             }}
@@ -404,7 +404,7 @@ const Home: React.FC = () => {
               left: '52%',
               width: '530px',
               height: '530px',
-              bgcolor: 'rgba(0,151,167,0.26)',
+              bgcolor: 'rgba(83,75,174,0.26)',
               clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
               filter: 'blur(64px)',
               transform: 'rotate(-15deg)',
@@ -478,7 +478,7 @@ const Home: React.FC = () => {
               right: '-2%',
               width: '500px',
               height: '500px',
-              bgcolor: 'rgba(0,151,167,0.3)',
+              bgcolor: 'rgba(83,75,174,0.3)',
               clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
               filter: 'blur(62px)',
               transform: 'rotate(-60deg)',
@@ -522,7 +522,7 @@ const Home: React.FC = () => {
               right: '42%',
               width: '550px',
               height: '550px',
-              bgcolor: 'rgba(198,40,40,0.3)',
+              bgcolor: 'rgba(26,35,126,0.3)',
               clipPath: 'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)',
               filter: 'blur(68px)',
               transform: 'rotate(15deg)',
@@ -537,7 +537,7 @@ const Home: React.FC = () => {
               left: '-1%',
               width: '520px',
               height: '520px',
-              bgcolor: 'rgba(0,151,167,0.29)',
+              bgcolor: 'rgba(83,75,174,0.29)',
               borderRadius: '70px',
               transform: 'rotate(-25deg)',
               filter: 'blur(64px)',
@@ -642,7 +642,7 @@ const Home: React.FC = () => {
                     <br />
                     <Box component="span" sx={{ 
                       fontWeight: 400,
-                      color: '#ef5350',
+                      color: 'primary.main',
                     }}>
                       Handmade Art
                     </Box>
@@ -746,7 +746,7 @@ const Home: React.FC = () => {
                           left: 0,
                           right: 0,
                           bottom: 0,
-                          background: 'linear-gradient(135deg, rgba(198,40,40,0.08) 0%, rgba(0,151,167,0.08) 100%)',
+                          background: 'linear-gradient(135deg, rgba(26,35,126,0.08) 0%, rgba(83,75,174,0.08) 100%)',
                         },
                       }}
                     />
@@ -768,7 +768,7 @@ const Home: React.FC = () => {
                           left: 0,
                           right: 0,
                           bottom: 0,
-                          background: 'linear-gradient(135deg, rgba(198,40,40,0.08) 0%, rgba(0,151,167,0.08) 100%)',
+                          background: 'linear-gradient(135deg, rgba(26,35,126,0.08) 0%, rgba(83,75,174,0.08) 100%)',
                         },
                       }}
                     />
@@ -797,11 +797,11 @@ const Home: React.FC = () => {
                 width: index === currentImage ? 32 : 12,
                 height: 12,
                 borderRadius: 6,
-                bgcolor: index === currentImage ? 'primary.main' : (index % 2 === 0 ? 'rgba(198,40,40,0.3)' : 'rgba(0,151,167,0.3)'),
+                bgcolor: index === currentImage ? 'primary.main' : (index % 2 === 0 ? 'rgba(26,35,126,0.3)' : 'rgba(83,75,174,0.3)'),
                 cursor: 'pointer',
                 transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
-                  bgcolor: index === currentImage ? 'primary.dark' : (index % 2 === 0 ? 'rgba(198,40,40,0.5)' : 'rgba(0,151,167,0.5)'),
+                  bgcolor: index === currentImage ? 'primary.dark' : (index % 2 === 0 ? 'rgba(26,35,126,0.5)' : 'rgba(83,75,174,0.5)'),
                   transform: 'scale(1.1)',
                 },
               }}
