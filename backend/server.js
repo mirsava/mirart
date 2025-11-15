@@ -1,9 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import usersRouter from './routes/users.js';
 import listingsRouter from './routes/listings.js';
 import dashboardRouter from './routes/dashboard.js';
+import uploadRouter from './routes/upload.js';
 
 dotenv.config();
 
@@ -39,6 +42,11 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve uploaded files statically
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'MirArt API is running' });
@@ -48,6 +56,7 @@ app.get('/health', (req, res) => {
 app.use('/api/users', usersRouter);
 app.use('/api/listings', listingsRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/upload', uploadRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

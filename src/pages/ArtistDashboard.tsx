@@ -5,6 +5,7 @@ import {
   Typography,
   Grid,
   Card,
+  CardMedia,
   CardContent,
   Button,
   Chip,
@@ -17,6 +18,11 @@ import {
   ListItemText,
   ListItemIcon,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -33,6 +39,16 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import apiService, { DashboardData, Listing, Order } from '../services/api';
 import { CircularProgress, Alert } from '@mui/material';
+
+const getImageUrl = (url?: string): string | undefined => {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  const baseUrl = API_BASE_URL.replace('/api', '');
+  return baseUrl + url;
+};
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -70,6 +86,9 @@ const ArtistDashboard: React.FC = () => {
   });
   const [recentListings, setRecentListings] = useState<Listing[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [listingToDelete, setListingToDelete] = useState<Listing | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -100,6 +119,34 @@ const ArtistDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteClick = (listing: Listing) => {
+    setListingToDelete(listing);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!listingToDelete) return;
+
+    setDeleting(true);
+    try {
+      await apiService.deleteListing(listingToDelete.id);
+      setDeleteDialogOpen(false);
+      setListingToDelete(null);
+      await fetchDashboardData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete listing');
+      setDeleteDialogOpen(false);
+      setListingToDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setListingToDelete(null);
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -235,7 +282,11 @@ const ArtistDashboard: React.FC = () => {
           <TabPanel value={tabValue} index={0}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Typography variant="h6">Your Artwork</Typography>
-              <Button variant="contained" startIcon={<AddIcon />}>
+              <Button 
+                variant="contained" 
+                startIcon={<AddIcon />}
+                onClick={() => navigate('/create-listing')}
+              >
                 Add New Listing
               </Button>
             </Box>
@@ -250,7 +301,11 @@ const ArtistDashboard: React.FC = () => {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       Start selling your art by creating your first listing
                     </Typography>
-                    <Button variant="contained" startIcon={<AddIcon />}>
+                    <Button 
+                      variant="contained" 
+                      startIcon={<AddIcon />}
+                      onClick={() => navigate('/create-listing')}
+                    >
                       Add New Listing
                     </Button>
                   </Paper>
@@ -258,8 +313,56 @@ const ArtistDashboard: React.FC = () => {
               ) : (
                 recentListings.map((listing) => (
                 <Grid item xs={12} sm={6} md={4} key={listing.id}>
-                  <Card>
-                    <CardContent>
+                  <Card 
+                    elevation={0}
+                    sx={{ 
+                      height: '100%', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      overflow: 'hidden',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      boxShadow: 'none',
+                      '& .MuiCardMedia-root': {
+                        margin: 0,
+                        padding: 0,
+                        width: '100%',
+                      },
+                    }}
+                  >
+                    {listing.primary_image_url ? (
+                      <Box
+                        component="img"
+                        src={getImageUrl(listing.primary_image_url)}
+                        alt={listing.title}
+                        sx={{
+                          width: '100%',
+                          height: 200,
+                          objectFit: 'cover',
+                          display: 'block',
+                          margin: 0,
+                          padding: 0,
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          height: 200,
+                          width: '100%',
+                          bgcolor: 'grey.200',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: 0,
+                          padding: 0,
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          No Image
+                        </Typography>
+                      </Box>
+                    )}
+                    <CardContent sx={{ flexGrow: 1 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                         <Typography variant="h6" noWrap>
                           {listing.title}
@@ -283,7 +386,14 @@ const ArtistDashboard: React.FC = () => {
                         <IconButton size="small">
                           <VisibilityIcon />
                         </IconButton>
-                        <IconButton size="small" color="error">
+                        <IconButton 
+                          size="small" 
+                          color="error"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(listing);
+                          }}
+                        >
                           <DeleteIcon />
                         </IconButton>
                       </Box>
@@ -354,9 +464,39 @@ const ArtistDashboard: React.FC = () => {
         </Paper>
           </>
         )}
-      </Container>
-    </Box>
-  );
-};
+        </Container>
 
-export default ArtistDashboard;
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={handleDeleteCancel}
+          aria-labelledby="delete-dialog-title"
+          aria-describedby="delete-dialog-description"
+        >
+          <DialogTitle id="delete-dialog-title">
+            Delete Listing
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText id="delete-dialog-description">
+              Are you sure you want to delete "{listingToDelete?.title}"? This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDeleteConfirm} 
+              color="error" 
+              variant="contained"
+              disabled={deleting}
+              startIcon={deleting ? <CircularProgress size={20} /> : null}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
+    );
+  };
+  
+  export default ArtistDashboard;

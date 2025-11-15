@@ -26,7 +26,8 @@ export interface Listing {
   category: string;
   subcategory?: string;
   price: number;
-  image_url?: string;
+  primary_image_url?: string;
+  image_urls?: string[];
   dimensions?: string;
   medium?: string;
   year?: number;

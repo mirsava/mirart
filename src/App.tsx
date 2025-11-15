@@ -17,6 +17,7 @@ import Contact from './pages/Contact';
 import ArtistSignup from './pages/ArtistSignup';
 import ArtistSignin from './pages/ArtistSignin';
 import ArtistDashboard from './pages/ArtistDashboard';
+import CreateListing from './pages/CreateListing';
 import ForgotPassword from './pages/ForgotPassword';
 import ConfirmSignup from './pages/ConfirmSignup';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -59,6 +60,14 @@ function AppContent(): JSX.Element {
               element={
                 <ProtectedRoute requiredUserType="artist">
                   <ArtistDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/create-listing" 
+              element={
+                <ProtectedRoute requiredUserType="artist">
+                  <CreateListing />
                 </ProtectedRoute>
               } 
             />

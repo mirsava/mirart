@@ -104,7 +104,7 @@ router.get('/:cognitoUsername', async (req, res) => {
     
     // Get recent listings
     const [recentListings] = await pool.execute(
-      `SELECT id, title, price, status, views, created_at
+      `SELECT id, title, price, status, views, created_at, primary_image_url, image_urls
        FROM listings
        WHERE user_id = ?
        ORDER BY created_at DESC
@@ -133,10 +133,22 @@ router.get('/:cognitoUsername', async (req, res) => {
         pendingOrders: pendingOrders[0].pending_orders || 0,
         totalViews: totalViews[0].total_views || 0,
       },
-      recentListings: recentListings.map(listing => ({
-        ...listing,
-        price: parseFloat(listing.price)
-      })),
+      recentListings: recentListings.map(listing => {
+        let parsedImageUrls = null;
+        if (listing.image_urls) {
+          try {
+            parsedImageUrls = JSON.parse(listing.image_urls);
+          } catch (parseError) {
+            console.error('Error parsing image_urls JSON:', parseError);
+            parsedImageUrls = null;
+          }
+        }
+        return {
+          ...listing,
+          price: parseFloat(listing.price),
+          image_urls: parsedImageUrls
+        };
+      }),
       recentOrders: recentOrders.map(order => ({
         ...order,
         unit_price: parseFloat(order.unit_price),
