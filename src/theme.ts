@@ -4,9 +4,9 @@ export const lightTheme: Theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#1a237e',
+      main: '#4a3a9a',
       light: '#534bae',
-      dark: '#000051',
+      dark: '#3d2d8a',
     },
     secondary: {
       main: '#5d4037',
@@ -61,6 +61,21 @@ export const lightTheme: Theme = createTheme({
         },
       },
     },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          '&:hover': {
+            backgroundColor: 'rgba(74, 58, 154, 0.12)',
+          },
+          '&.Mui-selected': {
+            backgroundColor: 'rgba(74, 58, 154, 0.2)',
+            '&:hover': {
+              backgroundColor: 'rgba(74, 58, 154, 0.28)',
+            },
+          },
+        },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {
@@ -93,7 +108,7 @@ export const darkTheme: Theme = createTheme({
     },
     text: {
       primary: '#ffffff',
-      secondary: '#b3b3b3',
+      secondary: '#e0e0e0',
     },
   },
   typography: {
@@ -132,6 +147,20 @@ export const darkTheme: Theme = createTheme({
         root: {
           textTransform: 'none',
           borderRadius: 8,
+          '&.MuiButton-text': {
+            color: '#ffffff',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            },
+          },
+          '&.MuiButton-outlined': {
+            borderColor: 'rgba(255, 255, 255, 0.5)',
+            color: '#ffffff',
+            '&:hover': {
+              borderColor: '#ffffff',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            },
+          },
         },
       },
     },
@@ -141,6 +170,55 @@ export const darkTheme: Theme = createTheme({
           boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
           '&:hover': {
             boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          },
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          color: '#e0e0e0',
+          '&.Mui-selected': {
+            color: '#ffffff',
+          },
+          '&:hover': {
+            color: '#ffffff',
+          },
+        },
+      },
+    },
+    MuiTabs: {
+      styleOverrides: {
+        indicator: {
+          backgroundColor: '#534bae',
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          '&.MuiChip-outlined': {
+            borderColor: 'rgba(255, 255, 255, 0.5)',
+            color: '#ffffff',
+            '&.MuiChip-colorPrimary': {
+              borderColor: '#534bae',
+              color: '#7986cb',
+            },
+          },
+        },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          '&:hover': {
+            backgroundColor: 'rgba(83, 75, 174, 0.2)',
+          },
+          '&.Mui-selected': {
+            backgroundColor: 'rgba(83, 75, 174, 0.3)',
+            '&:hover': {
+              backgroundColor: 'rgba(83, 75, 174, 0.4)',
+            },
           },
         },
       },

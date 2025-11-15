@@ -33,6 +33,9 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const featuredWoodworking = artworks.filter(item => item.category === 'Woodworking').slice(0, 3);
   const [currentImage, setCurrentImage] = useState<number>(0);
+  const [shape1Animation, setShape1Animation] = useState({ translateY: 0, rotate: -15 });
+  const [shape2Animation, setShape2Animation] = useState({ translateY: 0, rotate: 20 });
+  const [shape3Animation, setShape3Animation] = useState({ translateY: 0, rotate: 10 });
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -72,6 +75,46 @@ const Home: React.FC = () => {
       setCurrentImage((prev) => (prev + 1) % heroImages.length);
     }, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let timeout1: NodeJS.Timeout;
+    let timeout2: NodeJS.Timeout;
+
+    const scheduleUpdate1 = () => {
+      const randomY = Math.random() * 100 - 50;
+      const randomRotate = -15 + (Math.random() * 30 - 15);
+      setShape1Animation({ translateY: randomY, rotate: randomRotate });
+      const nextDelay = 2000 + Math.random() * 2000;
+      timeout1 = setTimeout(scheduleUpdate1, nextDelay);
+    };
+
+    const scheduleUpdate2 = () => {
+      const randomY = Math.random() * 100 - 50;
+      const randomRotate = 20 + (Math.random() * 30 - 15);
+      setShape2Animation({ translateY: randomY, rotate: randomRotate });
+      const nextDelay = 2000 + Math.random() * 2000;
+      timeout2 = setTimeout(scheduleUpdate2, nextDelay);
+    };
+
+    let timeout3: NodeJS.Timeout;
+    const scheduleUpdate3 = () => {
+      const randomY = Math.random() * 100 - 50;
+      const randomRotate = 10 + (Math.random() * 30 - 15);
+      setShape3Animation({ translateY: randomY, rotate: randomRotate });
+      const nextDelay = 2000 + Math.random() * 2000;
+      timeout3 = setTimeout(scheduleUpdate3, nextDelay);
+    };
+
+    scheduleUpdate1();
+    scheduleUpdate2();
+    scheduleUpdate3();
+
+    return () => {
+      clearTimeout(timeout1);
+      clearTimeout(timeout2);
+      clearTimeout(timeout3);
+    };
   }, []);
 
   useEffect(() => {
@@ -727,51 +770,180 @@ const Home: React.FC = () => {
             <Grid item xs={12} md={6}>
               <Slide direction="left" in={true} timeout={1200}>
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                  <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column', alignItems: 'center' }}>
+                    <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, alignItems: 'center' }}>
+                      <Box
+                        sx={{
+                          width: { xs: 280, md: 350 },
+                          height: { xs: 280, md: 350 },
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transform: `rotate(${shape1Animation.rotate}deg) translateY(${shape1Animation.translateY}px)`,
+                          transition: 'transform 2s ease-in-out',
+                        }}
+                      >
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, rgba(26,35,126,0.5) 0%, rgba(83,75,174,0.4) 100%)',
+                          position: 'relative',
+                          boxShadow: '0 20px 60px rgba(26,35,126,0.2)',
+                          '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: '20%',
+                            left: '20%',
+                            width: '60%',
+                            height: '60%',
+                            borderRadius: '50%',
+                            background: 'rgba(83,75,174,0.2)',
+                            filter: 'blur(20px)',
+                          },
+                          '&::after': {
+                            content: '""',
+                            position: 'absolute',
+                            top: '30%',
+                            right: '20%',
+                            width: '40%',
+                            height: '40%',
+                            borderRadius: '50%',
+                            background: 'rgba(26,35,126,0.25)',
+                            filter: 'blur(15px)',
+                          },
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: '15%',
+                          left: '15%',
+                          width: '30%',
+                          height: '30%',
+                          borderRadius: '50%',
+                          background: 'rgba(255,255,255,0.1)',
+                          filter: 'blur(10px)',
+                        }}
+                      />
+                    </Box>
                     <Box
                       sx={{
-                        width: { xs: 200, md: 250 },
-                        height: { xs: 200, md: 250 },
-                        borderRadius: 4,
-                        backgroundImage: `url(${heroImages[(currentImage + 1) % heroImages.length]})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
+                        width: { xs: 280, md: 350 },
+                        height: { xs: 280, md: 350 },
                         position: 'relative',
-                        overflow: 'hidden',
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          background: 'linear-gradient(135deg, rgba(26,35,126,0.08) 0%, rgba(83,75,174,0.08) 100%)',
-                        },
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transform: `rotate(${shape2Animation.rotate}deg) translateY(${shape2Animation.translateY}px)`,
+                        transition: 'transform 2s ease-in-out',
                       }}
-                    />
+                    >
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
+                          background: 'linear-gradient(45deg, rgba(255,152,0,0.5) 0%, rgba(255,193,7,0.4) 100%)',
+                          position: 'relative',
+                          boxShadow: '0 20px 60px rgba(255,152,0,0.2)',
+                          '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: '25%',
+                            left: '25%',
+                            width: '50%',
+                            height: '50%',
+                            clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
+                            background: 'rgba(255,193,7,0.2)',
+                            filter: 'blur(20px)',
+                          },
+                          '&::after': {
+                            content: '""',
+                            position: 'absolute',
+                            bottom: '20%',
+                            right: '20%',
+                            width: '35%',
+                            height: '35%',
+                            clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
+                            background: 'rgba(255,152,0,0.25)',
+                            filter: 'blur(15px)',
+                          },
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: '20%',
+                          right: '20%',
+                          width: '25%',
+                          height: '25%',
+                          clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
+                          background: 'rgba(255,255,255,0.1)',
+                          filter: 'blur(8px)',
+                        }}
+                      />
+                      </Box>
+                    </Box>
                     <Box
                       sx={{
-                        width: { xs: 200, md: 250 },
-                        height: { xs: 200, md: 250 },
-                        borderRadius: 4,
-                        backgroundImage: `url(${heroImages[(currentImage + 2) % heroImages.length]})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
+                        width: { xs: 280, md: 350 },
+                        height: { xs: 280, md: 350 },
                         position: 'relative',
-                        overflow: 'hidden',
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          background: 'linear-gradient(135deg, rgba(26,35,126,0.08) 0%, rgba(83,75,174,0.08) 100%)',
-                        },
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transform: `rotate(${shape3Animation.rotate}deg) translateY(${shape3Animation.translateY}px)`,
+                        transition: 'transform 2s ease-in-out',
                       }}
-                    />
+                    >
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                          background: 'linear-gradient(60deg, rgba(26,35,126,0.5) 0%, rgba(83,75,174,0.4) 100%)',
+                          position: 'relative',
+                          boxShadow: '0 20px 60px rgba(26,35,126,0.2)',
+                          '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: '20%',
+                            left: '20%',
+                            width: '60%',
+                            height: '60%',
+                            clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                            background: 'rgba(83,75,174,0.2)',
+                            filter: 'blur(20px)',
+                          },
+                          '&::after': {
+                            content: '""',
+                            position: 'absolute',
+                            bottom: '15%',
+                            left: '30%',
+                            width: '40%',
+                            height: '40%',
+                            clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                            background: 'rgba(26,35,126,0.25)',
+                            filter: 'blur(15px)',
+                          },
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: '25%',
+                          left: '35%',
+                          width: '30%',
+                          height: '30%',
+                          clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                          background: 'rgba(255,255,255,0.1)',
+                          filter: 'blur(8px)',
+                        }}
+                      />
+                    </Box>
                   </Box>
                 </Box>
               </Slide>
