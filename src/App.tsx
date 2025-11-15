@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { SnackbarProvider } from 'notistack';
 import { ThemeProvider as CustomThemeProvider, useTheme } from './contexts/ThemeContext';
 import { CartProvider } from './contexts/CartContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -41,9 +42,17 @@ function AppContent(): JSX.Element {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
-        <Layout>
-          <Routes>
+      <SnackbarProvider
+        maxSnack={3}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        autoHideDuration={3000}
+      >
+        <Router>
+          <Layout>
+            <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/painting/:id" element={<PaintingDetail />} />
@@ -80,9 +89,10 @@ function AppContent(): JSX.Element {
                 </ProtectedRoute>
               } 
             />
-          </Routes>
-        </Layout>
-      </Router>
+            </Routes>
+          </Layout>
+        </Router>
+      </SnackbarProvider>
     </ThemeProvider>
   );
 }

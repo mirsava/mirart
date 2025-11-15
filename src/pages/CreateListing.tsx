@@ -20,12 +20,14 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 
 const CreateListing: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -242,6 +244,7 @@ const CreateListing: React.FC = () => {
       };
 
       await apiService.createListing(listingData);
+      enqueueSnackbar('Listing created successfully!', { variant: 'success' });
       navigate('/artist-dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to create listing. Please try again.');

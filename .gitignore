@@ -125,3 +125,7 @@ coverage/
 # Misc
 *.tgz
 *.tar.gz
+
+# Uploaded files
+backend/uploads/
+uploads/

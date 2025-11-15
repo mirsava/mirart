@@ -37,6 +37,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User } from '../services/api';
 import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField } from '@mui/material';
 
@@ -75,6 +76,7 @@ function TabPanel(props: TabPanelProps) {
 const ArtistDashboard: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -212,6 +214,7 @@ const ArtistDashboard: React.FC = () => {
       });
 
       setProfileSuccess(true);
+      enqueueSnackbar('Profile saved successfully!', { variant: 'success' });
       await fetchProfile();
       
       setTimeout(() => {
@@ -237,6 +240,7 @@ const ArtistDashboard: React.FC = () => {
       await apiService.deleteListing(listingToDelete.id);
       setDeleteDialogOpen(false);
       setListingToDelete(null);
+      enqueueSnackbar('Listing deleted successfully!', { variant: 'success' });
       await fetchDashboardData();
     } catch (err: any) {
       setError(err.message || 'Failed to delete listing');

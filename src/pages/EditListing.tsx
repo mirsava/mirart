@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 
@@ -27,6 +28,7 @@ const EditListing: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -372,6 +374,7 @@ const EditListing: React.FC = () => {
       }
 
       await apiService.updateListing(parseInt(id), listingData);
+      enqueueSnackbar('Listing updated successfully!', { variant: 'success' });
       await fetchListing();
     } catch (err: any) {
       setError(err.message || 'Failed to update listing. Please try again.');
