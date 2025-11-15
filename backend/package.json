@@ -9,7 +9,8 @@
     "dev": "nodemon server.js",
     "init-db": "node database/init.js",
     "migrate": "node database/run-migration.js",
-    "rename-column": "node rename-column.js"
+    "rename-column": "node rename-column.js",
+    "reset-db": "node scripts/reset-database.js"
   },
   "keywords": [],
   "author": "",

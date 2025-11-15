@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import apiService from '../services/api';
 
 const ArtistSignin: React.FC = () => {
   const navigate = useNavigate();
@@ -72,8 +73,28 @@ const ArtistSignin: React.FC = () => {
     setLoginError('');
     
     try {
-      await signIn(formData.usernameOrEmail, formData.password);
-      navigate('/artist-dashboard');
+      const cognitoUser = await signIn(formData.usernameOrEmail, formData.password);
+      
+      // After successful Cognito login, check if user exists in database
+      if (cognitoUser) {
+        try {
+          await apiService.getUser(cognitoUser.username);
+          // User exists in database, proceed to dashboard
+          navigate('/artist-dashboard');
+        } catch (dbError: any) {
+          // User doesn't exist in database, redirect to signup
+          navigate('/artist-signup', {
+            state: {
+              message: 'Please complete your artist profile to continue.',
+              email: formData.usernameOrEmail.includes('@') ? formData.usernameOrEmail : undefined,
+              username: cognitoUser.username,
+            }
+          });
+        }
+      } else {
+        // Fallback: try to navigate to dashboard
+        navigate('/artist-dashboard');
+      }
     } catch (error: any) {
       setLoginError(error.message || 'Invalid username/email or password. Please try again.');
     } finally {
@@ -160,6 +181,7 @@ const ArtistSignin: React.FC = () => {
               />
               <Link 
                 component="button" 
+                type="button"
                 variant="body2"
                 onClick={() => navigate('/forgot-password')}
                 sx={{ textDecoration: 'none' }}
@@ -190,6 +212,7 @@ const ArtistSignin: React.FC = () => {
                 Don't have an artist account yet?
               </Typography>
               <Button
+                type="button"
                 variant="outlined"
                 fullWidth
                 size="large"

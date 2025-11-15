@@ -23,18 +23,26 @@ import {
   Lock as LockIcon,
   Business as BusinessIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 
 const ArtistSignup: React.FC = () => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const location = useLocation();
+  const { signUp, user, isAuthenticated } = useAuth();
+  
+  // Get pre-filled data from location state (if redirected from sign-in)
+  const locationState = location.state as { message?: string; email?: string; username?: string } | null;
+  
+  // If user is already authenticated but redirected here, they need to complete profile
+  const isCompletingProfile = isAuthenticated && locationState?.message;
+  
   const [formData, setFormData] = useState({
-    username: '',
+    username: locationState?.username || '',
     firstName: '',
     lastName: '',
-    email: '',
+    email: locationState?.email || '',
     password: '',
     confirmPassword: '',
     businessName: '',
@@ -48,6 +56,9 @@ const ArtistSignup: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  
+  // Show message if redirected from sign-in
+  const redirectMessage = locationState?.message;
 
   const specialties = [
     'Painting',
@@ -96,20 +107,26 @@ const ArtistSignup: React.FC = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.username.trim()) newErrors.username = 'Username is required';
-    else if (formData.username.length < 3) newErrors.username = 'Username must be at least 3 characters';
-    else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) newErrors.username = 'Username can only contain letters, numbers, and underscores';
+    // Skip username and password validation if completing profile (already authenticated)
+    if (!isCompletingProfile) {
+      if (!formData.username.trim()) newErrors.username = 'Username is required';
+      else if (formData.username.length < 3) newErrors.username = 'Username must be at least 3 characters';
+      else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) newErrors.username = 'Username can only contain letters, numbers, and underscores';
+      if (!formData.password) newErrors.password = 'Password is required';
+      else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+      if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    }
+    
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    if (!isCompletingProfile) {
+      if (!formData.email.trim()) newErrors.email = 'Email is required';
+      else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
+    }
     if (!formData.businessName.trim()) newErrors.businessName = 'Business/Studio name is required';
     if (!formData.country.trim()) newErrors.country = 'Country is required';
     if (formData.specialties.length === 0) newErrors.specialties = 'Please select at least one specialty';
-    if (!formData.agreeToTerms) newErrors.agreeToTerms = 'You must agree to the terms and conditions';
+    if (!isCompletingProfile && !formData.agreeToTerms) newErrors.agreeToTerms = 'You must agree to the terms and conditions';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -143,28 +160,56 @@ const ArtistSignup: React.FC = () => {
         attributes.phone_number = formattedPhone;
       }
 
-      await signUp(formData.email, formData.password, attributes, formData.username);
-      
-      // Save user data to database (non-blocking)
-      try {
-        await apiService.createOrUpdateUser({
-          cognito_username: formData.username,
-          email: formData.email,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          business_name: formData.businessName,
-          phone: formData.phone || null,
-          country: formData.country,
-          website: formData.website || null,
-          specialties: formData.specialties,
-          experience_level: formData.experience,
-        });
-      } catch (dbError) {
-        // Don't fail signup if database save fails - can be saved later
-        // User data can be saved after email confirmation
+      // If user is already authenticated (redirected from sign-in), just save to database
+      if (isCompletingProfile && user?.id) {
+        // User is already logged in, just update/create their database record
+        try {
+          await apiService.createOrUpdateUser({
+            cognito_username: user.id,
+            email: user.email || formData.email || '',
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            business_name: formData.businessName,
+            phone: formData.phone || null,
+            country: formData.country,
+            website: formData.website || null,
+            specialties: formData.specialties,
+            experience_level: formData.experience,
+          });
+          // Redirect to dashboard after profile completion
+          navigate('/artist-dashboard');
+          return;
+        } catch (dbError) {
+          console.error('Error saving user data to database:', dbError);
+          setErrors({ general: 'Failed to save profile. Please try again.' });
+          return;
+        }
+      } else {
+        // Normal signup flow - create Cognito account
+        await signUp(formData.email, formData.password, attributes, formData.username);
+        
+        // Save user data to database (non-blocking)
+        try {
+          await apiService.createOrUpdateUser({
+            cognito_username: formData.username,
+            email: formData.email,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            business_name: formData.businessName,
+            phone: formData.phone || null,
+            country: formData.country,
+            website: formData.website || null,
+            specialties: formData.specialties,
+            experience_level: formData.experience,
+          });
+        } catch (dbError) {
+          // Log error but don't fail signup - user data can be saved after email confirmation
+          console.error('Error saving user data to database:', dbError);
+          console.warn('User signed up in Cognito but database save failed. Data will need to be saved after email confirmation.');
+        }
+        
+        setSignupSuccess(true);
       }
-      
-      setSignupSuccess(true);
     } catch (error: any) {
       setErrors({ general: error.message || 'Signup failed. Please try again.' });
     } finally {
@@ -184,6 +229,12 @@ const ArtistSignup: React.FC = () => {
               Start selling your artwork to a global audience. It's free to join!
             </Typography>
           </Box>
+
+          {redirectMessage && (
+            <Alert severity="info" sx={{ mb: 3 }}>
+              {redirectMessage}
+            </Alert>
+          )}
 
           <Box sx={{ mb: 4 }}>
             <Grid container spacing={2}>
@@ -223,7 +274,18 @@ const ArtistSignup: React.FC = () => {
                 onClick={() => navigate('/confirm-signup', { 
                   state: { 
                     email: formData.email,
-                    username: formData.username 
+                    username: formData.username,
+                    userData: {
+                      email: formData.email,
+                      first_name: formData.firstName,
+                      last_name: formData.lastName,
+                      business_name: formData.businessName,
+                      phone: formData.phone || null,
+                      country: formData.country,
+                      website: formData.website || null,
+                      specialties: formData.specialties,
+                      experience_level: formData.experience,
+                    },
                   } 
                 })}
                 sx={{ px: 4 }}
@@ -270,57 +332,61 @@ const ArtistSignup: React.FC = () => {
                   required
                 />
               </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Email Address"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleInputChange('email')}
-                  error={!!errors.email}
-                  helperText={errors.email}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Username"
-                  value={formData.username}
-                  onChange={handleInputChange('username')}
-                  error={!!errors.username}
-                  helperText={errors.username || 'Choose a unique username (letters, numbers, and underscores only)'}
-                  required
-                  inputProps={{
-                    pattern: '[a-zA-Z0-9_]+',
-                    minLength: 3,
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleInputChange('password')}
-                  error={!!errors.password}
-                  helperText={errors.password}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Confirm Password"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange('confirmPassword')}
-                  error={!!errors.confirmPassword}
-                  helperText={errors.confirmPassword}
-                  required
-                />
-              </Grid>
+              {!isCompletingProfile && (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Email Address"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleInputChange('email')}
+                      error={!!errors.email}
+                      helperText={errors.email}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Username"
+                      value={formData.username}
+                      onChange={handleInputChange('username')}
+                      error={!!errors.username}
+                      helperText={errors.username || 'Choose a unique username (letters, numbers, and underscores only)'}
+                      required
+                      inputProps={{
+                        pattern: '[a-zA-Z0-9_]+',
+                        minLength: 3,
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Password"
+                      type="password"
+                      value={formData.password}
+                      onChange={handleInputChange('password')}
+                      error={!!errors.password}
+                      helperText={errors.password}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Confirm Password"
+                      type="password"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange('confirmPassword')}
+                      error={!!errors.confirmPassword}
+                      helperText={errors.confirmPassword}
+                      required
+                    />
+                  </Grid>
+                </>
+              )}
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -406,34 +472,36 @@ const ArtistSignup: React.FC = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12}>
-                <Divider sx={{ my: 2 }} />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={formData.agreeToTerms}
-                      onChange={(e) => setFormData(prev => ({ ...prev, agreeToTerms: e.target.checked }))}
-                    />
-                  }
-                  label={
-                    <Typography variant="body2">
-                      I agree to the{' '}
-                      <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
-                        Terms of Service
-                      </Button>{' '}
-                      and{' '}
-                      <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
-                        Privacy Policy
-                      </Button>
+              {!isCompletingProfile && (
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 2 }} />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.agreeToTerms}
+                        onChange={(e) => setFormData(prev => ({ ...prev, agreeToTerms: e.target.checked }))}
+                      />
+                    }
+                    label={
+                      <Typography variant="body2">
+                        I agree to the{' '}
+                        <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
+                          Terms of Service
+                        </Button>{' '}
+                        and{' '}
+                        <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
+                          Privacy Policy
+                        </Button>
+                      </Typography>
+                    }
+                  />
+                  {errors.agreeToTerms && (
+                    <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                      {errors.agreeToTerms}
                     </Typography>
-                  }
-                />
-                {errors.agreeToTerms && (
-                  <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-                    {errors.agreeToTerms}
-                  </Typography>
-                )}
-              </Grid>
+                  )}
+                </Grid>
+              )}
             </Grid>
 
             <Box sx={{ mt: 4, textAlign: 'center' }}>
@@ -453,7 +521,7 @@ const ArtistSignup: React.FC = () => {
                 disabled={isLoading}
                 sx={{ px: 6, py: 1.5 }}
               >
-                {isLoading ? 'Creating Account...' : 'Join as Artist'}
+                {isLoading ? (isCompletingProfile ? 'Saving Profile...' : 'Creating Account...') : (isCompletingProfile ? 'Complete Profile' : 'Join as Artist')}
               </Button>
               
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>

@@ -12,7 +12,14 @@ router.get('/', async (req, res) => {
     const { category, subcategory, status, userId, search } = req.query;
     
     let query = `
-      SELECT l.*, u.business_name as artist_name, u.cognito_username
+      SELECT l.*, 
+        COALESCE(
+          u.business_name,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
+          u.cognito_username,
+          u.email
+        ) as artist_name,
+        u.cognito_username
       FROM listings l
       JOIN users u ON l.user_id = u.id
       WHERE 1=1
@@ -71,7 +78,15 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     
     const [rows] = await pool.execute(
-      `SELECT l.*, u.business_name as artist_name, u.cognito_username, u.email as artist_email
+      `SELECT l.*, 
+        COALESCE(
+          u.business_name,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
+          u.cognito_username,
+          u.email
+        ) as artist_name,
+        u.cognito_username, 
+        u.email as artist_email
        FROM listings l
        JOIN users u ON l.user_id = u.id
        WHERE l.id = ?`,
@@ -157,9 +172,10 @@ router.post('/', async (req, res) => {
       // User doesn't exist in database, create a basic user record
       // We'll use the cognito_username as email if email is not provided
       // This allows users to create listings even if they haven't completed full signup
+      // Note: first_name and last_name will be NULL initially and can be updated later
       try {
         const [result] = await pool.execute(
-          `INSERT INTO users (cognito_username, email) VALUES (?, ?)`,
+          `INSERT INTO users (cognito_username, email, first_name, last_name) VALUES (?, ?, NULL, NULL)`,
           [cognito_username, cognito_username] // Use username as email placeholder
         );
         user_id = result.insertId;

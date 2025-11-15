@@ -16,15 +16,17 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import apiService from '../services/api';
 
 const ConfirmSignup: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { confirmSignUp, resendConfirmationCode } = useAuth();
   
-  // Get email and username from location state
+  // Get email, username, and user data from location state
   const emailFromState = location.state?.email || '';
   const usernameFromState = location.state?.username || '';
+  const userDataFromState = location.state?.userData || null;
   const [email, setEmail] = useState(emailFromState);
   const [username, setUsername] = useState(usernameFromState);
   const [code, setCode] = useState('');
@@ -88,6 +90,20 @@ const ConfirmSignup: React.FC = () => {
         return;
       }
       await confirmSignUp(identifier, code);
+      
+      // Try to save user data to database if it wasn't saved during signup
+      if (userDataFromState && username) {
+        try {
+          await apiService.createOrUpdateUser({
+            cognito_username: username,
+            ...userDataFromState,
+          });
+        } catch (dbError) {
+          console.error('Error saving user data after confirmation:', dbError);
+          // Don't fail confirmation if database save fails
+        }
+      }
+      
       setSuccess(true);
       setTimeout(() => {
         navigate('/artist-signin', { 

@@ -22,7 +22,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (usernameOrEmail: string, password: string) => Promise<void>;
+  signIn: (usernameOrEmail: string, password: string) => Promise<{ username: string } | null>;
   signUp: (email: string, password: string, attributes: Record<string, string>, username?: string) => Promise<void>;
   signOut: () => Promise<void>;
   confirmSignUp: (usernameOrEmail: string, code: string) => Promise<void>;
@@ -99,6 +99,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await signIn({ username: usernameOrEmail, password });
       await checkAuthState();
+      // Return the current user so caller can check if they exist in DB
+      const cognitoUser = await getCurrentUser();
+      return cognitoUser;
     } catch (error: any) {
       throw new Error(error.message || 'Sign in failed');
     }

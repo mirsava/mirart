@@ -57,9 +57,18 @@ router.post('/', async (req, res) => {
           experience_level = ?, bio = ?, profile_image_url = ?
         WHERE cognito_username = ?`,
         [
-          email, first_name, last_name, business_name,
-          phone, country, website, JSON.stringify(specialties || []),
-          experience_level, bio, profile_image_url, cognito_username
+          (email && email.trim()) || null, 
+          (first_name && first_name.trim()) || null, 
+          (last_name && last_name.trim()) || null, 
+          (business_name && business_name.trim()) || null,
+          (phone && phone.trim()) || null, 
+          (country && country.trim()) || null, 
+          (website && website.trim()) || null, 
+          specialties ? JSON.stringify(specialties) : null,
+          (experience_level && experience_level.trim()) || null, 
+          (bio && bio.trim()) || null, 
+          (profile_image_url && profile_image_url.trim()) || null, 
+          cognito_username
         ]
       );
       
@@ -77,9 +86,18 @@ router.post('/', async (req, res) => {
           phone, country, website, specialties, experience_level, bio, profile_image_url
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          cognito_username, email, first_name, last_name, business_name,
-          phone, country, website, JSON.stringify(specialties || []),
-          experience_level, bio, profile_image_url
+          cognito_username, 
+          (email && email.trim()) || null, 
+          (first_name && first_name.trim()) || null, 
+          (last_name && last_name.trim()) || null, 
+          (business_name && business_name.trim()) || null,
+          (phone && phone.trim()) || null, 
+          (country && country.trim()) || null, 
+          (website && website.trim()) || null, 
+          specialties ? JSON.stringify(specialties) : null,
+          (experience_level && experience_level.trim()) || null, 
+          (bio && bio.trim()) || null, 
+          (profile_image_url && profile_image_url.trim()) || null
         ]
       );
       
@@ -126,9 +144,17 @@ router.put('/:cognitoUsername', async (req, res) => {
         experience_level = ?, bio = ?, profile_image_url = ?
       WHERE cognito_username = ?`,
       [
-        first_name, last_name, business_name,
-        phone, country, website, JSON.stringify(specialties || []),
-        experience_level, bio, profile_image_url, cognitoUsername
+        (first_name && first_name.trim()) || null, 
+        (last_name && last_name.trim()) || null, 
+        (business_name && business_name.trim()) || null,
+        (phone && phone.trim()) || null, 
+        (country && country.trim()) || null, 
+        (website && website.trim()) || null, 
+        specialties ? JSON.stringify(specialties) : null,
+        (experience_level && experience_level.trim()) || null, 
+        (bio && bio.trim()) || null, 
+        (profile_image_url && profile_image_url.trim()) || null, 
+        cognitoUsername
       ]
     );
     

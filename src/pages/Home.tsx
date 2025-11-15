@@ -22,14 +22,44 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
+import apiService, { Listing } from '../services/api';
+import { Painting } from '../types';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const featuredPaintings = artworks.filter(item => item.category === 'Painting').slice(0, 3);
+  const [featuredPaintings, setFeaturedPaintings] = useState<Painting[]>([]);
+  const [loading, setLoading] = useState(true);
   const featuredWoodworking = artworks.filter(item => item.category === 'Woodworking').slice(0, 3);
   const [currentImage, setCurrentImage] = useState<number>(0);
+
+  const getImageUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return baseUrl + url;
+  };
+
+  const convertListingToPainting = (listing: Listing): Painting => {
+    return {
+      id: listing.id,
+      title: listing.title,
+      artist: listing.artist_name || 'Unknown Artist',
+      price: listing.price,
+      image: getImageUrl(listing.primary_image_url) || '',
+      description: listing.description || '',
+      category: 'Painting' as const,
+      subcategory: listing.subcategory || '',
+      dimensions: listing.dimensions || '',
+      medium: listing.medium || '',
+      year: listing.year || new Date().getFullYear(),
+      inStock: listing.in_stock,
+    };
+  };
 
   const heroImages = [
     'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=1200&h=800&fit=crop',
@@ -42,6 +72,42 @@ const Home: React.FC = () => {
       setCurrentImage((prev) => (prev + 1) % heroImages.length);
     }, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchFeaturedListings = async () => {
+      try {
+        const listings = await apiService.getListings({ status: 'active', category: 'Painting' });
+        const dbPaintings = listings.map(convertListingToPainting);
+        
+        // Get mock paintings as fallback
+        const mockPaintings = artworks.filter(item => item.category === 'Painting') as Painting[];
+        
+        // Combine: DB paintings first, then fill remaining slots with mock data
+        const combinedPaintings = [...dbPaintings];
+        const remainingSlots = 3 - combinedPaintings.length;
+        
+        if (remainingSlots > 0) {
+          // Filter out mock paintings that are already in the DB (by ID)
+          const dbIds = new Set(dbPaintings.map(p => p.id));
+          const availableMockPaintings = mockPaintings.filter(p => !dbIds.has(p.id));
+          
+          // Add mock paintings to fill remaining slots
+          combinedPaintings.push(...availableMockPaintings.slice(0, remainingSlots));
+        }
+        
+        setFeaturedPaintings(combinedPaintings.slice(0, 3));
+      } catch (error) {
+        console.error('Error fetching featured listings:', error);
+        // Fallback to mock data if API fails
+        const fallbackPaintings = artworks.filter(item => item.category === 'Painting').slice(0, 3);
+        setFeaturedPaintings(fallbackPaintings as Painting[]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeaturedListings();
   }, []);
 
 
@@ -756,13 +822,27 @@ const Home: React.FC = () => {
           </Typography>
         </Box>
 
-        <Grid container spacing={4}>
-          {featuredPaintings.map((painting) => (
-            <Grid item xs={12} sm={6} md={4} key={painting.id}>
-              <PaintingCard painting={painting} />
-            </Grid>
-          ))}
-        </Grid>
+        {loading ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="body1" color="text.secondary">
+              Loading featured paintings...
+            </Typography>
+          </Box>
+        ) : featuredPaintings.length > 0 ? (
+          <Grid container spacing={4}>
+            {featuredPaintings.map((painting) => (
+              <Grid item xs={12} sm={6} md={4} key={painting.id}>
+                <PaintingCard painting={painting} />
+              </Grid>
+            ))}
+          </Grid>
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="body1" color="text.secondary">
+              No featured paintings available at the moment.
+            </Typography>
+          </Box>
+        )}
 
         <Box sx={{ textAlign: 'center', mt: 6 }}>
           <Button
