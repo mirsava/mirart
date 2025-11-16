@@ -1,4 +1,4 @@
-# MirArt - Premium Art Gallery
+# ArtZyla - Premium Art Gallery
 
 A modern, responsive e-commerce website for selling original paintings built with React and Material-UI.
 
@@ -35,7 +35,7 @@ A modern, responsive e-commerce website for selling original paintings built wit
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd mirart
+cd artzyla
 ```
 
 2. Install dependencies:

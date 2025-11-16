@@ -1,7 +1,7 @@
 {
   "name": "mirart-backend",
   "version": "1.0.0",
-  "description": "Backend API for MirArt marketplace",
+  "description": "Backend API for ArtZyla marketplace",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -9,6 +9,8 @@
     "dev": "nodemon server.js",
     "init-db": "node database/init.js",
     "migrate": "node database/run-migration.js",
+    "migrate-signature": "node database/run-signature-migration.js",
+    "migrate-auction": "node database/run-auction-migration.js",
     "rename-column": "node rename-column.js",
     "reset-db": "node scripts/reset-database.js"
   },

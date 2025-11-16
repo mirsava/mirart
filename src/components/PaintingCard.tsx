@@ -8,6 +8,7 @@ import {
   Button,
   Box,
   Chip,
+  Link as MuiLink,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
@@ -66,14 +67,52 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting }) => {
           />
         </Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
-          by {painting.artist}
+          by{' '}
+          {painting.artistUsername ? (
+            <MuiLink
+              component="button"
+              variant="body2"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/artist/${painting.artistUsername}`);
+              }}
+              sx={{
+                color: 'text.secondary',
+                textDecoration: 'none',
+                '&:hover': {
+                  textDecoration: 'underline',
+                  color: 'primary.main',
+                },
+              }}
+            >
+              {painting.artist}
+            </MuiLink>
+          ) : (
+            painting.artist
+          )}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {painting.dimensions} • {painting.medium}
         </Typography>
-        <Typography variant="h6" color="primary" fontWeight="bold">
-          ${painting.price}
-        </Typography>
+        {painting.listing_type === 'auction' ? (
+          <Box>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Current Bid
+            </Typography>
+            <Typography variant="h6" color="primary" fontWeight="bold">
+              ${painting.current_bid || painting.starting_bid || 0}
+            </Typography>
+            {painting.auction_end_date && (
+              <Typography variant="caption" color="text.secondary">
+                Ends {new Date(painting.auction_end_date).toLocaleDateString()}
+              </Typography>
+            )}
+          </Box>
+        ) : (
+          <Typography variant="h6" color="primary" fontWeight="bold">
+            ${painting.price}
+          </Typography>
+        )}
       </CardContent>
       <CardActions sx={{ p: 2, pt: 0 }}>
         <Button
@@ -84,14 +123,24 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting }) => {
         >
           View Details
         </Button>
-        <Button
-          size="small"
-          variant="contained"
-          onClick={handleAddToCart}
-          disabled={!painting.inStock}
-        >
-          Add to Cart
-        </Button>
+        {painting.listing_type === 'auction' ? (
+          <Button
+            size="small"
+            variant="contained"
+            onClick={handleViewDetails}
+          >
+            Place Bid
+          </Button>
+        ) : (
+          <Button
+            size="small"
+            variant="contained"
+            onClick={handleAddToCart}
+            disabled={!painting.inStock}
+          >
+            Add to Cart
+          </Button>
+        )}
       </CardActions>
     </Card>
   );

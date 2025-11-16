@@ -1,6 +1,6 @@
-# MirArt Backend API
+# ArtZyla Backend API
 
-Backend API for the MirArt marketplace built with Express.js and MySQL.
+Backend API for the ArtZyla marketplace built with Express.js and MySQL.
 
 ## Setup Instructions
 

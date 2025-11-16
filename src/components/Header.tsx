@@ -15,7 +15,6 @@ import {
   useMediaQuery,
   useTheme,
   Container,
-  Chip,
   Fade,
   Menu,
   MenuItem,
@@ -25,7 +24,6 @@ import {
 import {
   Menu as MenuIcon,
   ShoppingCart as ShoppingCartIcon,
-  Palette as PaletteIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
   Close as CloseIcon,
@@ -38,6 +36,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
+import logo from '../assets/images/logo.png';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -121,11 +120,28 @@ const Header: React.FC = () => {
     <Box sx={{ width: 280, height: '100%', bgcolor: 'background.paper' }}>
       <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <PaletteIcon sx={{ mr: 1, color: 'primary.main' }} />
-            <Typography variant="h6" fontWeight="bold" color="text.primary">
-              MirArt
-            </Typography>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              cursor: 'pointer',
+            }}
+            onClick={() => {
+              navigate('/');
+              handleDrawerToggle();
+            }}
+          >
+            <Box
+              component="img"
+              src={logo}
+              alt="ArtZyla Logo"
+              sx={{
+                height: 90,
+                width: 'auto',
+                objectFit: 'contain',
+                py: 1,
+              }}
+            />
           </Box>
           <IconButton onClick={handleDrawerToggle} color="inherit">
             <CloseIcon />
@@ -301,28 +317,20 @@ const Header: React.FC = () => {
               onClick={() => navigate('/')}
             >
               <Box
+                component="img"
+                src={logo}
+                alt="ArtZyla Logo"
                 sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  p: 1,
-                  borderRadius: 2,
-                  bgcolor: 'primary.main',
-                  transition: 'all 0.3s ease',
+                  height: 90,
+                  width: 'auto',
+                  objectFit: 'contain',
+                  py: 1,
+                  transition: 'opacity 0.3s ease',
+                  '&:hover': {
+                    opacity: 0.8,
+                  },
                 }}
-              >
-                <PaletteIcon sx={{ mr: 1, color: 'white' }} />
-                <Typography
-                  variant="h6"
-                  component="div"
-                  sx={{ 
-                    fontWeight: 700,
-                    color: 'white',
-                    letterSpacing: '0.5px',
-                  }}
-                >
-                  MirArt
-                </Typography>
-              </Box>
+              />
             </Box>
 
             {!isMobile && (

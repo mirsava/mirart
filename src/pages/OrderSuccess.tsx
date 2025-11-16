@@ -104,7 +104,7 @@ const OrderSuccess: React.FC = () => {
           </Box>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-            Questions about your order? Contact us at info@mirart.com
+            Questions about your order? Contact us at info@artzyla.com
           </Typography>
         </Paper>
       </Container>

@@ -64,7 +64,7 @@ Open your browser or use curl to check the health endpoint:
 http://localhost:3001/health
 ```
 
-You should see: `{"status":"ok","message":"MirArt API is running"}`
+You should see: `{"status":"ok","message":"ArtZyla API is running"}`
 
 ## Troubleshooting
 

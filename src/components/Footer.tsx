@@ -29,7 +29,7 @@ const Footer: React.FC = () => {
         <Grid container spacing={4}>
           <Grid item xs={12} sm={6} md={3}>
             <Typography variant="h6" gutterBottom>
-              MirArt
+              ArtZyla
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Premium original paintings for art lovers and collectors. Each piece is
@@ -96,7 +96,7 @@ const Footer: React.FC = () => {
               </IconButton>
             </Box>
             <Typography variant="body2" color="text.secondary">
-              Email: info@mirart.com
+              Email: info@artzyla.com
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Phone: (555) 123-4567
@@ -115,7 +115,7 @@ const Footer: React.FC = () => {
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            © 2023 MirArt. All rights reserved.
+            © 2023 ArtZyla. All rights reserved.
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Made with ❤️ for art lovers

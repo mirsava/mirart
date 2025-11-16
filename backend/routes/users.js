@@ -39,7 +39,8 @@ router.post('/', async (req, res) => {
       specialties,
       experience_level,
       bio,
-      profile_image_url
+      profile_image_url,
+      signature_url
     } = req.body;
     
     // Check if user exists
@@ -54,7 +55,7 @@ router.post('/', async (req, res) => {
         `UPDATE users SET 
           email = ?, first_name = ?, last_name = ?, business_name = ?, 
           phone = ?, country = ?, website = ?, specialties = ?, 
-          experience_level = ?, bio = ?, profile_image_url = ?
+          experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?
         WHERE cognito_username = ?`,
         [
           (email && email.trim()) || null, 
@@ -67,7 +68,8 @@ router.post('/', async (req, res) => {
           specialties ? JSON.stringify(specialties) : null,
           (experience_level && experience_level.trim()) || null, 
           (bio && bio.trim()) || null, 
-          (profile_image_url && profile_image_url.trim()) || null, 
+          (profile_image_url && profile_image_url.trim()) || null,
+          (signature_url && signature_url.trim()) || null,
           cognito_username
         ]
       );
@@ -83,8 +85,8 @@ router.post('/', async (req, res) => {
       const [result] = await pool.execute(
         `INSERT INTO users (
           cognito_username, email, first_name, last_name, business_name,
-          phone, country, website, specialties, experience_level, bio, profile_image_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          phone, country, website, specialties, experience_level, bio, profile_image_url, signature_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           cognito_username, 
           (email && email.trim()) || null, 
@@ -97,7 +99,8 @@ router.post('/', async (req, res) => {
           specialties ? JSON.stringify(specialties) : null,
           (experience_level && experience_level.trim()) || null, 
           (bio && bio.trim()) || null, 
-          (profile_image_url && profile_image_url.trim()) || null
+          (profile_image_url && profile_image_url.trim()) || null,
+          (signature_url && signature_url.trim()) || null
         ]
       );
       
@@ -134,14 +137,15 @@ router.put('/:cognitoUsername', async (req, res) => {
       specialties,
       experience_level,
       bio,
-      profile_image_url
+      profile_image_url,
+      signature_url
     } = req.body;
     
     await pool.execute(
       `UPDATE users SET 
         first_name = ?, last_name = ?, business_name = ?, 
         phone = ?, country = ?, website = ?, specialties = ?, 
-        experience_level = ?, bio = ?, profile_image_url = ?
+        experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?
       WHERE cognito_username = ?`,
       [
         (first_name && first_name.trim()) || null, 
@@ -153,7 +157,8 @@ router.put('/:cognitoUsername', async (req, res) => {
         specialties ? JSON.stringify(specialties) : null,
         (experience_level && experience_level.trim()) || null, 
         (bio && bio.trim()) || null, 
-        (profile_image_url && profile_image_url.trim()) || null, 
+        (profile_image_url && profile_image_url.trim()) || null,
+        (signature_url && signature_url.trim()) || null,
         cognitoUsername
       ]
     );

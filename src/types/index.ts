@@ -2,7 +2,14 @@ export interface Artwork {
   id: number;
   title: string;
   artist: string;
+  artistUsername?: string;
   price: number;
+  listing_type?: 'fixed_price' | 'auction';
+  starting_bid?: number;
+  current_bid?: number;
+  reserve_price?: number;
+  auction_end_date?: string;
+  bid_count?: number;
   image: string;
   description: string;
   category: 'Painting' | 'Woodworking';

@@ -18,6 +18,7 @@ import Contact from './pages/Contact';
 import ArtistSignup from './pages/ArtistSignup';
 import ArtistSignin from './pages/ArtistSignin';
 import ArtistDashboard from './pages/ArtistDashboard';
+import ArtistProfile from './pages/ArtistProfile';
 import CreateListing from './pages/CreateListing';
 import EditListing from './pages/EditListing';
 import ForgotPassword from './pages/ForgotPassword';
@@ -61,10 +62,11 @@ function AppContent(): JSX.Element {
             <Route path="/order-success" element={<OrderSuccess />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="/artist-signup" element={<ArtistSignup />} />
-            <Route path="/artist-signin" element={<ArtistSignin />} />
-            <Route path="/confirm-signup" element={<ConfirmSignup />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/artist-signup" element={<ArtistSignup />} />
+                    <Route path="/artist-signin" element={<ArtistSignin />} />
+                    <Route path="/artist/:username" element={<ArtistProfile />} />
+                    <Route path="/confirm-signup" element={<ConfirmSignup />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route 
               path="/artist-dashboard" 
               element={

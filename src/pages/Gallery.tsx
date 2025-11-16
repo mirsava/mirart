@@ -12,14 +12,19 @@ import {
   Chip,
   Stack,
   CircularProgress,
+  Card,
+  CardContent,
+  Button,
 } from '@mui/material';
-import { Search as SearchIcon } from '@mui/icons-material';
+import { Search as SearchIcon, Add as AddIcon } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
 import apiService, { Listing } from '../services/api';
 import { Painting } from '../types';
 
 const Gallery: React.FC = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [sortBy, setSortBy] = useState<string>('title');
@@ -41,7 +46,14 @@ const Gallery: React.FC = () => {
       id: listing.id,
       title: listing.title,
       artist: listing.artist_name || 'Unknown Artist',
+      artistUsername: listing.cognito_username,
       price: listing.price,
+      listing_type: listing.listing_type,
+      starting_bid: listing.starting_bid,
+      current_bid: listing.current_bid,
+      reserve_price: listing.reserve_price,
+      auction_end_date: listing.auction_end_date,
+      bid_count: listing.bid_count,
       image: getImageUrl(listing.primary_image_url) || '',
       description: listing.description || '',
       category: listing.category as 'Painting' | 'Woodworking',
@@ -59,20 +71,10 @@ const Gallery: React.FC = () => {
       try {
         const listings = await apiService.getListings({ status: 'active' });
         const dbPaintings = listings.map(convertListingToPainting);
-        
-        // Get mock paintings as fallback
-        const mockPaintings = artworks as Painting[];
-        
-        // Combine: DB paintings first, then add mock data (avoiding duplicates by ID)
-        const dbIds = new Set(dbPaintings.map(p => p.id));
-        const availableMockPaintings = mockPaintings.filter(p => !dbIds.has(p.id));
-        
-        const combinedPaintings = [...dbPaintings, ...availableMockPaintings];
-        setPaintings(combinedPaintings);
+        setPaintings(dbPaintings);
       } catch (error) {
         console.error('Error fetching listings:', error);
-        // Fallback to mock data if API fails
-        setPaintings(artworks as Painting[]);
+        setPaintings([]);
       } finally {
         setLoading(false);
       }
@@ -203,6 +205,54 @@ const Gallery: React.FC = () => {
                 <PaintingCard painting={painting} />
               </Grid>
             ))}
+            <Grid item xs={12} sm={6} md={4} lg={3}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  border: '2px dashed',
+                  borderColor: 'divider',
+                  bgcolor: 'background.paper',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: 'action.hover',
+                    transform: 'translateY(-4px)',
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    height: 300,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'grey.50',
+                  }}
+                >
+                  <AddIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5 }} />
+                </Box>
+                <CardContent sx={{ flexGrow: 1, textAlign: 'center', py: 4 }}>
+                  <Typography variant="h6" gutterBottom color="text.secondary">
+                    Your Artwork Here
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Join our community and showcase your work
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => navigate('/artist-signup')}
+                    sx={{
+                      textTransform: 'none',
+                    }}
+                  >
+                    Add Your Listing
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
         )}
       </Container>

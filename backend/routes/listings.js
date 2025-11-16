@@ -180,7 +180,12 @@ router.post('/', async (req, res) => {
       description,
       category,
       subcategory,
+      listing_type = 'fixed_price',
       price,
+      starting_bid,
+      current_bid,
+      reserve_price,
+      auction_end_date,
       primary_image_url,
       image_urls,
       dimensions,
@@ -200,8 +205,14 @@ router.post('/', async (req, res) => {
     if (!category) {
       return res.status(400).json({ error: 'category is required' });
     }
-    if (price === undefined || price === null) {
-      return res.status(400).json({ error: 'price is required' });
+    if (listing_type === 'fixed_price' && (price === undefined || price === null)) {
+      return res.status(400).json({ error: 'price is required for fixed price listings' });
+    }
+    if (listing_type === 'auction' && (starting_bid === undefined || starting_bid === null)) {
+      return res.status(400).json({ error: 'starting_bid is required for auction listings' });
+    }
+    if (listing_type === 'auction' && !auction_end_date) {
+      return res.status(400).json({ error: 'auction_end_date is required for auction listings' });
     }
     
     // Validate image_urls (max 10 images)
@@ -265,16 +276,23 @@ router.post('/', async (req, res) => {
     
     const [result] = await pool.execute(
       `INSERT INTO listings (
-        user_id, title, description, category, subcategory, 
-        price, primary_image_url, image_urls, dimensions, medium, year, in_stock, status, shipping_info, returns_info
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        user_id, title, description, category, subcategory, listing_type,
+        price, starting_bid, current_bid, reserve_price, auction_end_date, bid_count,
+        primary_image_url, image_urls, dimensions, medium, year, in_stock, status, shipping_info, returns_info
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user_id, 
         title, 
         description || null, 
         category, 
         subcategory || null,
-        parseFloat(price), 
+        listing_type,
+        listing_type === 'fixed_price' ? parseFloat(price) : null,
+        listing_type === 'auction' ? parseFloat(starting_bid) : null,
+        listing_type === 'auction' ? (current_bid ? parseFloat(current_bid) : parseFloat(starting_bid)) : null,
+        listing_type === 'auction' && reserve_price ? parseFloat(reserve_price) : null,
+        listing_type === 'auction' && auction_end_date ? new Date(auction_end_date) : null,
+        listing_type === 'auction' ? 0 : null,
         primary_image_url || null, 
         imageUrlsJson, 
         dimensions || null, 
@@ -374,7 +392,11 @@ router.put('/:id', async (req, res) => {
       description,
       category,
       subcategory,
+      listing_type,
       price,
+      starting_bid,
+      reserve_price,
+      auction_end_date,
       primary_image_url,
       image_urls,
       dimensions,
@@ -417,7 +439,11 @@ router.put('/:id', async (req, res) => {
     if (description !== undefined) { updateFields.push('description = ?'); updateValues.push(description); }
     if (category !== undefined) { updateFields.push('category = ?'); updateValues.push(category); }
     if (subcategory !== undefined) { updateFields.push('subcategory = ?'); updateValues.push(subcategory); }
+    if (listing_type !== undefined) { updateFields.push('listing_type = ?'); updateValues.push(listing_type); }
     if (price !== undefined) { updateFields.push('price = ?'); updateValues.push(price); }
+    if (starting_bid !== undefined) { updateFields.push('starting_bid = ?'); updateValues.push(starting_bid); }
+    if (reserve_price !== undefined) { updateFields.push('reserve_price = ?'); updateValues.push(reserve_price || null); }
+    if (auction_end_date !== undefined) { updateFields.push('auction_end_date = ?'); updateValues.push(auction_end_date ? new Date(auction_end_date) : null); }
     if (primary_image_url !== undefined) { updateFields.push('primary_image_url = ?'); updateValues.push(primary_image_url); }
     if (image_urls !== undefined) { updateFields.push('image_urls = ?'); updateValues.push(imageUrlsArray ? JSON.stringify(imageUrlsArray) : null); }
     if (dimensions !== undefined) { updateFields.push('dimensions = ?'); updateValues.push(dimensions); }

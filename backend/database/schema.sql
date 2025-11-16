@@ -1,4 +1,4 @@
--- MirArt Marketplace Database Schema
+-- ArtZyla Marketplace Database Schema
 
 -- Create database if it doesn't exist
 CREATE DATABASE IF NOT EXISTS mirart;

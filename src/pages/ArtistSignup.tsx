@@ -63,13 +63,6 @@ const ArtistSignup: React.FC = () => {
   const specialties = [
     'Painting',
     'Woodworking',
-    'Sculpture',
-    'Photography',
-    'Digital Art',
-    'Ceramics',
-    'Textiles',
-    'Jewelry',
-    'Mixed Media',
     'Other',
   ];
 

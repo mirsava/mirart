@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { artworks } from '../data/paintings';
@@ -30,8 +31,10 @@ const Home: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [featuredPaintings, setFeaturedPaintings] = useState<Painting[]>([]);
+  const [featuredWoodworking, setFeaturedWoodworking] = useState<Painting[]>([]);
   const [loading, setLoading] = useState(true);
-  const featuredWoodworking = artworks.filter(item => item.category === 'Woodworking').slice(0, 3);
+  const [paintingPlaceholders, setPaintingPlaceholders] = useState(0);
+  const [woodworkingPlaceholders, setWoodworkingPlaceholders] = useState(0);
   const [currentImage, setCurrentImage] = useState<number>(0);
   const [shape1Animation, setShape1Animation] = useState({ translateY: 0, rotate: -15 });
   const [shape2Animation, setShape2Animation] = useState({ translateY: 0, rotate: 20 });
@@ -47,15 +50,22 @@ const Home: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Painting => {
+  const convertListingToPainting = (listing: Listing, category: 'Painting' | 'Woodworking' = 'Painting'): Painting => {
     return {
       id: listing.id,
       title: listing.title,
       artist: listing.artist_name || 'Unknown Artist',
+      artistUsername: listing.cognito_username,
       price: listing.price,
+      listing_type: listing.listing_type,
+      starting_bid: listing.starting_bid,
+      current_bid: listing.current_bid,
+      reserve_price: listing.reserve_price,
+      auction_end_date: listing.auction_end_date,
+      bid_count: listing.bid_count,
       image: getImageUrl(listing.primary_image_url) || '',
       description: listing.description || '',
-      category: 'Painting' as const,
+      category: category,
       subcategory: listing.subcategory || '',
       dimensions: listing.dimensions || '',
       medium: listing.medium || '',
@@ -120,31 +130,29 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchFeaturedListings = async () => {
       try {
-        const listings = await apiService.getListings({ status: 'active', category: 'Painting' });
-        const dbPaintings = listings.map(convertListingToPainting);
+        const [paintingsListings, woodworkingListings] = await Promise.all([
+          apiService.getListings({ status: 'active', category: 'Painting' }),
+          apiService.getListings({ status: 'active', category: 'Woodworking' }),
+        ]);
         
-        // Get mock paintings as fallback
-        const mockPaintings = artworks.filter(item => item.category === 'Painting') as Painting[];
+        const dbPaintings = paintingsListings.map(listing => convertListingToPainting(listing, 'Painting'));
+        const dbWoodworking = woodworkingListings.map(listing => convertListingToPainting(listing, 'Woodworking'));
         
-        // Combine: DB paintings first, then fill remaining slots with mock data
-        const combinedPaintings = [...dbPaintings];
-        const remainingSlots = 3 - combinedPaintings.length;
+        // Calculate how many placeholders are needed (up to 3 total items)
+        const remainingPaintingSlots = Math.max(0, 3 - dbPaintings.length);
+        const remainingWoodworkingSlots = Math.max(0, 3 - dbWoodworking.length);
         
-        if (remainingSlots > 0) {
-          // Filter out mock paintings that are already in the DB (by ID)
-          const dbIds = new Set(dbPaintings.map(p => p.id));
-          const availableMockPaintings = mockPaintings.filter(p => !dbIds.has(p.id));
-          
-          // Add mock paintings to fill remaining slots
-          combinedPaintings.push(...availableMockPaintings.slice(0, remainingSlots));
-        }
-        
-        setFeaturedPaintings(combinedPaintings.slice(0, 3));
+        setFeaturedPaintings(dbPaintings.slice(0, 3));
+        setFeaturedWoodworking(dbWoodworking.slice(0, 3));
+        setPaintingPlaceholders(remainingPaintingSlots);
+        setWoodworkingPlaceholders(remainingWoodworkingSlots);
       } catch (error) {
         console.error('Error fetching featured listings:', error);
-        // Fallback to mock data if API fails
-        const fallbackPaintings = artworks.filter(item => item.category === 'Painting').slice(0, 3);
-        setFeaturedPaintings(fallbackPaintings as Painting[]);
+        // On error, show all placeholders
+        setFeaturedPaintings([]);
+        setFeaturedWoodworking([]);
+        setPaintingPlaceholders(3);
+        setWoodworkingPlaceholders(3);
       } finally {
         setLoading(false);
       }
@@ -684,8 +692,8 @@ const Home: React.FC = () => {
                     Discover
                     <br />
                     <Box component="span" sx={{ 
-                      fontWeight: 400,
-                      color: 'primary.main',
+                      fontWeight: 700,
+                      color: '#ffffff',
                     }}>
                       Handmade Art
                     </Box>
@@ -789,9 +797,9 @@ const Home: React.FC = () => {
                           width: '100%',
                           height: '100%',
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, rgba(26,35,126,0.5) 0%, rgba(83,75,174,0.4) 100%)',
+                          background: 'linear-gradient(135deg, rgba(26,35,126,0.3) 0%, rgba(83,75,174,0.25) 100%)',
                           position: 'relative',
-                          boxShadow: '0 20px 60px rgba(26,35,126,0.2)',
+                          boxShadow: '0 20px 60px rgba(26,35,126,0.15)',
                           '&::before': {
                             content: '""',
                             position: 'absolute',
@@ -800,7 +808,7 @@ const Home: React.FC = () => {
                             width: '60%',
                             height: '60%',
                             borderRadius: '50%',
-                            background: 'rgba(83,75,174,0.2)',
+                            background: 'rgba(83,75,174,0.12)',
                             filter: 'blur(20px)',
                           },
                           '&::after': {
@@ -811,7 +819,7 @@ const Home: React.FC = () => {
                             width: '40%',
                             height: '40%',
                             borderRadius: '50%',
-                            background: 'rgba(26,35,126,0.25)',
+                            background: 'rgba(26,35,126,0.15)',
                             filter: 'blur(15px)',
                           },
                         }}
@@ -846,9 +854,9 @@ const Home: React.FC = () => {
                           width: '100%',
                           height: '100%',
                           clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
-                          background: 'linear-gradient(45deg, rgba(255,152,0,0.5) 0%, rgba(255,193,7,0.4) 100%)',
+                          background: 'linear-gradient(45deg, rgba(255,152,0,0.3) 0%, rgba(255,193,7,0.25) 100%)',
                           position: 'relative',
-                          boxShadow: '0 20px 60px rgba(255,152,0,0.2)',
+                          boxShadow: '0 20px 60px rgba(255,152,0,0.15)',
                           '&::before': {
                             content: '""',
                             position: 'absolute',
@@ -857,7 +865,7 @@ const Home: React.FC = () => {
                             width: '50%',
                             height: '50%',
                             clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
-                            background: 'rgba(255,193,7,0.2)',
+                            background: 'rgba(255,193,7,0.12)',
                             filter: 'blur(20px)',
                           },
                           '&::after': {
@@ -868,7 +876,7 @@ const Home: React.FC = () => {
                             width: '35%',
                             height: '35%',
                             clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
-                            background: 'rgba(255,152,0,0.25)',
+                            background: 'rgba(255,152,0,0.15)',
                             filter: 'blur(15px)',
                           },
                         }}
@@ -904,9 +912,9 @@ const Home: React.FC = () => {
                           width: '100%',
                           height: '100%',
                           clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-                          background: 'linear-gradient(60deg, rgba(26,35,126,0.5) 0%, rgba(83,75,174,0.4) 100%)',
+                          background: 'linear-gradient(60deg, rgba(26,35,126,0.3) 0%, rgba(83,75,174,0.25) 100%)',
                           position: 'relative',
-                          boxShadow: '0 20px 60px rgba(26,35,126,0.2)',
+                          boxShadow: '0 20px 60px rgba(26,35,126,0.15)',
                           '&::before': {
                             content: '""',
                             position: 'absolute',
@@ -915,7 +923,7 @@ const Home: React.FC = () => {
                             width: '60%',
                             height: '60%',
                             clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-                            background: 'rgba(83,75,174,0.2)',
+                            background: 'rgba(83,75,174,0.12)',
                             filter: 'blur(20px)',
                           },
                           '&::after': {
@@ -926,7 +934,7 @@ const Home: React.FC = () => {
                             width: '40%',
                             height: '40%',
                             clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-                            background: 'rgba(26,35,126,0.25)',
+                            background: 'rgba(26,35,126,0.15)',
                             filter: 'blur(15px)',
                           },
                         }}
@@ -1000,20 +1008,64 @@ const Home: React.FC = () => {
               Loading featured paintings...
             </Typography>
           </Box>
-        ) : featuredPaintings.length > 0 ? (
+        ) : (
           <Grid container spacing={4}>
             {featuredPaintings.map((painting) => (
               <Grid item xs={12} sm={6} md={4} key={painting.id}>
                 <PaintingCard painting={painting} />
               </Grid>
             ))}
+            {Array.from({ length: paintingPlaceholders }).map((_, index) => (
+              <Grid item xs={12} sm={6} md={4} key={`placeholder-${index}`}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    border: '2px dashed',
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      bgcolor: 'action.hover',
+                      transform: 'translateY(-4px)',
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      height: 300,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'grey.50',
+                    }}
+                  >
+                    <AddIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5 }} />
+                  </Box>
+                  <CardContent sx={{ flexGrow: 1, textAlign: 'center', py: 4 }}>
+                    <Typography variant="h6" gutterBottom color="text.secondary">
+                      Your Artwork Here
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      Share your paintings with our community
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={() => navigate('/artist-signup')}
+                      sx={{
+                        textTransform: 'none',
+                      }}
+                    >
+                      Add Your Listing
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
           </Grid>
-        ) : (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="body1" color="text.secondary">
-              No featured paintings available at the moment.
-            </Typography>
-          </Box>
         )}
 
         <Box sx={{ textAlign: 'center', mt: 6 }}>
@@ -1060,6 +1112,56 @@ const Home: React.FC = () => {
             {featuredWoodworking.map((item) => (
               <Grid item xs={12} sm={6} md={4} key={item.id}>
                 <PaintingCard painting={item} />
+              </Grid>
+            ))}
+            {Array.from({ length: woodworkingPlaceholders }).map((_, index) => (
+              <Grid item xs={12} sm={6} md={4} key={`placeholder-woodworking-${index}`}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    border: '2px dashed',
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      bgcolor: 'action.hover',
+                      transform: 'translateY(-4px)',
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      height: 300,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'grey.50',
+                    }}
+                  >
+                    <AddIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5 }} />
+                  </Box>
+                  <CardContent sx={{ flexGrow: 1, textAlign: 'center', py: 4 }}>
+                    <Typography variant="h6" gutterBottom color="text.secondary">
+                      Your Woodworking Here
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      Showcase your handcrafted pieces
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={() => navigate('/artist-signup')}
+                      sx={{
+                        textTransform: 'none',
+                      }}
+                    >
+                      Add Your Listing
+                    </Button>
+                  </CardContent>
+                </Card>
               </Grid>
             ))}
           </Grid>

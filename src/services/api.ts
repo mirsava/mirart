@@ -14,6 +14,7 @@ export interface User {
   experience_level?: string;
   bio?: string;
   profile_image_url?: string;
+  signature_url?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -26,6 +27,12 @@ export interface Listing {
   category: string;
   subcategory?: string;
   price: number;
+  listing_type: 'fixed_price' | 'auction';
+  starting_bid?: number;
+  current_bid?: number;
+  reserve_price?: number;
+  auction_end_date?: string;
+  bid_count?: number;
   primary_image_url?: string;
   image_urls?: string[];
   dimensions?: string;
@@ -82,20 +89,27 @@ class ApiService {
   ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-    
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(error.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error: any) {
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        throw new Error('Failed to connect to server. Please check if the backend is running.');
+      }
+      throw error;
     }
-    
-    return response.json();
   }
 
   // User endpoints

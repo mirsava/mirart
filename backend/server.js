@@ -49,7 +49,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'MirArt API is running' });
+  res.json({ status: 'ok', message: 'ArtZyla API is running' });
 });
 
 // Routes

@@ -40,6 +40,21 @@ import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User } from '../services/api';
 import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField } from '@mui/material';
+import SignatureInput from '../components/SignatureInput';
+
+const dataURLtoBlob = (dataURL: string): Promise<Blob> => {
+  return new Promise((resolve) => {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    resolve(new Blob([u8arr], { type: mime }));
+  });
+};
 
 const getImageUrl = (url?: string): string | undefined => {
   if (!url) return undefined;
@@ -102,6 +117,7 @@ const ArtistDashboard: React.FC = () => {
     specialties: [] as string[],
     experience: '',
     bio: '',
+    signatureUrl: '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -157,6 +173,7 @@ const ArtistDashboard: React.FC = () => {
         specialties: data.specialties ? (typeof data.specialties === 'string' ? JSON.parse(data.specialties) : data.specialties) : [],
         experience: data.experience_level || '',
         bio: data.bio || '',
+        signatureUrl: data.signature_url || '',
       });
     } catch (err: any) {
       setProfileError(err.message || 'Failed to load profile');
@@ -201,6 +218,34 @@ const ArtistDashboard: React.FC = () => {
     setProfileSuccess(false);
 
     try {
+      let signatureUrl = profileFormData.signatureUrl || null;
+      
+      if (signatureUrl && signatureUrl.startsWith('data:')) {
+        try {
+          const blob = await dataURLtoBlob(signatureUrl);
+          const formData = new FormData();
+          formData.append('image', blob, 'signature.png');
+
+          const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
+          const response = await fetch(`${API_BASE_URL}/upload/image`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to upload signature');
+          }
+
+          const data = await response.json();
+          signatureUrl = data.url;
+        } catch (error) {
+          console.error('Error uploading signature:', error);
+          setProfileError('Failed to upload signature. Please try again.');
+          setSavingProfile(false);
+          return;
+        }
+      }
+
       await apiService.updateUser(user.id, {
         first_name: profileFormData.firstName,
         last_name: profileFormData.lastName,
@@ -211,6 +256,7 @@ const ArtistDashboard: React.FC = () => {
         specialties: profileFormData.specialties,
         experience_level: profileFormData.experience,
         bio: profileFormData.bio || null,
+        signature_url: signatureUrl,
       });
 
       setProfileSuccess(true);
@@ -686,7 +732,7 @@ const ArtistDashboard: React.FC = () => {
                       Specialties
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {['Painting', 'Woodworking', 'Sculpture', 'Photography', 'Digital Art', 'Ceramics', 'Textiles', 'Jewelry', 'Mixed Media', 'Other'].map((specialty) => (
+                      {['Painting', 'Woodworking', 'Other'].map((specialty) => (
                         <Chip
                           key={specialty}
                           label={specialty}
@@ -707,6 +753,19 @@ const ArtistDashboard: React.FC = () => {
                       value={profileFormData.bio}
                       onChange={handleProfileInputChange('bio')}
                       placeholder="Tell us about yourself and your artistic journey..."
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <SignatureInput
+                      value={profileFormData.signatureUrl}
+                      onChange={(url) => {
+                        setProfileFormData(prev => ({
+                          ...prev,
+                          signatureUrl: url || '',
+                        }));
+                      }}
+                      disabled={savingProfile}
                     />
                   </Grid>
 

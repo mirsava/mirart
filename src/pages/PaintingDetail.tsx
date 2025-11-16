@@ -10,7 +10,7 @@ import {
   Divider,
   IconButton,
   Breadcrumbs,
-  Link,
+  Link as MuiLink,
   CircularProgress,
   Alert,
 } from '@mui/material';
@@ -21,7 +21,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import { useCart } from '../contexts/CartContext';
 import apiService, { Listing } from '../services/api';
@@ -52,7 +52,14 @@ const PaintingDetail: React.FC = () => {
       id: listing.id,
       title: listing.title,
       artist: listing.artist_name || 'Unknown Artist',
+      artistUsername: listing.cognito_username,
       price: listing.price,
+      listing_type: listing.listing_type,
+      starting_bid: listing.starting_bid,
+      current_bid: listing.current_bid,
+      reserve_price: listing.reserve_price,
+      auction_end_date: listing.auction_end_date,
+      bid_count: listing.bid_count,
       image: getImageUrl(listing.primary_image_url) || '',
       description: listing.description || '',
       category: listing.category as 'Painting' | 'Woodworking',
@@ -97,25 +104,95 @@ const PaintingDetail: React.FC = () => {
         if (!isNaN(listingId)) {
           try {
             const listing = await apiService.getListing(listingId);
+            console.log('Listing data:', listing);
+            console.log('Primary image URL:', listing.primary_image_url);
+            console.log('Image URLs:', listing.image_urls);
+            console.log('Image URLs type:', typeof listing.image_urls);
+            
             const convertedPainting = convertListingToPainting(listing);
             setPainting(convertedPainting);
             
-            const images = [];
-            if (listing.primary_image_url) {
-              images.push(getImageUrl(listing.primary_image_url));
-            }
-            if (listing.image_urls && listing.image_urls.length > 0) {
-              listing.image_urls.forEach(url => {
-                images.push(getImageUrl(url));
+            const images: string[] = [];
+            const seenUrls = new Set<string>();
+            
+            const addImage = (url: string | null | undefined) => {
+              if (!url) return;
+              const fullUrl = getImageUrl(url);
+              if (fullUrl && !seenUrls.has(fullUrl)) {
+                seenUrls.add(fullUrl);
+                images.push(fullUrl);
+              }
+            };
+            
+            addImage(listing.primary_image_url);
+            
+            if (listing.image_urls) {
+              let imageUrlsArray: string[] = [];
+              
+              if (Array.isArray(listing.image_urls)) {
+                listing.image_urls.forEach((item: any) => {
+                  if (typeof item === 'string') {
+                    if (item.includes(',')) {
+                      const split = item.split(',').map(url => url.trim()).filter(url => url);
+                      imageUrlsArray.push(...split);
+                    } else {
+                      imageUrlsArray.push(item);
+                    }
+                  }
+                });
+                console.log('Image URLs is array:', imageUrlsArray);
+              } else if (typeof listing.image_urls === 'string') {
+                const imageUrlsStr = listing.image_urls.trim();
+                console.log('Image URLs string:', imageUrlsStr);
+                
+                if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
+                  try {
+                    const parsed = JSON.parse(imageUrlsStr);
+                    console.log('Parsed JSON:', parsed);
+                    if (Array.isArray(parsed)) {
+                      if (parsed.length === 1 && typeof parsed[0] === 'string' && parsed[0].includes(',')) {
+                        imageUrlsArray = parsed[0].split(',').map(url => url.trim()).filter(url => url);
+                        console.log('Split comma-separated:', imageUrlsArray);
+                      } else {
+                        imageUrlsArray = parsed.filter((url: any) => url && typeof url === 'string');
+                      }
+                    } else if (typeof parsed === 'string' && parsed.includes(',')) {
+                      imageUrlsArray = parsed.split(',').map(url => url.trim()).filter(url => url);
+                    }
+                  } catch (e) {
+                    console.error('JSON parse error:', e);
+                    if (imageUrlsStr.includes(',')) {
+                      imageUrlsArray = imageUrlsStr.split(',').map(url => url.trim()).filter(url => url);
+                    } else {
+                      imageUrlsArray = [imageUrlsStr];
+                    }
+                  }
+                } else if (imageUrlsStr.includes(',')) {
+                  imageUrlsArray = imageUrlsStr.split(',').map(url => url.trim()).filter(url => url);
+                  console.log('Split by comma:', imageUrlsArray);
+                } else {
+                  imageUrlsArray = [imageUrlsStr];
+                }
+              }
+              
+              console.log('Final imageUrlsArray:', imageUrlsArray);
+              
+              imageUrlsArray.forEach(url => {
+                if (url && typeof url === 'string' && url.trim()) {
+                  addImage(url.trim());
+                }
               });
             }
-            setAllImages(images.length > 0 ? images : [convertedPainting.image]);
+            
+            console.log('Final images array:', images);
+            setAllImages(images.length > 0 ? images : [convertedPainting.image || '']);
             setCurrentImageIndex(0);
             setLoading(false);
             return;
-          } catch (apiError) {
+          } catch (apiError: any) {
             // If API fails, fall back to mock data
-            console.log('API fetch failed, trying mock data:', apiError);
+            console.error('API fetch failed, trying mock data:', apiError);
+            console.error('Error details:', apiError.message, apiError.stack);
           }
         }
 
@@ -129,8 +206,8 @@ const PaintingDetail: React.FC = () => {
           setError('Painting not found');
         }
       } catch (err: any) {
+        console.error('Error in fetchPainting:', err);
         setError(err.message || 'Failed to load painting');
-      } finally {
         setLoading(false);
       }
     };
@@ -195,22 +272,22 @@ const PaintingDetail: React.FC = () => {
     <Box sx={{ py: 4 }}>
       <Container maxWidth="lg">
         <Breadcrumbs sx={{ mb: 3 }}>
-          <Link
+          <MuiLink
             component="button"
             variant="body2"
             onClick={() => navigate('/')}
             sx={{ textDecoration: 'none' }}
           >
             Home
-          </Link>
-          <Link
+          </MuiLink>
+          <MuiLink
             component="button"
             variant="body2"
             onClick={() => navigate('/gallery')}
             sx={{ textDecoration: 'none' }}
           >
             Gallery
-          </Link>
+          </MuiLink>
           <Typography variant="body2" color="text.primary">
             {painting.title}
           </Typography>
@@ -401,12 +478,62 @@ const PaintingDetail: React.FC = () => {
                 </Typography>
 
                 <Typography variant="h6" color="text.secondary" gutterBottom>
-                  by {painting.artist}
+                  by{' '}
+                  {painting.artistUsername ? (
+                    <MuiLink
+                      component="button"
+                      variant="h6"
+                      onClick={() => navigate(`/artist/${painting.artistUsername}`)}
+                      sx={{
+                        color: 'text.secondary',
+                        textDecoration: 'none',
+                        '&:hover': {
+                          textDecoration: 'underline',
+                          color: 'primary.main',
+                        },
+                      }}
+                    >
+                      {painting.artist}
+                    </MuiLink>
+                  ) : (
+                    painting.artist
+                  )}
                 </Typography>
 
-                <Typography variant="h4" color="primary" sx={{ mb: 3 }}>
-                  ${painting.price}
-                </Typography>
+                {painting.listing_type === 'auction' ? (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="h4" color="primary" gutterBottom>
+                      ${painting.current_bid || painting.starting_bid || 0}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Current Bid
+                    </Typography>
+                    {painting.starting_bid && (
+                      <Typography variant="body2" color="text.secondary">
+                        Starting Bid: ${painting.starting_bid}
+                      </Typography>
+                    )}
+                    {painting.reserve_price && (
+                      <Typography variant="body2" color="text.secondary">
+                        Reserve Price: ${painting.reserve_price}
+                      </Typography>
+                    )}
+                    {painting.auction_end_date && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Auction ends: {new Date(painting.auction_end_date).toLocaleString()}
+                      </Typography>
+                    )}
+                    {painting.bid_count !== undefined && painting.bid_count > 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        {painting.bid_count} bid{painting.bid_count !== 1 ? 's' : ''}
+                      </Typography>
+                    )}
+                  </Box>
+                ) : (
+                  <Typography variant="h4" color="primary" sx={{ mb: 3 }}>
+                    ${painting.price}
+                  </Typography>
+                )}
 
                 <Typography variant="body1" paragraph>
                   {painting.description}
@@ -492,15 +619,29 @@ const PaintingDetail: React.FC = () => {
                 >
                   Back to Gallery
                 </Button>
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={handleAddToCart}
-                  disabled={!painting.inStock}
-                  sx={{ flexGrow: { xs: 1, sm: 0 } }}
-                >
-                  Add to Cart
-                </Button>
+                {painting.listing_type === 'auction' ? (
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={() => {
+                      // TODO: Implement bid placement
+                      alert('Bid placement coming soon!');
+                    }}
+                    sx={{ flexGrow: { xs: 1, sm: 0 } }}
+                  >
+                    Place Bid
+                  </Button>
+                ) : (
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={handleAddToCart}
+                    disabled={!painting.inStock}
+                    sx={{ flexGrow: { xs: 1, sm: 0 } }}
+                  >
+                    Add to Cart
+                  </Button>
+                )}
               </Box>
             </Box>
           </Grid>

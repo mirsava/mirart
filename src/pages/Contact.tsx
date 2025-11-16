@@ -14,7 +14,6 @@ import {
 import {
   Email as EmailIcon,
   Phone as PhoneIcon,
-  LocationOn as LocationIcon,
   Schedule as ScheduleIcon,
 } from '@mui/icons-material';
 
@@ -43,7 +42,7 @@ const Contact: React.FC = () => {
     {
       icon: <EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
       title: 'Email Us',
-      details: 'info@mirart.com',
+      details: 'info@artzyla.com',
       description: 'Send us an email anytime',
     },
     {
@@ -51,12 +50,6 @@ const Contact: React.FC = () => {
       title: 'Call Us',
       details: '(555) 123-4567',
       description: 'Mon-Fri 9AM-6PM EST',
-    },
-    {
-      icon: <LocationIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
-      title: 'Visit Us',
-      details: '123 Art Street, Gallery District',
-      description: 'New York, NY 10001',
     },
     {
       icon: <ScheduleIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
@@ -183,38 +176,55 @@ const Contact: React.FC = () => {
             <Grid item xs={12} md={6}>
               <Box sx={{ textAlign: 'left' }}>
                 <Typography variant="h6" gutterBottom>
-                  How do I know the painting is authentic?
+                  How does the marketplace work?
                 </Typography>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  Every painting comes with a certificate of authenticity and detailed 
-                  information about the artist and creation process.
+                  ArtZyla is a marketplace connecting artists and buyers. Each seller manages 
+                  their own listings, shipping, and customer service. You purchase directly from the artist.
                 </Typography>
 
                 <Typography variant="h6" gutterBottom>
-                  What is your return policy?
+                  What is the return policy?
                 </Typography>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  We offer a 30-day return policy for all purchases. If you're not 
-                  completely satisfied, we'll provide a full refund.
+                  Return policies are determined by each individual seller. Please check the 
+                  return information provided on each listing page before making a purchase.
+                </Typography>
+
+                <Typography variant="h6" gutterBottom>
+                  How do I contact a seller?
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  You can contact sellers directly through their artist profile page. Each 
+                  artist provides their own contact information and preferred communication method.
                 </Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               <Box sx={{ textAlign: 'left' }}>
                 <Typography variant="h6" gutterBottom>
-                  How is the artwork packaged?
+                  How is shipping handled?
                 </Typography>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  All paintings are carefully wrapped in protective materials and shipped 
-                  in sturdy boxes with insurance coverage.
+                  Shipping is handled directly by each seller. Shipping methods, costs, and 
+                  delivery times vary by seller and are specified on each listing page.
                 </Typography>
 
                 <Typography variant="h6" gutterBottom>
-                  Do you offer international shipping?
+                  How is the artwork packaged?
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  Packaging methods are determined by each seller. Artists are responsible 
+                  for ensuring their artwork is properly protected during shipping.
+                </Typography>
+
+                <Typography variant="h6" gutterBottom>
+                  Do sellers offer certificates of authenticity?
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Yes, we ship worldwide with free shipping on all orders. Delivery 
-                  times vary by location but typically range from 3-7 business days.
+                  Some sellers may provide certificates of authenticity with their artwork. 
+                  This varies by artist and is not guaranteed. Please check with individual 
+                  sellers or review their listing details for more information.
                 </Typography>
               </Box>
             </Grid>
