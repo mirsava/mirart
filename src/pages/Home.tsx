@@ -1219,7 +1219,7 @@ const Home: React.FC = () => {
                     }}
                   />
                   <Typography variant="body2">
-                    Artists keep 85% of their sales
+                    Flexible pricing: $10 fixed price fee or 10% auction commission
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -1245,7 +1245,7 @@ const Home: React.FC = () => {
                     }}
                   />
                   <Typography variant="body2">
-                    Secure payments and worldwide shipping
+                    Direct connection between artists and buyers
                   </Typography>
                 </Box>
               </Box>

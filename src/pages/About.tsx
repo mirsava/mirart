@@ -19,18 +19,18 @@ const About: React.FC = () => {
   const features = [
     {
       icon: <PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
-      title: 'Artist-First Platform',
-      description: 'Artists keep 85% of their sales, ensuring fair compensation for their creative work.',
+      title: 'Flexible Pricing',
+      description: 'Choose fixed price listings ($10 fee) or auction-style sales (10% commission). Artists control their pricing strategy.',
     },
     {
       icon: <BuildIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
-      title: 'Curated Quality',
-      description: 'Each piece is carefully selected to ensure the highest quality and artistic excellence.',
+      title: 'Artist Control',
+      description: 'Artists manage their own shipping, packaging, and customer service, building direct relationships with buyers.',
     },
     {
       icon: <StarIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
-      title: 'Global Community',
-      description: 'Connect with artists worldwide and discover unique pieces from diverse cultures.',
+      title: 'Global Marketplace',
+      description: 'Connect with artists worldwide and discover unique paintings, woodworking, and handmade art from diverse creators.',
     },
   ];
 
@@ -42,8 +42,9 @@ const About: React.FC = () => {
             About Our Marketplace
           </Typography>
           <Typography variant="h6" color="text.secondary" sx={{ maxWidth: '800px', mx: 'auto' }}>
-            We're a community-driven marketplace connecting talented artists with art lovers worldwide. 
-            Our platform makes it easy for artists to sell their work and for collectors to discover unique pieces.
+            ArtZyla is a vibrant marketplace connecting talented artists with art lovers worldwide. 
+            We empower artists to sell their work through flexible pricing options while providing 
+            buyers with access to authentic, handmade art from independent creators.
           </Typography>
         </Box>
 
@@ -65,19 +66,21 @@ const About: React.FC = () => {
                 Our Mission
               </Typography>
               <Typography variant="body1" paragraph>
-                We believe that art has the power to transform spaces and inspire emotions. Our marketplace 
-                was created to support artists by providing them with a platform to showcase and sell their 
-                work while connecting them with art lovers who appreciate authentic, handmade pieces.
+                We believe that art has the power to transform spaces and inspire emotions. ArtZyla was 
+                created to democratize art sales by providing artists with a flexible, accessible platform 
+                to showcase and sell their work directly to art lovers worldwide.
               </Typography>
               <Typography variant="body1" paragraph>
-                We're committed to fair compensation for artists, with a transparent fee structure that 
-                allows creators to keep 85% of their sales. Our platform handles the technical aspects 
-                of selling art, so artists can focus on what they do best - creating.
+                Our mission is to support independent artists by offering transparent, affordable pricing 
+                options. Artists can choose to list their work at a fixed price with a simple $10 listing 
+                fee, or opt for auction-style sales with a 10% commission only when their art sells. This 
+                flexibility ensures artists can find the pricing model that works best for their business.
               </Typography>
               <Typography variant="body1">
-                Whether you're an established artist or just starting out, our community welcomes creators 
-                of all levels. We provide the tools and support needed to successfully sell your artwork 
-                in a global marketplace.
+                We empower artists to maintain control over their sales process, including shipping, 
+                packaging, and customer service. This marketplace model allows creators to build direct 
+                relationships with buyers while we provide the platform and tools to make selling art 
+                simple and accessible.
               </Typography>
             </Box>
           </Grid>
@@ -114,43 +117,44 @@ const About: React.FC = () => {
 
         <Paper sx={{ p: 6, textAlign: 'center', bgcolor: 'background.paper' }}>
           <Typography variant="h4" component="h2" gutterBottom>
-            Our Commitment
+            How It Works
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph>
-            Every painting comes with a certificate of authenticity, secure packaging, and worldwide shipping. 
-            We offer a 30-day return policy and support artists with fair commission rates (15% platform fee).
+            ArtZyla provides a simple, transparent marketplace for artists and buyers. Artists create 
+            listings, choose their pricing model, and pay a $10 activation fee to make their listings 
+            visible. Buyers can purchase directly from artists, who handle all shipping and customer service.
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 4, flexWrap: 'wrap', mt: 4 }}>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h6" color="primary.main">
-                85%
+                $10
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Artist Commission
+                Fixed Price Listing Fee
               </Typography>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h6" color="primary.main">
-                Free
+                10%
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Worldwide Shipping
+                Auction Commission
               </Typography>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h6" color="primary.main">
-                30 Days
+                Artist
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Return Policy
+                Controlled Shipping
               </Typography>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h6" color="primary.main">
-                15%
+                Direct
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Platform Fee
+                Artist-Buyer Connection
               </Typography>
             </Box>
           </Box>

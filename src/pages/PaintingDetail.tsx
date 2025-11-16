@@ -24,6 +24,7 @@ import {
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import { useCart } from '../contexts/CartContext';
+import { useSnackbar } from 'notistack';
 import apiService, { Listing } from '../services/api';
 import { Painting } from '../types';
 
@@ -31,6 +32,7 @@ const PaintingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { enqueueSnackbar } = useSnackbar();
   const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string }) | null>(null);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -245,7 +247,12 @@ const PaintingDetail: React.FC = () => {
   }
 
   const handleAddToCart = (): void => {
-    addToCart(painting);
+    try {
+      addToCart(painting);
+      enqueueSnackbar('Added to cart!', { variant: 'success' });
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to add to cart', { variant: 'error' });
+    }
   };
 
   const handleShare = (): void => {

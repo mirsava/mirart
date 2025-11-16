@@ -28,7 +28,11 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting }) => {
 
   const handleAddToCart = (e: React.MouseEvent): void => {
     e.stopPropagation();
-    addToCart(painting);
+    try {
+      addToCart(painting);
+    } catch (error: any) {
+      alert(error.message);
+    }
   };
 
   return (

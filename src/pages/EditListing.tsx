@@ -48,7 +48,7 @@ const EditListing: React.FC = () => {
     medium: '',
     year: '',
     in_stock: true,
-    status: 'draft' as 'draft' | 'active',
+    status: 'draft' as 'draft',
     shipping_info: '',
     returns_info: '',
   });

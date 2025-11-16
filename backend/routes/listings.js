@@ -192,8 +192,11 @@ router.post('/', async (req, res) => {
       medium,
       year,
       in_stock,
-      status = 'draft'
+      status
     } = req.body;
+    
+    // Force status to 'draft' - listings must be activated after payment
+    const listingStatus = 'draft';
     
     // Validate required fields
     if (!cognito_username) {
@@ -299,7 +302,7 @@ router.post('/', async (req, res) => {
         medium || null, 
         year && year.toString().trim() !== '' ? parseInt(year) : null, 
         in_stock !== undefined ? Boolean(in_stock) : true, 
-        status || 'draft',
+        listingStatus,
         (shipping_info && shipping_info.trim()) || null,
         (returns_info && returns_info.trim()) || null
       ]
@@ -324,13 +327,6 @@ router.post('/', async (req, res) => {
         'UPDATE dashboard_stats SET total_listings = total_listings + 1 WHERE user_id = ?',
         [user_id]
       );
-      
-      if (status === 'active') {
-        await pool.execute(
-          'UPDATE dashboard_stats SET active_listings = active_listings + 1 WHERE user_id = ?',
-          [user_id]
-        );
-      }
     } catch (statsError) {
       // Log but don't fail the listing creation if stats update fails
       console.error('Error updating dashboard stats:', statsError);
@@ -380,6 +376,68 @@ router.post('/', async (req, res) => {
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  }
+});
+
+// Activate listing (after payment of $10 fee)
+router.post('/:id/activate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cognito_username, payment_intent_id } = req.body;
+
+    if (!cognito_username) {
+      return res.status(400).json({ error: 'cognito_username is required' });
+    }
+
+    // Get listing and verify ownership
+    const [listings] = await pool.execute(
+      `SELECT l.*, u.id as user_id, u.cognito_username 
+       FROM listings l
+       JOIN users u ON l.user_id = u.id
+       WHERE l.id = ? AND u.cognito_username = ?`,
+      [id, cognito_username]
+    );
+
+    if (listings.length === 0) {
+      return res.status(404).json({ error: 'Listing not found or you do not have permission' });
+    }
+
+    const listing = listings[0];
+
+    if (listing.status === 'active') {
+      return res.status(400).json({ error: 'Listing is already active' });
+    }
+
+    if (listing.status === 'sold') {
+      return res.status(400).json({ error: 'Cannot activate a sold listing' });
+    }
+
+    // Update listing status to active
+    await pool.execute(
+      'UPDATE listings SET status = ? WHERE id = ?',
+      ['active', id]
+    );
+
+    // Update dashboard stats
+    await pool.execute(
+      'UPDATE dashboard_stats SET active_listings = active_listings + 1 WHERE user_id = ?',
+      [listing.user_id]
+    );
+
+    // Get updated listing
+    const [updated] = await pool.execute(
+      'SELECT * FROM listings WHERE id = ?',
+      [id]
+    );
+
+    res.json({
+      ...updated[0],
+      price: parseFloat(updated[0].price),
+      message: 'Listing activated successfully'
+    });
+  } catch (error) {
+    console.error('Error activating listing:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -450,7 +508,13 @@ router.put('/:id', async (req, res) => {
     if (medium !== undefined) { updateFields.push('medium = ?'); updateValues.push(medium); }
     if (year !== undefined) { updateFields.push('year = ?'); updateValues.push(year); }
     if (in_stock !== undefined) { updateFields.push('in_stock = ?'); updateValues.push(in_stock); }
-    if (status !== undefined) { updateFields.push('status = ?'); updateValues.push(status); }
+    // Prevent direct status updates to 'active' - must use activate endpoint
+    if (status !== undefined && status !== 'active') {
+      updateFields.push('status = ?');
+      updateValues.push(status);
+    } else if (status === 'active') {
+      return res.status(400).json({ error: 'Cannot set status to active directly. Use the activate endpoint after payment.' });
+    }
     if (shipping_info !== undefined) { updateFields.push('shipping_info = ?'); updateValues.push((shipping_info && shipping_info.trim()) || null); }
     if (returns_info !== undefined) { updateFields.push('returns_info = ?'); updateValues.push((returns_info && returns_info.trim()) || null); }
     

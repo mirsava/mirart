@@ -532,6 +532,36 @@ const ArtistDashboard: React.FC = () => {
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         {listing.views} views
                       </Typography>
+                      {listing.status === 'draft' && (
+                        <Box sx={{ mb: 2 }}>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            fullWidth
+                            size="small"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!user?.id) return;
+                              
+                              try {
+                                // In a real implementation, this would process payment first
+                                // For now, we'll activate directly (payment processing would happen before this)
+                                await apiService.activateListing(listing.id, user.id);
+                                enqueueSnackbar('Listing activated successfully!', { variant: 'success' });
+                                await fetchDashboardData();
+                              } catch (err: any) {
+                                enqueueSnackbar(err.message || 'Failed to activate listing', { variant: 'error' });
+                              }
+                            }}
+                            sx={{ mb: 1 }}
+                          >
+                            Activate Listing ($10)
+                          </Button>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
+                            Pay $10 to make this listing active
+                          </Typography>
+                        </Box>
+                      )}
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <IconButton 
                           size="small"

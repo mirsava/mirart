@@ -26,6 +26,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   }, [cartItems]);
 
   const addToCart = (painting: Painting): void => {
+    // Only allow fixed price listings to be added to cart
+    if (painting.listing_type === 'auction') {
+      throw new Error('Auction listings cannot be added to cart. Please place a bid instead.');
+    }
+    
+    // Check if item is in stock
+    if (!painting.inStock) {
+      throw new Error('This item is no longer available.');
+    }
+    
     setCartItems(prev => {
       const existingItem = prev.find(item => item.id === painting.id);
       if (existingItem) {

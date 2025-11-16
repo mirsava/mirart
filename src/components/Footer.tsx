@@ -32,8 +32,8 @@ const Footer: React.FC = () => {
               ArtZyla
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Premium original paintings for art lovers and collectors. Each piece is
-              carefully crafted with passion and artistic vision.
+              A marketplace connecting talented artists with art lovers worldwide. Discover 
+              unique paintings, woodworking, and handmade art from independent creators.
             </Typography>
           </Grid>
 
@@ -59,16 +59,16 @@ const Footer: React.FC = () => {
 
           <Grid item xs={12} sm={6} md={3}>
             <Typography variant="h6" gutterBottom>
-              Customer Service
+              For Artists
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Link href="/shipping" color="text.secondary" underline="hover">
-                Shipping Info
+              <Link href="/artist-signup" color="text.secondary" underline="hover">
+                Sell Your Art
               </Link>
-              <Link href="/returns" color="text.secondary" underline="hover">
-                Returns
+              <Link href="/about" color="text.secondary" underline="hover">
+                How It Works
               </Link>
-              <Link href="/faq" color="text.secondary" underline="hover">
+              <Link href="/contact" color="text.secondary" underline="hover">
                 FAQ
               </Link>
               <Link href="/privacy" color="text.secondary" underline="hover">
@@ -97,9 +97,6 @@ const Footer: React.FC = () => {
             </Box>
             <Typography variant="body2" color="text.secondary">
               Email: info@artzyla.com
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Phone: (555) 123-4567
             </Typography>
           </Grid>
         </Grid>

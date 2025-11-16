@@ -24,12 +24,18 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from 'notistack';
+import apiService from '../services/api';
 import { FormData } from '../types';
 
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
   const { cartItems, getTotalPrice, clearCart } = useCart();
+  const { user } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
   const [activeStep, setActiveStep] = useState<number>(0);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     firstName: '',
     lastName: '',
@@ -94,10 +100,52 @@ const Checkout: React.FC = () => {
     setActiveStep((prevStep) => prevStep - 1);
   };
 
-  const handleSubmit = (): void => {
-    if (validateForm()) {
+  const handleSubmit = async (): Promise<void> => {
+    if (!validateForm()) {
+      return;
+    }
+
+    if (!user?.id) {
+      enqueueSnackbar('Please sign in to complete your purchase', { variant: 'error' });
+      navigate('/artist-signin');
+      return;
+    }
+
+    // Filter out auction listings (shouldn't be in cart, but double-check)
+    const fixedPriceItems = cartItems.filter(item => item.listing_type !== 'auction');
+    
+    if (fixedPriceItems.length === 0) {
+      enqueueSnackbar('No items available for checkout', { variant: 'error' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Create shipping address string
+      const shippingAddress = `${formData.firstName} ${formData.lastName}\n${formData.address}\n${formData.city}, ${formData.state} ${formData.zipCode}\n${formData.country}`;
+
+      // Create orders for each item in cart
+      const orderPromises = fixedPriceItems.map(item =>
+        apiService.createOrder({
+          cognito_username: user.id,
+          listing_id: item.id,
+          quantity: item.quantity,
+          shipping_address: shippingAddress,
+          payment_intent_id: `payment_${Date.now()}_${item.id}` // Placeholder payment ID
+        })
+      );
+
+      await Promise.all(orderPromises);
+
       clearCart();
+      enqueueSnackbar('Order placed successfully!', { variant: 'success' });
       navigate('/order-success');
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      enqueueSnackbar(error.message || 'Failed to place order. Please try again.', { variant: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -358,8 +406,9 @@ const Checkout: React.FC = () => {
                 <Button
                   variant="contained"
                   onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext}
+                  disabled={loading}
                 >
-                  {activeStep === steps.length - 1 ? 'Place Order' : 'Next'}
+                  {loading ? 'Processing...' : activeStep === steps.length - 1 ? 'Place Order' : 'Next'}
                 </Button>
               </Box>
             </Paper>

@@ -46,7 +46,7 @@ const CreateListing: React.FC = () => {
     medium: '',
     year: '',
     in_stock: true,
-    status: 'draft' as 'draft' | 'active',
+    status: 'draft' as 'draft',
     shipping_info: '',
     returns_info: '',
   });
@@ -281,7 +281,7 @@ const CreateListing: React.FC = () => {
         medium: formData.medium || undefined,
         year: formData.year ? parseInt(formData.year) : undefined,
         in_stock: formData.in_stock,
-        status: formData.status,
+        status: 'draft',
         shipping_info: formData.shipping_info || undefined,
         returns_info: formData.returns_info || undefined,
       };

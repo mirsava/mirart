@@ -173,6 +173,16 @@ class ApiService {
     });
   }
 
+  async activateListing(id: number, cognitoUsername: string, paymentIntentId?: string): Promise<Listing> {
+    return this.request<Listing>(`/listings/${id}/activate`, {
+      method: 'POST',
+      body: JSON.stringify({
+        cognito_username: cognitoUsername,
+        payment_intent_id: paymentIntentId
+      }),
+    });
+  }
+
   async getUserListings(cognitoUsername: string): Promise<Listing[]> {
     return this.request<Listing[]>(`/listings/user/${cognitoUsername}`);
   }
@@ -180,6 +190,25 @@ class ApiService {
   // Dashboard endpoints
   async getDashboardData(cognitoUsername: string): Promise<DashboardData> {
     return this.request<DashboardData>(`/dashboard/${cognitoUsername}`);
+  }
+
+  // Order endpoints
+  async createOrder(orderData: {
+    cognito_username: string;
+    listing_id: number;
+    quantity?: number;
+    shipping_address?: string;
+    payment_intent_id?: string;
+  }): Promise<Order> {
+    return this.request<Order>('/orders', {
+      method: 'POST',
+      body: JSON.stringify(orderData),
+    });
+  }
+
+  async getUserOrders(cognitoUsername: string, type?: 'buyer' | 'seller'): Promise<Order[]> {
+    const params = type ? `?type=${type}` : '';
+    return this.request<Order[]>(`/orders/user/${cognitoUsername}${params}`);
   }
 }
 
