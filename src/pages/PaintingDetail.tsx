@@ -21,22 +21,22 @@ import {
   Favorite as FavoriteIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  Email as EmailIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
-import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
 import apiService, { Listing } from '../services/api';
+import ContactSellerDialog from '../components/ContactSellerDialog';
 import { Painting } from '../types';
 
 const PaintingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { addToCart } = useCart();
   const { user, isAuthenticated } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
-  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean }) | null>(null);
+  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string }) | null>(null);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -44,6 +44,7 @@ const PaintingDetail: React.FC = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [liking, setLiking] = useState(false);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -55,7 +56,7 @@ const PaintingDetail: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean } => {
+  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string } => {
     return {
       id: listing.id,
       title: listing.title,
@@ -75,6 +76,7 @@ const PaintingDetail: React.FC = () => {
       returns_info: listing.returns_info,
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
+      artistEmail: (listing as any).artist_email,
     };
   };
 
@@ -252,13 +254,8 @@ const PaintingDetail: React.FC = () => {
     );
   }
 
-  const handleAddToCart = (): void => {
-    try {
-      addToCart(painting);
-      enqueueSnackbar('Added to cart!', { variant: 'success' });
-    } catch (error: any) {
-      enqueueSnackbar(error.message || 'Failed to add to cart', { variant: 'error' });
-    }
+  const handleContactSeller = (): void => {
+    setContactDialogOpen(true);
   };
 
   const handleShare = (): void => {
@@ -641,16 +638,25 @@ const PaintingDetail: React.FC = () => {
                 <Button
                   variant="contained"
                   size="large"
-                  onClick={handleAddToCart}
-                  disabled={!painting.inStock}
+                  startIcon={<EmailIcon />}
+                  onClick={handleContactSeller}
                   sx={{ flexGrow: { xs: 1, sm: 0 } }}
                 >
-                  Add to Cart
+                  Contact Seller
                 </Button>
               </Box>
             </Box>
           </Grid>
         </Grid>
+        
+        <ContactSellerDialog
+          open={contactDialogOpen}
+          onClose={() => setContactDialogOpen(false)}
+          listingTitle={painting.title}
+          artistName={painting.artist}
+          artistEmail={painting.artistEmail}
+          listingId={painting.id}
+        />
       </Container>
     </Box>
   );

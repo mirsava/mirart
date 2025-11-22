@@ -40,6 +40,7 @@ router.get('/', async (req, res) => {
           u.email
         ) as artist_name,
         u.cognito_username,
+        u.email as artist_email,
         u.signature_url,
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count
       FROM listings l

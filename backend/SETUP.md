@@ -20,9 +20,23 @@ DB_PASSWORD=your_mysql_password_here
 DB_NAME=mirart
 PORT=3001
 FRONTEND_URL=http://localhost:5173
+
+# SMTP Configuration (for sending emails)
+# Leave empty to use mock mode (emails will be logged to console)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+SMTP_FROM_EMAIL=noreply@artzyla.com
 ```
 
-**Important**: Replace `your_mysql_password_here` with your actual MySQL root password.
+**Important**: 
+- Replace `your_mysql_password_here` with your actual MySQL root password.
+- For SMTP configuration:
+  - **Mock Mode (Default)**: If SMTP credentials are not provided, emails will be logged to the console instead of being sent.
+  - **Gmail Setup**: If using Gmail, you'll need to generate an "App Password" (not your regular password) from your Google Account settings.
+  - **Other Providers**: Update `SMTP_HOST`, `SMTP_PORT`, and `SMTP_SECURE` according to your email provider's settings.
 
 ## Step 3: Make Sure MySQL is Running
 

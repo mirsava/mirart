@@ -12,37 +12,35 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import { Favorite, FavoriteBorder } from '@mui/icons-material';
+import { Favorite, FavoriteBorder, Email as EmailIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
+import ContactSellerDialog from './ContactSellerDialog';
 import { Artwork } from '../types';
 
 interface PaintingCardProps {
   painting: Artwork;
   onLikeChange?: (listingId: number, liked: boolean, likeCount: number) => void;
+  artistEmail?: string;
 }
 
-const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) => {
+const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange, artistEmail }) => {
   const navigate = useNavigate();
-  const { addToCart } = useCart();
   const { user, isAuthenticated } = useAuth();
   const [isLiked, setIsLiked] = useState(painting.isLiked || false);
   const [likeCount, setLikeCount] = useState(painting.likeCount || 0);
   const [liking, setLiking] = useState(false);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
 
   const handleViewDetails = (): void => {
     navigate(`/painting/${painting.id}`);
   };
 
-  const handleAddToCart = (e: React.MouseEvent): void => {
+  const handleContactSeller = (e: React.MouseEvent): void => {
     e.stopPropagation();
-    try {
-      addToCart(painting);
-    } catch (error: any) {
-      alert(error.message);
-    }
+    e.preventDefault();
+    setContactDialogOpen(true);
   };
 
   const handleLike = async (e: React.MouseEvent): Promise<void> => {
@@ -93,7 +91,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
           transform: 'translateY(-4px)',
         },
       }}
-      onClick={handleViewDetails}
+      onClick={contactDialogOpen ? undefined : handleViewDetails}
     >
       <CardMedia
         component="img"
@@ -184,12 +182,25 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
         <Button
           size="small"
           variant="contained"
-          onClick={handleAddToCart}
-          disabled={!painting.inStock}
+          startIcon={<EmailIcon />}
+          onClick={handleContactSeller}
         >
-          Add to Cart
+          Contact Seller
         </Button>
       </CardActions>
+      
+      {contactDialogOpen && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ContactSellerDialog
+            open={contactDialogOpen}
+            onClose={() => setContactDialogOpen(false)}
+            listingTitle={painting.title}
+            artistName={painting.artist}
+            artistEmail={artistEmail}
+            listingId={painting.id}
+          />
+        </div>
+      )}
     </Card>
   );
 };

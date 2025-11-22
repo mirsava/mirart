@@ -48,7 +48,7 @@ const Gallery: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Artwork => {
+  const convertListingToPainting = (listing: Listing): Artwork & { artistEmail?: string } => {
     return {
       id: listing.id,
       title: listing.title,
@@ -66,6 +66,7 @@ const Gallery: React.FC = () => {
       inStock: listing.in_stock,
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
+      artistEmail: (listing as any).artist_email,
     };
   };
 
@@ -187,6 +188,16 @@ const Gallery: React.FC = () => {
   const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number): void => {
     setPage(value);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLikeChange = (listingId: number, liked: boolean, likeCount: number): void => {
+    setPaintings(prevPaintings => 
+      prevPaintings.map(p => 
+        p.id === listingId 
+          ? { ...p, isLiked: liked, likeCount }
+          : p
+      )
+    );
   };
 
   return (
@@ -392,7 +403,11 @@ const Gallery: React.FC = () => {
             <Grid container spacing={4}>
               {paintings.map((painting) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={painting.id}>
-                  <PaintingCard painting={painting} />
+                  <PaintingCard 
+                    painting={painting} 
+                    onLikeChange={handleLikeChange}
+                    artistEmail={(painting as any).artistEmail}
+                  />
                 </Grid>
               ))}
               {pagination && pagination.page === pagination.totalPages && (

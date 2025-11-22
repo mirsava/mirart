@@ -52,7 +52,7 @@ const Home: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing, category: 'Painting' | 'Woodworking' = 'Painting'): Painting => {
+  const convertListingToPainting = (listing: Listing, category: 'Painting' | 'Woodworking' = 'Painting'): Painting & { artistEmail?: string } => {
     return {
       id: listing.id,
       title: listing.title,
@@ -70,6 +70,7 @@ const Home: React.FC = () => {
       inStock: listing.in_stock,
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
+      artistEmail: (listing as any).artist_email,
     };
   };
 
@@ -1011,7 +1012,10 @@ const Home: React.FC = () => {
           <Grid container spacing={4}>
             {featuredPaintings.map((painting) => (
               <Grid item xs={12} sm={6} md={4} key={painting.id}>
-                <PaintingCard painting={painting} />
+                <PaintingCard 
+                  painting={painting} 
+                  artistEmail={(painting as any).artistEmail}
+                />
               </Grid>
             ))}
             {Array.from({ length: paintingPlaceholders }).map((_, index) => (
