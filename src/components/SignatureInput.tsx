@@ -43,9 +43,12 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
     setIsDrawing(true);
     ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.moveTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -57,7 +60,10 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    ctx.lineTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
     ctx.stroke();
   };
 
@@ -71,11 +77,11 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dataUrl = canvas.toDataURL('image/png');
-    setDrawnSignature(dataUrl);
+    const croppedDataUrl = cropCanvas(canvas);
+    setDrawnSignature(croppedDataUrl);
     
     try {
-      const blob = await dataURLtoBlob(dataUrl);
+      const blob = await dataURLtoBlob(croppedDataUrl);
       const formData = new FormData();
       formData.append('image', blob, 'signature.png');
 
@@ -93,7 +99,7 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
       onChange(data.url);
     } catch (error) {
       console.error('Error uploading drawn signature:', error);
-      onChange(dataUrl);
+      onChange(croppedDataUrl);
     }
   };
 
@@ -111,14 +117,132 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
     });
   };
 
+  const cropImage = (imageData: ImageData | HTMLCanvasElement | HTMLImageElement): string => {
+    let canvas: HTMLCanvasElement;
+    let ctx: CanvasRenderingContext2D;
+    let width: number;
+    let height: number;
+    let imageDataArray: Uint8ClampedArray;
+    let sourceCanvas: HTMLCanvasElement | null = null;
+
+    if (imageData instanceof ImageData) {
+      width = imageData.width;
+      height = imageData.height;
+      imageDataArray = imageData.data;
+      sourceCanvas = document.createElement('canvas');
+      sourceCanvas.width = width;
+      sourceCanvas.height = height;
+      const sourceCtx = sourceCanvas.getContext('2d')!;
+      sourceCtx.putImageData(imageData, 0, 0);
+    } else if (imageData instanceof HTMLCanvasElement) {
+      canvas = imageData;
+      ctx = canvas.getContext('2d')!;
+      width = canvas.width;
+      height = canvas.height;
+      imageDataArray = ctx.getImageData(0, 0, width, height).data;
+      sourceCanvas = canvas;
+    } else {
+      canvas = document.createElement('canvas');
+      ctx = canvas.getContext('2d')!;
+      width = imageData.width;
+      height = imageData.height;
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(imageData, 0, 0);
+      imageDataArray = ctx.getImageData(0, 0, width, height).data;
+      sourceCanvas = canvas;
+    }
+
+    let minX = width;
+    let minY = height;
+    let maxX = 0;
+    let maxY = 0;
+    let hasContent = false;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const r = imageDataArray[idx];
+        const g = imageDataArray[idx + 1];
+        const b = imageDataArray[idx + 2];
+        const a = imageDataArray[idx + 3];
+
+        const brightness = (r + g + b) / 3;
+        const isWhiteOrLight = brightness > 240 && a > 200;
+        const isTransparent = a < 30;
+        const isContent = !isWhiteOrLight && !isTransparent;
+
+        if (isContent) {
+          hasContent = true;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+
+    if (!hasContent || minX > maxX || minY > maxY) {
+      if (sourceCanvas) {
+        return sourceCanvas.toDataURL('image/png');
+      }
+      return '';
+    }
+
+    const padding = 10;
+    minX = Math.max(0, minX - padding);
+    minY = Math.max(0, minY - padding);
+    maxX = Math.min(width - 1, maxX + padding);
+    maxY = Math.min(height - 1, maxY + padding);
+
+    const cropWidth = maxX - minX + 1;
+    const cropHeight = maxY - minY + 1;
+
+    if (cropWidth <= 0 || cropHeight <= 0) {
+      if (sourceCanvas) {
+        return sourceCanvas.toDataURL('image/png');
+      }
+      return '';
+    }
+
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = cropWidth;
+    croppedCanvas.height = cropHeight;
+    const croppedCtx = croppedCanvas.getContext('2d')!;
+    
+    croppedCtx.fillStyle = 'transparent';
+    croppedCtx.fillRect(0, 0, cropWidth, cropHeight);
+
+    if (sourceCanvas) {
+      croppedCtx.drawImage(
+        sourceCanvas,
+        minX, minY, cropWidth, cropHeight,
+        0, 0, cropWidth, cropHeight
+      );
+    }
+
+    return croppedCanvas.toDataURL('image/png');
+  };
+
+  const cropCanvas = (canvas: HTMLCanvasElement): string => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return canvas.toDataURL('image/png');
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const cropped = cropImage(imageData);
+    return cropped || canvas.toDataURL('image/png');
+  };
+
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'transparent';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     setDrawnSignature(null);
     onChange(null);
   };
@@ -132,28 +256,37 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
       return;
     }
 
-    const formData = new FormData();
-    formData.append('image', file);
+    const img = new Image();
+    img.onload = async () => {
+      try {
+        const croppedDataUrl = cropImage(img);
+        const blob = await dataURLtoBlob(croppedDataUrl);
+        const formData = new FormData();
+        formData.append('image', blob, 'signature.png');
 
-    try {
-      const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/upload/image`, {
-        method: 'POST',
-        body: formData,
-      });
+        const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
+        const response = await fetch(`${API_BASE_URL}/upload/image`, {
+          method: 'POST',
+          body: formData,
+        });
 
-      if (!response.ok) {
-        throw new Error('Failed to upload signature');
+        if (!response.ok) {
+          throw new Error('Failed to upload signature');
+        }
+
+        const data = await response.json();
+        const signatureUrl = data.url;
+        setUploadedImage(signatureUrl);
+        onChange(signatureUrl);
+      } catch (error) {
+        console.error('Error uploading signature:', error);
+        alert('Failed to upload signature');
       }
-
-      const data = await response.json();
-      const signatureUrl = data.url;
-      setUploadedImage(signatureUrl);
-      onChange(signatureUrl);
-    } catch (error) {
-      console.error('Error uploading signature:', error);
-      alert('Failed to upload signature');
-    }
+    };
+    img.onerror = () => {
+      alert('Failed to load image');
+    };
+    img.src = URL.createObjectURL(file);
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -164,7 +297,7 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
     ctx.strokeStyle = '#000000';
@@ -176,6 +309,8 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
       const img = new Image();
       img.onload = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'transparent';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       };
       img.src = drawnSignature;
@@ -184,12 +319,16 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'transparent';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       };
       const baseUrl = (import.meta as any).env?.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001';
       img.src = baseUrl + drawnSignature;
     } else if (!drawnSignature && tabValue === 1) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'transparent';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
   }, [tabValue, drawnSignature]);
 
@@ -304,9 +443,11 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
                   const rect = canvas.getBoundingClientRect();
                   const ctx = canvas.getContext('2d');
                   if (!ctx) return;
+                  const scaleX = canvas.width / rect.width;
+                  const scaleY = canvas.height / rect.height;
                   setIsDrawing(true);
                   ctx.beginPath();
-                  ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+                  ctx.moveTo((touch.clientX - rect.left) * scaleX, (touch.clientY - rect.top) * scaleY);
                 }}
                 onTouchMove={(e) => {
                   e.preventDefault();
@@ -317,7 +458,9 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
                   const rect = canvas.getBoundingClientRect();
                   const ctx = canvas.getContext('2d');
                   if (!ctx) return;
-                  ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+                  const scaleX = canvas.width / rect.width;
+                  const scaleY = canvas.height / rect.height;
+                  ctx.lineTo((touch.clientX - rect.left) * scaleX, (touch.clientY - rect.top) * scaleY);
                   ctx.stroke();
                 }}
                 onTouchEnd={(e) => {

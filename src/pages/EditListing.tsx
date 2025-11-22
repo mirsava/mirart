@@ -37,11 +37,7 @@ const EditListing: React.FC = () => {
     description: '',
     category: 'Painting',
     subcategory: '',
-    listing_type: 'fixed_price' as 'fixed_price' | 'auction',
     price: '',
-    starting_bid: '',
-    reserve_price: '',
-    auction_end_date: '',
     primary_image_url: '',
     image_urls: [] as string[],
     dimensions: '',
@@ -129,31 +125,22 @@ const EditListing: React.FC = () => {
     try {
       const listing = await apiService.getListing(parseInt(id));
       
-        const listingType = listing.listing_type || 'fixed_price';
-        const auctionEndDate = listing.auction_end_date 
-          ? new Date(listing.auction_end_date).toISOString().slice(0, 16)
-          : '';
-
-        setFormData({
-          title: listing.title || '',
-          description: listing.description || '',
-          category: listing.category || 'Painting',
-          subcategory: listing.subcategory || '',
-          listing_type: listingType,
-          price: listing.price?.toString() || '',
-          starting_bid: listing.starting_bid?.toString() || '',
-          reserve_price: listing.reserve_price?.toString() || '',
-          auction_end_date: auctionEndDate,
-          primary_image_url: listing.primary_image_url || '',
-          image_urls: listing.image_urls || [],
-          dimensions: listing.dimensions || '',
-          medium: listing.medium || '',
-          year: listing.year?.toString() || '',
-          in_stock: listing.in_stock !== undefined ? Boolean(listing.in_stock) : true,
-          status: listing.status || 'draft',
-          shipping_info: listing.shipping_info || '',
-          returns_info: listing.returns_info || '',
-        });
+      setFormData({
+        title: listing.title || '',
+        description: listing.description || '',
+        category: listing.category || 'Painting',
+        subcategory: listing.subcategory || '',
+        price: listing.price?.toString() || '',
+        primary_image_url: listing.primary_image_url || '',
+        image_urls: listing.image_urls || [],
+        dimensions: listing.dimensions || '',
+        medium: listing.medium || '',
+        year: listing.year?.toString() || '',
+        in_stock: listing.in_stock !== undefined ? Boolean(listing.in_stock) : true,
+        status: listing.status || 'draft',
+        shipping_info: listing.shipping_info || '',
+        returns_info: listing.returns_info || '',
+      });
 
       const allImages = [];
       const existingUrls = [];
@@ -410,7 +397,6 @@ const EditListing: React.FC = () => {
         description: formData.description || undefined,
         category: formData.category,
         subcategory: formData.subcategory || undefined,
-        listing_type: formData.listing_type,
         primary_image_url: primaryImage,
         dimensions: formData.dimensions || undefined,
         medium: formData.medium || undefined,
@@ -421,17 +407,7 @@ const EditListing: React.FC = () => {
         returns_info: formData.returns_info || undefined,
       };
 
-      if (formData.listing_type === 'fixed_price') {
-        listingData.price = parseFloat(formData.price);
-      } else {
-        listingData.starting_bid = parseFloat(formData.starting_bid);
-        if (formData.reserve_price) {
-          listingData.reserve_price = parseFloat(formData.reserve_price);
-        }
-        if (formData.auction_end_date) {
-          listingData.auction_end_date = new Date(formData.auction_end_date).toISOString();
-        }
-      }
+      listingData.price = parseFloat(formData.price);
       
       if (hadOriginalImages || uploadedImageUrls.length > 0 || additionalImages.length > 0) {
         listingData.image_urls = additionalImages;
@@ -540,75 +516,17 @@ const EditListing: React.FC = () => {
               </Grid>
 
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Listing Type</InputLabel>
-                  <Select
-                    name="listing_type"
-                    value={formData.listing_type}
-                    onChange={handleSelectChange}
-                    label="Listing Type"
-                  >
-                    <MenuItem value="fixed_price">Fixed Price ($10 fee)</MenuItem>
-                    <MenuItem value="auction">Auction (10% commission)</MenuItem>
-                  </Select>
-                </FormControl>
+                <TextField
+                  fullWidth
+                  required
+                  type="number"
+                  label="Price ($)"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleChange}
+                  inputProps={{ min: 0, step: 0.01 }}
+                />
               </Grid>
-
-              {formData.listing_type === 'fixed_price' ? (
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    required
-                    type="number"
-                    label="Price ($)"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleChange}
-                    inputProps={{ min: 0, step: 0.01 }}
-                  />
-                </Grid>
-              ) : (
-                <>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      required
-                      type="number"
-                      label="Starting Bid ($)"
-                      name="starting_bid"
-                      value={formData.starting_bid}
-                      onChange={handleChange}
-                      inputProps={{ min: 0, step: 0.01 }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="Reserve Price ($) - Optional"
-                      name="reserve_price"
-                      value={formData.reserve_price}
-                      onChange={handleChange}
-                      inputProps={{ min: 0, step: 0.01 }}
-                      helperText="Minimum price you're willing to accept"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      required
-                      type="datetime-local"
-                      label="Auction End Date & Time"
-                      name="auction_end_date"
-                      value={formData.auction_end_date}
-                      onChange={handleChange}
-                      InputLabelProps={{
-                        shrink: true,
-                      }}
-                    />
-                  </Grid>
-                </>
-              )}
 
               <Grid item xs={12} sm={6}>
                 <TextField

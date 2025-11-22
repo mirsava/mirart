@@ -56,13 +56,8 @@ const Home: React.FC = () => {
       title: listing.title,
       artist: listing.artist_name || 'Unknown Artist',
       artistUsername: listing.cognito_username,
+      artistSignatureUrl: listing.signature_url,
       price: listing.price,
-      listing_type: listing.listing_type,
-      starting_bid: listing.starting_bid,
-      current_bid: listing.current_bid,
-      reserve_price: listing.reserve_price,
-      auction_end_date: listing.auction_end_date,
-      bid_count: listing.bid_count,
       image: getImageUrl(listing.primary_image_url) || '',
       description: listing.description || '',
       category: category,
@@ -130,13 +125,13 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchFeaturedListings = async () => {
       try {
-        const [paintingsListings, woodworkingListings] = await Promise.all([
-          apiService.getListings({ status: 'active', category: 'Painting' }),
-          apiService.getListings({ status: 'active', category: 'Woodworking' }),
+        const [paintingsResponse, woodworkingResponse] = await Promise.all([
+          apiService.getListings({ status: 'active', category: 'Painting', limit: 3 }),
+          apiService.getListings({ status: 'active', category: 'Woodworking', limit: 3 }),
         ]);
         
-        const dbPaintings = paintingsListings.map(listing => convertListingToPainting(listing, 'Painting'));
-        const dbWoodworking = woodworkingListings.map(listing => convertListingToPainting(listing, 'Woodworking'));
+        const dbPaintings = paintingsResponse.listings.map(listing => convertListingToPainting(listing, 'Painting'));
+        const dbWoodworking = woodworkingResponse.listings.map(listing => convertListingToPainting(listing, 'Woodworking'));
         
         // Calculate how many placeholders are needed (up to 3 total items)
         const remainingPaintingSlots = Math.max(0, 3 - dbPaintings.length);
@@ -1219,7 +1214,7 @@ const Home: React.FC = () => {
                     }}
                   />
                   <Typography variant="body2">
-                    Flexible pricing: $10 fixed price fee or 10% auction commission
+                    Simple pricing: $10 activation fee per listing
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

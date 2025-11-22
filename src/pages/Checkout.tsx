@@ -111,10 +111,7 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    // Filter out auction listings (shouldn't be in cart, but double-check)
-    const fixedPriceItems = cartItems.filter(item => item.listing_type !== 'auction');
-    
-    if (fixedPriceItems.length === 0) {
+    if (cartItems.length === 0) {
       enqueueSnackbar('No items available for checkout', { variant: 'error' });
       return;
     }
@@ -126,7 +123,7 @@ const Checkout: React.FC = () => {
       const shippingAddress = `${formData.firstName} ${formData.lastName}\n${formData.address}\n${formData.city}, ${formData.state} ${formData.zipCode}\n${formData.country}`;
 
       // Create orders for each item in cart
-      const orderPromises = fixedPriceItems.map(item =>
+      const orderPromises = cartItems.map(item =>
         apiService.createOrder({
           cognito_username: user.id,
           listing_id: item.id,

@@ -527,7 +527,7 @@ const ArtistDashboard: React.FC = () => {
                         />
                       </Box>
                       <Typography variant="h6" color="primary" gutterBottom>
-                        ${listing.price}
+                        ${listing.price ?? 0}
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         {listing.views} views

@@ -35,11 +35,7 @@ const CreateListing: React.FC = () => {
     description: '',
     category: 'Painting',
     subcategory: '',
-    listing_type: 'fixed_price' as 'fixed_price' | 'auction',
     price: '',
-    starting_bid: '',
-    reserve_price: '',
-    auction_end_date: '',
     primary_image_url: '',
     image_urls: [] as string[],
     dimensions: '',
@@ -274,7 +270,6 @@ const CreateListing: React.FC = () => {
         description: formData.description || undefined,
         category: formData.category,
         subcategory: formData.subcategory || undefined,
-        listing_type: formData.listing_type,
         primary_image_url: primaryImage,
         image_urls: additionalImages.length > 0 ? additionalImages : undefined,
         dimensions: formData.dimensions || undefined,
@@ -286,18 +281,7 @@ const CreateListing: React.FC = () => {
         returns_info: formData.returns_info || undefined,
       };
 
-      if (formData.listing_type === 'fixed_price') {
-        listingData.price = parseFloat(formData.price);
-      } else {
-        listingData.starting_bid = parseFloat(formData.starting_bid);
-        listingData.current_bid = parseFloat(formData.starting_bid);
-        if (formData.reserve_price) {
-          listingData.reserve_price = parseFloat(formData.reserve_price);
-        }
-        if (formData.auction_end_date) {
-          listingData.auction_end_date = new Date(formData.auction_end_date).toISOString();
-        }
-      }
+      listingData.price = parseFloat(formData.price);
 
       await apiService.createListing(listingData);
       enqueueSnackbar('Listing created successfully!', { variant: 'success' });
@@ -394,75 +378,17 @@ const CreateListing: React.FC = () => {
               </Grid>
 
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Listing Type</InputLabel>
-                  <Select
-                    name="listing_type"
-                    value={formData.listing_type}
-                    onChange={handleSelectChange}
-                    label="Listing Type"
-                  >
-                    <MenuItem value="fixed_price">Fixed Price ($10 fee)</MenuItem>
-                    <MenuItem value="auction">Auction (10% commission)</MenuItem>
-                  </Select>
-                </FormControl>
+                <TextField
+                  fullWidth
+                  required
+                  type="number"
+                  label="Price ($)"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleChange}
+                  inputProps={{ min: 0, step: 0.01 }}
+                />
               </Grid>
-
-              {formData.listing_type === 'fixed_price' ? (
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    required
-                    type="number"
-                    label="Price ($)"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleChange}
-                    inputProps={{ min: 0, step: 0.01 }}
-                  />
-                </Grid>
-              ) : (
-                <>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      required
-                      type="number"
-                      label="Starting Bid ($)"
-                      name="starting_bid"
-                      value={formData.starting_bid}
-                      onChange={handleChange}
-                      inputProps={{ min: 0, step: 0.01 }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="Reserve Price ($) - Optional"
-                      name="reserve_price"
-                      value={formData.reserve_price}
-                      onChange={handleChange}
-                      inputProps={{ min: 0, step: 0.01 }}
-                      helperText="Minimum price you're willing to accept"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      required
-                      type="datetime-local"
-                      label="Auction End Date & Time"
-                      name="auction_end_date"
-                      value={formData.auction_end_date}
-                      onChange={handleChange}
-                      InputLabelProps={{
-                        shrink: true,
-                      }}
-                    />
-                  </Grid>
-                </>
-              )}
 
               <Grid item xs={12} sm={6}>
                 <TextField

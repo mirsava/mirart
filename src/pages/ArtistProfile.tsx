@@ -48,8 +48,8 @@ const ArtistProfile: React.FC = () => {
         setArtist(artistData);
         
         if (artistData?.id) {
-          const userListings = await apiService.getListings({ userId: artistData.id, status: 'active' }).catch(() => []);
-          setListings(userListings);
+          const listingsResponse = await apiService.getListings({ userId: artistData.id, status: 'active' }).catch(() => ({ listings: [] }));
+          setListings(listingsResponse.listings || []);
         }
       } catch (err: any) {
         setError(err.message || 'Failed to load artist profile');

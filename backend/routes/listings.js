@@ -6,12 +6,32 @@ import { fileURLToPath } from 'url';
 
 const router = express.Router();
 
-// Get all listings (with optional filters)
+// Get all listings (with optional filters and pagination)
 router.get('/', async (req, res) => {
   try {
-    const { category, subcategory, status, userId, search } = req.query;
+    try {
+      await pool.execute('SELECT business_name FROM users LIMIT 1');
+    } catch (colError) {
+      if (colError.code === 'ER_BAD_FIELD_ERROR' && colError.message && colError.message.includes('business_name')) {
+        try {
+          await pool.execute('ALTER TABLE users ADD COLUMN business_name VARCHAR(255) NULL');
+        } catch (alterError) {
+          if (alterError.code !== 'ER_DUP_FIELDNAME') {
+            console.error('Failed to add business_name column:', alterError.message);
+          }
+        }
+      } else if (colError.code !== 'ER_BAD_FIELD_ERROR') {
+        throw colError;
+      }
+    }
     
-    let query = `
+    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC' } = req.query;
+    
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 12;
+    const offset = (pageNum - 1) * limitNum;
+    
+    let baseQuery = `
       SELECT l.*, 
         COALESCE(
           u.business_name,
@@ -19,7 +39,8 @@ router.get('/', async (req, res) => {
           u.cognito_username,
           u.email
         ) as artist_name,
-        u.cognito_username
+        u.cognito_username,
+        u.signature_url
       FROM listings l
       JOIN users u ON l.user_id = u.id
       WHERE 1=1
@@ -27,36 +48,120 @@ router.get('/', async (req, res) => {
     const params = [];
     
     if (category) {
-      query += ' AND l.category = ?';
-      params.push(category);
+      baseQuery += ' AND l.category = ?';
+      params.push(String(category));
     }
     
     if (subcategory) {
-      query += ' AND l.subcategory = ?';
-      params.push(subcategory);
+      baseQuery += ' AND l.subcategory = ?';
+      params.push(String(subcategory));
     }
     
     if (status) {
-      query += ' AND l.status = ?';
-      params.push(status);
+      baseQuery += ' AND l.status = ?';
+      params.push(String(status));
     } else {
-      query += ' AND l.status = "active"';
+      baseQuery += ' AND l.status = "active"';
     }
     
     if (userId) {
-      query += ' AND l.user_id = ?';
-      params.push(userId);
+      baseQuery += ' AND l.user_id = ?';
+      params.push(String(userId));
     }
     
     if (search) {
-      query += ' AND (l.title LIKE ? OR l.description LIKE ?)';
-      const searchTerm = `%${search}%`;
-      params.push(searchTerm, searchTerm);
+      baseQuery += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)';
+      const searchTerm = `%${String(search)}%`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
     
-    query += ' ORDER BY l.created_at DESC';
+    // Get total count (before adding ORDER BY, LIMIT, OFFSET)
+    // Build count query with same WHERE conditions but COUNT instead of SELECT
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM listings l
+      JOIN users u ON l.user_id = u.id
+      WHERE 1=1
+    `;
+    const countParams = [];
     
-    const [rows] = await pool.execute(query, params);
+    if (category) {
+      countQuery += ' AND l.category = ?';
+      countParams.push(String(category));
+    }
+    
+    if (subcategory) {
+      countQuery += ' AND l.subcategory = ?';
+      countParams.push(String(subcategory));
+    }
+    
+    if (status) {
+      countQuery += ' AND l.status = ?';
+      countParams.push(String(status));
+    } else {
+      countQuery += ' AND l.status = "active"';
+    }
+    
+    if (userId) {
+      countQuery += ' AND l.user_id = ?';
+      countParams.push(String(userId));
+    }
+    
+    if (search) {
+      countQuery += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)';
+      const searchTerm = `%${String(search)}%`;
+      countParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+    
+    const [countResult] = await pool.execute(countQuery, countParams);
+    const total = Number(countResult[0].total);
+    
+    // Add sorting
+    let orderBy = 'l.created_at DESC';
+    const validSortFields = ['created_at', 'title', 'price', 'year', 'views'];
+    const validSortOrders = ['ASC', 'DESC'];
+    
+    if (validSortFields.includes(sortBy)) {
+      const order = validSortOrders.includes(sortOrder.toUpperCase()) ? sortOrder.toUpperCase() : 'DESC';
+      if (sortBy === 'title') {
+        orderBy = `l.title ${order}`;
+      } else if (sortBy === 'price') {
+        orderBy = `l.price ${order}`;
+      } else if (sortBy === 'year') {
+        orderBy = `l.year ${order}`;
+      } else if (sortBy === 'views') {
+        orderBy = `l.views ${order}`;
+      } else {
+        orderBy = `l.created_at ${order}`;
+      }
+    }
+    
+    // Add pagination to main query - rebuild query cleanly
+    const trimmedQuery = baseQuery.trim();
+    
+    const limitValue = Math.floor(Number(limitNum));
+    const offsetValue = Math.floor(Number(offset));
+    
+    if (isNaN(limitValue) || isNaN(offsetValue) || limitValue < 0 || offsetValue < 0) {
+      throw new Error(`Invalid pagination parameters: limit=${limitNum} (${typeof limitNum}), offset=${offset} (${typeof offset})`);
+    }
+    
+    const queryParams = [];
+    params.forEach(p => {
+      if (p !== undefined && p !== null) {
+        queryParams.push(p);
+      }
+    });
+    
+    const finalQuery = trimmedQuery + ' ORDER BY ' + orderBy + ` LIMIT ${limitValue} OFFSET ${offsetValue}`;
+    
+    const placeholderCount = (finalQuery.match(/\?/g) || []).length;
+    
+    if (queryParams.length !== placeholderCount) {
+      throw new Error(`Parameter count mismatch: expected ${placeholderCount}, got ${queryParams.length}`);
+    }
+    
+    const [rows] = await pool.execute(finalQuery, queryParams);
     
     // Parse JSON fields
     const listings = rows.map(listing => {
@@ -74,7 +179,6 @@ router.get('/', async (req, res) => {
             parsedImageUrls = JSON.parse(imageUrlsStr);
           }
         } catch (parseError) {
-          console.error('Error parsing image_urls JSON:', parseError);
           const imageUrlsStr = String(listing.image_urls).trim();
           if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
             parsedImageUrls = [imageUrlsStr];
@@ -86,15 +190,29 @@ router.get('/', async (req, res) => {
       
       return {
         ...listing,
-        price: parseFloat(listing.price),
+        price: listing.price ? parseFloat(listing.price) : null,
         image_urls: parsedImageUrls
       };
     });
     
-    res.json(listings);
+    const totalPages = Math.ceil(total / limitNum);
+    
+    res.json({
+      listings,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages,
+        hasNext: pageNum < totalPages,
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error) {
-    console.error('Error fetching listings:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching listings:', error.message || error);
+    console.error('Error code:', error.code);
+    console.error('SQL:', error.sql);
+    res.status(500).json({ error: 'Internal server error', details: error.sqlMessage || error.message });
   }
 });
 
@@ -112,9 +230,10 @@ router.get('/:id', async (req, res) => {
           u.email
         ) as artist_name,
         u.cognito_username, 
-        u.email as artist_email
-       FROM listings l
-       JOIN users u ON l.user_id = u.id
+        u.email as artist_email,
+        u.signature_url
+      FROM listings l
+      JOIN users u ON l.user_id = u.id
        WHERE l.id = ?`,
       [id]
     );
@@ -131,7 +250,7 @@ router.get('/:id', async (req, res) => {
     
     res.json({
       ...rows[0],
-      price: parseFloat(rows[0].price),
+      price: rows[0].price ? parseFloat(rows[0].price) : null,
       image_urls: (() => {
         if (!rows[0].image_urls || rows[0].image_urls === 'null' || rows[0].image_urls === '') return null;
         try {
@@ -156,7 +275,6 @@ router.get('/:id', async (req, res) => {
             return parsed;
           }
         } catch (parseError) {
-          console.error('Error parsing image_urls JSON:', parseError);
           const imageUrlsStr = String(rows[0].image_urls).trim();
           if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
             return [imageUrlsStr];
@@ -166,7 +284,6 @@ router.get('/:id', async (req, res) => {
       })()
     });
   } catch (error) {
-    console.error('Error fetching listing:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -180,12 +297,7 @@ router.post('/', async (req, res) => {
       description,
       category,
       subcategory,
-      listing_type = 'fixed_price',
       price,
-      starting_bid,
-      current_bid,
-      reserve_price,
-      auction_end_date,
       primary_image_url,
       image_urls,
       dimensions,
@@ -208,14 +320,8 @@ router.post('/', async (req, res) => {
     if (!category) {
       return res.status(400).json({ error: 'category is required' });
     }
-    if (listing_type === 'fixed_price' && (price === undefined || price === null)) {
-      return res.status(400).json({ error: 'price is required for fixed price listings' });
-    }
-    if (listing_type === 'auction' && (starting_bid === undefined || starting_bid === null)) {
-      return res.status(400).json({ error: 'starting_bid is required for auction listings' });
-    }
-    if (listing_type === 'auction' && !auction_end_date) {
-      return res.status(400).json({ error: 'auction_end_date is required for auction listings' });
+    if (price === undefined || price === null) {
+      return res.status(400).json({ error: 'price is required' });
     }
     
     // Validate image_urls (max 10 images)
@@ -246,7 +352,7 @@ router.post('/', async (req, res) => {
       // Note: first_name and last_name will be NULL initially and can be updated later
       try {
         const [result] = await pool.execute(
-          `INSERT INTO users (cognito_username, email, first_name, last_name) VALUES (?, ?, NULL, NULL)`,
+          'INSERT INTO users (cognito_username, email, first_name, last_name) VALUES (?, ?, NULL, NULL)',
           [cognito_username, cognito_username] // Use username as email placeholder
         );
         user_id = result.insertId;
@@ -257,7 +363,6 @@ router.post('/', async (req, res) => {
           [user_id]
         );
       } catch (createError) {
-        console.error('Error creating user:', createError);
         return res.status(500).json({ error: 'Failed to create user record' });
       }
     } else {
@@ -270,7 +375,6 @@ router.post('/', async (req, res) => {
       try {
         imageUrlsJson = JSON.stringify(imageUrlsArray);
       } catch (jsonError) {
-        console.error('Error stringifying image_urls:', jsonError);
         return res.status(400).json({ error: 'Invalid image_urls format' });
       }
     }
@@ -279,104 +383,98 @@ router.post('/', async (req, res) => {
     
     const [result] = await pool.execute(
       `INSERT INTO listings (
-        user_id, title, description, category, subcategory, listing_type,
-        price, starting_bid, current_bid, reserve_price, auction_end_date, bid_count,
-        primary_image_url, image_urls, dimensions, medium, year, in_stock, status, shipping_info, returns_info
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        user_id, title, description, category, subcategory,
+        price, primary_image_url, image_urls, dimensions, medium, year,
+        in_stock, status, shipping_info, returns_info
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        user_id, 
-        title, 
-        description || null, 
-        category, 
+        user_id,
+        title,
+        description || null,
+        category,
         subcategory || null,
-        listing_type,
-        listing_type === 'fixed_price' ? parseFloat(price) : null,
-        listing_type === 'auction' ? parseFloat(starting_bid) : null,
-        listing_type === 'auction' ? (current_bid ? parseFloat(current_bid) : parseFloat(starting_bid)) : null,
-        listing_type === 'auction' && reserve_price ? parseFloat(reserve_price) : null,
-        listing_type === 'auction' && auction_end_date ? new Date(auction_end_date) : null,
-        listing_type === 'auction' ? 0 : null,
-        primary_image_url || null, 
-        imageUrlsJson, 
-        dimensions || null, 
-        medium || null, 
-        year && year.toString().trim() !== '' ? parseInt(year) : null, 
-        in_stock !== undefined ? Boolean(in_stock) : true, 
+        price !== undefined && price !== null ? parseFloat(price) : null,
+        primary_image_url || null,
+        imageUrlsJson,
+        dimensions || null,
+        medium || null,
+        year && year.toString().trim() !== '' ? parseInt(year) : null,
+        in_stock !== undefined ? Boolean(in_stock) : true,
         listingStatus,
         (shipping_info && shipping_info.trim()) || null,
         (returns_info && returns_info.trim()) || null
       ]
     );
-    
-    // Update dashboard stats (ensure record exists first)
-    try {
-      const [statsCheck] = await pool.execute(
-        'SELECT id FROM dashboard_stats WHERE user_id = ?',
-        [user_id]
-      );
       
-      if (statsCheck.length === 0) {
-        // Create dashboard stats record if it doesn't exist
-        await pool.execute(
-          'INSERT INTO dashboard_stats (user_id, total_listings, active_listings) VALUES (?, 0, 0)',
+      // Update dashboard stats (ensure record exists first)
+      try {
+        const [statsCheck] = await pool.execute(
+          'SELECT id FROM dashboard_stats WHERE user_id = ?',
           [user_id]
         );
+        
+        if (statsCheck.length === 0) {
+          // Create dashboard stats record if it doesn't exist
+          await pool.execute(
+            'INSERT INTO dashboard_stats (user_id, total_listings, active_listings) VALUES (?, 0, 0)',
+            [user_id]
+          );
+        }
+        
+        await pool.execute(
+          'UPDATE dashboard_stats SET total_listings = total_listings + 1 WHERE user_id = ?',
+          [user_id]
+        );
+      } catch (statsError) {
       }
       
-      await pool.execute(
-        'UPDATE dashboard_stats SET total_listings = total_listings + 1 WHERE user_id = ?',
-        [user_id]
+      const [newListing] = await pool.execute(
+        'SELECT * FROM listings WHERE id = ?',
+        [result.insertId]
       );
-    } catch (statsError) {
-      // Log but don't fail the listing creation if stats update fails
-      console.error('Error updating dashboard stats:', statsError);
-    }
-    
-    const [newListing] = await pool.execute(
-      'SELECT * FROM listings WHERE id = ?',
-      [result.insertId]
-    );
-    
-    // Parse image_urls JSON safely
-    let parsedImageUrls = null;
-    if (newListing[0].image_urls) {
-      try {
-        const imageUrlsStr = String(newListing[0].image_urls).trim();
-        if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
-          parsedImageUrls = JSON.parse(imageUrlsStr);
-        } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
-          parsedImageUrls = [imageUrlsStr];
-        } else {
-          parsedImageUrls = JSON.parse(imageUrlsStr);
-        }
-      } catch (parseError) {
-        console.error('Error parsing image_urls JSON:', parseError);
-        const imageUrlsStr = String(newListing[0].image_urls).trim();
-        if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
-          parsedImageUrls = [imageUrlsStr];
-        } else {
-          parsedImageUrls = null;
+      
+      // Parse image_urls JSON safely
+      let parsedImageUrls = null;
+      if (newListing[0].image_urls) {
+        try {
+          const imageUrlsStr = String(newListing[0].image_urls).trim();
+          if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
+            parsedImageUrls = JSON.parse(imageUrlsStr);
+          } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
+            parsedImageUrls = [imageUrlsStr];
+          } else {
+            parsedImageUrls = JSON.parse(imageUrlsStr);
+          }
+        } catch (parseError) {
+          const imageUrlsStr = String(newListing[0].image_urls).trim();
+          if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
+            parsedImageUrls = [imageUrlsStr];
+          } else {
+            parsedImageUrls = null;
+          }
         }
       }
-    }
-    
-    res.status(201).json({
-      ...newListing[0],
-      price: parseFloat(newListing[0].price),
-      image_urls: parsedImageUrls
-    });
+      
+      res.status(201).json({
+        ...newListing[0],
+        price: newListing[0].price ? parseFloat(newListing[0].price) : null,
+        image_urls: parsedImageUrls
+      });
   } catch (error) {
-    console.error('Error creating listing:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code
-    });
-    res.status(500).json({ 
-      error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
+      
+      // Check for specific database errors
+      if (error.code === 'ER_BAD_NULL_ERROR' || (error.sqlMessage && error.sqlMessage.includes('cannot be null'))) {
+        return res.status(400).json({ 
+          error: 'Database constraint error. Please ensure the price column allows NULL values. Run the migration: npm run migrate-price-nullable',
+          details: process.env.NODE_ENV === 'development' ? error.sqlMessage : undefined
+        });
+      }
+      
+      res.status(500).json({ 
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
 });
 
 // Activate listing (after payment of $10 fee)
@@ -392,8 +490,8 @@ router.post('/:id/activate', async (req, res) => {
     // Get listing and verify ownership
     const [listings] = await pool.execute(
       `SELECT l.*, u.id as user_id, u.cognito_username 
-       FROM listings l
-       JOIN users u ON l.user_id = u.id
+      FROM listings l
+      JOIN users u ON l.user_id = u.id
        WHERE l.id = ? AND u.cognito_username = ?`,
       [id, cognito_username]
     );
@@ -432,11 +530,10 @@ router.post('/:id/activate', async (req, res) => {
 
     res.json({
       ...updated[0],
-      price: parseFloat(updated[0].price),
+      price: updated[0].price ? parseFloat(updated[0].price) : null,
       message: 'Listing activated successfully'
     });
   } catch (error) {
-    console.error('Error activating listing:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -450,11 +547,7 @@ router.put('/:id', async (req, res) => {
       description,
       category,
       subcategory,
-      listing_type,
       price,
-      starting_bid,
-      reserve_price,
-      auction_end_date,
       primary_image_url,
       image_urls,
       dimensions,
@@ -497,11 +590,7 @@ router.put('/:id', async (req, res) => {
     if (description !== undefined) { updateFields.push('description = ?'); updateValues.push(description); }
     if (category !== undefined) { updateFields.push('category = ?'); updateValues.push(category); }
     if (subcategory !== undefined) { updateFields.push('subcategory = ?'); updateValues.push(subcategory); }
-    if (listing_type !== undefined) { updateFields.push('listing_type = ?'); updateValues.push(listing_type); }
     if (price !== undefined) { updateFields.push('price = ?'); updateValues.push(price); }
-    if (starting_bid !== undefined) { updateFields.push('starting_bid = ?'); updateValues.push(starting_bid); }
-    if (reserve_price !== undefined) { updateFields.push('reserve_price = ?'); updateValues.push(reserve_price || null); }
-    if (auction_end_date !== undefined) { updateFields.push('auction_end_date = ?'); updateValues.push(auction_end_date ? new Date(auction_end_date) : null); }
     if (primary_image_url !== undefined) { updateFields.push('primary_image_url = ?'); updateValues.push(primary_image_url); }
     if (image_urls !== undefined) { updateFields.push('image_urls = ?'); updateValues.push(imageUrlsArray ? JSON.stringify(imageUrlsArray) : null); }
     if (dimensions !== undefined) { updateFields.push('dimensions = ?'); updateValues.push(dimensions); }
@@ -567,7 +656,6 @@ router.put('/:id', async (req, res) => {
           }
         }
       } catch (parseError) {
-        console.error('Error parsing image_urls JSON:', parseError);
         const imageUrlsStr = String(updated[0].image_urls).trim();
         if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
           parsedImageUrls = [imageUrlsStr];
@@ -579,11 +667,10 @@ router.put('/:id', async (req, res) => {
     
     res.json({
       ...updated[0],
-      price: parseFloat(updated[0].price),
+      price: updated[0].price ? parseFloat(updated[0].price) : null,
       image_urls: parsedImageUrls
     });
   } catch (error) {
-    console.error('Error updating listing:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -634,7 +721,6 @@ router.delete('/:id', async (req, res) => {
           }
         }
       } catch (parseError) {
-        console.error('Error parsing image_urls JSON:', parseError);
       }
     }
     
@@ -643,11 +729,8 @@ router.delete('/:id', async (req, res) => {
       try {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
-          console.log(`Deleted image file: ${filePath}`);
         }
       } catch (fileError) {
-        console.error(`Error deleting file ${filePath}:`, fileError);
-        // Continue even if file deletion fails
       }
     });
     
@@ -669,7 +752,6 @@ router.delete('/:id', async (req, res) => {
     
     res.json({ message: 'Listing deleted successfully' });
   } catch (error) {
-    console.error('Error deleting listing:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -702,7 +784,6 @@ function extractFilePath(url, uploadsDir) {
   const resolvedUploadsDir = path.resolve(uploadsDir);
   
   if (!resolvedPath.startsWith(resolvedUploadsDir)) {
-    console.error('Security check failed: file path outside uploads directory');
     return null;
   }
   
@@ -715,8 +796,8 @@ router.get('/user/:cognitoUsername', async (req, res) => {
     const { cognitoUsername } = req.params;
     
     const [listings] = await pool.execute(
-      `SELECT l.* FROM listings l
-       JOIN users u ON l.user_id = u.id
+      `SELECT l.*       FROM listings l
+      JOIN users u ON l.user_id = u.id
        WHERE u.cognito_username = ?
        ORDER BY l.created_at DESC`,
       [cognitoUsername]
@@ -727,7 +808,6 @@ router.get('/user/:cognitoUsername', async (req, res) => {
       price: parseFloat(listing.price)
     })));
   } catch (error) {
-    console.error('Error fetching user listings:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

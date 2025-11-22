@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Painting, CartItem, CartContextType } from '../types';
+import { Artwork, CartItem, CartContextType } from '../types';
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -25,12 +25,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     localStorage.setItem('cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  const addToCart = (painting: Painting): void => {
-    // Only allow fixed price listings to be added to cart
-    if (painting.listing_type === 'auction') {
-      throw new Error('Auction listings cannot be added to cart. Please place a bid instead.');
-    }
-    
+  const addToCart = (painting: Artwork): void => {
     // Check if item is in stock
     if (!painting.inStock) {
       throw new Error('This item is no longer available.');
@@ -70,7 +65,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   };
 
   const getTotalPrice = (): number => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return cartItems.reduce((total, item) => {
+      const itemPrice = item.price || 0;
+      return total + (itemPrice * item.quantity);
+    }, 0);
   };
 
   const getTotalItems = (): number => {

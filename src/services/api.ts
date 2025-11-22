@@ -26,13 +26,7 @@ export interface Listing {
   description?: string;
   category: string;
   subcategory?: string;
-  price: number;
-  listing_type: 'fixed_price' | 'auction';
-  starting_bid?: number;
-  current_bid?: number;
-  reserve_price?: number;
-  auction_end_date?: string;
-  bid_count?: number;
+  price: number | null;
   primary_image_url?: string;
   image_urls?: string[];
   dimensions?: string;
@@ -45,6 +39,7 @@ export interface Listing {
   updated_at: string;
   artist_name?: string;
   cognito_username?: string;
+  signature_url?: string;
   shipping_info?: string;
   returns_info?: string;
 }
@@ -138,15 +133,19 @@ class ApiService {
     status?: string;
     userId?: number;
     search?: string;
-  }): Promise<Listing[]> {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<{ listings: Listing[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } }> {
     const params = new URLSearchParams();
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value.toString());
+        if (value !== undefined && value !== null) params.append(key, value.toString());
       });
     }
     const queryString = params.toString();
-    return this.request<Listing[]>(`/listings${queryString ? `?${queryString}` : ''}`);
+    return this.request<{ listings: Listing[]; pagination: any }>(`/listings${queryString ? `?${queryString}` : ''}`);
   }
 
   async getListing(id: number): Promise<Listing> {

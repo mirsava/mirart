@@ -15,21 +15,26 @@ import {
   Card,
   CardContent,
   Button,
+  Pagination,
 } from '@mui/material';
 import { Search as SearchIcon, Add as AddIcon } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
-import { artworks } from '../data/paintings';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PaintingCard from '../components/PaintingCard';
 import apiService, { Listing } from '../services/api';
-import { Painting } from '../types';
+import { Artwork } from '../types';
 
 const Gallery: React.FC = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [sortBy, setSortBy] = useState<string>('title');
-  const [paintings, setPaintings] = useState<Painting[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState<string>(searchParams.get('search') || '');
+  const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || 'All');
+  const [sortBy, setSortBy] = useState<string>(searchParams.get('sortBy') || 'created_at');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>(searchParams.get('sortOrder') === 'ASC' ? 'ASC' : 'DESC');
+  const [paintings, setPaintings] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState<number>(parseInt(searchParams.get('page') || '1', 10));
+  const [itemsPerPage, setItemsPerPage] = useState<number>(parseInt(searchParams.get('limit') || '12', 10));
+  const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } | null>(null);
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -41,22 +46,17 @@ const Gallery: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Painting => {
+  const convertListingToPainting = (listing: Listing): Artwork => {
     return {
       id: listing.id,
       title: listing.title,
       artist: listing.artist_name || 'Unknown Artist',
       artistUsername: listing.cognito_username,
+      artistSignatureUrl: listing.signature_url,
       price: listing.price,
-      listing_type: listing.listing_type,
-      starting_bid: listing.starting_bid,
-      current_bid: listing.current_bid,
-      reserve_price: listing.reserve_price,
-      auction_end_date: listing.auction_end_date,
-      bid_count: listing.bid_count,
       image: getImageUrl(listing.primary_image_url) || '',
       description: listing.description || '',
-      category: listing.category as 'Painting' | 'Woodworking',
+      category: (listing.category === 'Painting' || listing.category === 'Woodworking') ? listing.category : 'Painting',
       subcategory: listing.subcategory || '',
       dimensions: listing.dimensions || '',
       medium: listing.medium || '',
@@ -69,47 +69,119 @@ const Gallery: React.FC = () => {
     const fetchListings = async () => {
       setLoading(true);
       try {
-        const listings = await apiService.getListings({ status: 'active' });
-        const dbPaintings = listings.map(convertListingToPainting);
+        const filters: any = {
+          status: 'active',
+          page,
+          limit: itemsPerPage,
+          sortBy,
+          sortOrder,
+        };
+        
+        if (selectedCategory !== 'All') {
+          filters.category = selectedCategory;
+        }
+        
+        if (searchTerm) {
+          filters.search = searchTerm;
+        }
+        
+        const response = await apiService.getListings(filters);
+        const dbPaintings = response.listings.map(convertListingToPainting);
         setPaintings(dbPaintings);
+        if (response.pagination) {
+          setPagination(response.pagination);
+        } else {
+          setPagination({
+            page: page,
+            limit: itemsPerPage,
+            total: dbPaintings.length,
+            totalPages: Math.ceil(dbPaintings.length / itemsPerPage),
+            hasNext: false,
+            hasPrev: false
+          });
+        }
+        
       } catch (error) {
         console.error('Error fetching listings:', error);
         setPaintings([]);
+        setPagination(null);
       } finally {
         setLoading(false);
       }
     };
 
     fetchListings();
-  }, []);
+  }, [page, itemsPerPage, selectedCategory, searchTerm, sortBy, sortOrder]);
 
-  const categories = ['All', ...new Set(paintings.map(p => p.category))];
-
-  const filteredPaintings = paintings
-    .filter(painting => {
-      const matchesSearch = painting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           painting.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           painting.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategory === 'All' || painting.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'price-low':
-          return a.price - b.price;
-        case 'price-high':
-          return b.price - a.price;
-        case 'title':
-          return a.title.localeCompare(b.title);
-        case 'year':
-          return b.year - a.year;
-        default:
-          return 0;
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    const limitParam = searchParams.get('limit');
+    let shouldUpdate = false;
+    
+    if (pageParam) {
+      const pageNum = parseInt(pageParam, 10);
+      if (!isNaN(pageNum) && pageNum > 0 && pageNum !== page) {
+        setPage(pageNum);
+        shouldUpdate = true;
       }
-    });
+    }
+    
+    if (limitParam) {
+      const limitNum = parseInt(limitParam, 10);
+      if (!isNaN(limitNum) && [2, 5, 10].includes(limitNum) && limitNum !== itemsPerPage) {
+        setItemsPerPage(limitNum);
+        if (page !== 1) {
+          setPage(1);
+        }
+        shouldUpdate = true;
+      }
+    }
+  }, [searchParams]);
+
+  const categories = ['All', 'Painting', 'Woodworking', 'Other'];
 
   const handleCategoryClick = (category: string): void => {
     setSelectedCategory(category);
+    setPage(1);
+  };
+
+  const handleSearchChange = (value: string): void => {
+    setSearchTerm(value);
+    setPage(1);
+  };
+
+  const handleItemsPerPageChange = (value: number): void => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('limit', value.toString());
+    newParams.set('page', '1');
+    setSearchParams(newParams, { replace: true });
+    setItemsPerPage(value);
+    setPage(1);
+  };
+
+  const handleSortChange = (newSortBy: string): void => {
+    if (newSortBy === 'price-low') {
+      setSortBy('price');
+      setSortOrder('ASC');
+    } else if (newSortBy === 'price-high') {
+      setSortBy('price');
+      setSortOrder('DESC');
+    } else if (newSortBy === 'title') {
+      setSortBy('title');
+      setSortOrder('ASC');
+    } else if (newSortBy === 'year') {
+      setSortBy('year');
+      setSortOrder('DESC');
+    } else {
+      setSortBy('created_at');
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number): void => {
+    setPage(value);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -132,7 +204,12 @@ const Gallery: React.FC = () => {
                 fullWidth
                 placeholder="Search artwork..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearchChange((e.target as HTMLInputElement).value);
+                  }
+                }}
                 InputProps={{
                   startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}
@@ -142,12 +219,28 @@ const Gallery: React.FC = () => {
             <Grid item xs={12} md={6}>
               <Box sx={{ display: 'flex', gap: 2, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
                 <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <InputLabel>Items per page</InputLabel>
+                  <Select
+                    value={itemsPerPage}
+                    label="Items per page"
+                    onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                  >
+                    <MenuItem value={2}>2</MenuItem>
+                    <MenuItem value={5}>5</MenuItem>
+                    <MenuItem value={10}>10</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 120 }}>
                   <InputLabel>Sort by</InputLabel>
                   <Select
-                    value={sortBy}
+                    value={sortBy === 'price' && sortOrder === 'ASC' ? 'price-low' : 
+                           sortBy === 'price' && sortOrder === 'DESC' ? 'price-high' :
+                           sortBy === 'title' ? 'title' :
+                           sortBy === 'year' ? 'year' : 'created_at'}
                     label="Sort by"
-                    onChange={(e) => setSortBy(e.target.value)}
+                    onChange={(e) => handleSortChange(e.target.value)}
                   >
+                    <MenuItem value="created_at">Newest First</MenuItem>
                     <MenuItem value="title">Title</MenuItem>
                     <MenuItem value="price-low">Price: Low to High</MenuItem>
                     <MenuItem value="price-high">Price: High to Low</MenuItem>
@@ -179,9 +272,15 @@ const Gallery: React.FC = () => {
 
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary">
-            Showing {filteredPaintings.length} of {paintings.length} pieces
-            {selectedCategory !== 'All' && ` in ${selectedCategory}`}
-            {searchTerm && ` matching "${searchTerm}"`}
+            {pagination ? (
+              <>
+                Showing {((page - 1) * itemsPerPage) + 1} - {Math.min(page * itemsPerPage, pagination.total)} of {pagination.total} pieces
+                {selectedCategory !== 'All' && ` in ${selectedCategory}`}
+                {searchTerm && ` matching "${searchTerm}"`}
+              </>
+            ) : (
+              'Loading...'
+            )}
           </Typography>
         </Box>
 
@@ -189,7 +288,7 @@ const Gallery: React.FC = () => {
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />
           </Box>
-        ) : filteredPaintings.length === 0 ? (
+        ) : paintings.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <Typography variant="h6" color="text.secondary" gutterBottom>
               No artwork found
@@ -199,61 +298,79 @@ const Gallery: React.FC = () => {
             </Typography>
           </Box>
         ) : (
-          <Grid container spacing={4}>
-            {filteredPaintings.map((painting) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={painting.id}>
-                <PaintingCard painting={painting} />
-              </Grid>
-            ))}
-            <Grid item xs={12} sm={6} md={4} lg={3}>
-              <Card
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  border: '2px dashed',
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    borderColor: 'primary.main',
-                    bgcolor: 'action.hover',
-                    transform: 'translateY(-4px)',
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    height: 300,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: 'grey.50',
-                  }}
-                >
-                  <AddIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5 }} />
-                </Box>
-                <CardContent sx={{ flexGrow: 1, textAlign: 'center', py: 4 }}>
-                  <Typography variant="h6" gutterBottom color="text.secondary">
-                    Your Artwork Here
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Join our community and showcase your work
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => navigate('/artist-signup')}
+          <>
+            <Grid container spacing={4}>
+              {paintings.map((painting) => (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={painting.id}>
+                  <PaintingCard painting={painting} />
+                </Grid>
+              ))}
+              {pagination && pagination.page === pagination.totalPages && (
+                <Grid item xs={12} sm={6} md={4} lg={3}>
+                  <Card
                     sx={{
-                      textTransform: 'none',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      border: '2px dashed',
+                      borderColor: 'divider',
+                      bgcolor: 'background.paper',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: 'action.hover',
+                        transform: 'translateY(-4px)',
+                      },
                     }}
                   >
-                    Add Your Listing
-                  </Button>
-                </CardContent>
-              </Card>
+                    <Box
+                      sx={{
+                        height: 300,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: 'grey.50',
+                      }}
+                    >
+                      <AddIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5 }} />
+                    </Box>
+                    <CardContent sx={{ flexGrow: 1, textAlign: 'center', py: 4 }}>
+                      <Typography variant="h6" gutterBottom color="text.secondary">
+                        Your Artwork Here
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        Join our community and showcase your work
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => navigate('/artist-signup')}
+                        sx={{
+                          textTransform: 'none',
+                        }}
+                      >
+                        Add Your Listing
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
             </Grid>
-          </Grid>
+            
+            {pagination && pagination.total > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+                <Pagination
+                  count={pagination.totalPages || 1}
+                  page={pagination.page || page}
+                  onChange={handlePageChange}
+                  color="primary"
+                  size="large"
+                  showFirstButton
+                  showLastButton
+                />
+              </Box>
+            )}
+          </>
         )}
       </Container>
     </Box>

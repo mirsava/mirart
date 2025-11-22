@@ -55,11 +55,6 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Listing is out of stock' });
     }
 
-    // Only allow fixed price listings
-    if (listing.listing_type !== 'fixed_price') {
-      return res.status(400).json({ error: 'Only fixed price listings can be purchased through checkout' });
-    }
-
     const unit_price = parseFloat(listing.price);
     const total_price = unit_price * quantity;
     

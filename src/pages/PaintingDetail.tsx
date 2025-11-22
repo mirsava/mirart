@@ -55,13 +55,8 @@ const PaintingDetail: React.FC = () => {
       title: listing.title,
       artist: listing.artist_name || 'Unknown Artist',
       artistUsername: listing.cognito_username,
+      artistSignatureUrl: listing.signature_url,
       price: listing.price,
-      listing_type: listing.listing_type,
-      starting_bid: listing.starting_bid,
-      current_bid: listing.current_bid,
-      reserve_price: listing.reserve_price,
-      auction_end_date: listing.auction_end_date,
-      bid_count: listing.bid_count,
       image: getImageUrl(listing.primary_image_url) || '',
       description: listing.description || '',
       category: listing.category as 'Painting' | 'Woodworking',
@@ -507,40 +502,9 @@ const PaintingDetail: React.FC = () => {
                   )}
                 </Typography>
 
-                {painting.listing_type === 'auction' ? (
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" color="primary" gutterBottom>
-                      ${painting.current_bid || painting.starting_bid || 0}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Current Bid
-                    </Typography>
-                    {painting.starting_bid && (
-                      <Typography variant="body2" color="text.secondary">
-                        Starting Bid: ${painting.starting_bid}
-                      </Typography>
-                    )}
-                    {painting.reserve_price && (
-                      <Typography variant="body2" color="text.secondary">
-                        Reserve Price: ${painting.reserve_price}
-                      </Typography>
-                    )}
-                    {painting.auction_end_date && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        Auction ends: {new Date(painting.auction_end_date).toLocaleString()}
-                      </Typography>
-                    )}
-                    {painting.bid_count !== undefined && painting.bid_count > 0 && (
-                      <Typography variant="body2" color="text.secondary">
-                        {painting.bid_count} bid{painting.bid_count !== 1 ? 's' : ''}
-                      </Typography>
-                    )}
-                  </Box>
-                ) : (
-                  <Typography variant="h4" color="primary" sx={{ mb: 3 }}>
-                    ${painting.price}
-                  </Typography>
-                )}
+                <Typography variant="h4" color="primary" sx={{ mb: 3 }}>
+                  ${painting.price ?? 'N/A'}
+                </Typography>
 
                 <Typography variant="body1" paragraph>
                   {painting.description}
@@ -626,29 +590,15 @@ const PaintingDetail: React.FC = () => {
                 >
                   Back to Gallery
                 </Button>
-                {painting.listing_type === 'auction' ? (
-                  <Button
-                    variant="contained"
-                    size="large"
-                    onClick={() => {
-                      // TODO: Implement bid placement
-                      alert('Bid placement coming soon!');
-                    }}
-                    sx={{ flexGrow: { xs: 1, sm: 0 } }}
-                  >
-                    Place Bid
-                  </Button>
-                ) : (
-                  <Button
-                    variant="contained"
-                    size="large"
-                    onClick={handleAddToCart}
-                    disabled={!painting.inStock}
-                    sx={{ flexGrow: { xs: 1, sm: 0 } }}
-                  >
-                    Add to Cart
-                  </Button>
-                )}
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={handleAddToCart}
+                  disabled={!painting.inStock}
+                  sx={{ flexGrow: { xs: 1, sm: 0 } }}
+                >
+                  Add to Cart
+                </Button>
               </Box>
             </Box>
           </Grid>

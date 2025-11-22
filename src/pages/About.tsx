@@ -20,7 +20,7 @@ const About: React.FC = () => {
     {
       icon: <PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
       title: 'Flexible Pricing',
-      description: 'Choose fixed price listings ($10 fee) or auction-style sales (10% commission). Artists control their pricing strategy.',
+      description: 'List your work for a fixed price with a simple $10 activation fee and keep the full sale amount.',
     },
     {
       icon: <BuildIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
@@ -71,10 +71,10 @@ const About: React.FC = () => {
                 to showcase and sell their work directly to art lovers worldwide.
               </Typography>
               <Typography variant="body1" paragraph>
-                Our mission is to support independent artists by offering transparent, affordable pricing 
-                options. Artists can choose to list their work at a fixed price with a simple $10 listing 
-                fee, or opt for auction-style sales with a 10% commission only when their art sells. This 
-                flexibility ensures artists can find the pricing model that works best for their business.
+                Our mission is to support independent artists by offering transparent, affordable pricing. 
+                Artists list their work at a fixed price and pay a straightforward $10 activation fee when 
+                they are ready to publish. No ongoing commissions or surprise charges—artists keep the full 
+                sale price and maintain control over their business.
               </Typography>
               <Typography variant="body1">
                 We empower artists to maintain control over their sales process, including shipping, 
@@ -121,8 +121,8 @@ const About: React.FC = () => {
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph>
             ArtZyla provides a simple, transparent marketplace for artists and buyers. Artists create 
-            listings, choose their pricing model, and pay a $10 activation fee to make their listings 
-            visible. Buyers can purchase directly from artists, who handle all shipping and customer service.
+            listings, pay a flat $10 activation fee to make them visible, and manage shipping and 
+            customer service directly with collectors. Buyers purchase authentic art straight from the source.
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 4, flexWrap: 'wrap', mt: 4 }}>
             <Box sx={{ textAlign: 'center' }}>
@@ -135,10 +135,10 @@ const About: React.FC = () => {
             </Box>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h6" color="primary.main">
-                10%
+                0%
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Auction Commission
+                Platform Commission
               </Typography>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
