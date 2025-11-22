@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardMedia,
@@ -9,18 +9,28 @@ import {
   Box,
   Chip,
   Link as MuiLink,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import { Favorite, FavoriteBorder } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
+import { useAuth } from '../contexts/AuthContext';
+import apiService from '../services/api';
 import { Artwork } from '../types';
 
 interface PaintingCardProps {
   painting: Artwork;
+  onLikeChange?: (listingId: number, liked: boolean, likeCount: number) => void;
 }
 
-const PaintingCard: React.FC<PaintingCardProps> = ({ painting }) => {
+const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { user, isAuthenticated } = useAuth();
+  const [isLiked, setIsLiked] = useState(painting.isLiked || false);
+  const [likeCount, setLikeCount] = useState(painting.likeCount || 0);
+  const [liking, setLiking] = useState(false);
 
   const handleViewDetails = (): void => {
     navigate(`/painting/${painting.id}`);
@@ -32,6 +42,42 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting }) => {
       addToCart(painting);
     } catch (error: any) {
       alert(error.message);
+    }
+  };
+
+  const handleLike = async (e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation();
+    
+    if (!isAuthenticated || !user?.id) {
+      navigate('/artist-signin');
+      return;
+    }
+
+    if (liking) return;
+
+    setLiking(true);
+    const wasLiked = isLiked;
+    const previousCount = likeCount;
+
+    setIsLiked(!wasLiked);
+    setLikeCount(wasLiked ? likeCount - 1 : likeCount + 1);
+
+    try {
+      if (wasLiked) {
+        await apiService.unlikeListing(painting.id, user.id);
+      } else {
+        const result = await apiService.likeListing(painting.id, user.id);
+        setLikeCount(result.likeCount);
+      }
+      
+      if (onLikeChange) {
+        onLikeChange(painting.id, !wasLiked, wasLiked ? likeCount - 1 : likeCount + 1);
+      }
+    } catch (error) {
+      setIsLiked(wasLiked);
+      setLikeCount(previousCount);
+    } finally {
+      setLiking(false);
     }
   };
 
@@ -98,9 +144,33 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting }) => {
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {painting.dimensions} • {painting.medium}
         </Typography>
-        <Typography variant="h6" color="primary" fontWeight="bold">
-          ${painting.price ?? 'N/A'}
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" color="primary" fontWeight="bold">
+            ${painting.price ?? 'N/A'}
+          </Typography>
+          {isAuthenticated && (
+            <Tooltip title={isLiked ? 'Unlike' : 'Like'}>
+              <IconButton
+                size="small"
+                onClick={handleLike}
+                disabled={liking}
+                sx={{
+                  color: isLiked ? 'error.main' : 'action.disabled',
+                  '&:hover': {
+                    color: 'error.main',
+                  },
+                }}
+              >
+                {isLiked ? <Favorite /> : <FavoriteBorder />}
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+        {likeCount > 0 && (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+          </Typography>
+        )}
       </CardContent>
       <CardActions sx={{ p: 2, pt: 0 }}>
         <Button

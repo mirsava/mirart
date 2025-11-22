@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
       }
     }
     
-    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC' } = req.query;
+    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC', cognitoUsername } = req.query;
     
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 12;
@@ -40,7 +40,8 @@ router.get('/', async (req, res) => {
           u.email
         ) as artist_name,
         u.cognito_username,
-        u.signature_url
+        u.signature_url,
+        (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count
       FROM listings l
       JOIN users u ON l.user_id = u.id
       WHERE 1=1
@@ -163,6 +164,26 @@ router.get('/', async (req, res) => {
     
     const [rows] = await pool.execute(finalQuery, queryParams);
     
+    let userLikedListings = [];
+    if (cognitoUsername) {
+      const [users] = await pool.execute(
+        'SELECT id FROM users WHERE cognito_username = ?',
+        [cognitoUsername]
+      );
+      if (users.length > 0) {
+        const userId = users[0].id;
+        const listingIds = rows.map(r => r.id);
+        if (listingIds.length > 0) {
+          const placeholders = listingIds.map(() => '?').join(',');
+          const [likes] = await pool.execute(
+            `SELECT listing_id FROM likes WHERE user_id = ? AND listing_id IN (${placeholders})`,
+            [userId, ...listingIds]
+          );
+          userLikedListings = likes.map(like => like.listing_id);
+        }
+      }
+    }
+    
     // Parse JSON fields
     const listings = rows.map(listing => {
       let parsedImageUrls = null;
@@ -191,7 +212,9 @@ router.get('/', async (req, res) => {
       return {
         ...listing,
         price: listing.price ? parseFloat(listing.price) : null,
-        image_urls: parsedImageUrls
+        image_urls: parsedImageUrls,
+        like_count: listing.like_count || 0,
+        is_liked: userLikedListings.includes(listing.id)
       };
     });
     
@@ -220,6 +243,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const { cognitoUsername } = req.query;
     
     const [rows] = await pool.execute(
       `SELECT l.*, 
@@ -231,7 +255,8 @@ router.get('/:id', async (req, res) => {
         ) as artist_name,
         u.cognito_username, 
         u.email as artist_email,
-        u.signature_url
+        u.signature_url,
+        (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count
       FROM listings l
       JOIN users u ON l.user_id = u.id
        WHERE l.id = ?`,
@@ -240,6 +265,22 @@ router.get('/:id', async (req, res) => {
     
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Listing not found' });
+    }
+    
+    let isLiked = false;
+    if (cognitoUsername) {
+      const [users] = await pool.execute(
+        'SELECT id FROM users WHERE cognito_username = ?',
+        [cognitoUsername]
+      );
+      if (users.length > 0) {
+        const userId = users[0].id;
+        const [likes] = await pool.execute(
+          'SELECT id FROM likes WHERE user_id = ? AND listing_id = ?',
+          [userId, id]
+        );
+        isLiked = likes.length > 0;
+      }
     }
     
     // Increment views
@@ -251,6 +292,8 @@ router.get('/:id', async (req, res) => {
     res.json({
       ...rows[0],
       price: rows[0].price ? parseFloat(rows[0].price) : null,
+      like_count: rows[0].like_count || 0,
+      is_liked: isLiked,
       image_urls: (() => {
         if (!rows[0].image_urls || rows[0].image_urls === 'null' || rows[0].image_urls === '') return null;
         try {

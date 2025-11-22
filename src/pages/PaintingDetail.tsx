@@ -18,12 +18,14 @@ import {
   ArrowBack as ArrowBackIcon,
   Share as ShareIcon,
   FavoriteBorder as FavoriteBorderIcon,
+  Favorite as FavoriteIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import { useCart } from '../contexts/CartContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
 import apiService, { Listing } from '../services/api';
 import { Painting } from '../types';
@@ -32,12 +34,16 @@ const PaintingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { user, isAuthenticated } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
-  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string }) | null>(null);
+  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean }) | null>(null);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [liking, setLiking] = useState(false);
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -49,7 +55,7 @@ const PaintingDetail: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string } => {
+  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean } => {
     return {
       id: listing.id,
       title: listing.title,
@@ -67,6 +73,8 @@ const PaintingDetail: React.FC = () => {
       inStock: listing.in_stock,
       shipping_info: listing.shipping_info,
       returns_info: listing.returns_info,
+      likeCount: listing.like_count || 0,
+      isLiked: listing.is_liked || false,
     };
   };
 
@@ -100,14 +108,17 @@ const PaintingDetail: React.FC = () => {
         const listingId = parseInt(id);
         if (!isNaN(listingId)) {
           try {
-            const listing = await apiService.getListing(listingId);
-            console.log('Listing data:', listing);
-            console.log('Primary image URL:', listing.primary_image_url);
-            console.log('Image URLs:', listing.image_urls);
-            console.log('Image URLs type:', typeof listing.image_urls);
+            const url = user?.id 
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/listings/${listingId}?cognitoUsername=${user.id}`
+              : `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/listings/${listingId}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to fetch listing');
+            const listing: Listing = await response.json();
             
             const convertedPainting = convertListingToPainting(listing);
             setPainting(convertedPainting);
+            setIsLiked(convertedPainting.isLiked || false);
+            setLikeCount(convertedPainting.likeCount || 0);
             
             const images: string[] = [];
             const seenUrls = new Set<string>();
@@ -210,7 +221,7 @@ const PaintingDetail: React.FC = () => {
     };
 
     fetchPainting();
-  }, [id]);
+  }, [id, user?.id]);
 
   if (loading) {
     return (
@@ -259,6 +270,38 @@ const PaintingDetail: React.FC = () => {
       });
     } else {
       navigator.clipboard.writeText(window.location.href);
+    }
+  };
+
+  const handleLike = async (): Promise<void> => {
+    if (!isAuthenticated || !user?.id) {
+      navigate('/artist-signin');
+      return;
+    }
+
+    if (liking || !painting) return;
+
+    setLiking(true);
+    const wasLiked = isLiked;
+    const previousCount = likeCount;
+
+    setIsLiked(!wasLiked);
+    setLikeCount(wasLiked ? likeCount - 1 : likeCount + 1);
+
+    try {
+      if (wasLiked) {
+        const result = await apiService.unlikeListing(painting.id, user.id);
+        setLikeCount(result.likeCount);
+      } else {
+        const result = await apiService.likeListing(painting.id, user.id);
+        setLikeCount(result.likeCount);
+      }
+    } catch (error) {
+      setIsLiked(wasLiked);
+      setLikeCount(previousCount);
+      enqueueSnackbar('Failed to update like', { variant: 'error' });
+    } finally {
+      setLiking(false);
     }
   };
 
@@ -444,6 +487,19 @@ const PaintingDetail: React.FC = () => {
                   zIndex: 1,
                 }}
               >
+                {isAuthenticated && (
+                  <IconButton
+                    sx={{
+                      bgcolor: 'rgba(255,255,255,0.9)',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,1)' },
+                      color: isLiked ? 'error.main' : 'inherit',
+                    }}
+                    onClick={handleLike}
+                    disabled={liking}
+                  >
+                    {isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                  </IconButton>
+                )}
                 <IconButton
                   sx={{
                     bgcolor: 'rgba(255,255,255,0.9)',
@@ -452,14 +508,6 @@ const PaintingDetail: React.FC = () => {
                   onClick={handleShare}
                 >
                   <ShareIcon />
-                </IconButton>
-                <IconButton
-                  sx={{
-                    bgcolor: 'rgba(255,255,255,0.9)',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,1)' },
-                  }}
-                >
-                  <FavoriteBorderIcon />
                 </IconButton>
               </Box>
             </Box>

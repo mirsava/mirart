@@ -13,6 +13,8 @@ export interface Artwork {
   medium: string;
   year: number;
   inStock: boolean;
+  likeCount?: number;
+  isLiked?: boolean;
 }
 
 export interface Painting extends Artwork {

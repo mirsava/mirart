@@ -25,9 +25,11 @@ import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
 import apiService, { Listing } from '../services/api';
 import { Painting } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [featuredPaintings, setFeaturedPaintings] = useState<Painting[]>([]);
@@ -66,6 +68,8 @@ const Home: React.FC = () => {
       medium: listing.medium || '',
       year: listing.year || new Date().getFullYear(),
       inStock: listing.in_stock,
+      likeCount: listing.like_count || 0,
+      isLiked: listing.is_liked || false,
     };
   };
 
@@ -126,8 +130,8 @@ const Home: React.FC = () => {
     const fetchFeaturedListings = async () => {
       try {
         const [paintingsResponse, woodworkingResponse] = await Promise.all([
-          apiService.getListings({ status: 'active', category: 'Painting', limit: 3 }),
-          apiService.getListings({ status: 'active', category: 'Woodworking', limit: 3 }),
+          apiService.getListings({ status: 'active', category: 'Painting', limit: 3, cognitoUsername: user?.id }),
+          apiService.getListings({ status: 'active', category: 'Woodworking', limit: 3, cognitoUsername: user?.id }),
         ]);
         
         const dbPaintings = paintingsResponse.listings.map(listing => convertListingToPainting(listing, 'Painting'));

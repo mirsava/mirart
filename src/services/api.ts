@@ -42,6 +42,8 @@ export interface Listing {
   signature_url?: string;
   shipping_info?: string;
   returns_info?: string;
+  like_count?: number;
+  is_liked?: boolean;
 }
 
 export interface Order {
@@ -137,6 +139,7 @@ class ApiService {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
+    cognitoUsername?: string;
   }): Promise<{ listings: Listing[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } }> {
     const params = new URLSearchParams();
     if (filters) {
@@ -146,6 +149,20 @@ class ApiService {
     }
     const queryString = params.toString();
     return this.request<{ listings: Listing[]; pagination: any }>(`/listings${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async likeListing(listingId: number, cognitoUsername: string): Promise<{ liked: boolean; likeCount: number }> {
+    return this.request<{ liked: boolean; likeCount: number }>(`/likes/${listingId}`, {
+      method: 'POST',
+      body: JSON.stringify({ cognitoUsername }),
+    });
+  }
+
+  async unlikeListing(listingId: number, cognitoUsername: string): Promise<{ liked: boolean; likeCount: number }> {
+    return this.request<{ liked: boolean; likeCount: number }>(`/likes/${listingId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ cognitoUsername }),
+    });
   }
 
   async getListing(id: number): Promise<Listing> {
