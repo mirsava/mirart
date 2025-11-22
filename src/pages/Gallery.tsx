@@ -116,13 +116,11 @@ const Gallery: React.FC = () => {
   useEffect(() => {
     const pageParam = searchParams.get('page');
     const limitParam = searchParams.get('limit');
-    let shouldUpdate = false;
     
     if (pageParam) {
       const pageNum = parseInt(pageParam, 10);
       if (!isNaN(pageNum) && pageNum > 0 && pageNum !== page) {
         setPage(pageNum);
-        shouldUpdate = true;
       }
     }
     
@@ -133,7 +131,6 @@ const Gallery: React.FC = () => {
         if (page !== 1) {
           setPage(1);
         }
-        shouldUpdate = true;
       }
     }
   }, [searchParams]);
