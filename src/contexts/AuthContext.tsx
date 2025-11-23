@@ -61,13 +61,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const attributes = await fetchUserAttributes();
         const userAttributesObj = attributes;
 
-        // Default to 'artist' if userType is not set (since custom attributes aren't configured yet)
-        // Users signing up through artist signup should be treated as artists
-        const userType = userAttributesObj['custom:user_type'] as 'artist' | 'buyer' | 'admin' || 'artist';
-        
         // Try to fetch user data from database
         try {
           const dbUser: ApiUser = await apiService.getUser(cognitoUser.username);
+          const userType = (dbUser as any).user_type || userAttributesObj['custom:user_type'] as 'artist' | 'buyer' | 'admin' || 'artist';
+          
           setUser({
             id: cognitoUser.username,
             email: userAttributesObj.email || dbUser.email || '',
@@ -79,6 +77,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           });
         } catch (dbError) {
           // If user doesn't exist in DB yet, use Cognito data only
+          const userType = userAttributesObj['custom:user_type'] as 'artist' | 'buyer' | 'admin' || 'artist';
           setUser({
             id: cognitoUser.username,
             email: userAttributesObj.email || '',

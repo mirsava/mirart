@@ -237,6 +237,56 @@ class ApiService {
       body: JSON.stringify({ cognitoUsername }),
     });
   }
+
+  async getAdminStats(cognitoUsername: string): Promise<any> {
+    return this.request<any>(`/admin/stats?cognitoUsername=${cognitoUsername}`);
+  }
+
+  async getAdminUsers(cognitoUsername: string, filters?: { page?: number; limit?: number; search?: string }): Promise<any> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) params.append(key, value.toString());
+      });
+    }
+    return this.request<any>(`/admin/users?${params.toString()}`);
+  }
+
+  async getAdminListings(cognitoUsername: string, filters?: { page?: number; limit?: number; status?: string; category?: string }): Promise<any> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) params.append(key, value.toString());
+      });
+    }
+    return this.request<any>(`/admin/listings?${params.toString()}`);
+  }
+
+  async getAdminMessages(cognitoUsername: string, filters?: { page?: number; limit?: number }): Promise<any> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) params.append(key, value.toString());
+      });
+    }
+    return this.request<any>(`/admin/messages?${params.toString()}`);
+  }
+
+  async updateUserType(cognitoUsername: string, targetCognitoUsername: string, userType: 'artist' | 'buyer' | 'admin'): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/admin/users/${targetCognitoUsername}/user-type?cognitoUsername=${cognitoUsername}`, {
+      method: 'PUT',
+      body: JSON.stringify({ user_type: userType }),
+    });
+  }
+
+  async deleteListingAsAdmin(cognitoUsername: string, listingId: number): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/admin/listings/${listingId}?cognitoUsername=${cognitoUsername}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export interface Message {

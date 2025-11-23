@@ -62,6 +62,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         <Typography variant="body1" color="text.secondary" textAlign="center">
           You don't have permission to access this page. 
           {requiredUserType === 'artist' && ' This page is for artists only.'}
+          {requiredUserType === 'admin' && ' This page is for administrators only.'}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           Your user type: {user?.userType || 'not set'}

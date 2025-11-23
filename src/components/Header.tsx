@@ -32,6 +32,7 @@ import {
   Add as AddIcon,
   Email as EmailIcon,
   Notifications as NotificationsIcon,
+  AdminPanelSettings as AdminIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
@@ -295,6 +296,35 @@ const Header: React.FC = () => {
                 }}
               />
             </ListItem>
+            {user?.userType === 'admin' && (
+              <ListItem 
+                onClick={() => {
+                  handleNavigation('/admin');
+                  handleDrawerToggle();
+                }}
+                sx={{
+                  borderRadius: 2,
+                  mb: 1,
+                  cursor: 'pointer',
+                  bgcolor: location.pathname === '/admin' ? 'error.main' : 'transparent',
+                  color: location.pathname === '/admin' ? 'white' : 'inherit',
+                  '&:hover': {
+                    bgcolor: location.pathname === '/admin' ? 'error.dark' : 'error.light',
+                    color: 'white',
+                  },
+                }}
+              >
+                <ListItemIcon>
+                  <AdminIcon />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Admin Dashboard"
+                  primaryTypographyProps={{
+                    fontWeight: location.pathname === '/admin' ? 600 : 400,
+                  }}
+                />
+              </ListItem>
+            )}
             <ListItem 
               onClick={async () => {
                 await handleSignOut();
@@ -612,6 +642,25 @@ const Header: React.FC = () => {
           <EmailIcon sx={{ mr: 2, fontSize: 20 }} />
           Messages
         </MenuItem>
+        {user?.userType === 'admin' && (
+          <>
+            <Divider />
+            <MenuItem 
+              onClick={() => {
+                handleUserMenuClose();
+                navigate('/admin');
+              }}
+              sx={{ 
+                py: 1.5,
+                px: 2,
+                '&:hover': { bgcolor: 'error.light', color: 'white' },
+              }}
+            >
+              <AdminIcon sx={{ mr: 2, fontSize: 20 }} />
+              Admin Dashboard
+            </MenuItem>
+          </>
+        )}
         <Divider />
         <MenuItem 
           onClick={handleSignOut}

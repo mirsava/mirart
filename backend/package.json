@@ -13,9 +13,11 @@
     "migrate-business-name": "node database/run-business-name-migration.js",
     "migrate-likes": "node database/run-likes-migration.js",
     "migrate-messages": "node database/run-messages-migration.js",
+    "migrate-user-type": "node database/run-user-type-migration.js",
     "migrate-price-nullable": "node database/run-price-nullable-migration.js",
     "rename-column": "node rename-column.js",
-    "reset-db": "node scripts/reset-database.js"
+    "reset-db": "node scripts/reset-database.js",
+    "set-admin": "node scripts/set-admin.js"
   },
   "keywords": [],
   "author": "",

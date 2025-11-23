@@ -25,6 +25,7 @@ import EditListing from './pages/EditListing';
 import ForgotPassword from './pages/ForgotPassword';
 import ConfirmSignup from './pages/ConfirmSignup';
 import Messages from './pages/Messages';
+import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App(): JSX.Element {
@@ -99,6 +100,14 @@ function AppContent(): JSX.Element {
               element={
                 <ProtectedRoute>
                   <Messages />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute requiredUserType="admin">
+                  <AdminDashboard />
                 </ProtectedRoute>
               } 
             />
