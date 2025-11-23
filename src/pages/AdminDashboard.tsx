@@ -122,7 +122,7 @@ const AdminDashboard: React.FC = () => {
   const fetchStats = async (): Promise<void> => {
     if (!user?.id) return;
     try {
-      const data = await apiService.getAdminStats(user.id);
+      const data = await apiService.getAdminStats(user.id, user.groups);
       setStats(data);
     } catch (error: any) {
       const errorMessage = error.message || error.error || 'Failed to fetch stats';
@@ -140,7 +140,7 @@ const AdminDashboard: React.FC = () => {
         page: usersPage,
         limit: 20,
         search: searchTerm || undefined,
-      });
+      }, user.groups);
       setUsers(response.users || []);
       setUsersPagination(response.pagination);
     } catch (error: any) {
@@ -158,7 +158,7 @@ const AdminDashboard: React.FC = () => {
         limit: 20,
         status: statusFilter || undefined,
         category: categoryFilter || undefined,
-      });
+      }, user.groups);
       setListings(response.listings || []);
       setListingsPagination(response.pagination);
     } catch (error: any) {
@@ -174,7 +174,7 @@ const AdminDashboard: React.FC = () => {
       const response = await apiService.getAdminMessages(user.id, {
         page: messagesPage,
         limit: 20,
-      });
+      }, user.groups);
       setMessages(response.messages || []);
       setMessagesPagination(response.pagination);
     } catch (error: any) {

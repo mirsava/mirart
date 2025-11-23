@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { 
   signIn, 
   signUp, 
@@ -6,16 +6,19 @@ import {
   confirmSignUp, 
   getCurrentUser, 
   fetchUserAttributes,
+  fetchAuthSession,
   resetPassword,
   confirmResetPassword
 } from 'aws-amplify/auth';
 import apiService, { User as ApiUser } from '../services/api';
+import { UserRole, UserRoleType } from '../types/userRoles';
 
 interface User {
   id: string;
   email: string;
   name?: string;
-  userType?: 'artist' | 'buyer' | 'admin';
+  userRole?: UserRoleType;
+  groups?: string[];
   attributes?: Record<string, any>;
 }
 
@@ -29,6 +32,7 @@ interface AuthContextType {
   resendConfirmationCode: (email: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -50,21 +54,85 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkAuthState();
-  }, []);
+  const getRoleFromGroups = (groups: string[]): UserRoleType | undefined => {
+    if (!groups || groups.length === 0) {
+      return undefined;
+    }
+    
+    if (groups.includes(UserRole.SITE_ADMIN) || groups.includes('site_admin') || groups.includes('admin')) {
+      return UserRole.SITE_ADMIN;
+    }
+    if (groups.includes(UserRole.ARTIST) || groups.includes('artist')) {
+      return UserRole.ARTIST;
+    }
+    if (groups.includes(UserRole.BUYER) || groups.includes('buyer')) {
+      return UserRole.BUYER;
+    }
+    return undefined;
+  };
 
-  const checkAuthState = async () => {
+  const decodeToken = (token: string): any => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const checkAuthState = useCallback(async () => {
     try {
       const cognitoUser = await getCurrentUser();
       if (cognitoUser) {
         const attributes = await fetchUserAttributes();
         const userAttributesObj = attributes;
+        
+        let groups: string[] = [];
+        let userRole: UserRoleType | undefined;
+        
+        try {
+          const session = await fetchAuthSession({ forceRefresh: true });
+          
+          if (session.tokens?.idToken) {
+            const idToken = session.tokens.idToken.toString();
+            const decodedIdToken = decodeToken(idToken);
+            
+            if (decodedIdToken['cognito:groups']) {
+              groups = Array.isArray(decodedIdToken['cognito:groups']) 
+                ? decodedIdToken['cognito:groups'] 
+                : [decodedIdToken['cognito:groups']];
+            } else if (decodedIdToken['groups']) {
+              groups = Array.isArray(decodedIdToken['groups']) 
+                ? decodedIdToken['groups'] 
+                : [decodedIdToken['groups']];
+            }
+          }
+          
+          if (groups.length === 0 && session.tokens?.accessToken) {
+            const accessToken = session.tokens.accessToken.toString();
+            const decodedAccessToken = decodeToken(accessToken);
+            
+            if (decodedAccessToken['cognito:groups']) {
+              groups = Array.isArray(decodedAccessToken['cognito:groups']) 
+                ? decodedAccessToken['cognito:groups'] 
+                : [decodedAccessToken['cognito:groups']];
+            }
+          }
+          
+          userRole = getRoleFromGroups(groups);
+        } catch (tokenError) {
+          // Token fetch/decoding failed, continue without groups
+        }
 
-        // Try to fetch user data from database
         try {
           const dbUser: ApiUser = await apiService.getUser(cognitoUser.username);
-          const userType = (dbUser as any).user_type || userAttributesObj['custom:user_type'] as 'artist' | 'buyer' | 'admin' || 'artist';
           
           setUser({
             id: cognitoUser.username,
@@ -72,17 +140,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             name: dbUser.first_name && dbUser.last_name 
               ? `${dbUser.first_name} ${dbUser.last_name}`
               : userAttributesObj.name || (userAttributesObj.given_name ? `${userAttributesObj.given_name} ${userAttributesObj.family_name || ''}`.trim() : ''),
-            userType: userType,
+            userRole: userRole,
+            groups: groups,
             attributes: { ...userAttributesObj, ...dbUser } as Record<string, any>,
           });
         } catch (dbError) {
-          // If user doesn't exist in DB yet, use Cognito data only
-          const userType = userAttributesObj['custom:user_type'] as 'artist' | 'buyer' | 'admin' || 'artist';
           setUser({
             id: cognitoUser.username,
             email: userAttributesObj.email || '',
             name: userAttributesObj.name || (userAttributesObj.given_name ? `${userAttributesObj.given_name} ${userAttributesObj.family_name || ''}`.trim() : ''),
-            userType: userType,
+            userRole: userRole,
+            groups: groups,
             attributes: userAttributesObj,
           });
         }
@@ -92,7 +160,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    checkAuthState();
+  }, [checkAuthState]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user) {
+        checkAuthState();
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user, checkAuthState]);
 
   const handleSignIn = async (usernameOrEmail: string, password: string) => {
     try {
@@ -184,6 +265,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resendConfirmationCode: handleResendConfirmationCode,
     forgotPassword: handleForgotPassword,
     resetPassword: handleResetPassword,
+    refreshUser: checkAuthState,
     isAuthenticated: !!user,
   };
 

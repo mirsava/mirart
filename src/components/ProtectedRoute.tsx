@@ -1,20 +1,33 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Box, CircularProgress, Typography } from '@mui/material';
+import { UserRole, UserRoleType } from '../types/userRoles';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredUserType?: 'artist' | 'buyer' | 'admin';
+  requiredUserType?: UserRoleType;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requiredUserType 
 }) => {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, refreshUser } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    if (requiredUserType && isAuthenticated && !loading) {
+      if (requiredUserType === UserRole.SITE_ADMIN && user?.userRole !== UserRole.SITE_ADMIN) {
+        setRefreshing(true);
+        refreshUser().finally(() => {
+          setRefreshing(false);
+        });
+      }
+    }
+  }, [requiredUserType, isAuthenticated, loading, user?.userRole, refreshUser]);
+
+  if (loading || refreshing) {
     return (
       <Box 
         sx={{ 
@@ -38,9 +51,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/artist-signin" replace />;
   }
 
-  if (requiredUserType && user?.userType !== requiredUserType) {
-    // If userType is not set, allow access (defaults to artist)
-    if (!user?.userType && requiredUserType === 'artist') {
+  if (requiredUserType && user?.userRole !== requiredUserType) {
+    
+    if (!user?.userRole && requiredUserType === UserRole.ARTIST) {
+      return <>{children}</>;
+    }
+    
+    if (requiredUserType === UserRole.ARTIST && user?.userRole === UserRole.SITE_ADMIN) {
       return <>{children}</>;
     }
     
@@ -61,11 +78,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         </Typography>
         <Typography variant="body1" color="text.secondary" textAlign="center">
           You don't have permission to access this page. 
-          {requiredUserType === 'artist' && ' This page is for artists only.'}
-          {requiredUserType === 'admin' && ' This page is for administrators only.'}
+          {requiredUserType === UserRole.ARTIST && ' This page is for artists only.'}
+          {requiredUserType === UserRole.SITE_ADMIN && ' This page is for administrators only.'}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Your user type: {user?.userType || 'not set'}
+          Your user role: {user?.userRole || 'not set'}
         </Typography>
       </Box>
     );

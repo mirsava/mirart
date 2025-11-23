@@ -38,6 +38,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
+import { UserRole } from '../types/userRoles';
 import logo from '../assets/images/logo.png';
 
 const Header: React.FC = () => {
@@ -45,7 +46,7 @@ const Header: React.FC = () => {
   const location = useLocation();
   const theme = useTheme();
   const { isDarkMode, toggleTheme } = useCustomTheme();
-  const { user, signOut, isAuthenticated } = useAuth();
+  const { user, signOut, isAuthenticated, refreshUser } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
@@ -101,6 +102,9 @@ const Header: React.FC = () => {
   }, [isAuthenticated, user?.id, location.pathname]);
 
   const handleDrawerToggle = (): void => {
+    if (!drawerOpen && isAuthenticated) {
+      refreshUser();
+    }
     setDrawerOpen(!drawerOpen);
   };
 
@@ -123,6 +127,9 @@ const Header: React.FC = () => {
   };
 
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>): void => {
+    if (isAuthenticated) {
+      refreshUser();
+    }
     setUserMenuAnchor(event.currentTarget);
   };
 
@@ -296,7 +303,7 @@ const Header: React.FC = () => {
                 }}
               />
             </ListItem>
-            {user?.userType === 'admin' && (
+            {user?.userRole === UserRole.SITE_ADMIN && (
               <ListItem 
                 onClick={() => {
                   handleNavigation('/admin');
@@ -642,7 +649,7 @@ const Header: React.FC = () => {
           <EmailIcon sx={{ mr: 2, fontSize: 20 }} />
           Messages
         </MenuItem>
-        {user?.userType === 'admin' && (
+        {user?.userRole === UserRole.SITE_ADMIN && (
           <>
             <Divider />
             <MenuItem 

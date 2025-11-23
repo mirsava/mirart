@@ -1,30 +1,34 @@
 import express from 'express';
 import pool from '../config/database.js';
+import UserRole from '../constants/userRoles.js';
 
 const router = express.Router();
 
 const checkAdminAccess = async (req, res, next) => {
   try {
-    const { cognitoUsername } = req.query;
+    const { cognitoUsername, groups } = req.query;
     
     if (!cognitoUsername) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const [users] = await pool.execute(
-      'SELECT user_type FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found in database' });
+    let userGroups = [];
+    if (groups) {
+      try {
+        userGroups = JSON.parse(groups);
+      } catch (parseError) {
+        userGroups = Array.isArray(groups) ? groups : [groups];
+      }
     }
 
-    const userType = users[0].user_type;
-    if (!userType || userType !== 'admin') {
+    const isAdmin = userGroups.includes(UserRole.SITE_ADMIN) || 
+                   userGroups.includes('site_admin') || 
+                   userGroups.includes('admin');
+
+    if (!isAdmin) {
       return res.status(403).json({ 
         error: 'Admin access required',
-        message: `Your user type is: ${userType || 'not set'}. Please contact an administrator.`
+        message: `You must be a member of the '${UserRole.SITE_ADMIN}' group to access this resource.`
       });
     }
 
@@ -277,7 +281,8 @@ router.put('/users/:cognitoUsername/user-type', checkAdminAccess, async (req, re
     const { cognitoUsername } = req.params;
     const { user_type } = req.body;
 
-    if (!['artist', 'buyer', 'admin'].includes(user_type)) {
+    const validUserTypes = [UserRole.ARTIST, UserRole.BUYER, UserRole.SITE_ADMIN];
+    if (!validUserTypes.includes(user_type)) {
       return res.status(400).json({ error: 'Invalid user_type' });
     }
 

@@ -27,6 +27,7 @@ import ConfirmSignup from './pages/ConfirmSignup';
 import Messages from './pages/Messages';
 import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import { UserRole } from './types/userRoles';
 
 function App(): JSX.Element {
   return (
@@ -74,7 +75,7 @@ function AppContent(): JSX.Element {
             <Route 
               path="/artist-dashboard" 
               element={
-                <ProtectedRoute requiredUserType="artist">
+                <ProtectedRoute requiredUserType={UserRole.ARTIST}>
                   <ArtistDashboard />
                 </ProtectedRoute>
               } 
@@ -82,7 +83,7 @@ function AppContent(): JSX.Element {
             <Route 
               path="/create-listing" 
               element={
-                <ProtectedRoute requiredUserType="artist">
+                <ProtectedRoute requiredUserType={UserRole.ARTIST}>
                   <CreateListing />
                 </ProtectedRoute>
               } 
@@ -90,7 +91,7 @@ function AppContent(): JSX.Element {
             <Route 
               path="/edit-listing/:id" 
               element={
-                <ProtectedRoute requiredUserType="artist">
+                <ProtectedRoute requiredUserType={UserRole.ARTIST}>
                   <EditListing />
                 </ProtectedRoute>
               } 
@@ -106,7 +107,7 @@ function AppContent(): JSX.Element {
             <Route 
               path="/admin" 
               element={
-                <ProtectedRoute requiredUserType="admin">
+                <ProtectedRoute requiredUserType={UserRole.SITE_ADMIN}>
                   <AdminDashboard />
                 </ProtectedRoute>
               } 

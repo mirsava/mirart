@@ -238,13 +238,21 @@ class ApiService {
     });
   }
 
-  async getAdminStats(cognitoUsername: string): Promise<any> {
-    return this.request<any>(`/admin/stats?cognitoUsername=${cognitoUsername}`);
-  }
-
-  async getAdminUsers(cognitoUsername: string, filters?: { page?: number; limit?: number; search?: string }): Promise<any> {
+  async getAdminStats(cognitoUsername: string, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<any>(`/admin/stats?${params.toString()}`);
+  }
+
+  async getAdminUsers(cognitoUsername: string, filters?: { page?: number; limit?: number; search?: string }, groups?: string[]): Promise<any> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null) params.append(key, value.toString());
@@ -253,9 +261,12 @@ class ApiService {
     return this.request<any>(`/admin/users?${params.toString()}`);
   }
 
-  async getAdminListings(cognitoUsername: string, filters?: { page?: number; limit?: number; status?: string; category?: string }): Promise<any> {
+  async getAdminListings(cognitoUsername: string, filters?: { page?: number; limit?: number; status?: string; category?: string }, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null) params.append(key, value.toString());
@@ -264,9 +275,12 @@ class ApiService {
     return this.request<any>(`/admin/listings?${params.toString()}`);
   }
 
-  async getAdminMessages(cognitoUsername: string, filters?: { page?: number; limit?: number }): Promise<any> {
+  async getAdminMessages(cognitoUsername: string, filters?: { page?: number; limit?: number }, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null) params.append(key, value.toString());
@@ -274,6 +288,7 @@ class ApiService {
     }
     return this.request<any>(`/admin/messages?${params.toString()}`);
   }
+
 
   async updateUserType(cognitoUsername: string, targetCognitoUsername: string, userType: 'artist' | 'buyer' | 'admin'): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>(`/admin/users/${targetCognitoUsername}/user-type?cognitoUsername=${cognitoUsername}`, {
