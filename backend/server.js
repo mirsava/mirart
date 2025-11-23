@@ -10,6 +10,7 @@ import uploadRouter from './routes/upload.js';
 import ordersRouter from './routes/orders.js';
 import likesRouter from './routes/likes.js';
 import emailRouter from './routes/email.js';
+import messagesRouter from './routes/messages.js';
 
 dotenv.config();
 
@@ -63,6 +64,7 @@ app.use('/api/upload', uploadRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/likes', likesRouter);
 app.use('/api/email', emailRouter);
+app.use('/api/messages', messagesRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

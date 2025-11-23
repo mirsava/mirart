@@ -226,6 +226,36 @@ class ApiService {
     const params = type ? `?type=${type}` : '';
     return this.request<Order[]>(`/orders/user/${cognitoUsername}${params}`);
   }
+
+  async getMessages(cognitoUsername: string, type: 'all' | 'sent' | 'received' = 'all'): Promise<{ messages: Message[] }> {
+    return this.request<{ messages: Message[] }>(`/messages/user/${cognitoUsername}?type=${type}`);
+  }
+
+  async markMessageAsRead(messageId: number, cognitoUsername: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/messages/${messageId}/read`, {
+      method: 'PUT',
+      body: JSON.stringify({ cognitoUsername }),
+    });
+  }
+}
+
+export interface Message {
+  id: number;
+  listing_id: number;
+  sender_id: number;
+  recipient_id: number;
+  subject: string;
+  message: string;
+  sender_email: string;
+  sender_name?: string;
+  recipient_email: string;
+  status: 'sent' | 'read' | 'archived';
+  created_at: string;
+  updated_at: string;
+  listing_title?: string;
+  listing_image?: string;
+  sender_name_display?: string;
+  recipient_name?: string;
 }
 
 export const apiService = new ApiService();

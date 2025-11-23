@@ -31,6 +31,7 @@ import {
   Person as PersonIcon,
   Logout as LogoutIcon,
   Add as AddIcon,
+  Email as EmailIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
@@ -62,6 +63,7 @@ const Header: React.FC = () => {
     ? [
         { label: 'My Dashboard', path: '/artist-dashboard' },
         { label: 'Create Listing', path: '/create-listing' },
+        { label: 'Messages', path: '/messages' },
       ]
     : [
         { label: 'Sell Art', path: '/artist-signup' },
@@ -243,6 +245,32 @@ const Header: React.FC = () => {
                 primary="My Dashboard"
                 primaryTypographyProps={{
                   fontWeight: location.pathname === '/artist-dashboard' ? 600 : 400,
+                }}
+              />
+            </ListItem>
+            <ListItem 
+              onClick={() => {
+                handleNavigation('/messages');
+                handleDrawerToggle();
+              }}
+              sx={{
+                borderRadius: 2,
+                mb: 1,
+                cursor: 'pointer',
+                bgcolor: location.pathname === '/messages' ? 'primary.main' : 'transparent',
+                color: location.pathname === '/messages' ? 'white' : 'inherit',
+                '&:hover': {
+                  bgcolor: location.pathname === '/messages' ? 'primary.dark' : 'action.hover',
+                },
+              }}
+            >
+              <ListItemIcon>
+                <EmailIcon />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Messages"
+                primaryTypographyProps={{
+                  fontWeight: location.pathname === '/messages' ? 600 : 400,
                 }}
               />
             </ListItem>
@@ -546,6 +574,20 @@ const Header: React.FC = () => {
         >
           <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
           My Dashboard
+        </MenuItem>
+        <MenuItem 
+          onClick={() => {
+            handleUserMenuClose();
+            navigate('/messages');
+          }}
+          sx={{ 
+            py: 1.5,
+            px: 2,
+            '&:hover': { bgcolor: 'primary.light', color: 'white' },
+          }}
+        >
+          <EmailIcon sx={{ mr: 2, fontSize: 20 }} />
+          Messages
         </MenuItem>
         <Divider />
         <MenuItem 

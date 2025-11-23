@@ -53,6 +53,41 @@ router.post('/contact-seller', async (req, res) => {
       listingId: listingId,
     });
 
+    const [buyers] = await pool.execute(
+      'SELECT id FROM users WHERE cognito_username = ? OR email = ?',
+      [buyerEmail, buyerEmail]
+    );
+
+    let senderId = null;
+    if (buyers.length > 0) {
+      senderId = buyers[0].id;
+    } else {
+      const [users] = await pool.execute(
+        'SELECT id FROM users WHERE email = ?',
+        [buyerEmail]
+      );
+      if (users.length > 0) {
+        senderId = users[0].id;
+      }
+    }
+
+    await pool.execute(
+      `INSERT INTO messages (
+        listing_id, sender_id, recipient_id, subject, message,
+        sender_email, sender_name, recipient_email, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent')`,
+      [
+        listingId,
+        senderId || listing.user_id,
+        listing.user_id,
+        subject || `Inquiry about: ${listing.title}`,
+        message,
+        buyerEmail,
+        buyerName || null,
+        listing.seller_email,
+      ]
+    );
+
     res.json({
       success: true,
       message: result.mocked 

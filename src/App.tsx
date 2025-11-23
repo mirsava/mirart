@@ -24,6 +24,7 @@ import CreateListing from './pages/CreateListing';
 import EditListing from './pages/EditListing';
 import ForgotPassword from './pages/ForgotPassword';
 import ConfirmSignup from './pages/ConfirmSignup';
+import Messages from './pages/Messages';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App(): JSX.Element {
@@ -90,6 +91,14 @@ function AppContent(): JSX.Element {
               element={
                 <ProtectedRoute requiredUserType="artist">
                   <EditListing />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/messages" 
+              element={
+                <ProtectedRoute>
+                  <Messages />
                 </ProtectedRoute>
               } 
             />
