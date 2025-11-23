@@ -24,6 +24,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions,
   Select,
   FormControl,
@@ -41,6 +42,7 @@ import {
   MoreVert as MoreVertIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
+  Block as BlockIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
@@ -89,6 +91,16 @@ const AdminDashboard: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userTypeDialogOpen, setUserTypeDialogOpen] = useState(false);
   const [newUserType, setNewUserType] = useState<'artist' | 'buyer' | 'admin'>('artist');
+  const [inactivateConfirmOpen, setInactivateConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [listingToInactivate, setListingToInactivate] = useState<number | null>(null);
+  const [listingToDelete, setListingToDelete] = useState<number | null>(null);
+  const [inactivating, setInactivating] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [statusChanging, setStatusChanging] = useState<number | null>(null);
+  const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
+  const [listingToChangeStatus, setListingToChangeStatus] = useState<{ id: number; currentStatus: string } | null>(null);
+  const [newStatus, setNewStatus] = useState<'draft' | 'active' | 'inactive' | 'sold' | 'archived'>('active');
 
   useEffect(() => {
     if (!user?.id) return;
@@ -212,17 +224,86 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteListing = async (listingId: number): Promise<void> => {
-    if (!user?.id) return;
-    if (!window.confirm('Are you sure you want to delete this listing?')) return;
+  const handleInactivateClick = (listingId: number): void => {
+    setListingToInactivate(listingId);
+    setInactivateConfirmOpen(true);
+  };
 
+  const handleInactivateConfirm = async (): Promise<void> => {
+    if (!user?.id || !listingToInactivate) return;
+
+    setInactivating(listingToInactivate);
     try {
-      await apiService.deleteListingAsAdmin(user.id, listingId);
+      await apiService.inactivateListingAsAdmin(user.id, listingToInactivate, user.groups);
+      enqueueSnackbar('Listing inactivated successfully', { variant: 'success' });
+      fetchListings();
+      setInactivateConfirmOpen(false);
+      setListingToInactivate(null);
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to inactivate listing', { variant: 'error' });
+    } finally {
+      setInactivating(null);
+    }
+  };
+
+  const handleInactivateCancel = (): void => {
+    setInactivateConfirmOpen(false);
+    setListingToInactivate(null);
+  };
+
+  const handleDeleteClick = (listingId: number): void => {
+    setListingToDelete(listingId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async (): Promise<void> => {
+    if (!user?.id || !listingToDelete) return;
+
+    setDeleting(listingToDelete);
+    try {
+      await apiService.deleteListingAsAdmin(user.id, listingToDelete, user.groups);
       enqueueSnackbar('Listing deleted successfully', { variant: 'success' });
       fetchListings();
+      setDeleteConfirmOpen(false);
+      setListingToDelete(null);
     } catch (error: any) {
       enqueueSnackbar(error.message || 'Failed to delete listing', { variant: 'error' });
+    } finally {
+      setDeleting(null);
     }
+  };
+
+  const handleDeleteCancel = (): void => {
+    setDeleteConfirmOpen(false);
+    setListingToDelete(null);
+  };
+
+  const handleStatusChangeClick = (listingId: number, currentStatus: string): void => {
+    setListingToChangeStatus({ id: listingId, currentStatus });
+    setNewStatus(currentStatus as 'draft' | 'active' | 'sold' | 'archived');
+    setStatusChangeDialogOpen(true);
+  };
+
+  const handleStatusChangeConfirm = async (): Promise<void> => {
+    if (!user?.id || !listingToChangeStatus) return;
+
+    setStatusChanging(listingToChangeStatus.id);
+    try {
+      await apiService.updateListingStatusAsAdmin(user.id, listingToChangeStatus.id, newStatus, user.groups);
+      enqueueSnackbar(`Listing status updated to ${newStatus} successfully`, { variant: 'success' });
+      fetchListings();
+      setStatusChangeDialogOpen(false);
+      setListingToChangeStatus(null);
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to update listing status', { variant: 'error' });
+    } finally {
+      setStatusChanging(null);
+    }
+  };
+
+  const handleStatusChangeCancel = (): void => {
+    setStatusChangeDialogOpen(false);
+    setListingToChangeStatus(null);
   };
 
   if (loading) {
@@ -483,7 +564,13 @@ const AdminDashboard: React.FC = () => {
                         <Chip 
                           label={listing.status} 
                           size="small"
-                          color={listing.status === 'active' ? 'success' : listing.status === 'sold' ? 'default' : 'default'}
+                          color={
+                            listing.status === 'active' ? 'success' : 
+                            listing.status === 'inactive' ? 'warning' : 
+                            listing.status === 'sold' ? 'error' : 
+                            listing.status === 'archived' ? 'info' : 
+                            'default'
+                          }
                         />
                       </TableCell>
                       <TableCell>
@@ -492,8 +579,20 @@ const AdminDashboard: React.FC = () => {
                       <TableCell align="right">
                         <IconButton
                           size="small"
+                          color="primary"
+                          onClick={() => handleStatusChangeClick(listing.id, listing.status)}
+                          title="Change status"
+                          disabled={statusChanging === listing.id}
+                          sx={{ mr: 1 }}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton
+                          size="small"
                           color="error"
-                          onClick={() => handleDeleteListing(listing.id)}
+                          onClick={() => handleDeleteClick(listing.id)}
+                          title="Delete listing"
+                          disabled={deleting === listing.id}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -609,6 +708,79 @@ const AdminDashboard: React.FC = () => {
             <Button onClick={() => setUserTypeDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleUpdateUserType} variant="contained">
               Update
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={inactivateConfirmOpen} onClose={handleInactivateCancel}>
+          <DialogTitle>Inactivate Listing</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to inactivate this listing? It will no longer be visible to buyers.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleInactivateCancel}>Cancel</Button>
+            <Button
+              onClick={handleInactivateConfirm}
+              color="warning"
+              variant="contained"
+              disabled={inactivating !== null}
+            >
+              {inactivating ? 'Inactivating...' : 'Inactivate'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={deleteConfirmOpen} onClose={handleDeleteCancel}>
+          <DialogTitle>Delete Listing</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to delete this listing? This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel}>Cancel</Button>
+            <Button
+              onClick={handleDeleteConfirm}
+              color="error"
+              variant="contained"
+              disabled={deleting !== null}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={statusChangeDialogOpen} onClose={handleStatusChangeCancel}>
+          <DialogTitle>Change Listing Status</DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              Current status: <strong>{listingToChangeStatus?.currentStatus}</strong>
+            </DialogContentText>
+            <FormControl fullWidth>
+              <InputLabel>New Status</InputLabel>
+              <Select
+                value={newStatus}
+                label="New Status"
+                onChange={(e) => setNewStatus(e.target.value as 'draft' | 'active' | 'inactive' | 'sold' | 'archived')}
+              >
+                <MenuItem value="draft">Draft</MenuItem>
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="inactive">Inactive</MenuItem>
+                <MenuItem value="sold">Sold</MenuItem>
+                <MenuItem value="archived">Archived</MenuItem>
+              </Select>
+            </FormControl>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleStatusChangeCancel}>Cancel</Button>
+            <Button
+              onClick={handleStatusChangeConfirm}
+              variant="contained"
+              disabled={statusChanging !== null || newStatus === listingToChangeStatus?.currentStatus}
+            >
+              {statusChanging ? 'Updating...' : 'Update Status'}
             </Button>
           </DialogActions>
         </Dialog>

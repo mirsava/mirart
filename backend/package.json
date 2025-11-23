@@ -15,6 +15,7 @@
     "migrate-messages": "node database/run-messages-migration.js",
     "migrate-user-type": "node database/run-user-type-migration.js",
     "migrate-price-nullable": "node database/run-price-nullable-migration.js",
+    "migrate-inactive-status": "node database/run-inactive-status-migration.js",
     "rename-column": "node rename-column.js",
     "reset-db": "node scripts/reset-database.js",
     "set-admin": "node scripts/set-admin.js"

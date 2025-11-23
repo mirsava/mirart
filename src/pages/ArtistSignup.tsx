@@ -213,15 +213,41 @@ const ArtistSignup: React.FC = () => {
   return (
     <Box sx={{ py: 8, minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="md">
-        <Paper sx={{ p: 6, borderRadius: 3, boxShadow: 3 }}>
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h4" component="h1" gutterBottom>
-              Join Our Artist Community
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Start selling your artwork to a global audience. It's free to join!
-            </Typography>
-          </Box>
+        {/* Header Section */}
+        <Paper
+          elevation={0}
+          sx={{
+            mb: 4,
+            mt: 3,
+            p: { xs: 3, sm: 4, md: 5 },
+            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            textAlign: 'center',
+          }}
+        >
+          <Typography 
+            variant="h4" 
+            component="h1" 
+            gutterBottom
+            sx={{ 
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              mb: 2,
+            }}
+          >
+            Join Our Artist Community
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem', lineHeight: 1.7 }}>
+            Start selling your artwork to a global audience. Simple pricing, no hidden fees.
+          </Typography>
+        </Paper>
+
+        <Paper sx={{ p: { xs: 3, sm: 4, md: 6 }, borderRadius: 3, boxShadow: 3 }}>
 
           {redirectMessage && (
             <Alert severity="info" sx={{ mb: 3 }}>
@@ -229,28 +255,6 @@ const ArtistSignup: React.FC = () => {
             </Alert>
           )}
 
-          <Box sx={{ mb: 4 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <PersonIcon color="primary" />
-                  <Typography variant="h6">Personal Information</Typography>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  Tell us about yourself and your artistic background.
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <BusinessIcon color="primary" />
-                  <Typography variant="h6">Business Details</Typography>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  Set up your artist profile and studio information.
-                </Typography>
-              </Grid>
-            </Grid>
-          </Box>
 
           {signupSuccess ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -497,16 +501,72 @@ const ArtistSignup: React.FC = () => {
               )}
             </Grid>
 
-            <Box sx={{ mt: 4, textAlign: 'center' }}>
-              <Alert severity="info" sx={{ mb: 3 }}>
+            {/* Pricing Section */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 4,
+                mt: 4,
+                mb: 4,
+                background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(156, 39, 176, 0.05) 100%)',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
+                Simple, Transparent Pricing
+              </Typography>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ textAlign: 'center', p: 2 }}>
+                    <Typography variant="h4" color="primary.main" sx={{ fontWeight: 700, mb: 1 }}>
+                      $10
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+                      One-Time Listing Fee
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Pay only when you're ready to publish your listing
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ textAlign: 'center', p: 2 }}>
+                    <Typography variant="h4" color="primary.main" sx={{ fontWeight: 700, mb: 1 }}>
+                      0%
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+                      Platform Commission
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Keep 100% of your sale price
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ textAlign: 'center', p: 2 }}>
+                    <Typography variant="h4" color="primary.main" sx={{ fontWeight: 700, mb: 1 }}>
+                      Free
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+                      Account Creation
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      No monthly fees or subscriptions
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+              <Divider sx={{ my: 3 }} />
+              <Alert severity="info" sx={{ bgcolor: 'transparent' }}>
                 <Typography variant="body2">
-                  <strong>Platform Fee:</strong> 15% commission on sales (you keep 85%)
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 1, fontSize: '0.85rem' }}>
-                  <strong>Note:</strong> Your profile information (business name, specialties, etc.) will be saved to your account after verification.
+                  <strong>How it works:</strong> Create your listing for free. When you're ready to make it visible to buyers, pay a one-time $10 activation fee. You keep the full sale price - no commission, no hidden fees.
                 </Typography>
               </Alert>
-              
+            </Paper>
+
+            <Box sx={{ textAlign: 'center' }}>
               <Button
                 type="submit"
                 variant="contained"

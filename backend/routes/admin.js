@@ -298,6 +298,38 @@ router.put('/users/:cognitoUsername/user-type', checkAdminAccess, async (req, re
   }
 });
 
+router.put('/listings/:id/inactivate', checkAdminAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await pool.execute('UPDATE listings SET status = ? WHERE id = ?', ['archived', id]);
+
+    res.json({ success: true, message: 'Listing inactivated successfully' });
+  } catch (error) {
+    console.error('Error inactivating listing:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/listings/:id/status', checkAdminAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['draft', 'active', 'inactive', 'sold', 'archived'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be one of: draft, active, inactive, sold, archived' });
+    }
+
+    await pool.execute('UPDATE listings SET status = ? WHERE id = ?', [status, id]);
+
+    res.json({ success: true, message: `Listing status updated to ${status} successfully` });
+  } catch (error) {
+    console.error('Error updating listing status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.delete('/listings/:id', checkAdminAccess, async (req, res) => {
   try {
     const { id } = req.params;

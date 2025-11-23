@@ -33,7 +33,7 @@ export interface Listing {
   medium?: string;
   year?: number;
   in_stock: boolean;
-  status: 'draft' | 'active' | 'sold' | 'archived';
+  status: 'draft' | 'active' | 'inactive' | 'sold' | 'archived';
   views: number;
   created_at: string;
   updated_at: string;
@@ -317,8 +317,36 @@ class ApiService {
     });
   }
 
-  async deleteListingAsAdmin(cognitoUsername: string, listingId: number): Promise<{ success: boolean; message: string }> {
-    return this.request<{ success: boolean; message: string }>(`/admin/listings/${listingId}?cognitoUsername=${cognitoUsername}`, {
+  async inactivateListingAsAdmin(cognitoUsername: string, listingId: number, groups?: string[]): Promise<{ success: boolean; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<{ success: boolean; message: string }>(`/admin/listings/${listingId}/inactivate?${params.toString()}`, {
+      method: 'PUT',
+    });
+  }
+
+  async updateListingStatusAsAdmin(cognitoUsername: string, listingId: number, status: 'draft' | 'active' | 'inactive' | 'sold' | 'archived', groups?: string[]): Promise<{ success: boolean; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<{ success: boolean; message: string }>(`/admin/listings/${listingId}/status?${params.toString()}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async deleteListingAsAdmin(cognitoUsername: string, listingId: number, groups?: string[]): Promise<{ success: boolean; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<{ success: boolean; message: string }>(`/admin/listings/${listingId}?${params.toString()}`, {
       method: 'DELETE',
     });
   }
