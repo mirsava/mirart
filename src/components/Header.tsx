@@ -23,7 +23,6 @@ import {
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  ShoppingCart as ShoppingCartIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
   Close as CloseIcon,
@@ -32,11 +31,12 @@ import {
   Logout as LogoutIcon,
   Add as AddIcon,
   Email as EmailIcon,
+  Notifications as NotificationsIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
-import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
+import apiService from '../services/api';
 import logo from '../assets/images/logo.png';
 
 const Header: React.FC = () => {
@@ -44,11 +44,11 @@ const Header: React.FC = () => {
   const location = useLocation();
   const theme = useTheme();
   const { isDarkMode, toggleTheme } = useCustomTheme();
-  const { getTotalItems } = useCart();
   const { user, signOut, isAuthenticated } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -77,6 +77,27 @@ const Header: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    const fetchUnreadCount = async (): Promise<void> => {
+      if (!isAuthenticated || !user?.id) {
+        setUnreadCount(0);
+        return;
+      }
+
+      try {
+        const response = await apiService.getMessages(user.id, 'received');
+        const unreadMessages = response.messages.filter(m => m.status === 'sent');
+        setUnreadCount(unreadMessages.length);
+      } catch (error) {
+        console.error('Error fetching unread messages:', error);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user?.id, location.pathname]);
 
   const handleDrawerToggle = (): void => {
     setDrawerOpen(!drawerOpen);
@@ -456,6 +477,32 @@ const Header: React.FC = () => {
                 </>
               ) : null}
               
+              {isAuthenticated && (
+                <IconButton
+                  onClick={() => navigate('/messages')}
+                  sx={{ 
+                    color: isDarkMode ? 'white' : 'text.primary',
+                    bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
+                    '&:hover': {
+                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
+                    },
+                  }}
+                >
+                  <Badge 
+                    badgeContent={unreadCount} 
+                    color="error"
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        bgcolor: 'error.main',
+                        color: 'white',
+                        fontWeight: 600,
+                      },
+                    }}
+                  >
+                    <NotificationsIcon />
+                  </Badge>
+                </IconButton>
+              )}
               <IconButton 
                 onClick={toggleTheme}
                 sx={{ 
@@ -469,30 +516,6 @@ const Header: React.FC = () => {
                 {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
               </IconButton>
 
-              <IconButton
-                onClick={() => navigate('/cart')}
-                sx={{ 
-                  color: isDarkMode ? 'white' : 'text.primary',
-                  bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
-                  '&:hover': {
-                    bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
-                  },
-                }}
-              >
-                <Badge 
-                  badgeContent={getTotalItems()} 
-                  color="secondary"
-                  sx={{
-                    '& .MuiBadge-badge': {
-                      bgcolor: 'error.main',
-                      color: 'white',
-                      fontWeight: 600,
-                    },
-                  }}
-                >
-                  <ShoppingCartIcon />
-                </Badge>
-              </IconButton>
             </Box>
           </Toolbar>
         </Container>
