@@ -260,5 +260,108 @@ router.delete('/:messageId', async (req, res) => {
   }
 });
 
+router.post('/:messageId/reply', async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { cognitoUsername, subject, message } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Subject and message are required' });
+    }
+
+    const [users] = await pool.execute(
+      'SELECT id, email, business_name, first_name, last_name FROM users WHERE cognito_username = ?',
+      [cognitoUsername]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const currentUser = users[0];
+    const currentUserId = currentUser.id;
+
+    // Get the original message
+    const [originalMessages] = await pool.execute(
+      `SELECT m.*, 
+        u_sender.email as sender_email_display,
+        u_recipient.email as recipient_email_display,
+        COALESCE(
+          u_sender.business_name,
+          CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
+          u_sender.cognito_username
+        ) as sender_name_display,
+        COALESCE(
+          u_recipient.business_name,
+          CONCAT(COALESCE(u_recipient.first_name, ''), ' ', COALESCE(u_recipient.last_name, '')),
+          u_recipient.cognito_username
+        ) as recipient_name_display
+      FROM messages m
+      JOIN users u_sender ON m.sender_id = u_sender.id
+      JOIN users u_recipient ON m.recipient_id = u_recipient.id
+      WHERE m.id = ? AND (m.sender_id = ? OR m.recipient_id = ?)`,
+      [messageId, currentUserId, currentUserId]
+    );
+
+    if (originalMessages.length === 0) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    const originalMessage = originalMessages[0];
+
+    // Determine new sender and recipient (swap them)
+    const newSenderId = originalMessage.recipient_id;
+    const newRecipientId = originalMessage.sender_id;
+    const newSenderEmail = originalMessage.recipient_email_display;
+    const newRecipientEmail = originalMessage.sender_email_display;
+    const newSenderName = originalMessage.recipient_name_display || currentUser.business_name || 
+      `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.email;
+
+    // Create reply subject with "Re: " prefix if not already present
+    const replySubject = originalMessage.subject.startsWith('Re: ') 
+      ? originalMessage.subject 
+      : `Re: ${originalMessage.subject}`;
+
+    // Insert the reply message
+    await pool.execute(
+      `INSERT INTO messages (
+        listing_id, sender_id, recipient_id, subject, message,
+        sender_email, sender_name, recipient_email, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent')`,
+      [
+        originalMessage.listing_id,
+        newSenderId,
+        newRecipientId,
+        replySubject,
+        message,
+        newSenderEmail,
+        newSenderName,
+        newRecipientEmail,
+      ]
+    );
+
+    // Send email notification
+    try {
+      const { sendContactEmail } = await import('../services/emailService.js');
+      await sendContactEmail({
+        to: newRecipientEmail,
+        from: newSenderEmail,
+        fromName: newSenderName,
+        subject: replySubject,
+        message: message,
+        listingTitle: originalMessage.listing_title || 'Artwork',
+        listingId: originalMessage.listing_id,
+      });
+    } catch (emailError) {
+      console.error('Error sending reply email:', emailError);
+    }
+
+    res.json({ success: true, message: 'Reply sent successfully' });
+  } catch (error) {
+    console.error('Error sending reply:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
 

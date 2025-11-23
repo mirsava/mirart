@@ -258,6 +258,13 @@ class ApiService {
     });
   }
 
+  async replyToMessage(messageId: number, cognitoUsername: string, subject: string, message: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/messages/${messageId}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ cognitoUsername, subject, message }),
+    });
+  }
+
   async getAdminStats(cognitoUsername: string, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);

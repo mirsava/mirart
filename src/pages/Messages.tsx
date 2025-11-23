@@ -23,10 +23,12 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions,
   IconButton,
   Menu,
   MenuItem,
+  TextField,
 } from '@mui/material';
 import {
   Email as EmailIcon,
@@ -37,6 +39,7 @@ import {
   Archive as ArchiveIcon,
   MoreVert as MoreVertIcon,
   ArchiveOutlined as ArchiveOutlinedIcon,
+  Reply as ReplyIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import apiService, { Message } from '../services/api';
@@ -57,6 +60,10 @@ const Messages: React.FC = () => {
   const [unarchiving, setUnarchiving] = useState<number | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<number | null>(null);
+  const [replyDialogOpen, setReplyDialogOpen] = useState(false);
+  const [replySubject, setReplySubject] = useState('');
+  const [replyMessage, setReplyMessage] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -198,6 +205,40 @@ const Messages: React.FC = () => {
     setMessageToDelete(null);
   };
 
+  const handleReplyClick = (): void => {
+    if (!selectedMessage) return;
+    const replySubject = selectedMessage.subject.startsWith('Re: ') 
+      ? selectedMessage.subject 
+      : `Re: ${selectedMessage.subject}`;
+    setReplySubject(replySubject);
+    setReplyMessage('');
+    setReplyDialogOpen(true);
+  };
+
+  const handleReplySend = async (): Promise<void> => {
+    if (!user?.id || !selectedMessage || !replyMessage.trim()) return;
+
+    setSendingReply(true);
+    try {
+      await apiService.replyToMessage(selectedMessage.id, user.id, replySubject, replyMessage);
+      setReplyDialogOpen(false);
+      setReplySubject('');
+      setReplyMessage('');
+      fetchMessages();
+      window.dispatchEvent(new CustomEvent('messagesRead'));
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reply');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const handleReplyCancel = (): void => {
+    setReplyDialogOpen(false);
+    setReplySubject('');
+    setReplyMessage('');
+  };
+
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
@@ -218,14 +259,38 @@ const Messages: React.FC = () => {
   return (
     <Box sx={{ py: 4 }}>
       <Container maxWidth="lg">
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
+        <Paper
+          elevation={0}
+          sx={{
+            mb: 4,
+            mt: 3,
+            p: { xs: 3, sm: 4, md: 5 },
+            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            textAlign: 'center',
+          }}
+        >
+          <Typography 
+            variant="h4" 
+            component="h1" 
+            gutterBottom
+            sx={{ 
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              mb: 2,
+            }}
+          >
             Messages
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem', lineHeight: 1.7 }}>
             View and manage your communication with buyers and sellers
           </Typography>
-        </Box>
+        </Paper>
 
         <Paper sx={{ mb: 3 }}>
           <Tabs value={tabValue} onChange={handleTabChange}>
@@ -487,6 +552,15 @@ const Messages: React.FC = () => {
                 >
                   {deleting === selectedMessage?.id ? 'Deleting...' : 'Delete'}
                 </Button>
+                {(tabValue === 0 || tabValue === 2) && (
+                  <Button
+                    variant="contained"
+                    startIcon={<ReplyIcon />}
+                    onClick={handleReplyClick}
+                  >
+                    Reply
+                  </Button>
+                )}
                 <Button
                   variant="contained"
                   onClick={() => {
@@ -499,6 +573,45 @@ const Messages: React.FC = () => {
               </DialogActions>
             </>
           )}
+        </Dialog>
+
+        <Dialog open={replyDialogOpen} onClose={handleReplyCancel} maxWidth="sm" fullWidth>
+          <DialogTitle>Reply to Message</DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              Replying to: <strong>{selectedMessage?.sender_name_display || selectedMessage?.sender_email}</strong>
+            </DialogContentText>
+            <TextField
+              fullWidth
+              label="Subject"
+              value={replySubject}
+              onChange={(e) => setReplySubject(e.target.value)}
+              margin="normal"
+              required
+            />
+            <TextField
+              fullWidth
+              label="Message"
+              value={replyMessage}
+              onChange={(e) => setReplyMessage(e.target.value)}
+              margin="normal"
+              multiline
+              rows={6}
+              required
+              placeholder="Type your reply here..."
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleReplyCancel}>Cancel</Button>
+            <Button
+              onClick={handleReplySend}
+              variant="contained"
+              startIcon={<SendIcon />}
+              disabled={!replyMessage.trim() || sendingReply}
+            >
+              {sendingReply ? 'Sending...' : 'Send Reply'}
+            </Button>
+          </DialogActions>
         </Dialog>
 
         <Menu
