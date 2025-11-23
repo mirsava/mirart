@@ -70,10 +70,10 @@ export interface DashboardData {
   stats: {
     totalListings: number;
     activeListings: number;
-    totalSales: number;
-    totalRevenue: number;
-    pendingOrders: number;
     totalViews: number;
+    draftListings: number;
+    messagesReceived: number;
+    totalLikes: number;
   };
   recentListings: Listing[];
   recentOrders: Order[];
@@ -227,7 +227,7 @@ class ApiService {
     return this.request<Order[]>(`/orders/user/${cognitoUsername}${params}`);
   }
 
-  async getMessages(cognitoUsername: string, type: 'all' | 'sent' | 'received' = 'all'): Promise<{ messages: Message[] }> {
+  async getMessages(cognitoUsername: string, type: 'all' | 'sent' | 'received' | 'archived' = 'all'): Promise<{ messages: Message[] }> {
     return this.request<{ messages: Message[] }>(`/messages/user/${cognitoUsername}?type=${type}`);
   }
 
@@ -235,6 +235,26 @@ class ApiService {
     return this.request<{ success: boolean }>(`/messages/${messageId}/read`, {
       method: 'PUT',
       body: JSON.stringify({ cognitoUsername }),
+    });
+  }
+
+  async archiveMessage(messageId: number, cognitoUsername: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/messages/${messageId}/archive`, {
+      method: 'PUT',
+      body: JSON.stringify({ cognitoUsername }),
+    });
+  }
+
+  async unarchiveMessage(messageId: number, cognitoUsername: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/messages/${messageId}/unarchive`, {
+      method: 'PUT',
+      body: JSON.stringify({ cognitoUsername }),
+    });
+  }
+
+  async deleteMessage(messageId: number, cognitoUsername: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/messages/${messageId}?cognitoUsername=${encodeURIComponent(cognitoUsername)}`, {
+      method: 'DELETE',
     });
   }
 

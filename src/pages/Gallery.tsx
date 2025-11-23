@@ -16,6 +16,7 @@ import {
   CardContent,
   Button,
   Pagination,
+  Paper,
 } from '@mui/material';
 import { Search as SearchIcon, Add as AddIcon, Palette as PaletteIcon, Brush as BrushIcon } from '@mui/icons-material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -201,102 +202,80 @@ const Gallery: React.FC = () => {
   };
 
   return (
-    <Box sx={{ py: 4 }}>
+    <Box sx={{ py: 4, bgcolor: 'background.default' }}>
       <Container maxWidth="lg">
-        <Box 
-          sx={{ 
+        {/* Header Section */}
+        <Paper
+          elevation={0}
+          sx={{
             mb: 6,
-            position: 'relative',
-            overflow: 'hidden',
+            mt: 3,
+            p: { xs: 3, sm: 4, md: 5 },
+            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            textAlign: 'center',
           }}
         >
-          <Box
-            sx={{
-              position: 'relative',
-              py: 6,
-              px: 3,
-              background: (theme) => 
-                theme.palette.mode === 'dark'
-                  ? `radial-gradient(ellipse at center, ${theme.palette.primary.dark}25 0%, transparent 70%)`
-                  : `radial-gradient(ellipse at center, ${theme.palette.primary.light}20 0%, transparent 70%)`,
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: (theme) => 
-                  theme.palette.mode === 'dark'
-                    ? `linear-gradient(45deg, transparent 30%, ${theme.palette.primary.main}08 50%, transparent 70%)`
-                    : `linear-gradient(45deg, transparent 30%, ${theme.palette.primary.main}05 50%, transparent 70%)`,
-                pointerEvents: 'none',
-              },
-            }}
-          >
-            <Container maxWidth="md">
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 3 }}>
-                <PaletteIcon 
-                  sx={{ 
-                    fontSize: 48, 
-                    color: 'primary.main',
-                    opacity: 0.8,
-                    transform: 'rotate(-15deg)',
-                  }} 
-                />
-                <Typography 
-                  variant="h2" 
-                  component="h1"
-                  sx={{
-                    fontWeight: 800,
-                    letterSpacing: '-0.02em',
-                    color: 'primary.main',
-                    textShadow: (theme) => 
-                      theme.palette.mode === 'dark'
-                        ? `0 2px 8px ${theme.palette.primary.main}30`
-                        : `0 2px 4px ${theme.palette.primary.main}20`,
-                  }}
-                >
-                  Art Gallery
-                </Typography>
-                <BrushIcon 
-                  sx={{ 
-                    fontSize: 48, 
-                    color: 'primary.main',
-                    opacity: 0.8,
-                    transform: 'rotate(15deg)',
-                  }} 
-                />
-              </Box>
-              
-              <Box sx={{ textAlign: 'center', maxWidth: '700px', mx: 'auto' }}>
-                <Typography 
-                  variant="h6" 
-                  color="text.secondary"
-                  sx={{ 
-                    fontWeight: 400,
-                    lineHeight: 1.8,
-                    mb: 1,
-                  }}
-                >
-                  Discover Unique Artwork
-                </Typography>
-                <Typography 
-                  variant="body1" 
-                  color="text.secondary"
-                  sx={{ 
-                    fontSize: '1rem',
-                    lineHeight: 1.7,
-                    opacity: 0.9,
-                  }}
-                >
-                  Explore our curated collection of original paintings and handcrafted woodworking pieces. 
-                  Each piece tells a unique story from talented artists around the world.
-                </Typography>
-              </Box>
-            </Container>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 3 }}>
+            <PaletteIcon 
+              sx={{ 
+                fontSize: 48, 
+                color: 'primary.main',
+                opacity: 0.8,
+                transform: 'rotate(-15deg)',
+              }} 
+            />
+            <Typography 
+              variant="h2" 
+              component="h1"
+              sx={{
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              Art Gallery
+            </Typography>
+            <BrushIcon 
+              sx={{ 
+                fontSize: 48, 
+                color: 'primary.main',
+                opacity: 0.8,
+                transform: 'rotate(15deg)',
+              }} 
+            />
           </Box>
-        </Box>
+          
+          <Box sx={{ textAlign: 'center', maxWidth: '700px', mx: 'auto' }}>
+            <Typography 
+              variant="h6" 
+              color="text.secondary"
+              sx={{ 
+                fontWeight: 400,
+                lineHeight: 1.8,
+                mb: 1,
+              }}
+            >
+              Discover Unique Artwork
+            </Typography>
+            <Typography 
+              variant="body1" 
+              color="text.secondary"
+              sx={{ 
+                fontSize: '1rem',
+                lineHeight: 1.7,
+                opacity: 0.9,
+              }}
+            >
+              Explore our curated collection of original paintings and handcrafted woodworking pieces. 
+              Each piece tells a unique story from talented artists around the world.
+            </Typography>
+          </Box>
+        </Paper>
 
         <Box sx={{ mb: 4 }}>
           <Grid container spacing={3} alignItems="center">

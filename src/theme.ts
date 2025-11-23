@@ -53,6 +53,26 @@ export const lightTheme: Theme = createTheme({
     borderRadius: 8,
   },
   components: {
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          width: '100%',
+          maxWidth: '100%',
+          left: 0,
+          right: 0,
+          margin: 0,
+          padding: 0,
+        },
+      },
+    },
+    MuiToolbar: {
+      styleOverrides: {
+        root: {
+          paddingLeft: '0 !important',
+          paddingRight: '0 !important',
+        },
+      },
+    },
     MuiButton: {
       styleOverrides: {
         root: {
@@ -142,6 +162,26 @@ export const darkTheme: Theme = createTheme({
     borderRadius: 8,
   },
   components: {
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          width: '100%',
+          maxWidth: '100%',
+          left: 0,
+          right: 0,
+          margin: 0,
+          padding: 0,
+        },
+      },
+    },
+    MuiToolbar: {
+      styleOverrides: {
+        root: {
+          paddingLeft: '0 !important',
+          paddingRight: '0 !important',
+        },
+      },
+    },
     MuiButton: {
       styleOverrides: {
         root: {

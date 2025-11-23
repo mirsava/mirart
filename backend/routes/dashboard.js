@@ -22,10 +22,10 @@ router.get('/:cognitoUsername', async (req, res) => {
         stats: {
           totalListings: 0,
           activeListings: 0,
-          totalSales: 0,
-          totalRevenue: 0,
-          pendingOrders: 0,
           totalViews: 0,
+          draftListings: 0,
+          messagesReceived: 0,
+          totalLikes: 0,
         },
         recentListings: [],
         recentOrders: []
@@ -61,23 +61,29 @@ router.get('/:cognitoUsername', async (req, res) => {
       [user_id]
     );
     
-    const [salesData] = await pool.execute(
-      `SELECT 
-        COUNT(*) as total_sales,
-        COALESCE(SUM(artist_earnings), 0) as total_revenue
-       FROM orders WHERE seller_id = ? AND status IN ('paid', 'shipped', 'delivered')`,
-      [user_id]
-    );
-    
-    const [pendingOrders] = await pool.execute(
-      `SELECT COUNT(*) as pending_orders
-       FROM orders WHERE seller_id = ? AND status = 'pending'`,
-      [user_id]
-    );
-    
     const [totalViews] = await pool.execute(
       `SELECT COALESCE(SUM(views), 0) as total_views
        FROM listings WHERE user_id = ?`,
+      [user_id]
+    );
+    
+    const [draftListings] = await pool.execute(
+      `SELECT COUNT(*) as draft_listings
+       FROM listings WHERE user_id = ? AND status = 'draft'`,
+      [user_id]
+    );
+    
+    const [messagesReceived] = await pool.execute(
+      `SELECT COUNT(*) as messages_received
+       FROM messages WHERE recipient_id = ? AND status = 'sent'`,
+      [user_id]
+    );
+    
+    const [totalLikes] = await pool.execute(
+      `SELECT COUNT(*) as total_likes
+       FROM likes l
+       JOIN listings li ON l.listing_id = li.id
+       WHERE li.user_id = ?`,
       [user_id]
     );
     
@@ -86,17 +92,11 @@ router.get('/:cognitoUsername', async (req, res) => {
       `UPDATE dashboard_stats SET
         total_listings = ?,
         active_listings = ?,
-        total_sales = ?,
-        total_revenue = ?,
-        pending_orders = ?,
         total_views = ?
       WHERE user_id = ?`,
       [
         listingCounts[0].total_listings || 0,
         listingCounts[0].active_listings || 0,
-        salesData[0].total_sales || 0,
-        salesData[0].total_revenue || 0,
-        pendingOrders[0].pending_orders || 0,
         totalViews[0].total_views || 0,
         user_id
       ]
@@ -128,10 +128,10 @@ router.get('/:cognitoUsername', async (req, res) => {
       stats: {
         totalListings: listingCounts[0].total_listings || 0,
         activeListings: listingCounts[0].active_listings || 0,
-        totalSales: salesData[0].total_sales || 0,
-        totalRevenue: parseFloat(salesData[0].total_revenue || 0),
-        pendingOrders: pendingOrders[0].pending_orders || 0,
         totalViews: totalViews[0].total_views || 0,
+        draftListings: draftListings[0].draft_listings || 0,
+        messagesReceived: messagesReceived[0].messages_received || 0,
+        totalLikes: totalLikes[0].total_likes || 0,
       },
       recentListings: recentListings.map(listing => {
           let parsedImageUrls = null;

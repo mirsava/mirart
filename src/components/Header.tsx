@@ -14,7 +14,6 @@ import {
   Box,
   useMediaQuery,
   useTheme,
-  Container,
   Fade,
   Menu,
   MenuItem,
@@ -96,9 +95,36 @@ const Header: React.FC = () => {
       }
     };
 
+    // Initial fetch
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+    
+    // Poll for new messages more frequently (every 10 seconds)
+    const interval = setInterval(fetchUnreadCount, 10000);
+    
+    // Listen for messages being marked as read
+    const handleMessagesRead = () => {
+      // Small delay to ensure backend has processed the update
+      setTimeout(() => {
+        fetchUnreadCount();
+      }, 500);
+    };
+    window.addEventListener('messagesRead', handleMessagesRead);
+    
+    // Also refresh more frequently when on messages page
+    let messagesPageInterval: NodeJS.Timeout | null = null;
+    if (location.pathname === '/messages') {
+      messagesPageInterval = setInterval(() => {
+        fetchUnreadCount();
+      }, 2000);
+    }
+    
+    return () => {
+      clearInterval(interval);
+      if (messagesPageInterval) {
+        clearInterval(messagesPageInterval);
+      }
+      window.removeEventListener('messagesRead', handleMessagesRead);
+    };
   }, [isAuthenticated, user?.id, location.pathname]);
 
   const handleDrawerToggle = (): void => {
@@ -363,7 +389,7 @@ const Header: React.FC = () => {
     <>
       <AppBar 
         position="fixed" 
-        elevation={scrolled ? 4 : 0}
+        elevation={scrolled ? 4 : 2}
         sx={{
           bgcolor: scrolled 
             ? 'background.paper' 
@@ -372,13 +398,31 @@ const Header: React.FC = () => {
               : 'rgba(255,255,255,0.95)',
           backdropFilter: scrolled ? 'blur(20px)' : 'blur(10px)',
           transition: 'all 0.3s ease-in-out',
-          borderBottom: scrolled ? 1 : 0,
+          borderBottom: '1px solid',
           borderColor: 'divider',
+          boxShadow: scrolled 
+            ? '0 4px 20px rgba(0, 0, 0, 0.1)' 
+            : '0 2px 8px rgba(0, 0, 0, 0.08)',
           zIndex: 1300,
+          width: '100vw',
+          maxWidth: '100%',
+          left: 0,
+          right: 0,
+          margin: 0,
+          paddingLeft: { xs: 2, sm: 3, md: 4 },
+          paddingRight: { xs: 2, sm: 3, md: 4 },
+          position: 'fixed',
+          top: 0,
         }}
       >
-        <Container maxWidth="lg">
-          <Toolbar sx={{ px: { xs: 0, sm: 2 } }}>
+          <Toolbar 
+            disableGutters
+            sx={{ 
+              width: '100%',
+              minHeight: { xs: 64, sm: 70 },
+              justifyContent: 'space-between',
+            }}
+          >
             <IconButton
               edge="start"
               color="inherit"
@@ -388,6 +432,7 @@ const Header: React.FC = () => {
                 mr: 2, 
                 display: { md: 'none' },
                 color: isDarkMode ? 'white' : 'text.primary',
+                ml: 0,
               }}
             >
               <MenuIcon />
@@ -397,8 +442,8 @@ const Header: React.FC = () => {
               sx={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                flexGrow: 1,
                 cursor: 'pointer',
+                flex: { xs: 0, md: 0 },
               }}
               onClick={() => navigate('/')}
             >
@@ -421,28 +466,53 @@ const Header: React.FC = () => {
 
             {!isMobile && (
               <Fade in={true} timeout={800}>
-                <Box sx={{ display: 'flex', gap: 1, mr: 3, alignItems: 'center' }}>
+                <Box 
+                  sx={{ 
+                    display: 'flex', 
+                    gap: 0.5,
+                    alignItems: 'center',
+                    position: 'absolute',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                    borderRadius: 3,
+                    p: 0.5,
+                    border: '1px solid',
+                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+                  }}
+                >
                   {menuItems.map((item) => (
                     <Button
                       key={item.label}
                       onClick={() => handleNavigation(item.path)}
                       sx={{
-                        color: isDarkMode ? 'white' : 'text.primary',
-                        fontWeight: location.pathname === item.path ? 600 : 400,
+                        color: location.pathname === item.path 
+                          ? (isDarkMode ? 'white' : 'primary.main')
+                          : (isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'),
+                        fontWeight: location.pathname === item.path ? 600 : 500,
+                        fontSize: '0.9rem',
+                        textTransform: 'none',
+                        px: { xs: 2, sm: 2.5 },
+                        py: 0.75,
+                        borderRadius: 2.5,
                         position: 'relative',
-                        '&::after': {
-                          content: '""',
-                          position: 'absolute',
-                          bottom: -4,
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          width: location.pathname === item.path ? '100%' : 0,
-                          height: 2,
-                          bgcolor: isDarkMode ? 'primary.light' : 'primary.main',
-                          transition: 'width 0.3s ease',
-                        },
-                        '&:hover::after': {
-                          width: '100%',
+                        transition: 'all 0.2s ease',
+                        minWidth: 'auto',
+                        bgcolor: location.pathname === item.path 
+                          ? (isDarkMode 
+                              ? 'linear-gradient(135deg, rgba(83, 75, 174, 0.3) 0%, rgba(25, 118, 210, 0.3) 100%)'
+                              : 'linear-gradient(135deg, rgba(25, 118, 210, 0.12) 0%, rgba(156, 39, 176, 0.12) 100%)')
+                          : 'transparent',
+                        '&:hover': {
+                          bgcolor: location.pathname === item.path
+                            ? (isDarkMode 
+                                ? 'linear-gradient(135deg, rgba(83, 75, 174, 0.4) 0%, rgba(25, 118, 210, 0.4) 100%)'
+                                : 'linear-gradient(135deg, rgba(25, 118, 210, 0.18) 0%, rgba(156, 39, 176, 0.18) 100%)')
+                            : (isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)'),
+                          color: location.pathname === item.path 
+                            ? (isDarkMode ? 'white' : 'primary.main')
+                            : (isDarkMode ? 'white' : 'text.primary'),
+                          transform: 'scale(1.05)',
                         },
                       }}
                     >
@@ -475,7 +545,7 @@ const Header: React.FC = () => {
               </Fade>
             )}
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
               {isAuthenticated && user ? (
                 <>
                   <Button
@@ -516,7 +586,24 @@ const Header: React.FC = () => {
               
               {isAuthenticated && (
                 <IconButton
-                  onClick={() => navigate('/messages')}
+                  onClick={() => {
+                    // Refresh unread count when clicking notification bell
+                    const fetchUnreadCount = async (): Promise<void> => {
+                      if (!isAuthenticated || !user?.id) {
+                        setUnreadCount(0);
+                        return;
+                      }
+                      try {
+                        const response = await apiService.getMessages(user.id, 'received');
+                        const unreadMessages = response.messages.filter(m => m.status === 'sent');
+                        setUnreadCount(unreadMessages.length);
+                      } catch (error) {
+                        console.error('Error fetching unread messages:', error);
+                      }
+                    };
+                    fetchUnreadCount();
+                    navigate('/messages');
+                  }}
                   sx={{ 
                     color: isDarkMode ? 'white' : 'text.primary',
                     bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
@@ -555,7 +642,6 @@ const Header: React.FC = () => {
 
             </Box>
           </Toolbar>
-        </Container>
       </AppBar>
 
       <Menu

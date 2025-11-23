@@ -35,18 +35,52 @@ const About: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ py: 8 }}>
+    <Box sx={{ py: 8, bgcolor: 'background.default' }}>
       <Container maxWidth="lg">
-        <Box sx={{ textAlign: 'center', mb: 8 }}>
-          <Typography variant="h3" component="h1" gutterBottom>
+        {/* Header Section */}
+        <Paper
+          elevation={0}
+          sx={{
+            mb: 8,
+            mt: 3,
+            p: { xs: 3, sm: 4, md: 5 },
+            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            textAlign: 'center',
+          }}
+        >
+          <Typography 
+            variant="h3" 
+            component="h1" 
+            gutterBottom
+            sx={{ 
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              mb: 2,
+            }}
+          >
             About Our Marketplace
           </Typography>
-          <Typography variant="h6" color="text.secondary" sx={{ maxWidth: '800px', mx: 'auto' }}>
+          <Typography 
+            variant="h6" 
+            color="text.secondary" 
+            sx={{ 
+              maxWidth: '800px', 
+              mx: 'auto',
+              lineHeight: 1.7,
+              fontSize: { xs: '1rem', sm: '1.1rem' },
+            }}
+          >
             ArtZyla is a vibrant marketplace connecting talented artists with art lovers worldwide. 
             We empower artists to sell their work through flexible pricing options while providing 
             buyers with access to authentic, handmade art from independent creators.
           </Typography>
-        </Box>
+        </Paper>
 
         <Grid container spacing={6} sx={{ mb: 8 }}>
           <Grid item xs={12} md={6}>

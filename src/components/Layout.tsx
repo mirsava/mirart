@@ -22,7 +22,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         component="main" 
         sx={{ 
           flexGrow: 1,
-          pt: { xs: 8, sm: 8 },
+          pt: { xs: 9, sm: 9 },
         }}
       >
         {children}

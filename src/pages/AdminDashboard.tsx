@@ -234,16 +234,42 @@ const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <Box sx={{ py: 4 }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Admin Dashboard
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Manage users, listings, and platform content
-          </Typography>
-        </Box>
+        {/* Header Section */}
+        <Paper
+          elevation={0}
+          sx={{
+            mb: 4,
+            mt: { xs: 4, sm: 5, md: 6 },
+            p: { xs: 3, sm: 4 },
+            background: 'linear-gradient(135deg, rgba(156, 39, 176, 0.08) 0%, rgba(25, 118, 210, 0.08) 100%)',
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Box>
+            <Typography 
+              variant="h4" 
+              component="h1" 
+              gutterBottom
+              sx={{ 
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #9c27b0 0%, #1976d2 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 1
+              }}
+            >
+              Admin Dashboard
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1rem', lineHeight: 1.6 }}>
+              Manage users, listings, and platform content
+            </Typography>
+          </Box>
+        </Paper>
 
         {stats && (
           <Grid container spacing={3} sx={{ mb: 4 }}>

@@ -10,6 +10,7 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
+  ListItemSecondaryAction,
   Avatar,
   Chip,
   Divider,
@@ -23,12 +24,19 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  IconButton,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import {
   Email as EmailIcon,
   Send as SendIcon,
   Inbox as InboxIcon,
   Image as ImageIcon,
+  Delete as DeleteIcon,
+  Archive as ArchiveIcon,
+  MoreVert as MoreVertIcon,
+  ArchiveOutlined as ArchiveOutlinedIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import apiService, { Message } from '../services/api';
@@ -43,6 +51,12 @@ const Messages: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<{ element: HTMLElement; messageId: number } | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [archiving, setArchiving] = useState<number | null>(null);
+  const [unarchiving, setUnarchiving] = useState<number | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<number | null>(null);
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -56,11 +70,13 @@ const Messages: React.FC = () => {
 
   useEffect(() => {
     if (!user?.id) {
-      navigate('/artist-signin');
       return;
     }
 
     fetchMessages();
+    
+    // Notify header to refresh unread count when messages page is loaded
+    window.dispatchEvent(new CustomEvent('messagesRead'));
   }, [user?.id, tabValue]);
 
   const fetchMessages = async (): Promise<void> => {
@@ -70,20 +86,9 @@ const Messages: React.FC = () => {
     setError(null);
 
     try {
-      const type = tabValue === 0 ? 'all' : tabValue === 1 ? 'sent' : 'received';
+      const type = tabValue === 0 ? 'all' : tabValue === 1 ? 'sent' : tabValue === 2 ? 'received' : 'archived';
       const response = await apiService.getMessages(user.id, type);
       setMessages(response.messages);
-
-      if (type === 'received') {
-        const unreadMessages = response.messages.filter(m => m.status === 'sent');
-        for (const msg of unreadMessages) {
-          try {
-            await apiService.markMessageAsRead(msg.id, user.id);
-          } catch (err) {
-            console.error('Error marking message as read:', err);
-          }
-        }
-      }
     } catch (err: any) {
       setError(err.message || 'Failed to load messages');
     } finally {
@@ -95,13 +100,102 @@ const Messages: React.FC = () => {
     setTabValue(newValue);
   };
 
-  const handleMessageClick = (message: Message): void => {
+  const handleMessageClick = async (message: Message): Promise<void> => {
     setSelectedMessage(message);
     setDialogOpen(true);
+    
+    // Mark message as read if it's unread and user is the recipient
+    if (message.status === 'sent' && tabValue !== 1 && user?.id) {
+      try {
+        await apiService.markMessageAsRead(message.id, user.id);
+        // Update local state
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === message.id ? { ...msg, status: 'read' as const } : msg
+          )
+        );
+        // Notify header to refresh count
+        window.dispatchEvent(new CustomEvent('messagesRead'));
+      } catch (err) {
+        console.error('Error marking message as read:', err);
+      }
+    }
   };
 
   const handleViewListing = (listingId: number): void => {
     navigate(`/painting/${listingId}`);
+  };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, messageId: number): void => {
+    event.stopPropagation();
+    setMenuAnchor({ element: event.currentTarget, messageId });
+  };
+
+  const handleMenuClose = (): void => {
+    setMenuAnchor(null);
+  };
+
+  const handleArchive = async (messageId: number): Promise<void> => {
+    if (!user?.id) return;
+    
+    setArchiving(messageId);
+    try {
+      await apiService.archiveMessage(messageId, user.id);
+      setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageId));
+      handleMenuClose();
+      // Refresh unread count
+      window.dispatchEvent(new CustomEvent('messagesRead'));
+    } catch (err: any) {
+      setError(err.message || 'Failed to archive message');
+    } finally {
+      setArchiving(null);
+    }
+  };
+
+  const handleUnarchive = async (messageId: number): Promise<void> => {
+    if (!user?.id) return;
+    
+    setUnarchiving(messageId);
+    try {
+      await apiService.unarchiveMessage(messageId, user.id);
+      setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageId));
+      handleMenuClose();
+      // Refresh unread count
+      window.dispatchEvent(new CustomEvent('messagesRead'));
+    } catch (err: any) {
+      setError(err.message || 'Failed to unarchive message');
+    } finally {
+      setUnarchiving(null);
+    }
+  };
+
+  const handleDeleteClick = (messageId: number): void => {
+    setMessageToDelete(messageId);
+    setDeleteConfirmOpen(true);
+    handleMenuClose();
+  };
+
+  const handleDeleteConfirm = async (): Promise<void> => {
+    if (!user?.id || !messageToDelete) return;
+    
+    setDeleting(messageToDelete);
+    setDeleteConfirmOpen(false);
+    try {
+      await apiService.deleteMessage(messageToDelete, user.id);
+      setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageToDelete));
+      // Refresh unread count
+      window.dispatchEvent(new CustomEvent('messagesRead'));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete message');
+    } finally {
+      setDeleting(null);
+      setMessageToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = (): void => {
+    setDeleteConfirmOpen(false);
+    setMessageToDelete(null);
   };
 
   const formatDate = (dateString: string): string => {
@@ -138,6 +232,7 @@ const Messages: React.FC = () => {
             <Tab icon={<EmailIcon />} iconPosition="start" label="All Messages" />
             <Tab icon={<SendIcon />} iconPosition="start" label="Sent" />
             <Tab icon={<InboxIcon />} iconPosition="start" label="Received" />
+            <Tab icon={<ArchiveOutlinedIcon />} iconPosition="start" label="Archived" />
           </Tabs>
         </Paper>
 
@@ -160,7 +255,9 @@ const Messages: React.FC = () => {
                 ? "You don't have any messages yet."
                 : tabValue === 1
                 ? "You haven't sent any messages yet."
-                : "You haven't received any messages yet."}
+                : tabValue === 2
+                ? "You haven't received any messages yet."
+                : "You don't have any archived messages yet."}
             </Typography>
           </Paper>
         ) : (
@@ -171,10 +268,21 @@ const Messages: React.FC = () => {
                   button
                   onClick={() => handleMessageClick(message)}
                   sx={{
-                    bgcolor: message.status === 'sent' && tabValue === 2 ? 'action.hover' : 'transparent',
+                    bgcolor: message.status === 'sent' && (tabValue === 0 || tabValue === 2)
+                      ? 'rgba(25, 118, 210, 0.04)'
+                      : 'transparent',
+                    borderLeft: message.status === 'sent' && (tabValue === 0 || tabValue === 2)
+                      ? '4px solid'
+                      : 'none',
+                    borderColor: 'primary.main',
+                    opacity: tabValue === 3 ? 0.7 : 1,
                     '&:hover': {
-                      bgcolor: 'action.hover',
+                      bgcolor: message.status === 'sent' && (tabValue === 0 || tabValue === 2)
+                        ? 'rgba(25, 118, 210, 0.08)'
+                        : 'action.hover',
+                      opacity: 1,
                     },
+                    pr: 10,
                   }}
                 >
                   <ListItemAvatar>
@@ -197,13 +305,45 @@ const Messages: React.FC = () => {
                   <ListItemText
                     primary={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                        <Typography variant="subtitle1" component="span">
+                        <Typography 
+                          variant="subtitle1" 
+                          component="span"
+                          sx={{
+                            fontWeight: message.status === 'sent' && (tabValue === 0 || tabValue === 2) ? 600 : 400,
+                          }}
+                        >
                           {tabValue === 1
                             ? message.recipient_name || message.recipient_email
                             : message.sender_name_display || message.sender_name || message.sender_email}
                         </Typography>
-                        {message.status === 'sent' && tabValue === 2 && (
-                          <Chip label="New" size="small" color="primary" />
+                        {message.status === 'sent' && (tabValue === 0 || tabValue === 2) && (
+                          <Chip 
+                            label="New" 
+                            size="small" 
+                            color="primary"
+                            sx={{
+                              fontWeight: 600,
+                              animation: 'pulse 2s ease-in-out infinite',
+                              '@keyframes pulse': {
+                                '0%, 100%': {
+                                  opacity: 1,
+                                },
+                                '50%': {
+                                  opacity: 0.7,
+                                },
+                              },
+                            }}
+                          />
+                        )}
+                        {tabValue === 3 && (
+                          <Chip 
+                            label="Archived" 
+                            size="small" 
+                            color="default"
+                            sx={{
+                              fontWeight: 500,
+                            }}
+                          />
                         )}
                       </Box>
                     }
@@ -227,6 +367,15 @@ const Messages: React.FC = () => {
                       </>
                     }
                   />
+                  <ListItemSecondaryAction>
+                    <IconButton
+                      edge="end"
+                      onClick={(e) => handleMenuOpen(e, message.id)}
+                      disabled={deleting === message.id || archiving === message.id}
+                    >
+                      <MoreVertIcon />
+                    </IconButton>
+                  </ListItemSecondaryAction>
                 </ListItem>
                 {index < messages.length - 1 && <Divider />}
               </React.Fragment>
@@ -295,6 +444,49 @@ const Messages: React.FC = () => {
               </DialogContent>
               <DialogActions>
                 <Button onClick={() => setDialogOpen(false)}>Close</Button>
+                {tabValue === 3 ? (
+                  <Button
+                    variant="outlined"
+                    startIcon={<ArchiveOutlinedIcon />}
+                    onClick={async () => {
+                      if (selectedMessage && user?.id) {
+                        await handleUnarchive(selectedMessage.id);
+                        setDialogOpen(false);
+                      }
+                    }}
+                    disabled={unarchiving === selectedMessage?.id}
+                  >
+                    {unarchiving === selectedMessage?.id ? 'Unarchiving...' : 'Unarchive'}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    startIcon={<ArchiveIcon />}
+                    onClick={async () => {
+                      if (selectedMessage && user?.id) {
+                        await handleArchive(selectedMessage.id);
+                        setDialogOpen(false);
+                      }
+                    }}
+                    disabled={archiving === selectedMessage?.id}
+                  >
+                    {archiving === selectedMessage?.id ? 'Archiving...' : 'Archive'}
+                  </Button>
+                )}
+                <Button
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={() => {
+                    if (selectedMessage) {
+                      setDialogOpen(false);
+                      handleDeleteClick(selectedMessage.id);
+                    }
+                  }}
+                  disabled={deleting === selectedMessage?.id}
+                >
+                  {deleting === selectedMessage?.id ? 'Deleting...' : 'Delete'}
+                </Button>
                 <Button
                   variant="contained"
                   onClick={() => {
@@ -307,6 +499,70 @@ const Messages: React.FC = () => {
               </DialogActions>
             </>
           )}
+        </Dialog>
+
+        <Menu
+          anchorEl={menuAnchor?.element}
+          open={Boolean(menuAnchor)}
+          onClose={handleMenuClose}
+        >
+          {tabValue === 3 ? (
+            <MenuItem
+              onClick={() => {
+                if (menuAnchor) {
+                  handleUnarchive(menuAnchor.messageId);
+                }
+              }}
+              disabled={unarchiving === menuAnchor?.messageId}
+            >
+              <ArchiveOutlinedIcon sx={{ mr: 1, fontSize: 20 }} />
+              {unarchiving === menuAnchor?.messageId ? 'Unarchiving...' : 'Unarchive'}
+            </MenuItem>
+          ) : (
+            <MenuItem
+              onClick={() => {
+                if (menuAnchor) {
+                  handleArchive(menuAnchor.messageId);
+                }
+              }}
+              disabled={archiving === menuAnchor?.messageId}
+            >
+              <ArchiveIcon sx={{ mr: 1, fontSize: 20 }} />
+              {archiving === menuAnchor?.messageId ? 'Archiving...' : 'Archive'}
+            </MenuItem>
+          )}
+          <MenuItem
+            onClick={() => {
+              if (menuAnchor) {
+                handleDeleteClick(menuAnchor.messageId);
+              }
+            }}
+            disabled={deleting === menuAnchor?.messageId}
+            sx={{ color: 'error.main' }}
+          >
+            <DeleteIcon sx={{ mr: 1, fontSize: 20 }} />
+            {deleting === menuAnchor?.messageId ? 'Deleting...' : 'Delete'}
+          </MenuItem>
+        </Menu>
+
+        <Dialog open={deleteConfirmOpen} onClose={handleDeleteCancel}>
+          <DialogTitle>Delete Message</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete this message? This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel}>Cancel</Button>
+            <Button
+              onClick={handleDeleteConfirm}
+              color="error"
+              variant="contained"
+              disabled={deleting !== null}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogActions>
         </Dialog>
       </Container>
     </Box>

@@ -29,9 +29,9 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Visibility as VisibilityIcon,
-  TrendingUp as TrendingUpIcon,
-  AttachMoney as MoneyIcon,
-  ShoppingCart as CartIcon,
+  Favorite as FavoriteIcon,
+  Email as EmailIcon,
+  Description as DraftIcon,
   Person as PersonIcon,
   Logout as LogoutIcon,
 } from '@mui/icons-material';
@@ -97,12 +97,13 @@ const ArtistDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [artistStats, setArtistStats] = useState({
     totalListings: 0,
-    totalSales: 0,
-    totalRevenue: 0,
-    pendingOrders: 0,
+    activeListings: 0,
+    totalViews: 0,
+    draftListings: 0,
+    messagesReceived: 0,
+    totalLikes: 0,
   });
   const [recentListings, setRecentListings] = useState<Listing[]>([]);
-  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<Listing | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -126,7 +127,7 @@ const ArtistDashboard: React.FC = () => {
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
-      if (tabValue === 3) {
+      if (tabValue === 2) {
         fetchProfile();
       }
     }
@@ -142,15 +143,16 @@ const ArtistDashboard: React.FC = () => {
       const data: DashboardData = await apiService.getDashboardData(user.id);
       setArtistStats(data.stats);
       setRecentListings(data.recentListings || []);
-      setRecentOrders(data.recentOrders || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard data');
       // Set default values on error
       setArtistStats({
         totalListings: 0,
-        totalSales: 0,
-        totalRevenue: 0,
-        pendingOrders: 0,
+        activeListings: 0,
+        totalViews: 0,
+        draftListings: 0,
+        messagesReceived: 0,
+        totalLikes: 0,
       });
     } finally {
       setLoading(false);
@@ -316,26 +318,59 @@ const ArtistDashboard: React.FC = () => {
   };
 
   return (
-    <Box sx={{ py: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <Container maxWidth="lg">
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Box>
-            <Typography variant="h4" component="h1" gutterBottom>
-              Welcome back, {user?.name || 'Artist'}!
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Manage your listings, track sales, and grow your art business.
-            </Typography>
+        {/* Header Section */}
+        <Paper
+          elevation={0}
+          sx={{
+            mb: 4,
+            mt: { xs: 4, sm: 5, md: 6 },
+            p: { xs: 3, sm: 4 },
+            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+            <Box sx={{ flex: 1 }}>
+              <Typography 
+                variant="h4" 
+                component="h1" 
+                gutterBottom
+                sx={{ 
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  mb: 1
+                }}
+              >
+                Welcome back, {user?.name || 'Artist'}!
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1rem', lineHeight: 1.6 }}>
+                Manage your listings, track engagement, and grow your art business.
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              startIcon={<LogoutIcon />}
+              onClick={handleSignOut}
+              sx={{ 
+                minWidth: { xs: '100%', sm: 'auto' },
+                borderColor: 'divider',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  bgcolor: 'action.hover',
+                }
+              }}
+            >
+              Sign Out
+            </Button>
           </Box>
-          <Button
-            variant="outlined"
-            startIcon={<LogoutIcon />}
-            onClick={handleSignOut}
-            sx={{ ml: 2 }}
-          >
-            Sign Out
-          </Button>
-        </Box>
+        </Paper>
 
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -351,7 +386,7 @@ const ArtistDashboard: React.FC = () => {
           <>
             {/* Stats Overview */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={4}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -361,6 +396,23 @@ const ArtistDashboard: React.FC = () => {
                   <Box>
                     <Typography variant="h6">{artistStats.totalListings}</Typography>
                     <Typography variant="body2" color="text.secondary">
+                      Total Listings
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ bgcolor: 'success.main' }}>
+                    <VisibilityIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6">{artistStats.activeListings}</Typography>
+                    <Typography variant="body2" color="text.secondary">
                       Active Listings
                     </Typography>
                   </Box>
@@ -368,51 +420,68 @@ const ArtistDashboard: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'success.main' }}>
-                    <TrendingUpIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6">{artistStats.totalSales}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Sales
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'warning.main' }}>
-                    <MoneyIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6">${artistStats.totalRevenue}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Revenue
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={4}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Avatar sx={{ bgcolor: 'info.main' }}>
-                    <CartIcon />
+                    <VisibilityIcon />
                   </Avatar>
                   <Box>
-                    <Typography variant="h6">{artistStats.pendingOrders}</Typography>
+                    <Typography variant="h6">{artistStats.totalViews}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Pending Orders
+                      Total Views
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ bgcolor: 'warning.main' }}>
+                    <DraftIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6">{artistStats.draftListings}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Draft Listings
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ bgcolor: 'error.main' }}>
+                    <EmailIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6">{artistStats.messagesReceived}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Messages Received
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                    <FavoriteIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6">{artistStats.totalLikes}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Likes
                     </Typography>
                   </Box>
                 </Box>
@@ -426,7 +495,6 @@ const ArtistDashboard: React.FC = () => {
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="My Listings" />
-              <Tab label="Orders" />
               <Tab label="Analytics" />
               <Tab label="Profile" />
             </Tabs>
@@ -605,50 +673,49 @@ const ArtistDashboard: React.FC = () => {
 
           <TabPanel value={tabValue} index={1}>
             <Typography variant="h6" gutterBottom>
-              Recent Orders
+              Analytics
             </Typography>
-            <List>
-              {recentOrders.length === 0 ? (
-                <ListItem>
-                  <ListItemText
-                    primary="No orders yet"
-                    secondary="Your orders will appear here once customers make purchases"
-                  />
-                </ListItem>
-              ) : (
-                recentOrders.map((order) => (
-                  <ListItem key={order.id} divider>
-                    <ListItemIcon>
-                      <Avatar sx={{ bgcolor: 'primary.main' }}>
-                        <CartIcon />
-                      </Avatar>
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={order.listing_title || 'Artwork'}
-                      secondary={`Sold to ${order.buyer_email || 'Customer'} on ${new Date(order.created_at).toLocaleDateString()}`}
-                    />
-                    <Typography variant="h6" color="primary">
-                      ${order.artist_earnings || order.total_price}
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Listing Performance
+                  </Typography>
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Listings: {artistStats.totalListings}
                     </Typography>
-                  </ListItem>
-                ))
-              )}
-            </List>
+                    <Typography variant="body2" color="text.secondary">
+                      Active Listings: {artistStats.activeListings}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Draft Listings: {artistStats.draftListings}
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Engagement
+                  </Typography>
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Views: {artistStats.totalViews}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Likes: {artistStats.totalLikes}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Messages Received: {artistStats.messagesReceived}
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
           </TabPanel>
 
           <TabPanel value={tabValue} index={2}>
-            <Typography variant="h6" gutterBottom>
-              Sales Analytics
-            </Typography>
-            <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="body1" color="text.secondary">
-                Analytics dashboard coming soon! Track your sales performance, 
-                popular items, and customer insights.
-              </Typography>
-            </Paper>
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={3}>
             <Typography variant="h6" gutterBottom>
               Artist Profile
             </Typography>
