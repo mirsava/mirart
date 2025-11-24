@@ -3,6 +3,54 @@ import pool from '../config/database.js';
 
 const router = express.Router();
 
+// Search users (for chat)
+router.get('/search', async (req, res) => {
+  try {
+    const { q, limit = 20 } = req.query;
+    const searchLimit = parseInt(limit) || 20;
+    
+    if (!q || q.trim().length === 0) {
+      return res.json({ users: [] });
+    }
+
+    const searchTerm = `%${q.trim()}%`;
+    
+    const [users] = await pool.execute(
+      `SELECT 
+        id,
+        cognito_username,
+        email,
+        first_name,
+        last_name,
+        business_name,
+        profile_image_url,
+        created_at
+      FROM users 
+      WHERE 
+        (email LIKE ? OR 
+         cognito_username LIKE ? OR 
+         first_name LIKE ? OR 
+         last_name LIKE ? OR 
+         business_name LIKE ?)
+      ORDER BY 
+        CASE 
+          WHEN business_name LIKE ? THEN 1
+          WHEN first_name LIKE ? OR last_name LIKE ? THEN 2
+          WHEN email LIKE ? THEN 3
+          ELSE 4
+        END,
+        created_at DESC
+      LIMIT ${searchLimit}`,
+      [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm]
+    );
+    
+    res.json({ users: users || [] });
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get user by Cognito username
 router.get('/:cognitoUsername', async (req, res) => {
   try {

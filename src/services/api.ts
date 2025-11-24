@@ -294,6 +294,15 @@ class ApiService {
     });
   }
 
+  async searchUsers(query: string, limit?: number): Promise<{ users: User[] }> {
+    const params = new URLSearchParams();
+    params.append('q', query);
+    if (limit) {
+      params.append('limit', limit.toString());
+    }
+    return this.request<{ users: User[] }>(`/users/search?${params.toString()}`);
+  }
+
   async getAdminStats(cognitoUsername: string, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);

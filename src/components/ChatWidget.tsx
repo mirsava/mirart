@@ -27,10 +27,12 @@ import {
   Close as CloseIcon,
   Minimize as MinimizeIcon,
   Image as ImageIcon,
+  PersonAdd as PersonAddIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
-import apiService from '../services/api';
+import apiService, { User } from '../services/api';
 
 interface ChatMessage {
   id: number;
@@ -80,9 +82,14 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
   const [isResizingWindow, setIsResizingWindow] = useState(false);
   const [resizeType, setResizeType] = useState<'width' | 'height' | 'corner' | null>(null);
   const [showConversationsList, setShowConversationsList] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searching, setSearching] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const getImageUrl = (url?: string | null): string => {
     if (!url) return '';
@@ -193,6 +200,80 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
     return conversation.other_user_business_name || 
            conversation.other_user_name.trim() || 
            conversation.other_user_email;
+  };
+
+  const getUserDisplayName = (user: User): string => {
+    if (user.business_name) return user.business_name;
+    if (user.first_name || user.last_name) {
+      return `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    }
+    return user.email || user.cognito_username;
+  };
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const response = await apiService.searchUsers(searchQuery, 10);
+        const filteredUsers = response.users.filter(u => u.id !== user?.id);
+        setSearchResults(filteredUsers);
+      } catch (err: any) {
+        setError(err.message || 'Failed to search users');
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, user?.id]);
+
+  const handleStartChatWithUser = async (otherUser: User) => {
+    if (!user?.id || !otherUser.id) {
+      setError('User information not available');
+      return;
+    }
+
+    try {
+      setSearching(true);
+      setError(null);
+      const message = `Hi! I'd like to connect with you.`;
+      const response = await apiService.createChatConversation(
+        user.id,
+        otherUser.id,
+        null,
+        message
+      );
+      
+      if (response && response.conversationId) {
+        setShowSearch(false);
+        setSearchQuery('');
+        setSearchResults([]);
+        setSelectedConversation(response.conversationId);
+        await fetchMessages(response.conversationId);
+        await fetchConversations();
+      } else {
+        setError('Failed to create conversation');
+      }
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.error || err?.message || 'Failed to start chat';
+      setError(errorMessage);
+    } finally {
+      setSearching(false);
+    }
   };
 
   const totalUnread = conversations.reduce((sum, conv) => sum + conv.unread_count, 0);
@@ -346,6 +427,23 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
               <IconButton 
                 color="inherit" 
                 size="small" 
+                onClick={() => {
+                  setShowSearch(!showSearch);
+                  if (!showSearch) {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }
+                }}
+                sx={{ 
+                  mr: 0.5,
+                  p: 0.75,
+                }}
+              >
+                <PersonAddIcon fontSize="small" />
+              </IconButton>
+              <IconButton 
+                color="inherit" 
+                size="small" 
                 onClick={() => setShowConversationsList(!showConversationsList)} 
                 sx={{ 
                   mr: 0.5, 
@@ -373,6 +471,75 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
               </IconButton>
             </Toolbar>
           </AppBar>
+
+          {showSearch && (
+            <Box sx={{ 
+              borderBottom: 1, 
+              borderColor: 'divider',
+              p: 1.5,
+              bgcolor: 'background.paper',
+            }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search users by name, email, or username..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary', fontSize: 20 }} />,
+                }}
+                sx={{ mb: 1 }}
+              />
+              {searching && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              )}
+              {!searching && searchResults.length > 0 && (
+                <List sx={{ maxHeight: 200, overflow: 'auto', p: 0 }}>
+                  {searchResults.map((resultUser) => (
+                    <ListItem
+                      key={resultUser.id}
+                      button
+                      onClick={() => handleStartChatWithUser(resultUser)}
+                      sx={{
+                        borderRadius: 1,
+                        mb: 0.5,
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                        },
+                      }}
+                    >
+                      <ListItemAvatar>
+                        <Avatar src={getImageUrl(resultUser.profile_image_url)}>
+                          {getUserDisplayName(resultUser).charAt(0).toUpperCase()}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={getUserDisplayName(resultUser)}
+                        secondary={resultUser.email}
+                        primaryTypographyProps={{
+                          variant: 'body2',
+                          fontWeight: 500,
+                        }}
+                        secondaryTypographyProps={{
+                          variant: 'caption',
+                        }}
+                      />
+                      <IconButton size="small" sx={{ ml: 1 }}>
+                        <ChatIcon fontSize="small" />
+                      </IconButton>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+              {!searching && searchQuery.trim() && searchResults.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                  No users found
+                </Typography>
+              )}
+            </Box>
+          )}
 
           {showConversationsList && (
             <Box sx={{ 
@@ -484,6 +651,16 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
               ))}
             </Tabs>
           </Box>
+
+          {error && (
+            <Alert 
+              severity="error" 
+              onClose={() => setError(null)}
+              sx={{ m: 1 }}
+            >
+              {error}
+            </Alert>
+          )}
 
           <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0, flexDirection: 'column' }}>
 
