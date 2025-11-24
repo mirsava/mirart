@@ -32,10 +32,12 @@ import {
   Email as EmailIcon,
   Notifications as NotificationsIcon,
   AdminPanelSettings as AdminIcon,
+  Chat as ChatIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useChat } from '../contexts/ChatContext';
 import apiService from '../services/api';
 import { UserRole } from '../types/userRoles';
 import logo from '../assets/images/logo.png';
@@ -46,6 +48,7 @@ const Header: React.FC = () => {
   const theme = useTheme();
   const { isDarkMode, toggleTheme } = useCustomTheme();
   const { user, signOut, isAuthenticated, refreshUser } = useAuth();
+  const { openChat } = useChat();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
@@ -65,6 +68,7 @@ const Header: React.FC = () => {
         { label: 'My Dashboard', path: '/artist-dashboard' },
         { label: 'Create Listing', path: '/create-listing' },
         { label: 'Messages', path: '/messages' },
+        { label: 'Chat', path: null, onClick: () => openChat() },
       ]
     : [
         { label: 'Sell Art', path: '/artist-signup' },
@@ -236,15 +240,21 @@ const Header: React.FC = () => {
             {artistMenuItems.map((item) => (
               <ListItem 
                 key={item.label} 
-                onClick={() => handleNavigation(item.path)}
+                onClick={() => {
+                  if (item.onClick) {
+                    item.onClick();
+                  } else if (item.path) {
+                    handleNavigation(item.path);
+                  }
+                }}
                 sx={{
                   borderRadius: 2,
                   mb: 1,
                   cursor: 'pointer',
-                  bgcolor: location.pathname === item.path ? 'primary.main' : 'transparent',
-                  color: location.pathname === item.path ? 'white' : 'inherit',
+                  bgcolor: item.path && location.pathname === item.path ? 'primary.main' : 'transparent',
+                  color: item.path && location.pathname === item.path ? 'white' : 'inherit',
                   '&:hover': {
-                    bgcolor: location.pathname === item.path ? 'primary.dark' : 'action.hover',
+                    bgcolor: item.path && location.pathname === item.path ? 'primary.dark' : 'action.hover',
                   },
                 }}
               >
@@ -326,6 +336,32 @@ const Header: React.FC = () => {
                 primary="Messages"
                 primaryTypographyProps={{
                   fontWeight: location.pathname === '/messages' ? 600 : 400,
+                }}
+              />
+            </ListItem>
+            <ListItem 
+              onClick={() => {
+                openChat();
+                handleDrawerToggle();
+              }}
+              sx={{
+                borderRadius: 2,
+                mb: 1,
+                cursor: 'pointer',
+                bgcolor: 'transparent',
+                color: 'inherit',
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+              }}
+            >
+              <ListItemIcon>
+                <ChatIcon />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Chat"
+                primaryTypographyProps={{
+                  fontWeight: 400,
                 }}
               />
             </ListItem>

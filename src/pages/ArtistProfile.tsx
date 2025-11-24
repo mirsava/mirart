@@ -10,13 +10,21 @@ import {
   CircularProgress,
   Alert,
   Divider,
+  Button,
 } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Chat as ChatIcon } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import { useChat } from '../contexts/ChatContext';
+import { useSnackbar } from 'notistack';
 import apiService, { User, Listing } from '../services/api';
 
 const ArtistProfile: React.FC = () => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+  const { openChat } = useChat();
+  const { enqueueSnackbar } = useSnackbar();
   const [artist, setArtist] = useState<User | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +68,38 @@ const ArtistProfile: React.FC = () => {
 
     fetchArtistProfile();
   }, [username]);
+
+  const handleStartChat = async (): Promise<void> => {
+    if (!isAuthenticated || !user?.id) {
+      navigate('/artist-signin');
+      return;
+    }
+
+    if (!artist?.id) {
+      enqueueSnackbar('Unable to start chat. Artist information not available.', { variant: 'error' });
+      return;
+    }
+
+    if (artist.cognito_username === user.id) {
+      enqueueSnackbar('You cannot chat with yourself', { variant: 'error' });
+      return;
+    }
+
+    try {
+      const message = `Hi! I'd like to connect with you.`;
+      const response = await apiService.createChatConversation(
+        user.id,
+        artist.id,
+        null,
+        message,
+        artist.cognito_username
+      );
+      
+      openChat(response.conversationId);
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to start chat', { variant: 'error' });
+    }
+  };
 
   if (loading) {
     return (
@@ -108,6 +148,16 @@ const ArtistProfile: React.FC = () => {
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     {artist.first_name} {artist.last_name}
                   </Typography>
+                )}
+                {isAuthenticated && artist.id && artist.cognito_username !== user?.id && (
+                  <Button
+                    variant="contained"
+                    startIcon={<ChatIcon />}
+                    onClick={handleStartChat}
+                    sx={{ mt: 2 }}
+                  >
+                    Start Chat
+                  </Button>
                 )}
               </Box>
             </Grid>

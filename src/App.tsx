@@ -5,6 +5,7 @@ import { SnackbarProvider } from 'notistack';
 import { ThemeProvider as CustomThemeProvider, useTheme } from './contexts/ThemeContext';
 import { CartProvider } from './contexts/CartContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { ChatProvider } from './contexts/ChatContext';
 import './aws-config';
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -26,6 +27,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ConfirmSignup from './pages/ConfirmSignup';
 import Messages from './pages/Messages';
 import AdminDashboard from './pages/AdminDashboard';
+import Chat from './pages/Chat';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UserRole } from './types/userRoles';
 
@@ -34,7 +36,9 @@ function App(): JSX.Element {
     <CustomThemeProvider>
       <AuthProvider>
         <CartProvider>
-          <AppContent />
+          <ChatProvider>
+            <AppContent />
+          </ChatProvider>
         </CartProvider>
       </AuthProvider>
     </CustomThemeProvider>
@@ -101,6 +105,14 @@ function AppContent(): JSX.Element {
               element={
                 <ProtectedRoute>
                   <Messages />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/chat" 
+              element={
+                <ProtectedRoute requiredUserType={UserRole.ARTIST}>
+                  <Chat />
                 </ProtectedRoute>
               } 
             />

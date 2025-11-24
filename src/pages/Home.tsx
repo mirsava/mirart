@@ -736,7 +736,7 @@ const Home: React.FC = () => {
                         },
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
-                      onClick={() => navigate('/gallery')}
+                      onClick={() => navigate('/gallery?category=Painting')}
                     >
                       Browse Artwork
                     </Button>
@@ -1093,7 +1093,7 @@ const Home: React.FC = () => {
               },
               transition: 'all 0.3s ease',
             }}
-            onClick={() => navigate('/gallery')}
+            onClick={() => navigate('/gallery?category=Painting')}
           >
             View All Paintings
           </Button>
@@ -1191,7 +1191,7 @@ const Home: React.FC = () => {
                 },
                 transition: 'all 0.3s ease',
               }}
-              onClick={() => navigate('/gallery')}
+              onClick={() => navigate('/gallery?category=Woodworking')}
             >
               View All Woodworking
             </Button>

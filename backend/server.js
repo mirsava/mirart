@@ -12,6 +12,7 @@ import likesRouter from './routes/likes.js';
 import emailRouter from './routes/email.js';
 import messagesRouter from './routes/messages.js';
 import adminRouter from './routes/admin.js';
+import chatRouter from './routes/chat.js';
 
 dotenv.config();
 
@@ -67,6 +68,7 @@ app.use('/api/likes', likesRouter);
 app.use('/api/email', emailRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/chat', chatRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

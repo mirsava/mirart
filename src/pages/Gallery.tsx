@@ -29,6 +29,7 @@ const Gallery: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchInput, setSearchInput] = useState<string>(searchParams.get('search') || '');
   const [searchTerm, setSearchTerm] = useState<string>(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || 'All');
   const [sortBy, setSortBy] = useState<string>(searchParams.get('sortBy') || 'created_at');
@@ -70,6 +71,39 @@ const Gallery: React.FC = () => {
       artistEmail: (listing as any).artist_email,
     };
   };
+
+  useEffect(() => {
+    const categoryFromUrl = searchParams.get('category');
+    if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
+      setSelectedCategory(categoryFromUrl);
+      setPage(1);
+    }
+    
+    const searchFromUrl = searchParams.get('search') || '';
+    if (searchFromUrl !== searchInput) {
+      setSearchInput(searchFromUrl);
+      setSearchTerm(searchFromUrl);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      if (searchInput !== searchTerm) {
+        setSearchTerm(searchInput);
+        setPage(1);
+        const newParams = new URLSearchParams(searchParams);
+        if (searchInput.trim()) {
+          newParams.set('search', searchInput.trim());
+        } else {
+          newParams.delete('search');
+        }
+        newParams.set('page', '1');
+        setSearchParams(newParams, { replace: true });
+      }
+    }, 500);
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchInput, searchTerm, searchParams, setSearchParams]);
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -121,9 +155,15 @@ const Gallery: React.FC = () => {
     };
 
     fetchListings();
-  }, [page, itemsPerPage, selectedCategory, searchTerm, sortBy, sortOrder]);
+  }, [page, itemsPerPage, selectedCategory, searchTerm, sortBy, sortOrder, user?.id]);
 
   useEffect(() => {
+    const categoryFromUrl = searchParams.get('category');
+    if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
+      setSelectedCategory(categoryFromUrl);
+      setPage(1);
+    }
+    
     const pageParam = searchParams.get('page');
     const limitParam = searchParams.get('limit');
     
@@ -150,11 +190,18 @@ const Gallery: React.FC = () => {
   const handleCategoryClick = (category: string): void => {
     setSelectedCategory(category);
     setPage(1);
+    const newParams = new URLSearchParams(searchParams);
+    if (category === 'All') {
+      newParams.delete('category');
+    } else {
+      newParams.set('category', category);
+    }
+    newParams.set('page', '1');
+    setSearchParams(newParams);
   };
 
   const handleSearchChange = (value: string): void => {
-    setSearchTerm(value);
-    setPage(1);
+    setSearchInput(value);
   };
 
   const handleItemsPerPageChange = (value: number): void => {
@@ -283,13 +330,8 @@ const Gallery: React.FC = () => {
               <TextField
                 fullWidth
                 placeholder="Search artwork..."
-                value={searchTerm}
+                value={searchInput}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSearchChange((e.target as HTMLInputElement).value);
-                  }
-                }}
                 InputProps={{
                   startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}

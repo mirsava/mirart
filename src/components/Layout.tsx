@@ -2,12 +2,16 @@ import React, { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import Header from './Header';
 import Footer from './Footer';
+import ChatWidget from './ChatWidget';
+import { useChat } from '../contexts/ChatContext';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const { chatOpen, closeChat, initialConversationId } = useChat();
+
   return (
     <Box
       sx={{
@@ -28,6 +32,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {children}
       </Box>
       <Footer />
+      <ChatWidget 
+        open={chatOpen} 
+        onClose={closeChat}
+        initialConversationId={initialConversationId}
+      />
     </Box>
   );
 };

@@ -265,6 +265,35 @@ class ApiService {
     });
   }
 
+  async getChatConversations(cognitoUsername: string): Promise<{ conversations: any[] }> {
+    return this.request<{ conversations: any[] }>(`/chat/conversations/${cognitoUsername}`);
+  }
+
+  async getChatConversation(conversationId: number, cognitoUsername: string): Promise<{ conversation: any; messages: any[] }> {
+    return this.request<{ conversation: any; messages: any[] }>(`/chat/conversation/${conversationId}?cognitoUsername=${encodeURIComponent(cognitoUsername)}`);
+  }
+
+  async createChatConversation(cognitoUsername: string, otherUserId: number, listingId: number | null, message: string): Promise<{ success: boolean; conversationId: number }> {
+    return this.request<{ success: boolean; conversationId: number }>(`/chat/conversation`, {
+      method: 'POST',
+      body: JSON.stringify({ cognitoUsername, otherUserId, listingId, message }),
+    });
+  }
+
+  async sendChatMessage(cognitoUsername: string, conversationId: number, message: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/chat/message`, {
+      method: 'POST',
+      body: JSON.stringify({ cognitoUsername, conversationId, message }),
+    });
+  }
+
+  async markChatMessagesAsRead(conversationId: number, cognitoUsername: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/chat/messages/read/${conversationId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ cognitoUsername }),
+    });
+  }
+
   async getAdminStats(cognitoUsername: string, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);

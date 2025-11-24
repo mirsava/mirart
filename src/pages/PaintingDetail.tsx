@@ -22,10 +22,12 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Email as EmailIcon,
+  Chat as ChatIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import { useAuth } from '../contexts/AuthContext';
+import { useChat } from '../contexts/ChatContext';
 import { useSnackbar } from 'notistack';
 import apiService, { Listing } from '../services/api';
 import ContactSellerDialog from '../components/ContactSellerDialog';
@@ -35,8 +37,9 @@ const PaintingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { openChat } = useChat();
   const { enqueueSnackbar } = useSnackbar();
-  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string }) | null>(null);
+  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string; userId?: number }) | null>(null);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -67,6 +70,7 @@ const PaintingDetail: React.FC = () => {
       image: getImageUrl(listing.primary_image_url) || '',
       description: listing.description || '',
       category: listing.category as 'Painting' | 'Woodworking',
+      userId: listing.user_id,
       subcategory: listing.subcategory || '',
       dimensions: listing.dimensions || '',
       medium: listing.medium || '',
@@ -256,6 +260,32 @@ const PaintingDetail: React.FC = () => {
 
   const handleContactSeller = (): void => {
     setContactDialogOpen(true);
+  };
+
+  const handleStartChat = async (): Promise<void> => {
+    if (!isAuthenticated || !user?.id) {
+      navigate('/artist-signin');
+      return;
+    }
+
+    if (!painting?.userId) {
+      enqueueSnackbar('Unable to start chat. User information not available.', { variant: 'error' });
+      return;
+    }
+
+    try {
+      const message = `Hi! I'm interested in "${painting.title}".`;
+      const response = await apiService.createChatConversation(
+        user.id,
+        painting.userId,
+        painting.id,
+        message
+      );
+      
+      openChat(response.conversationId);
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to start chat', { variant: 'error' });
+    }
   };
 
   const handleShare = (): void => {
@@ -636,7 +666,7 @@ const PaintingDetail: React.FC = () => {
                   Back to Gallery
                 </Button>
                 <Button
-                  variant="contained"
+                  variant="outlined"
                   size="large"
                   startIcon={<EmailIcon />}
                   onClick={handleContactSeller}
@@ -644,6 +674,17 @@ const PaintingDetail: React.FC = () => {
                 >
                   Contact Seller
                 </Button>
+                {isAuthenticated && painting?.userId && (
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<ChatIcon />}
+                    onClick={handleStartChat}
+                    sx={{ flexGrow: { xs: 1, sm: 0 } }}
+                  >
+                    Start Chat
+                  </Button>
+                )}
               </Box>
             </Box>
           </Grid>

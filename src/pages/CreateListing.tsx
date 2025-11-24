@@ -17,8 +17,18 @@ import {
   CircularProgress,
   IconButton,
   Chip,
+  Divider,
+  Stepper,
+  Step,
+  StepLabel,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { 
+  Add as AddIcon, 
+  Delete as DeleteIcon,
+  Image as ImageIcon,
+  Info as InfoIcon,
+  Settings as SettingsIcon,
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
@@ -50,6 +60,9 @@ const CreateListing: React.FC = () => {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
+
+  const steps = ['Basic Information', 'Images', 'Details', 'Pricing & Status'];
 
   const categories = [
     'Painting',
@@ -295,14 +308,45 @@ const CreateListing: React.FC = () => {
 
   return (
     <Box sx={{ py: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
-      <Container maxWidth="md">
-        <Paper sx={{ p: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Create New Listing
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-            Add a new artwork listing to your portfolio
-          </Typography>
+      <Container maxWidth="lg">
+        <Paper
+          sx={{
+            p: { xs: 3, sm: 4, md: 5 },
+            mb: 4,
+            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 3,
+          }}
+        >
+          <Box sx={{ mb: 4 }}>
+            <Typography
+              variant="h4"
+              component="h1"
+              gutterBottom
+              sx={{
+                background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 700,
+                mb: 1,
+              }}
+            >
+              Create New Listing
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Add a new artwork listing to your portfolio. Fill in the details below to get started.
+            </Typography>
+          </Box>
+
+          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
 
           {error && (
             <Alert severity="error" sx={{ mb: 3 }}>
@@ -311,102 +355,177 @@ const CreateListing: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit}>
-            <Grid container spacing={3}>
+            <Grid container spacing={4}>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  required
-                  label="Title"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  placeholder="e.g., Sunset Over Mountains"
-                />
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                    <InfoIcon color="primary" />
+                    <Typography variant="h6" fontWeight={600}>
+                      Basic Information
+                    </Typography>
+                  </Box>
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        required
+                        label="Title"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleChange}
+                        placeholder="e.g., Sunset Over Mountains"
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={4}
+                        label="Description"
+                        name="description"
+                        value={formData.description}
+                        onChange={handleChange}
+                        placeholder="Describe your artwork..."
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth required>
+                        <InputLabel>Category</InputLabel>
+                        <Select
+                          name="category"
+                          value={formData.category}
+                          onChange={handleSelectChange}
+                          label="Category"
+                          sx={{ bgcolor: 'background.default' }}
+                        >
+                          {categories.map((cat) => (
+                            <MenuItem key={cat} value={cat}>
+                              {cat}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Subcategory</InputLabel>
+                        <Select
+                          name="subcategory"
+                          value={formData.subcategory}
+                          onChange={handleSelectChange}
+                          label="Subcategory"
+                          disabled={!formData.category}
+                          sx={{ bgcolor: 'background.default' }}
+                        >
+                          {formData.category && subcategories[formData.category]?.map((subcat) => (
+                            <MenuItem key={subcat} value={subcat}>
+                              {subcat}
+                            </MenuItem>
+                          ))}
+                          {formData.category && (
+                            <MenuItem value="Other">Other</MenuItem>
+                          )}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                </Paper>
               </Grid>
 
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  label="Description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Describe your artwork..."
-                />
-              </Grid>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                    <SettingsIcon color="primary" />
+                    <Typography variant="h6" fontWeight={600}>
+                      Additional Details
+                    </Typography>
+                  </Box>
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Dimensions"
+                        name="dimensions"
+                        value={formData.dimensions}
+                        onChange={handleChange}
+                        placeholder="e.g., 24x36 inches"
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
 
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Category</InputLabel>
-                  <Select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleSelectChange}
-                    label="Category"
-                  >
-                    {categories.map((cat) => (
-                      <MenuItem key={cat} value={cat}>
-                        {cat}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Medium"
+                        name="medium"
+                        value={formData.medium}
+                        onChange={handleChange}
+                        placeholder="e.g., Oil on Canvas"
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
 
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Subcategory</InputLabel>
-                  <Select
-                    name="subcategory"
-                    value={formData.subcategory}
-                    onChange={handleSelectChange}
-                    label="Subcategory"
-                    disabled={!formData.category}
-                  >
-                    {formData.category && subcategories[formData.category]?.map((subcat) => (
-                      <MenuItem key={subcat} value={subcat}>
-                        {subcat}
-                      </MenuItem>
-                    ))}
-                    {formData.category && (
-                      <MenuItem value="Other">Other</MenuItem>
-                    )}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  required
-                  type="number"
-                  label="Price ($)"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  inputProps={{ min: 0, step: 0.01 }}
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Year"
-                  name="year"
-                  value={formData.year}
-                  onChange={handleChange}
-                  placeholder="e.g., 2024"
-                />
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Year"
+                        name="year"
+                        value={formData.year}
+                        onChange={handleChange}
+                        placeholder="e.g., 2024"
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Paper>
               </Grid>
 
               <Grid item xs={12}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Artwork Photos (up to 10 images)
-                </Typography>
-                <Box
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                    <ImageIcon color="primary" />
+                    <Typography variant="h6" fontWeight={600}>
+                      Artwork Photos
+                    </Typography>
+                    <Chip label={`${imageFiles.length}/10`} size="small" color="primary" variant="outlined" />
+                  </Box>
+                  
+                  <Box
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
@@ -466,9 +585,9 @@ const CreateListing: React.FC = () => {
                       </Button>
                     </label>
                   </Box>
-                </Box>
-                
-                {imagePreviews.length > 0 && (
+                  </Box>
+                  
+                  {imagePreviews.length > 0 && (
                   <Box
                     sx={{
                       display: 'flex',
@@ -523,110 +642,162 @@ const CreateListing: React.FC = () => {
                       </Box>
                     ))}
                   </Box>
-                )}
-                
-                {uploadingImages && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
-                    <CircularProgress size={20} />
-                    <Typography variant="body2" color="text.secondary">
-                      Uploading images...
-                    </Typography>
-                  </Box>
-                )}
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Dimensions"
-                  name="dimensions"
-                  value={formData.dimensions}
-                  onChange={handleChange}
-                  placeholder="e.g., 24x36 inches"
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Medium"
-                  name="medium"
-                  value={formData.medium}
-                  onChange={handleChange}
-                  placeholder="e.g., Oil on Canvas"
-                />
+                  )}
+                  
+                  {uploadingImages && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                      <CircularProgress size={20} />
+                      <Typography variant="body2" color="text.secondary">
+                        Uploading images...
+                      </Typography>
+                    </Box>
+                  )}
+                </Paper>
               </Grid>
 
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label="Shipping Information"
-                  name="shipping_info"
-                  value={formData.shipping_info}
-                  onChange={handleChange}
-                  placeholder="e.g., Free worldwide shipping, Estimated delivery: 5-7 business days, Secure packaging with insurance"
-                  helperText="Provide details about shipping options, costs, and delivery times"
-                />
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                  }}
+                >
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Shipping & Returns
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Optional information to help buyers understand shipping and return policies
+                  </Typography>
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Shipping Information"
+                        name="shipping_info"
+                        value={formData.shipping_info}
+                        onChange={handleChange}
+                        placeholder="e.g., Free worldwide shipping, Estimated delivery: 5-7 business days, Secure packaging with insurance"
+                        helperText="Provide details about shipping options, costs, and delivery times"
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Returns & Refunds Policy"
+                        name="returns_info"
+                        value={formData.returns_info}
+                        onChange={handleChange}
+                        placeholder="e.g., 30-day return policy, Full refund if returned in original condition, Buyer pays return shipping"
+                        helperText="Specify your return and refund policy"
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Paper>
               </Grid>
 
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label="Returns & Refunds Policy"
-                  name="returns_info"
-                  value={formData.returns_info}
-                  onChange={handleChange}
-                  placeholder="e.g., 30-day return policy, Full refund if returned in original condition, Buyer pays return shipping"
-                  helperText="Specify your return and refund policy"
-                />
-              </Grid>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                  }}
+                >
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Pricing & Status
+                  </Typography>
+                  
+                  <Grid container spacing={3} sx={{ mt: 1 }}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        required
+                        type="number"
+                        label="Price ($)"
+                        name="price"
+                        value={formData.price}
+                        onChange={handleChange}
+                        inputProps={{ min: 0, step: 0.01 }}
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
 
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleSelectChange}
-                    label="Status"
-                  >
-                    <MenuItem value="draft">Draft</MenuItem>
-                    <MenuItem value="active">Active</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Status</InputLabel>
+                        <Select
+                          name="status"
+                          value={formData.status}
+                          onChange={handleSelectChange}
+                          label="Status"
+                          sx={{ bgcolor: 'background.default' }}
+                        >
+                          <MenuItem value="draft">Draft</MenuItem>
+                          <MenuItem value="active">Active</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
 
-              <Grid item xs={12} sm={6}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formData.in_stock}
-                      onChange={handleSwitchChange}
-                      name="in_stock"
-                    />
-                  }
-                  label="In Stock"
-                />
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={formData.in_stock}
+                            onChange={handleSwitchChange}
+                            name="in_stock"
+                            color="primary"
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography variant="body1" fontWeight={500}>
+                              In Stock
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Toggle if this artwork is currently available
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </Grid>
+                  </Grid>
+                </Paper>
               </Grid>
 
               <Grid item xs={12}>
-                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
                   <Button
                     variant="outlined"
+                    size="large"
                     onClick={() => navigate('/artist-dashboard')}
-                    disabled={loading}
+                    disabled={loading || uploadingImages}
+                    sx={{ minWidth: 120 }}
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     variant="contained"
+                    size="large"
                     disabled={loading || uploadingImages}
-                    startIcon={loading ? <CircularProgress size={20} /> : null}
+                    startIcon={loading || uploadingImages ? <CircularProgress size={20} color="inherit" /> : <AddIcon />}
+                    sx={{ minWidth: 180 }}
                   >
                     {loading ? 'Creating...' : uploadingImages ? 'Uploading...' : 'Create Listing'}
                   </Button>
