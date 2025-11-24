@@ -47,6 +47,7 @@ const EditListing: React.FC = () => {
     status: 'draft' as 'draft',
     shipping_info: '',
     returns_info: '',
+    allow_comments: true,
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -140,6 +141,7 @@ const EditListing: React.FC = () => {
         status: listing.status || 'draft',
         shipping_info: listing.shipping_info || '',
         returns_info: listing.returns_info || '',
+        allow_comments: listing.allow_comments === true || listing.allow_comments === 1 || (listing.allow_comments !== false && listing.allow_comments !== 0),
       });
 
       const allImages = [];
@@ -405,6 +407,7 @@ const EditListing: React.FC = () => {
         status: formData.status,
         shipping_info: formData.shipping_info || undefined,
         returns_info: formData.returns_info || undefined,
+        allow_comments: Boolean(formData.allow_comments),
       };
 
       listingData.price = parseFloat(formData.price);
@@ -747,6 +750,19 @@ const EditListing: React.FC = () => {
                     />
                   }
                   label="In Stock"
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.allow_comments}
+                      onChange={handleSwitchChange}
+                      name="allow_comments"
+                    />
+                  }
+                  label="Allow Comments"
                 />
               </Grid>
 

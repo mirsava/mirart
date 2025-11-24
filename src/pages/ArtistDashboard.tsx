@@ -34,12 +34,13 @@ import {
   Description as DraftIcon,
   Person as PersonIcon,
   Logout as LogoutIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User } from '../services/api';
-import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField } from '@mui/material';
+import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider } from '@mui/material';
 import SignatureInput from '../components/SignatureInput';
 
 const dataURLtoBlob = (dataURL: string): Promise<Blob> => {
@@ -123,12 +124,24 @@ const ArtistDashboard: React.FC = () => {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
+  const [settings, setSettings] = useState({
+    default_allow_comments: true,
+    email_notifications: true,
+    comment_notifications: true,
+  });
+  const [loadingSettings, setLoadingSettings] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsSuccess, setSettingsSuccess] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
       if (tabValue === 2) {
         fetchProfile();
+      }
+      if (tabValue === 3) {
+        fetchSettings();
       }
     }
   }, [user?.id, tabValue]);
@@ -306,6 +319,72 @@ const ArtistDashboard: React.FC = () => {
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const fetchSettings = async () => {
+    if (!user?.id) return;
+    
+    setLoadingSettings(true);
+    setSettingsError(null);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/users/${user.id}/settings`);
+      if (!response.ok) throw new Error('Failed to fetch settings');
+      const data = await response.json();
+      setSettings(data);
+    } catch (err: any) {
+      setSettingsError(err.message || 'Failed to load settings');
+    } finally {
+      setLoadingSettings(false);
+    }
+  };
+
+  const handleSettingsChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSettings({
+      ...settings,
+      [field]: event.target.checked,
+    });
+  };
+
+  const handleSettingsSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!user?.id) return;
+
+    setSavingSettings(true);
+    setSettingsError(null);
+    setSettingsSuccess(false);
+    
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/users/${user.id}/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+        throw new Error(errorData.error || `Failed to update settings: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response from server');
+      }
+      setSettings(data);
+      setSettingsSuccess(true);
+      enqueueSnackbar('Settings saved successfully!', { variant: 'success' });
+      
+      setTimeout(() => {
+        setSettingsSuccess(false);
+      }, 3000);
+    } catch (err: any) {
+      setSettingsError(err.message || 'Failed to update settings');
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -497,6 +576,7 @@ const ArtistDashboard: React.FC = () => {
               <Tab label="My Listings" />
               <Tab label="Analytics" />
               <Tab label="Profile" />
+              <Tab label="Settings" />
             </Tabs>
           </Box>
 
@@ -881,6 +961,125 @@ const ArtistDashboard: React.FC = () => {
                 </Grid>
               </form>
             </Paper>
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={3}>
+            <Typography variant="h6" gutterBottom>
+              Settings
+            </Typography>
+
+            {settingsError && (
+              <Alert severity="error" sx={{ mb: 3 }} onClose={() => setSettingsError(null)}>
+                {settingsError}
+              </Alert>
+            )}
+
+            {settingsSuccess && (
+              <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSettingsSuccess(false)}>
+                Settings saved successfully!
+              </Alert>
+            )}
+
+            {loadingSettings ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <Paper sx={{ p: 4 }}>
+                <form onSubmit={handleSettingsSubmit}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                        Comment Settings
+                      </Typography>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={settings.default_allow_comments}
+                            onChange={handleSettingsChange('default_allow_comments')}
+                            color="primary"
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography variant="body1" fontWeight={500}>
+                              Allow Comments by Default
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              New listings will have comments enabled by default. You can change this for individual listings.
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Divider sx={{ my: 2 }} />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                        Notification Settings
+                      </Typography>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={settings.email_notifications}
+                            onChange={handleSettingsChange('email_notifications')}
+                            color="primary"
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography variant="body1" fontWeight={500}>
+                              Email Notifications
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Receive email notifications for messages and inquiries
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={settings.comment_notifications}
+                            onChange={handleSettingsChange('comment_notifications')}
+                            color="primary"
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography variant="body1" fontWeight={500}>
+                              Comment Notifications
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Get notified when someone comments on your listings
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
+                        <Button
+                          type="submit"
+                          variant="contained"
+                          disabled={savingSettings}
+                          startIcon={savingSettings ? <CircularProgress size={20} /> : <SettingsIcon />}
+                        >
+                          {savingSettings ? 'Saving...' : 'Save Settings'}
+                        </Button>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </form>
+              </Paper>
+            )}
           </TabPanel>
         </Paper>
           </>

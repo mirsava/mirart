@@ -171,6 +171,71 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Get user settings
+router.get('/:cognitoUsername/settings', async (req, res) => {
+  try {
+    const { cognitoUsername } = req.params;
+    
+    const [rows] = await pool.execute(
+      'SELECT default_allow_comments, email_notifications, comment_notifications FROM users WHERE cognito_username = ?',
+      [cognitoUsername]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({
+      default_allow_comments: rows[0].default_allow_comments !== 0,
+      email_notifications: rows[0].email_notifications !== 0,
+      comment_notifications: rows[0].comment_notifications !== 0,
+    });
+  } catch (error) {
+    console.error('Error fetching user settings:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update user settings
+router.put('/:cognitoUsername/settings', async (req, res) => {
+  try {
+    const { cognitoUsername } = req.params;
+    const { default_allow_comments, email_notifications, comment_notifications } = req.body;
+    
+    await pool.execute(
+      `UPDATE users SET 
+        default_allow_comments = ?,
+        email_notifications = ?,
+        comment_notifications = ?
+      WHERE cognito_username = ?`,
+      [
+        default_allow_comments !== undefined ? (default_allow_comments ? 1 : 0) : null,
+        email_notifications !== undefined ? (email_notifications ? 1 : 0) : null,
+        comment_notifications !== undefined ? (comment_notifications ? 1 : 0) : null,
+        cognitoUsername
+      ]
+    );
+    
+    const [updated] = await pool.execute(
+      'SELECT default_allow_comments, email_notifications, comment_notifications FROM users WHERE cognito_username = ?',
+      [cognitoUsername]
+    );
+    
+    if (updated.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({
+      default_allow_comments: updated[0].default_allow_comments !== 0,
+      email_notifications: updated[0].email_notifications !== 0,
+      comment_notifications: updated[0].comment_notifications !== 0,
+    });
+  } catch (error) {
+    console.error('Error updating user settings:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Update user profile
 router.put('/:cognitoUsername', async (req, res) => {
   try {

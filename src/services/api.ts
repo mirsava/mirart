@@ -44,6 +44,7 @@ export interface Listing {
   returns_info?: string;
   like_count?: number;
   is_liked?: boolean;
+  allow_comments?: boolean;
 }
 
 export interface Order {
@@ -303,6 +304,23 @@ class ApiService {
     return this.request<{ users: User[] }>(`/users/search?${params.toString()}`);
   }
 
+  async getListingComments(listingId: number): Promise<{ comments: Comment[] }> {
+    return this.request<{ comments: Comment[] }>(`/comments/listing/${listingId}`);
+  }
+
+  async createComment(listingId: number, cognitoUsername: string, comment: string): Promise<{ comment: Comment }> {
+    return this.request<{ comment: Comment }>(`/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ listingId, cognitoUsername, comment }),
+    });
+  }
+
+  async deleteComment(commentId: number, cognitoUsername: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/comments/${commentId}?cognitoUsername=${encodeURIComponent(cognitoUsername)}`, {
+      method: 'DELETE',
+    });
+  }
+
   async getAdminStats(cognitoUsername: string, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);
@@ -395,6 +413,19 @@ class ApiService {
       method: 'DELETE',
     });
   }
+}
+
+export interface Comment {
+  id: number;
+  listing_id: number;
+  user_id: number;
+  comment: string;
+  created_at: string;
+  updated_at: string;
+  cognito_username: string;
+  email: string;
+  user_name: string;
+  profile_image_url?: string;
 }
 
 export interface Message {

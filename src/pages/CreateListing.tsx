@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -55,7 +55,30 @@ const CreateListing: React.FC = () => {
     status: 'draft' as 'draft',
     shipping_info: '',
     returns_info: '',
+    allow_comments: true,
   });
+
+  useEffect(() => {
+    const fetchUserSettings = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+        const response = await fetch(`${API_BASE_URL}/users/${user.id}/settings`);
+        if (response.ok) {
+          const data = await response.json();
+          setFormData(prev => ({
+            ...prev,
+            allow_comments: data.default_allow_comments !== false,
+          }));
+        }
+      } catch (error) {
+        // Silently fail, use default value
+      }
+    };
+
+    fetchUserSettings();
+  }, [user?.id]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -292,6 +315,7 @@ const CreateListing: React.FC = () => {
         status: 'draft',
         shipping_info: formData.shipping_info || undefined,
         returns_info: formData.returns_info || undefined,
+        allow_comments: formData.allow_comments,
       };
 
       listingData.price = parseFloat(formData.price);
@@ -770,6 +794,29 @@ const CreateListing: React.FC = () => {
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               Toggle if this artwork is currently available
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={formData.allow_comments}
+                            onChange={handleSwitchChange}
+                            name="allow_comments"
+                            color="primary"
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography variant="body1" fontWeight={500}>
+                              Allow Comments
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Enable comments on this listing
                             </Typography>
                           </Box>
                         }

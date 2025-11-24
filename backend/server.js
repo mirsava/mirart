@@ -13,6 +13,7 @@ import emailRouter from './routes/email.js';
 import messagesRouter from './routes/messages.js';
 import adminRouter from './routes/admin.js';
 import chatRouter from './routes/chat.js';
+import commentsRouter from './routes/comments.js';
 
 dotenv.config();
 
@@ -69,6 +70,7 @@ app.use('/api/email', emailRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/comments', commentsRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

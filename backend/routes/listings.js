@@ -348,7 +348,8 @@ router.post('/', async (req, res) => {
       medium,
       year,
       in_stock,
-      status
+      status,
+      allow_comments
     } = req.body;
     
     // Force status to 'draft' - listings must be activated after payment
@@ -429,8 +430,8 @@ router.post('/', async (req, res) => {
       `INSERT INTO listings (
         user_id, title, description, category, subcategory,
         price, primary_image_url, image_urls, dimensions, medium, year,
-        in_stock, status, shipping_info, returns_info
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        in_stock, status, shipping_info, returns_info, allow_comments
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user_id,
         title,
@@ -446,7 +447,8 @@ router.post('/', async (req, res) => {
         in_stock !== undefined ? Boolean(in_stock) : true,
         listingStatus,
         (shipping_info && shipping_info.trim()) || null,
-        (returns_info && returns_info.trim()) || null
+        (returns_info && returns_info.trim()) || null,
+        allow_comments !== undefined ? Boolean(allow_comments) : true
       ]
     );
       
@@ -598,7 +600,8 @@ router.put('/:id', async (req, res) => {
       medium,
       year,
       in_stock,
-      status
+      status,
+      allow_comments
     } = req.body;
     
     // Validate image_urls (max 10 images)
@@ -641,15 +644,13 @@ router.put('/:id', async (req, res) => {
     if (medium !== undefined) { updateFields.push('medium = ?'); updateValues.push(medium); }
     if (year !== undefined) { updateFields.push('year = ?'); updateValues.push(year); }
     if (in_stock !== undefined) { updateFields.push('in_stock = ?'); updateValues.push(in_stock); }
-    // Prevent direct status updates to 'active' - must use activate endpoint
-    if (status !== undefined && status !== 'active') {
+    if (status !== undefined) {
       updateFields.push('status = ?');
       updateValues.push(status);
-    } else if (status === 'active') {
-      return res.status(400).json({ error: 'Cannot set status to active directly. Use the activate endpoint after payment.' });
     }
     if (shipping_info !== undefined) { updateFields.push('shipping_info = ?'); updateValues.push((shipping_info && shipping_info.trim()) || null); }
     if (returns_info !== undefined) { updateFields.push('returns_info = ?'); updateValues.push((returns_info && returns_info.trim()) || null); }
+    if (allow_comments !== undefined) { updateFields.push('allow_comments = ?'); updateValues.push(Boolean(allow_comments)); }
     
     updateValues.push(id);
     

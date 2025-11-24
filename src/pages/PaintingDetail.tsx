@@ -13,6 +13,16 @@ import {
   Link as MuiLink,
   CircularProgress,
   Alert,
+  TextField,
+  Avatar,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -23,13 +33,15 @@ import {
   ChevronRight as ChevronRightIcon,
   Email as EmailIcon,
   Chat as ChatIcon,
+  Comment as CommentIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { useSnackbar } from 'notistack';
-import apiService, { Listing } from '../services/api';
+import apiService, { Listing, Comment } from '../services/api';
 import ContactSellerDialog from '../components/ContactSellerDialog';
 import { Painting } from '../types';
 
@@ -39,7 +51,7 @@ const PaintingDetail: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { openChat } = useChat();
   const { enqueueSnackbar } = useSnackbar();
-  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string; userId?: number }) | null>(null);
+  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string; userId?: number; allow_comments?: boolean }) | null>(null);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -48,6 +60,12 @@ const PaintingDetail: React.FC = () => {
   const [likeCount, setLikeCount] = useState(0);
   const [liking, setLiking] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -59,7 +77,7 @@ const PaintingDetail: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string } => {
+  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string; userId?: number; allow_comments?: boolean } => {
     return {
       id: listing.id,
       title: listing.title,
@@ -81,7 +99,19 @@ const PaintingDetail: React.FC = () => {
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
       artistEmail: (listing as any).artist_email,
+      allow_comments: listing.allow_comments !== false && listing.allow_comments !== 0,
     };
+  };
+
+  const fetchComments = async (listingId: number) => {
+    setLoadingComments(true);
+    try {
+      const response = await apiService.getListingComments(listingId);
+      setComments(response.comments);
+    } catch (error: any) {
+    } finally {
+      setLoadingComments(false);
+    }
   };
 
   useEffect(() => {
@@ -118,8 +148,15 @@ const PaintingDetail: React.FC = () => {
               ? `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/listings/${listingId}?cognitoUsername=${user.id}`
               : `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/listings/${listingId}`;
             const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to fetch listing');
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+              throw new Error(errorData.error || `Failed to fetch listing: ${response.status}`);
+            }
             const listing: Listing = await response.json();
+            
+            if (!listing || !listing.id) {
+              throw new Error('Invalid listing data received');
+            }
             
             const convertedPainting = convertListingToPainting(listing);
             setPainting(convertedPainting);
@@ -154,19 +191,15 @@ const PaintingDetail: React.FC = () => {
                     }
                   }
                 });
-                console.log('Image URLs is array:', imageUrlsArray);
               } else if (typeof listing.image_urls === 'string') {
                 const imageUrlsStr = listing.image_urls.trim();
-                console.log('Image URLs string:', imageUrlsStr);
                 
                 if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
                   try {
                     const parsed = JSON.parse(imageUrlsStr);
-                    console.log('Parsed JSON:', parsed);
                     if (Array.isArray(parsed)) {
                       if (parsed.length === 1 && typeof parsed[0] === 'string' && parsed[0].includes(',')) {
                         imageUrlsArray = parsed[0].split(',').map(url => url.trim()).filter(url => url);
-                        console.log('Split comma-separated:', imageUrlsArray);
                       } else {
                         imageUrlsArray = parsed.filter((url: any) => url && typeof url === 'string');
                       }
@@ -174,7 +207,6 @@ const PaintingDetail: React.FC = () => {
                       imageUrlsArray = parsed.split(',').map(url => url.trim()).filter(url => url);
                     }
                   } catch (e) {
-                    console.error('JSON parse error:', e);
                     if (imageUrlsStr.includes(',')) {
                       imageUrlsArray = imageUrlsStr.split(',').map(url => url.trim()).filter(url => url);
                     } else {
@@ -183,13 +215,10 @@ const PaintingDetail: React.FC = () => {
                   }
                 } else if (imageUrlsStr.includes(',')) {
                   imageUrlsArray = imageUrlsStr.split(',').map(url => url.trim()).filter(url => url);
-                  console.log('Split by comma:', imageUrlsArray);
                 } else {
                   imageUrlsArray = [imageUrlsStr];
                 }
               }
-              
-              console.log('Final imageUrlsArray:', imageUrlsArray);
               
               imageUrlsArray.forEach(url => {
                 if (url && typeof url === 'string' && url.trim()) {
@@ -197,31 +226,27 @@ const PaintingDetail: React.FC = () => {
                 }
               });
             }
-            
-            console.log('Final images array:', images);
             setAllImages(images.length > 0 ? images : [convertedPainting.image || '']);
             setCurrentImageIndex(0);
             setLoading(false);
+            
+            if (listing.allow_comments !== false && listing.allow_comments !== 0) {
+              fetchComments(listingId);
+            }
             return;
           } catch (apiError: any) {
-            // If API fails, fall back to mock data
-            console.error('API fetch failed, trying mock data:', apiError);
-            console.error('Error details:', apiError.message, apiError.stack);
+            const errorMessage = apiError?.message || 'Failed to load listing. Please try again.';
+            setError(errorMessage);
+            setLoading(false);
+            return;
           }
         }
 
-        // Fallback to mock data
-        const mockPainting = artworks.find(p => p.id === parseInt(id));
-        if (mockPainting) {
-          setPainting(mockPainting);
-          setAllImages([mockPainting.image]);
-          setCurrentImageIndex(0);
-        } else {
-          setError('Painting not found');
-        }
+        setError('Invalid listing ID');
+        setLoading(false);
       } catch (err: any) {
         console.error('Error in fetchPainting:', err);
-        setError(err.message || 'Failed to load painting');
+        setError(err.message || 'Failed to load listing');
         setLoading(false);
       }
     };
@@ -329,6 +354,48 @@ const PaintingDetail: React.FC = () => {
       enqueueSnackbar('Failed to update like', { variant: 'error' });
     } finally {
       setLiking(false);
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!isAuthenticated || !user?.id) {
+      enqueueSnackbar('Please sign in to comment', { variant: 'info' });
+      return;
+    }
+
+    if (!newComment.trim() || !painting) return;
+
+    setSubmittingComment(true);
+    try {
+      const response = await apiService.createComment(painting.id, user.id, newComment.trim());
+      setComments([...comments, response.comment]);
+      setNewComment('');
+      enqueueSnackbar('Comment posted successfully', { variant: 'success' });
+    } catch (error: any) {
+      console.error('Error posting comment:', error);
+      let errorMessage = 'Failed to post comment';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      enqueueSnackbar(errorMessage, { variant: 'error' });
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!user?.id) return;
+
+    try {
+      await apiService.deleteComment(commentId, user.id);
+      setComments(comments.filter(c => c.id !== commentId));
+      enqueueSnackbar('Comment deleted', { variant: 'success' });
+      setDeleteDialogOpen(false);
+      setCommentToDelete(null);
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to delete comment', { variant: 'error' });
     }
   };
 
@@ -698,6 +765,134 @@ const PaintingDetail: React.FC = () => {
           artistEmail={painting.artistEmail}
           listingId={painting.id}
         />
+
+        <Box sx={{ mt: 6 }}>
+          <Divider sx={{ mb: 4 }} />
+          <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 600 }}>
+            Comments
+          </Typography>
+
+          {painting.allow_comments === true ? (
+            <>
+              <Alert severity="info" sx={{ mb: 3 }}>
+                <Typography variant="body2">
+                  <strong>Please be courteous:</strong> Comments are monitored and inappropriate content will be deleted.
+                </Typography>
+              </Alert>
+
+              {isAuthenticated && (
+                <Paper sx={{ p: 2, mb: 3 }}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={3}
+                    placeholder="Write a comment..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    sx={{ mb: 2 }}
+                  />
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                      variant="contained"
+                      onClick={handleSubmitComment}
+                      disabled={!newComment.trim() || submittingComment}
+                      startIcon={<CommentIcon />}
+                    >
+                      {submittingComment ? 'Posting...' : 'Post Comment'}
+                    </Button>
+                  </Box>
+                </Paper>
+              )}
+
+              {!isAuthenticated && (
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  Please sign in to leave a comment.
+                </Alert>
+              )}
+
+              {loadingComments ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : comments.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                  No comments yet. Be the first to comment!
+                </Typography>
+              ) : (
+                <List>
+                  {comments.map((comment) => (
+                    <ListItem
+                      key={comment.id}
+                      sx={{
+                        bgcolor: 'background.paper',
+                        mb: 1,
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    >
+                      <ListItemAvatar>
+                        <Avatar src={comment.profile_image_url}>
+                          {comment.user_name.charAt(0).toUpperCase()}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="subtitle2" fontWeight={600}>
+                              {comment.user_name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(comment.created_at).toLocaleDateString()}
+                            </Typography>
+                          </Box>
+                        }
+                        secondary={
+                          <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>
+                            {comment.comment}
+                          </Typography>
+                        }
+                      />
+                      {(user?.id === comment.cognito_username || painting.userId === user?.id) && (
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setCommentToDelete(comment.id);
+                            setDeleteDialogOpen(true);
+                          }}
+                          sx={{ ml: 1 }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </>
+          ) : (
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Comments are disabled for this listing.
+            </Alert>
+          )}
+        </Box>
+
+        <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+          <DialogTitle>Delete Comment</DialogTitle>
+          <DialogContent>
+            <Typography>Are you sure you want to delete this comment? This action cannot be undone.</Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => commentToDelete && handleDeleteComment(commentToDelete)}
+              color="error"
+              variant="contained"
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </Box>
   );
