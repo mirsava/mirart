@@ -35,6 +35,7 @@ import {
   Chat as ChatIcon,
   Comment as CommentIcon,
   Delete as DeleteIcon,
+  Reply as ReplyIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
@@ -64,7 +65,10 @@ const PaintingDetail: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState<{ [key: number]: string }>({});
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [submittingReply, setSubmittingReply] = useState<number | null>(null);
   const [loadingComments, setLoadingComments] = useState(false);
 
   const getImageUrl = (url?: string): string => {
@@ -102,11 +106,36 @@ const PaintingDetail: React.FC = () => {
     };
   };
 
+  const organizeComments = (comments: Comment[]): Comment[] => {
+    const commentMap = new Map<number, Comment>();
+    const rootComments: Comment[] = [];
+
+    comments.forEach(comment => {
+      comment.replies = [];
+      commentMap.set(comment.id, comment);
+    });
+
+    comments.forEach(comment => {
+      if (comment.parent_comment_id) {
+        const parent = commentMap.get(comment.parent_comment_id);
+        if (parent) {
+          if (!parent.replies) parent.replies = [];
+          parent.replies.push(comment);
+        }
+      } else {
+        rootComments.push(comment);
+      }
+    });
+
+    return rootComments;
+  };
+
   const fetchComments = async (listingId: number) => {
     setLoadingComments(true);
     try {
       const response = await apiService.getListingComments(listingId);
-      setComments(response.comments);
+      const organized = organizeComments(response.comments);
+      setComments(organized);
     } catch (error: any) {
     } finally {
       setLoadingComments(false);
@@ -356,20 +385,43 @@ const PaintingDetail: React.FC = () => {
     }
   };
 
-  const handleSubmitComment = async () => {
+  const handleSubmitComment = async (parentCommentId?: number) => {
     if (!isAuthenticated || !user?.id) {
       enqueueSnackbar('Please sign in to comment', { variant: 'info' });
       return;
     }
 
-    if (!newComment.trim() || !painting) return;
+    const commentText = parentCommentId ? replyText[parentCommentId] : newComment;
+    if (!commentText?.trim() || !painting) return;
 
-    setSubmittingComment(true);
+    if (parentCommentId) {
+      setSubmittingReply(parentCommentId);
+    } else {
+      setSubmittingComment(true);
+    }
+
     try {
-      const response = await apiService.createComment(painting.id, user.id, newComment.trim());
-      setComments([...comments, response.comment]);
-      setNewComment('');
-      enqueueSnackbar('Comment posted successfully', { variant: 'success' });
+      const response = await apiService.createComment(painting.id, user.id, commentText.trim(), parentCommentId);
+      
+      if (parentCommentId) {
+        const updatedComments = comments.map(comment => {
+          if (comment.id === parentCommentId) {
+            return {
+              ...comment,
+              replies: [...(comment.replies || []), response.comment],
+            };
+          }
+          return comment;
+        });
+        setComments(updatedComments);
+        setReplyText({ ...replyText, [parentCommentId]: '' });
+        setReplyingTo(null);
+        enqueueSnackbar('Reply posted successfully', { variant: 'success' });
+      } else {
+        setComments([...comments, response.comment]);
+        setNewComment('');
+        enqueueSnackbar('Comment posted successfully', { variant: 'success' });
+      }
     } catch (error: any) {
       console.error('Error posting comment:', error);
       let errorMessage = 'Failed to post comment';
@@ -380,7 +432,11 @@ const PaintingDetail: React.FC = () => {
       }
       enqueueSnackbar(errorMessage, { variant: 'error' });
     } finally {
-      setSubmittingComment(false);
+      if (parentCommentId) {
+        setSubmittingReply(null);
+      } else {
+        setSubmittingComment(false);
+      }
     }
   };
 
@@ -792,7 +848,7 @@ const PaintingDetail: React.FC = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
                       variant="contained"
-                      onClick={handleSubmitComment}
+                      onClick={() => handleSubmitComment()}
                       disabled={!newComment.trim() || submittingComment}
                       startIcon={<CommentIcon />}
                     >
@@ -819,51 +875,135 @@ const PaintingDetail: React.FC = () => {
               ) : (
                 <List>
                   {comments.map((comment) => (
-                    <ListItem
-                      key={comment.id}
-                      sx={{
-                        bgcolor: 'background.paper',
-                        mb: 1,
-                        borderRadius: 1,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                      }}
-                    >
-                      <ListItemAvatar>
-                        <Avatar src={comment.profile_image_url}>
-                          {comment.user_name.charAt(0).toUpperCase()}
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle2" fontWeight={600}>
-                              {comment.user_name}
+                    <Box key={comment.id}>
+                      <ListItem
+                        sx={{
+                          bgcolor: 'background.paper',
+                          mb: 1,
+                          borderRadius: 1,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          px: 2,
+                          py: 2,
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', width: '100%', alignItems: 'flex-start', gap: 2 }}>
+                          <ListItemAvatar>
+                            <Avatar src={comment.profile_image_url}>
+                              {comment.user_name.charAt(0).toUpperCase()}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <Box sx={{ flex: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                              <Typography variant="subtitle2" fontWeight={600}>
+                                {comment.user_name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {new Date(comment.created_at).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                            <Typography variant="body2" sx={{ mb: 1, whiteSpace: 'pre-wrap' }}>
+                              {comment.comment}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {new Date(comment.created_at).toLocaleDateString()}
-                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                              {isAuthenticated && (
+                                <Button
+                                  size="small"
+                                  startIcon={<ReplyIcon />}
+                                  onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                                  sx={{ textTransform: 'none' }}
+                                >
+                                  Reply
+                                </Button>
+                              )}
+                              {(user?.id === comment.cognito_username || painting.userId === user?.id) && (
+                                <IconButton
+                                  size="small"
+                                  onClick={() => {
+                                    setCommentToDelete(comment.id);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              )}
+                            </Box>
+                            {replyingTo === comment.id && isAuthenticated && (
+                              <Box sx={{ mt: 2, ml: 4, pl: 2, borderLeft: '2px solid', borderColor: 'divider' }}>
+                                <TextField
+                                  fullWidth
+                                  multiline
+                                  rows={2}
+                                  placeholder={`Reply to ${comment.user_name}...`}
+                                  value={replyText[comment.id] || ''}
+                                  onChange={(e) => setReplyText({ ...replyText, [comment.id]: e.target.value })}
+                                  sx={{ mb: 1 }}
+                                />
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    onClick={() => handleSubmitComment(comment.id)}
+                                    disabled={!replyText[comment.id]?.trim() || submittingReply === comment.id}
+                                  >
+                                    {submittingReply === comment.id ? 'Posting...' : 'Post Reply'}
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    onClick={() => {
+                                      setReplyingTo(null);
+                                      setReplyText({ ...replyText, [comment.id]: '' });
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </Box>
+                              </Box>
+                            )}
                           </Box>
-                        }
-                        secondary={
-                          <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>
-                            {comment.comment}
-                          </Typography>
-                        }
-                      />
-                      {(user?.id === comment.cognito_username || painting.userId === user?.id) && (
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setCommentToDelete(comment.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                          sx={{ ml: 1 }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      )}
-                    </ListItem>
+                        </Box>
+                        {comment.replies && comment.replies.length > 0 && (
+                          <Box sx={{ width: '100%', mt: 2, ml: 6, pl: 2, borderLeft: '2px solid', borderColor: 'divider' }}>
+                            {comment.replies.map((reply) => (
+                              <Box key={reply.id} sx={{ mb: 2 }}>
+                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                                  <Avatar sx={{ width: 32, height: 32 }} src={reply.profile_image_url}>
+                                    {reply.user_name.charAt(0).toUpperCase()}
+                                  </Avatar>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                      <Typography variant="subtitle2" fontWeight={600} fontSize="0.875rem">
+                                        {reply.user_name}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                                        {new Date(reply.created_at).toLocaleDateString()}
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
+                                      {reply.comment}
+                                    </Typography>
+                                    {(user?.id === reply.cognito_username || painting.userId === user?.id) && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setCommentToDelete(reply.id);
+                                          setDeleteDialogOpen(true);
+                                        }}
+                                        sx={{ mt: 0.5 }}
+                                      >
+                                        <DeleteIcon fontSize="small" />
+                                      </IconButton>
+                                    )}
+                                  </Box>
+                                </Box>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                      </ListItem>
+                    </Box>
                   ))}
                 </List>
               )}

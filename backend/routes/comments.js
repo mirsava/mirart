@@ -13,10 +13,10 @@ router.get('/listing/:listingId', async (req, res) => {
         c.listing_id,
         c.user_id,
         c.comment,
+        c.parent_comment_id,
         c.created_at,
         c.updated_at,
         u.cognito_username,
-        u.email,
         COALESCE(
           u.business_name,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
@@ -40,7 +40,7 @@ router.get('/listing/:listingId', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { listingId, cognitoUsername, comment } = req.body;
+    const { listingId, cognitoUsername, comment, parentCommentId } = req.body;
 
     if (!listingId || !cognitoUsername || !comment || !comment.trim()) {
       return res.status(400).json({ error: 'listingId, cognitoUsername, and comment are required' });
@@ -70,9 +70,26 @@ router.post('/', async (req, res) => {
       return res.status(403).json({ error: 'Comments are disabled for this listing' });
     }
 
+    let parentId = null;
+    if (parentCommentId) {
+      parentId = parseInt(parentCommentId);
+      if (isNaN(parentId)) {
+        return res.status(400).json({ error: 'Invalid parent comment ID' });
+      }
+      const [parentComments] = await pool.execute(
+        'SELECT listing_id FROM listing_comments WHERE id = ?',
+        [parentId]
+      );
+      if (parentComments.length === 0) {
+        return res.status(404).json({ error: 'Parent comment not found' });
+      }
+      if (parentComments[0].listing_id !== parseInt(listingId)) {
+        return res.status(400).json({ error: 'Parent comment does not belong to this listing' });
+      }
+    }
     const [result] = await pool.execute(
-      'INSERT INTO listing_comments (listing_id, user_id, comment) VALUES (?, ?, ?)',
-      [listingId, userId, comment.trim()]
+      'INSERT INTO listing_comments (listing_id, user_id, comment, parent_comment_id) VALUES (?, ?, ?, ?)',
+      [parseInt(listingId), userId, comment.trim(), parentId]
     );
 
     const [newComment] = await pool.execute(
@@ -81,10 +98,10 @@ router.post('/', async (req, res) => {
         c.listing_id,
         c.user_id,
         c.comment,
+        c.parent_comment_id,
         c.created_at,
         c.updated_at,
         u.cognito_username,
-        u.email,
         COALESCE(
           u.business_name,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
@@ -100,6 +117,12 @@ router.post('/', async (req, res) => {
     res.status(201).json({ comment: newComment[0] });
   } catch (error) {
     console.error('Error creating comment:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage
+    });
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });

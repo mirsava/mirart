@@ -308,10 +308,10 @@ class ApiService {
     return this.request<{ comments: Comment[] }>(`/comments/listing/${listingId}`);
   }
 
-  async createComment(listingId: number, cognitoUsername: string, comment: string): Promise<{ comment: Comment }> {
+  async createComment(listingId: number, cognitoUsername: string, comment: string, parentCommentId?: number): Promise<{ comment: Comment }> {
     return this.request<{ comment: Comment }>(`/comments`, {
       method: 'POST',
-      body: JSON.stringify({ listingId, cognitoUsername, comment }),
+      body: JSON.stringify({ listingId, cognitoUsername, comment, parentCommentId }),
     });
   }
 
@@ -420,12 +420,13 @@ export interface Comment {
   listing_id: number;
   user_id: number;
   comment: string;
+  parent_comment_id?: number | null;
   created_at: string;
   updated_at: string;
   cognito_username: string;
-  email: string;
   user_name: string;
   profile_image_url?: string;
+  replies?: Comment[];
 }
 
 export interface Message {
