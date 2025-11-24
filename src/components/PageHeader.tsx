@@ -20,20 +20,22 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const defaultGradient = 'linear-gradient(135deg, rgba(25, 118, 210, 0.12) 0%, rgba(156, 39, 176, 0.12) 50%, rgba(83, 75, 174, 0.12) 100%)';
+  const defaultGradient = 'linear-gradient(135deg, rgba(25, 118, 210, 0.04) 0%, rgba(156, 39, 176, 0.04) 50%, rgba(83, 75, 174, 0.04) 100%)';
 
   return (
-    <Container maxWidth="lg" sx={{ mb: { xs: 4, md: 6 }, mt: { xs: 2, md: 3 }, ...sx }}>
+    <Box sx={{ mb: { xs: 4, md: 6 }, width: '100%', ...sx }}>
       <Fade in={true} timeout={800}>
         <Paper
           elevation={0}
           sx={{
             position: 'relative',
             overflow: 'hidden',
+            width: '100%',
             p: { xs: 4, sm: 5, md: 6 },
             background: backgroundGradient || defaultGradient,
-            borderRadius: 4,
-            border: '1px solid',
+            borderRadius: 0,
+            border: 'none',
+            borderBottom: '1px solid',
             borderColor: 'divider',
             textAlign: 'center',
             '&::before': {
@@ -43,7 +45,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'radial-gradient(circle at 20% 50%, rgba(25, 118, 210, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(156, 39, 176, 0.15) 0%, transparent 50%)',
+              background: 'radial-gradient(circle at 20% 50%, rgba(25, 118, 210, 0.05) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(156, 39, 176, 0.05) 0%, transparent 50%)',
               pointerEvents: 'none',
             },
             '&::after': {
@@ -53,7 +55,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
               left: '-50%',
               width: '200%',
               height: '200%',
-              background: 'radial-gradient(circle, rgba(83, 75, 174, 0.08) 0%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(83, 75, 174, 0.03) 0%, transparent 70%)',
               animation: 'pulse 8s ease-in-out infinite',
               pointerEvents: 'none',
             },
@@ -78,10 +80,10 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                     mb: 3,
                     p: 2,
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.1) 0%, rgba(156, 39, 176, 0.1) 100%)',
-                    border: '2px solid',
+                    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(156, 39, 176, 0.05) 100%)',
+                    border: '1px solid',
                     borderColor: 'primary.main',
-                    borderOpacity: 0.3,
+                    borderOpacity: 0.2,
                     transform: 'rotate(-5deg)',
                     transition: 'transform 0.3s ease',
                     '&:hover': {
@@ -148,7 +150,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
           </Box>
         </Paper>
       </Fade>
-    </Container>
+    </Box>
   );
 };
 

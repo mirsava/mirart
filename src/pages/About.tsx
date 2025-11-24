@@ -36,14 +36,14 @@ const About: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ py: 8, bgcolor: 'background.default' }}>
-      <Container maxWidth="lg">
-        <PageHeader
-          title="About Our Marketplace"
-          subtitle="ArtZyla is a vibrant marketplace connecting talented artists with art lovers worldwide. We empower artists to sell their work through flexible pricing options while providing buyers with access to authentic, handmade art from independent creators."
-          icon={<PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
-        />
+    <Box sx={{ bgcolor: 'background.default' }}>
+      <PageHeader
+        title="About Our Marketplace"
+        subtitle="ArtZyla is a vibrant marketplace connecting talented artists with art lovers worldwide. We empower artists to sell their work through flexible pricing options while providing buyers with access to authentic, handmade art from independent creators."
+        icon={<PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
+      />
 
+      <Container maxWidth="lg">
         <Grid container spacing={6} sx={{ mb: 8 }}>
           <Grid item xs={12} md={6}>
             <Paper

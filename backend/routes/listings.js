@@ -531,6 +531,10 @@ router.post('/:id/activate', async (req, res) => {
       return res.status(400).json({ error: 'cognito_username is required' });
     }
 
+    if (!payment_intent_id) {
+      return res.status(400).json({ error: 'payment_intent_id is required. Payment must be completed before activation.' });
+    }
+
     // Get listing and verify ownership
     const [listings] = await pool.execute(
       `SELECT l.*, u.id as user_id, u.cognito_username 

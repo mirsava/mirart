@@ -248,19 +248,19 @@ const Gallery: React.FC = () => {
   };
 
   return (
-    <Box sx={{ py: 4, bgcolor: 'background.default' }}>
-      <Container maxWidth="lg">
-        <PageHeader
-          title="Art Gallery"
-          subtitle="Explore our curated collection of original paintings and handcrafted woodworking pieces from talented artists around the world."
-          icon={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-              <BrushIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-            </Box>
-          }
-        />
+    <Box sx={{ bgcolor: 'background.default' }}>
+      <PageHeader
+        title="Art Gallery"
+        subtitle="Explore our curated collection of original paintings and handcrafted woodworking pieces from talented artists around the world."
+        icon={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+            <BrushIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+          </Box>
+        }
+      />
 
+      <Container maxWidth="lg">
         <Box sx={{ mb: 4 }}>
           <Grid container spacing={3} alignItems="center">
             <Grid item xs={12} md={6}>

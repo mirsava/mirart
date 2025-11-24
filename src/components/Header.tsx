@@ -33,11 +33,13 @@ import {
   Notifications as NotificationsIcon,
   AdminPanelSettings as AdminIcon,
   Chat as ChatIcon,
+  ShoppingCart as ShoppingCartIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
+import { useCart } from '../contexts/CartContext';
 import apiService from '../services/api';
 import { UserRole } from '../types/userRoles';
 import logo from '../assets/images/logo.png';
@@ -49,6 +51,7 @@ const Header: React.FC = () => {
   const { isDarkMode, toggleTheme } = useCustomTheme();
   const { user, signOut, isAuthenticated, refreshUser } = useAuth();
   const { openChat } = useChat();
+  const { getTotalItems } = useCart();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
@@ -620,10 +623,33 @@ const Header: React.FC = () => {
                 </>
               ) : null}
               
+              <IconButton
+                onClick={() => navigate('/cart')}
+                sx={{ 
+                  color: isDarkMode ? 'white' : 'text.primary',
+                  bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
+                  '&:hover': {
+                    bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
+                  },
+                }}
+              >
+                <Badge 
+                  badgeContent={getTotalItems()} 
+                  color="primary"
+                  sx={{
+                    '& .MuiBadge-badge': {
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                      fontWeight: 600,
+                    },
+                  }}
+                >
+                  <ShoppingCartIcon />
+                </Badge>
+              </IconButton>
               {isAuthenticated && (
                 <IconButton
                   onClick={() => {
-                    // Refresh unread count when clicking notification bell
                     const fetchUnreadCount = async (): Promise<void> => {
                       if (!isAuthenticated || !user?.id) {
                         setUnreadCount(0);

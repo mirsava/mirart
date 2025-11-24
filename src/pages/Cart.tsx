@@ -86,12 +86,20 @@ const Cart: React.FC = () => {
                           <Typography variant="h6" component="h2">
                             {item.title}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            by {item.artist}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {item.dimensions} • {item.medium}
-                          </Typography>
+                          {item.type === 'activation' ? (
+                            <Typography variant="body2" color="primary" sx={{ fontWeight: 500 }}>
+                              Listing Activation Fee
+                            </Typography>
+                          ) : (
+                            <>
+                              <Typography variant="body2" color="text.secondary">
+                                by {item.artist}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {item.dimensions} • {item.medium}
+                              </Typography>
+                            </>
+                          )}
                         </Box>
                         <IconButton
                           color="error"
@@ -103,33 +111,41 @@ const Cart: React.FC = () => {
                       </Box>
 
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                          >
-                            <RemoveIcon />
-                          </IconButton>
-                          <TextField
-                            size="small"
-                            value={item.quantity}
-                            onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
-                            inputProps={{
-                              min: 1,
-                              style: { textAlign: 'center', width: 60 },
-                            }}
-                            type="number"
-                          />
-                          <IconButton
-                            size="small"
-                            onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                          >
-                            <AddIcon />
-                          </IconButton>
-                        </Box>
-                        <Typography variant="h6" color="primary">
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </Typography>
+                        {item.type === 'activation' ? (
+                          <Typography variant="h6" color="primary">
+                            ${((item.price || 0) * item.quantity).toFixed(2)}
+                          </Typography>
+                        ) : (
+                          <>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                              >
+                                <RemoveIcon />
+                              </IconButton>
+                              <TextField
+                                size="small"
+                                value={item.quantity}
+                                onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 1)}
+                                inputProps={{
+                                  min: 1,
+                                  style: { textAlign: 'center', width: 60 },
+                                }}
+                                type="number"
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                              >
+                                <AddIcon />
+                              </IconButton>
+                            </Box>
+                            <Typography variant="h6" color="primary">
+                              ${((item.price || 0) * item.quantity).toFixed(2)}
+                            </Typography>
+                          </>
+                        )}
                       </Box>
                     </CardContent>
                   </Card>

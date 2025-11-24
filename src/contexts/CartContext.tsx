@@ -25,22 +25,25 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     localStorage.setItem('cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  const addToCart = (painting: Artwork): void => {
-    // Check if item is in stock
-    if (!painting.inStock) {
-      throw new Error('This item is no longer available.');
+  const addToCart = (painting: Artwork, type: 'artwork' | 'activation' = 'artwork', listingId?: number): void => {
+    if (type === 'artwork') {
+      if (!painting.inStock) {
+        throw new Error('This item is no longer available.');
+      }
     }
     
     setCartItems(prev => {
-      const existingItem = prev.find(item => item.id === painting.id);
+      const existingItem = prev.find(item => 
+        item.id === painting.id && item.type === type
+      );
       if (existingItem) {
         return prev.map(item =>
-          item.id === painting.id
+          item.id === painting.id && item.type === type
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { ...painting, quantity: 1 }];
+      return [...prev, { ...painting, quantity: 1, type, listingId }];
     });
   };
 

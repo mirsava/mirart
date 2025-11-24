@@ -61,14 +61,14 @@ const Contact: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ py: 8, bgcolor: 'background.default' }}>
-      <Container maxWidth="lg">
-        <PageHeader
-          title="Contact Us"
-          subtitle="Have questions about our paintings or need assistance? We're here to help! Reach out to us through any of the channels below."
-          icon={<EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
-        />
+    <Box sx={{ bgcolor: 'background.default' }}>
+      <PageHeader
+        title="Contact Us"
+        subtitle="Have questions about our paintings or need assistance? We're here to help! Reach out to us through any of the channels below."
+        icon={<EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
+      />
 
+      <Container maxWidth="lg">
         <Grid container spacing={6}>
           <Grid item xs={12} md={8}>
             <Paper sx={{ p: 4 }}>

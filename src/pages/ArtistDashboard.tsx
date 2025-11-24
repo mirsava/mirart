@@ -37,6 +37,7 @@ import {
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User } from '../services/api';
@@ -687,19 +688,27 @@ const ArtistDashboard: React.FC = () => {
                             color="primary"
                             fullWidth
                             size="small"
-                            onClick={async (e) => {
+                            onClick={(e) => {
                               e.stopPropagation();
                               if (!user?.id) return;
                               
-                              try {
-                                // In a real implementation, this would process payment first
-                                // For now, we'll activate directly (payment processing would happen before this)
-                                await apiService.activateListing(listing.id, user.id);
-                                enqueueSnackbar('Listing activated successfully!', { variant: 'success' });
-                                await fetchDashboardData();
-                              } catch (err: any) {
-                                enqueueSnackbar(err.message || 'Failed to activate listing', { variant: 'error' });
-                              }
+                              const activationItem = {
+                                id: listing.id,
+                                title: `Activate: ${listing.title}`,
+                                artist: user.name || 'You',
+                                price: 10,
+                                image: listing.primary_image_url || '',
+                                description: `Listing activation fee for: ${listing.title}`,
+                                category: listing.category as 'Painting' | 'Woodworking',
+                                subcategory: listing.subcategory || '',
+                                dimensions: listing.dimensions || '',
+                                medium: listing.medium || '',
+                                year: listing.year || new Date().getFullYear(),
+                                inStock: true,
+                              };
+                              
+                              addToCart(activationItem, 'activation', listing.id);
+                              enqueueSnackbar('Added to cart. Proceed to checkout to activate.', { variant: 'success' });
                             }}
                             sx={{ mb: 1 }}
                           >

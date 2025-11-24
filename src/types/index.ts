@@ -29,6 +29,8 @@ export interface Woodworking extends Artwork {
 
 export interface CartItem extends Artwork {
   quantity: number;
+  type?: 'artwork' | 'activation';
+  listingId?: number;
 }
 
 export interface ThemeContextType {
@@ -39,7 +41,7 @@ export interface ThemeContextType {
 
 export interface CartContextType {
   cartItems: CartItem[];
-  addToCart: (painting: Artwork) => void;
+  addToCart: (painting: Artwork, type?: 'artwork' | 'activation', listingId?: number) => void;
   removeFromCart: (id: number) => void;
   updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
