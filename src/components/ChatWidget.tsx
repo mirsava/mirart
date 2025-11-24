@@ -517,7 +517,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
                       </ListItemAvatar>
                       <ListItemText
                         primary={getUserDisplayName(resultUser)}
-                        secondary={resultUser.email}
+                        secondary={`@${resultUser.cognito_username}`}
                         primaryTypographyProps={{
                           variant: 'body2',
                           fontWeight: 500,

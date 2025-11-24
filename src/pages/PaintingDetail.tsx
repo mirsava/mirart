@@ -51,7 +51,7 @@ const PaintingDetail: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { openChat } = useChat();
   const { enqueueSnackbar } = useSnackbar();
-  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string; userId?: number; allow_comments?: boolean }) | null>(null);
+  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean }) | null>(null);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -77,7 +77,7 @@ const PaintingDetail: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; artistEmail?: string; userId?: number; allow_comments?: boolean } => {
+  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean } => {
     return {
       id: listing.id,
       title: listing.title,
@@ -98,7 +98,6 @@ const PaintingDetail: React.FC = () => {
       returns_info: listing.returns_info,
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
-      artistEmail: (listing as any).artist_email,
       allow_comments: listing.allow_comments !== false && listing.allow_comments !== 0,
     };
   };
@@ -762,7 +761,6 @@ const PaintingDetail: React.FC = () => {
           onClose={() => setContactDialogOpen(false)}
           listingTitle={painting.title}
           artistName={painting.artist}
-          artistEmail={painting.artistEmail}
           listingId={painting.id}
         />
 

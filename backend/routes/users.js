@@ -19,7 +19,6 @@ router.get('/search', async (req, res) => {
       `SELECT 
         id,
         cognito_username,
-        email,
         first_name,
         last_name,
         business_name,
@@ -55,6 +54,7 @@ router.get('/search', async (req, res) => {
 router.get('/:cognitoUsername', async (req, res) => {
   try {
     const { cognitoUsername } = req.params;
+    const { requestingUser } = req.query;
     
     const [rows] = await pool.execute(
       'SELECT * FROM users WHERE cognito_username = ?',
@@ -65,7 +65,14 @@ router.get('/:cognitoUsername', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json(rows[0]);
+    const user = rows[0];
+    
+    if (requestingUser && requestingUser === cognitoUsername) {
+      res.json(user);
+    } else {
+      const { email, ...userWithoutEmail } = user;
+      res.json(userWithoutEmail);
+    }
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Internal server error' });

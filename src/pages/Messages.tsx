@@ -378,8 +378,8 @@ const Messages: React.FC = () => {
                           }}
                         >
                           {tabValue === 1
-                            ? message.recipient_name || message.recipient_email
-                            : message.sender_name_display || message.sender_name || message.sender_email}
+                            ? message.recipient_name || `@${message.recipient_id}`
+                            : message.sender_name_display || message.sender_name || `@${message.sender_id}`}
                         </Typography>
                         {message.status === 'sent' && (tabValue === 0 || tabValue === 2) && (
                           <Chip 
@@ -486,11 +486,13 @@ const Messages: React.FC = () => {
                     </Typography>
                     <Typography variant="body1">
                       {tabValue === 1
-                        ? selectedMessage.recipient_name || selectedMessage.recipient_email
-                        : selectedMessage.sender_name_display || selectedMessage.sender_name || selectedMessage.sender_email}
+                        ? selectedMessage.recipient_name || `@${selectedMessage.recipient_id}`
+                        : selectedMessage.sender_name_display || selectedMessage.sender_name || `@${selectedMessage.sender_id}`}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {tabValue === 1 ? selectedMessage.recipient_email : selectedMessage.sender_email}
+                      {tabValue === 1 
+                        ? selectedMessage.recipient_email_display || `user${selectedMessage.recipient_id}@artzyla.com`
+                        : selectedMessage.sender_email_display || `user${selectedMessage.sender_id}@artzyla.com`}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6}>
@@ -579,7 +581,7 @@ const Messages: React.FC = () => {
           <DialogTitle>Reply to Message</DialogTitle>
           <DialogContent>
             <DialogContentText sx={{ mb: 2 }}>
-              Replying to: <strong>{selectedMessage?.sender_name_display || selectedMessage?.sender_email}</strong>
+              Replying to: <strong>{selectedMessage?.sender_name_display || selectedMessage?.sender_name || `@${selectedMessage?.sender_id}`}</strong>
             </DialogContentText>
             <TextField
               fullWidth

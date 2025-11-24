@@ -22,7 +22,6 @@ interface ContactSellerDialogProps {
   onClose: () => void;
   listingTitle: string;
   artistName: string;
-  artistEmail?: string;
   listingId: number;
 }
 
@@ -37,7 +36,6 @@ const ContactSellerDialog: React.FC<ContactSellerDialogProps> = ({
   onClose,
   listingTitle,
   artistName,
-  artistEmail,
   listingId,
 }) => {
   const { user } = useAuth();
@@ -145,11 +143,6 @@ const ContactSellerDialog: React.FC<ContactSellerDialogProps> = ({
           </Typography>
         </Box>
 
-        {!artistEmail && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            Seller contact information is not available. Please visit the artist's profile for contact details.
-          </Alert>
-        )}
 
         <TextField
           fullWidth
@@ -206,7 +199,7 @@ const ContactSellerDialog: React.FC<ContactSellerDialogProps> = ({
           onClick={handleSubmit}
           variant="contained"
           startIcon={loading ? <CircularProgress size={20} /> : <SendIcon />}
-          disabled={loading || !artistEmail || !buyerEmail.trim()}
+          disabled={loading || !buyerEmail.trim()}
         >
           {loading ? 'Sending...' : 'Send Message'}
         </Button>

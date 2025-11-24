@@ -16,7 +16,6 @@ import {
   CardContent,
   Button,
   Pagination,
-  Paper,
 } from '@mui/material';
 import { Search as SearchIcon, Add as AddIcon, Palette as PaletteIcon, Brush as BrushIcon } from '@mui/icons-material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -24,6 +23,7 @@ import PaintingCard from '../components/PaintingCard';
 import apiService, { Listing } from '../services/api';
 import { Artwork } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import PageHeader from '../components/PageHeader';
 
 const Gallery: React.FC = () => {
   const navigate = useNavigate();
@@ -50,7 +50,7 @@ const Gallery: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Artwork & { artistEmail?: string } => {
+  const convertListingToPainting = (listing: Listing): Artwork => {
     return {
       id: listing.id,
       title: listing.title,
@@ -68,7 +68,6 @@ const Gallery: React.FC = () => {
       inStock: listing.in_stock,
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
-      artistEmail: (listing as any).artist_email,
     };
   };
 
@@ -251,78 +250,16 @@ const Gallery: React.FC = () => {
   return (
     <Box sx={{ py: 4, bgcolor: 'background.default' }}>
       <Container maxWidth="lg">
-        {/* Header Section */}
-        <Paper
-          elevation={0}
-          sx={{
-            mb: 6,
-            mt: 3,
-            p: { xs: 3, sm: 4, md: 5 },
-            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            textAlign: 'center',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 3 }}>
-            <PaletteIcon 
-              sx={{ 
-                fontSize: 48, 
-                color: 'primary.main',
-                opacity: 0.8,
-                transform: 'rotate(-15deg)',
-              }} 
-            />
-            <Typography 
-              variant="h2" 
-              component="h1"
-              sx={{
-                fontWeight: 600,
-                background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              Art Gallery
-            </Typography>
-            <BrushIcon 
-              sx={{ 
-                fontSize: 48, 
-                color: 'primary.main',
-                opacity: 0.8,
-                transform: 'rotate(15deg)',
-              }} 
-            />
-          </Box>
-          
-          <Box sx={{ textAlign: 'center', maxWidth: '700px', mx: 'auto' }}>
-            <Typography 
-              variant="h6" 
-              color="text.secondary"
-              sx={{ 
-                fontWeight: 400,
-                lineHeight: 1.8,
-                mb: 1,
-              }}
-            >
-              Discover Unique Artwork
-            </Typography>
-            <Typography 
-              variant="body1" 
-              color="text.secondary"
-              sx={{ 
-                fontSize: '1rem',
-                lineHeight: 1.7,
-                opacity: 0.9,
-              }}
-            >
-              Explore our curated collection of original paintings and handcrafted woodworking pieces. 
-              Each piece tells a unique story from talented artists around the world.
-            </Typography>
-          </Box>
-        </Paper>
+        <PageHeader
+          title="Art Gallery"
+          subtitle="Explore our curated collection of original paintings and handcrafted woodworking pieces from talented artists around the world."
+          icon={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+              <BrushIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+            </Box>
+          }
+        />
 
         <Box sx={{ mb: 4 }}>
           <Grid container spacing={3} alignItems="center">
@@ -427,7 +364,6 @@ const Gallery: React.FC = () => {
                   <PaintingCard 
                     painting={painting} 
                     onLikeChange={handleLikeChange}
-                    artistEmail={(painting as any).artistEmail}
                   />
                 </Grid>
               ))}

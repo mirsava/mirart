@@ -16,6 +16,7 @@ import {
   Phone as PhoneIcon,
   Schedule as ScheduleIcon,
 } from '@mui/icons-material';
+import PageHeader from '../components/PageHeader';
 
 const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -62,49 +63,11 @@ const Contact: React.FC = () => {
   return (
     <Box sx={{ py: 8, bgcolor: 'background.default' }}>
       <Container maxWidth="lg">
-        {/* Header Section */}
-        <Paper
-          elevation={0}
-          sx={{
-            mb: 6,
-            mt: 3,
-            p: { xs: 3, sm: 4, md: 5 },
-            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            textAlign: 'center',
-          }}
-        >
-          <Typography 
-            variant="h3" 
-            component="h1" 
-            gutterBottom
-            sx={{ 
-              fontWeight: 600,
-              background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              mb: 2,
-            }}
-          >
-            Contact Us
-          </Typography>
-          <Typography 
-            variant="h6" 
-            color="text.secondary" 
-            sx={{ 
-              maxWidth: '700px', 
-              mx: 'auto',
-              lineHeight: 1.7,
-              fontSize: { xs: '1rem', sm: '1.1rem' },
-            }}
-          >
-            Have questions about our paintings or need assistance? 
-            We're here to help! Reach out to us through any of the channels below.
-          </Typography>
-        </Paper>
+        <PageHeader
+          title="Contact Us"
+          subtitle="Have questions about our paintings or need assistance? We're here to help! Reach out to us through any of the channels below."
+          icon={<EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
+        />
 
         <Grid container spacing={6}>
           <Grid item xs={12} md={8}>

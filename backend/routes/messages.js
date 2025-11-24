@@ -26,8 +26,8 @@ router.get('/user/:cognitoUsername', async (req, res) => {
         SELECT m.*, 
           l.title as listing_title,
           l.primary_image_url as listing_image,
-          u_sender.email as sender_email_display,
-          u_recipient.email as recipient_email_display,
+          CONCAT('user', u_sender.id, '@artzyla.com') as sender_email_display,
+          CONCAT('user', u_recipient.id, '@artzyla.com') as recipient_email_display,
           COALESCE(
             u_sender.business_name,
             CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
@@ -52,8 +52,8 @@ router.get('/user/:cognitoUsername', async (req, res) => {
         SELECT m.*, 
           l.title as listing_title,
           l.primary_image_url as listing_image,
-          u_sender.email as sender_email_display,
-          u_recipient.email as recipient_email_display,
+          CONCAT('user', u_sender.id, '@artzyla.com') as sender_email_display,
+          CONCAT('user', u_recipient.id, '@artzyla.com') as recipient_email_display,
           COALESCE(
             u_recipient.business_name,
             CONCAT(COALESCE(u_recipient.first_name, ''), ' ', COALESCE(u_recipient.last_name, '')),
@@ -72,8 +72,8 @@ router.get('/user/:cognitoUsername', async (req, res) => {
         SELECT m.*, 
           l.title as listing_title,
           l.primary_image_url as listing_image,
-          u_sender.email as sender_email_display,
-          u_recipient.email as recipient_email_display,
+          CONCAT('user', u_sender.id, '@artzyla.com') as sender_email_display,
+          CONCAT('user', u_recipient.id, '@artzyla.com') as recipient_email_display,
           COALESCE(
             u_sender.business_name,
             CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
@@ -93,8 +93,8 @@ router.get('/user/:cognitoUsername', async (req, res) => {
         SELECT m.*, 
           l.title as listing_title,
           l.primary_image_url as listing_image,
-          u_sender.email as sender_email_display,
-          u_recipient.email as recipient_email_display,
+          CONCAT('user', u_sender.id, '@artzyla.com') as sender_email_display,
+          CONCAT('user', u_recipient.id, '@artzyla.com') as recipient_email_display,
           COALESCE(
             u_sender.business_name,
             CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
@@ -284,8 +284,8 @@ router.post('/:messageId/reply', async (req, res) => {
     // Get the original message
     const [originalMessages] = await pool.execute(
       `SELECT m.*, 
-        u_sender.email as sender_email_display,
-        u_recipient.email as recipient_email_display,
+        CONCAT('user', u_sender.id, '@artzyla.com') as sender_email_display,
+        CONCAT('user', u_recipient.id, '@artzyla.com') as recipient_email_display,
         COALESCE(
           u_sender.business_name,
           CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
@@ -315,7 +315,7 @@ router.post('/:messageId/reply', async (req, res) => {
     const newSenderEmail = originalMessage.recipient_email_display;
     const newRecipientEmail = originalMessage.sender_email_display;
     const newSenderName = originalMessage.recipient_name_display || currentUser.business_name || 
-      `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.email;
+      `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.cognito_username;
 
     // Create reply subject with "Re: " prefix if not already present
     const replySubject = originalMessage.subject.startsWith('Re: ') 

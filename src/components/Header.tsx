@@ -115,7 +115,7 @@ const Header: React.FC = () => {
     window.addEventListener('messagesRead', handleMessagesRead);
     
     // Also refresh more frequently when on messages page
-    let messagesPageInterval: NodeJS.Timeout | null = null;
+    let messagesPageInterval: ReturnType<typeof setInterval> | null = null;
     if (location.pathname === '/messages') {
       messagesPageInterval = setInterval(() => {
         fetchUnreadCount();
@@ -684,6 +684,7 @@ const Header: React.FC = () => {
         anchorEl={artistMenuAnchor}
         open={Boolean(artistMenuAnchor)}
         onClose={handleArtistMenuClose}
+        disableScrollLock={true}
         PaperProps={{
           sx: {
             mt: 1,
@@ -723,6 +724,7 @@ const Header: React.FC = () => {
         anchorEl={userMenuAnchor}
         open={Boolean(userMenuAnchor)}
         onClose={handleUserMenuClose}
+        disableScrollLock={true}
         PaperProps={{
           sx: {
             mt: 1,

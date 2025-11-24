@@ -37,10 +37,9 @@ router.get('/', async (req, res) => {
           u.business_name,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
           u.cognito_username,
-          u.email
+          u.cognito_username
         ) as artist_name,
         u.cognito_username,
-        u.email as artist_email,
         u.signature_url,
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count
       FROM listings l
@@ -252,10 +251,9 @@ router.get('/:id', async (req, res) => {
           u.business_name,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
           u.cognito_username,
-          u.email
+          u.cognito_username
         ) as artist_name,
-        u.cognito_username, 
-        u.email as artist_email,
+        u.cognito_username,
         u.signature_url,
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count
       FROM listings l

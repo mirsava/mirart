@@ -65,6 +65,11 @@ export const lightTheme: Theme = createTheme({
         },
       },
     },
+    MuiMenu: {
+      defaultProps: {
+        disableScrollLock: true,
+      },
+    },
     MuiToolbar: {
       styleOverrides: {
         root: {
@@ -172,6 +177,11 @@ export const darkTheme: Theme = createTheme({
           margin: 0,
           padding: 0,
         },
+      },
+    },
+    MuiMenu: {
+      defaultProps: {
+        disableScrollLock: true,
       },
     },
     MuiToolbar: {

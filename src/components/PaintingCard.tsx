@@ -22,10 +22,9 @@ import { Artwork } from '../types';
 interface PaintingCardProps {
   painting: Artwork;
   onLikeChange?: (listingId: number, liked: boolean, likeCount: number) => void;
-  artistEmail?: string;
 }
 
-const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange, artistEmail }) => {
+const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [isLiked, setIsLiked] = useState(painting.isLiked || false);
@@ -196,7 +195,6 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange, art
             onClose={() => setContactDialogOpen(false)}
             listingTitle={painting.title}
             artistName={painting.artist}
-            artistEmail={artistEmail}
             listingId={painting.id}
           />
         </div>
