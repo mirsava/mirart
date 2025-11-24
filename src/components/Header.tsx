@@ -430,11 +430,13 @@ const Header: React.FC = () => {
         position="fixed" 
         elevation={scrolled ? 4 : 2}
         sx={{
-          bgcolor: scrolled 
-            ? 'background.paper' 
-            : isDarkMode 
-              ? 'rgba(18,18,18,0.95)' 
-              : 'rgba(255,255,255,0.95)',
+          background: scrolled 
+            ? (isDarkMode 
+                ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(30, 30, 30, 0.98) 100%)'
+                : 'linear-gradient(135deg, rgba(240, 245, 255, 0.98) 0%, rgba(235, 240, 250, 0.98) 100%)')
+            : (isDarkMode 
+                ? 'linear-gradient(135deg, rgba(25, 25, 35, 0.98) 0%, rgba(18, 18, 28, 0.98) 100%)'
+                : 'linear-gradient(135deg, rgba(240, 245, 255, 1) 0%, rgba(235, 240, 250, 1) 100%)'),
           backdropFilter: scrolled ? 'blur(20px)' : 'blur(10px)',
           transition: 'all 0.3s ease-in-out',
           borderBottom: '1px solid',
