@@ -200,7 +200,7 @@ const Header: React.FC = () => {
               src={logo}
               alt="ArtZyla Logo"
               sx={{
-                height: 90,
+                height: 100,
                 width: 'auto',
                 objectFit: 'contain',
                 py: 1,
@@ -493,7 +493,7 @@ const Header: React.FC = () => {
                 src={logo}
                 alt="ArtZyla Logo"
                 sx={{
-                  height: 90,
+                  height: { xs: 100, md: 120 },
                   width: 'auto',
                   objectFit: 'contain',
                   py: 1,

@@ -49,10 +49,11 @@ const About: React.FC = () => {
             <Paper
               sx={{
                 height: 400,
-                backgroundImage: 'url(https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=600&h=400&fit=crop)',
+                backgroundImage: 'url(https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&h=600&fit=crop&q=80)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 borderRadius: 2,
+                boxShadow: 3,
               }}
             />
           </Grid>
