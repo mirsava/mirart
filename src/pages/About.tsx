@@ -49,11 +49,23 @@ const About: React.FC = () => {
             <Paper
               sx={{
                 height: 400,
-                backgroundImage: 'url(https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&h=600&fit=crop&q=80)',
+                backgroundImage: 'url(https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=800&h=600&fit=crop&q=80)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 borderRadius: 2,
                 boxShadow: 3,
+                position: 'relative',
+                overflow: 'hidden',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: `linear-gradient(135deg, rgba(74, 58, 154, 0.2) 0%, rgba(255, 143, 0, 0.15) 100%)`,
+                  mixBlendMode: 'overlay',
+                },
               }}
             />
           </Grid>

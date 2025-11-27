@@ -71,9 +71,6 @@ const Home: React.FC = () => {
     };
   };
 
-  const heroImage = 'https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=1920&h=1080&fit=crop&q=80';
-
-
   useEffect(() => {
     const fetchFeaturedListings = async () => {
       try {
@@ -128,10 +125,8 @@ const Home: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundImage: `url(${heroImage})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            transition: 'opacity 1s ease-in-out',
+            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.primary.dark} 100%)`,
+            overflow: 'hidden',
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -139,10 +134,132 @@ const Home: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.5) 100%)',
+              backgroundImage: `url("https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=1200&h=800&fit=crop&q=80")`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              opacity: 0.12,
+              filter: 'blur(2px) grayscale(30%)',
+              pointerEvents: 'none',
             },
           }}
-        />
+        >
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundImage: `
+                url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cstyle%3E.polygon%7Bfill:none;stroke:rgba(255,255,255,0.08);stroke-width:1.5%7D%3C/style%3E%3C/defs%3E%3Cpolygon points='100,10 190,60 190,150 100,190 10,150 10,60' class='polygon'/%3E%3Cpolygon points='100,40 150,70 150,130 100,160 50,130 50,70' class='polygon'/%3E%3C/svg%3E"),
+                url("data:image/svg+xml,%3Csvg width='150' height='150' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cstyle%3E.rect%7Bfill:none;stroke:rgba(255,112,67,0.12);stroke-width:2%7D%3C/style%3E%3C/defs%3E%3Crect x='25' y='25' width='100' height='100' transform='rotate(45 75 75)' class='rect'/%3E%3Crect x='50' y='50' width='50' height='50' transform='rotate(45 75 75)' class='rect'/%3E%3C/svg%3E")
+              `,
+              backgroundSize: '200px 200px, 150px 150px',
+              backgroundPosition: '0 0, 100px 100px',
+              opacity: 0.6,
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '15%',
+              right: '10%',
+              width: '200px',
+              height: '200px',
+              border: `2px solid rgba(255, 255, 255, 0.15)`,
+              borderRadius: '20px',
+              transform: 'rotate(25deg)',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}40, ${theme.palette.primary.light}20)`,
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '25%',
+              right: '15%',
+              width: '120px',
+              height: '120px',
+              border: `2px solid rgba(255, 143, 0, 0.2)`,
+              borderRadius: '20px',
+              transform: 'rotate(-15deg)',
+              background: `linear-gradient(135deg, ${theme.palette.secondary.main}30, transparent)`,
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: '20%',
+              left: '8%',
+              width: '0',
+              height: '0',
+              borderLeft: '100px solid transparent',
+              borderRight: '100px solid transparent',
+              borderBottom: `180px solid ${theme.palette.primary.main}30`,
+              borderTop: 'none',
+              filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.12))',
+              transform: 'rotate(30deg)',
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: '15%',
+              left: '12%',
+              width: '0',
+              height: '0',
+              borderLeft: '60px solid transparent',
+              borderRight: '60px solid transparent',
+              borderBottom: `100px solid ${theme.palette.secondary.main}25`,
+              borderTop: 'none',
+              filter: 'drop-shadow(0 0 1.5px rgba(255, 143, 0, 0.18))',
+              transform: 'rotate(-20deg)',
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '5%',
+              width: '150px',
+              height: '150px',
+              border: `2px solid rgba(255, 255, 255, 0.1)`,
+              borderRadius: '50%',
+              background: `radial-gradient(circle, ${theme.palette.primary.light}25, transparent)`,
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '60%',
+              right: '5%',
+              width: '180px',
+              height: '180px',
+              border: `2px solid rgba(255, 143, 0, 0.15)`,
+              borderRadius: '50%',
+              background: `radial-gradient(circle, ${theme.palette.secondary.main}20, transparent)`,
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: '10%',
+              right: '20%',
+              width: '140px',
+              height: '140px',
+              border: `2px solid rgba(255, 255, 255, 0.12)`,
+              transform: 'rotate(45deg)',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}30, ${theme.palette.secondary.main}20)`,
+              pointerEvents: 'none',
+            }}
+          />
+        </Box>
         
         <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
           <Grid container spacing={6} alignItems="center" justifyContent="center">
@@ -154,9 +271,9 @@ const Home: React.FC = () => {
                       label="Art Marketplace"
                       sx={{ 
                         mb: 2, 
-                        bgcolor: 'rgba(198,40,40,0.2)',
+                        bgcolor: 'rgba(255, 143, 0, 0.2)',
                         color: 'white',
-                        border: '1px solid rgba(198,40,40,0.4)',
+                        border: '1px solid rgba(255, 143, 0, 0.4)',
                         backdropFilter: 'blur(10px)',
                         fontWeight: 500,
                         fontSize: '0.85rem',
@@ -184,7 +301,9 @@ const Home: React.FC = () => {
                     <br />
                     <Box component="span" sx={{ 
                       fontWeight: 700,
-                      color: '#ffffff',
+                      color: 'white',
+                      textShadow: '0 4px 12px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4)',
+                      position: 'relative',
                     }}>
                       Handmade Art
                     </Box>
@@ -210,20 +329,22 @@ const Home: React.FC = () => {
                       variant="contained"
                       size="large"
                       sx={{
-                        bgcolor: 'primary.main',
-                        color: 'white',
+                        bgcolor: 'white',
+                        color: 'primary.main',
                         px: 5,
                         py: 2,
                         borderRadius: 2,
                         textTransform: 'none',
-                        fontWeight: 500,
+                        fontWeight: 600,
                         fontSize: '1rem',
                         letterSpacing: '0.5px',
-                        boxShadow: '0 4px 20px rgba(198,40,40,0.25)',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2)',
+                        border: '2px solid white',
                         '&:hover': {
-                          bgcolor: 'primary.dark',
+                          bgcolor: 'rgba(255, 255, 255, 0.95)',
+                          color: 'primary.dark',
                           transform: 'translateY(-2px)',
-                          boxShadow: '0 6px 30px rgba(198,40,40,0.35)',
+                          boxShadow: '0 6px 30px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3)',
                         },
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
@@ -232,11 +353,10 @@ const Home: React.FC = () => {
                       Browse Artwork
                     </Button>
                     <Button
-                      variant="outlined"
+                      variant="contained"
                       size="large"
                       sx={{
-                        borderColor: 'rgba(255,255,255,0.5)',
-                        borderWidth: 1.5,
+                        bgcolor: 'secondary.main',
                         color: 'white',
                         px: 5,
                         py: 2,
@@ -245,15 +365,11 @@ const Home: React.FC = () => {
                         fontWeight: 500,
                         fontSize: '1rem',
                         letterSpacing: '0.5px',
-                        bgcolor: 'rgba(255,255,255,0.1)',
-                        backdropFilter: 'blur(10px)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                        boxShadow: '0 4px 20px rgba(255, 143, 0, 0.25)',
                         '&:hover': {
-                          borderColor: 'white',
-                          bgcolor: 'rgba(255,255,255,0.2)',
-                          color: 'white',
+                          bgcolor: 'secondary.dark',
                           transform: 'translateY(-2px)',
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                          boxShadow: '0 6px 30px rgba(255, 143, 0, 0.35)',
                         },
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}

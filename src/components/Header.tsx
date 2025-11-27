@@ -196,16 +196,28 @@ const Header: React.FC = () => {
             }}
           >
             <Box
-              component="img"
-              src={logo}
-              alt="ArtZyla Logo"
               sx={{
-                height: 100,
-                width: 'auto',
-                objectFit: 'contain',
-                py: 1,
+                position: 'relative',
+                display: 'inline-block',
+                px: isDarkMode ? 1.5 : 0,
+                py: isDarkMode ? 0.5 : 0,
+                borderRadius: isDarkMode ? 1 : 0,
+                bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
               }}
-            />
+            >
+              <Box
+                component="img"
+                src={logo}
+                alt="ArtZyla Logo"
+                sx={{
+                  height: 100,
+                  width: 'auto',
+                  objectFit: 'contain',
+                  py: 1,
+                  display: 'block',
+                }}
+              />
+            </Box>
           </Box>
           <IconButton onClick={handleDrawerToggle} color="inherit">
             <CloseIcon />
@@ -430,20 +442,17 @@ const Header: React.FC = () => {
         position="fixed" 
         elevation={scrolled ? 4 : 2}
         sx={{
-          background: scrolled 
-            ? (isDarkMode 
-                ? 'linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(30, 30, 30, 0.98) 100%)'
-                : 'linear-gradient(135deg, rgba(240, 245, 255, 0.98) 0%, rgba(235, 240, 250, 0.98) 100%)')
-            : (isDarkMode 
-                ? 'linear-gradient(135deg, rgba(25, 25, 35, 0.98) 0%, rgba(18, 18, 28, 0.98) 100%)'
-                : 'linear-gradient(135deg, rgba(240, 245, 255, 1) 0%, rgba(235, 240, 250, 1) 100%)'),
-          backdropFilter: scrolled ? 'blur(20px)' : 'blur(10px)',
+          background: theme.palette.background.paper,
           transition: 'all 0.3s ease-in-out',
           borderBottom: '1px solid',
           borderColor: 'divider',
           boxShadow: scrolled 
-            ? '0 4px 20px rgba(0, 0, 0, 0.1)' 
-            : '0 2px 8px rgba(0, 0, 0, 0.08)',
+            ? (theme.palette.mode === 'dark' 
+                ? '0 4px 20px rgba(0, 0, 0, 0.5)' 
+                : '0 4px 20px rgba(0, 0, 0, 0.1)')
+            : (theme.palette.mode === 'dark'
+                ? '0 2px 8px rgba(0, 0, 0, 0.3)'
+                : '0 2px 8px rgba(0, 0, 0, 0.08)'),
           zIndex: 1300,
           width: '100vw',
           maxWidth: '100%',
@@ -489,20 +498,36 @@ const Header: React.FC = () => {
               onClick={() => navigate('/')}
             >
               <Box
-                component="img"
-                src={logo}
-                alt="ArtZyla Logo"
                 sx={{
-                  height: { xs: 100, md: 120 },
-                  width: 'auto',
-                  objectFit: 'contain',
-                  py: 1,
-                  transition: 'opacity 0.3s ease',
+                  position: 'relative',
+                  display: 'inline-block',
+                  px: isDarkMode ? 1.5 : 0,
+                  py: isDarkMode ? 0.5 : 0,
+                  borderRadius: isDarkMode ? 1 : 0,
+                  bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                  transition: 'all 0.3s ease',
                   '&:hover': {
-                    opacity: 0.8,
+                    bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
                   },
                 }}
-              />
+              >
+                <Box
+                  component="img"
+                  src={logo}
+                  alt="ArtZyla Logo"
+                  sx={{
+                    height: { xs: 100, md: 120 },
+                    width: 'auto',
+                    objectFit: 'contain',
+                    py: 1,
+                    display: 'block',
+                    transition: 'opacity 0.3s ease',
+                    '&:hover': {
+                      opacity: 0.9,
+                    },
+                  }}
+                />
+              </Box>
             </Box>
 
             {!isMobile && (
@@ -729,7 +754,7 @@ const Header: React.FC = () => {
           sx={{ 
             py: 1.5,
             px: 2,
-            '&:hover': { bgcolor: 'primary.light', color: 'white' },
+            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
           }}
         >
           <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
@@ -740,7 +765,7 @@ const Header: React.FC = () => {
           sx={{ 
             py: 1.5,
             px: 2,
-            '&:hover': { bgcolor: 'primary.light', color: 'white' },
+            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
           }}
         >
           <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
@@ -781,7 +806,7 @@ const Header: React.FC = () => {
           sx={{ 
             py: 1.5,
             px: 2,
-            '&:hover': { bgcolor: 'primary.light', color: 'white' },
+            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
           }}
         >
           <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
@@ -795,7 +820,7 @@ const Header: React.FC = () => {
           sx={{ 
             py: 1.5,
             px: 2,
-            '&:hover': { bgcolor: 'primary.light', color: 'white' },
+            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
           }}
         >
           <EmailIcon sx={{ mr: 2, fontSize: 20 }} />
