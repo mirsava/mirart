@@ -118,9 +118,9 @@ export const darkTheme: Theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#4a3a9a',
-      light: '#534bae',
-      dark: '#3d2d8a',
+      main: '#7c6bc5',
+      light: '#9e8fd9',
+      dark: '#5d4a9a',
     },
     secondary: {
       main: '#ff8f00',

@@ -345,7 +345,9 @@ const CreateListing: React.FC = () => {
           sx={{
             p: { xs: 3, sm: 4, md: 5 },
             mb: 4,
-            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            background: theme.palette.mode === 'dark'
+              ? `linear-gradient(135deg, rgba(74, 58, 154, 0.15) 0%, rgba(255, 143, 0, 0.1) 100%)`
+              : `linear-gradient(135deg, rgba(74, 58, 154, 0.08) 0%, rgba(255, 143, 0, 0.05) 100%)`,
             border: '1px solid',
             borderColor: 'divider',
             borderRadius: 3,

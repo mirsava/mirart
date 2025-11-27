@@ -196,16 +196,28 @@ const Header: React.FC = () => {
             }}
           >
             <Box
-              component="img"
-              src={logo}
-              alt="ArtZyla Logo"
               sx={{
-                height: 100,
-                width: 'auto',
-                objectFit: 'contain',
-                py: 1,
+                position: 'relative',
+                display: 'inline-block',
+                px: isDarkMode ? 1.5 : 0,
+                py: isDarkMode ? 0.5 : 0,
+                borderRadius: isDarkMode ? 1 : 0,
+                bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
               }}
-            />
+            >
+              <Box
+                component="img"
+                src={logo}
+                alt="ArtZyla Logo"
+                sx={{
+                  height: 100,
+                  width: 'auto',
+                  objectFit: 'contain',
+                  py: 1,
+                  display: 'block',
+                }}
+              />
+            </Box>
           </Box>
           <IconButton onClick={handleDrawerToggle} color="inherit">
             <CloseIcon />
@@ -430,13 +442,17 @@ const Header: React.FC = () => {
         position="fixed" 
         elevation={scrolled ? 4 : 2}
         sx={{
-          background: '#ffffff',
+          background: theme.palette.background.paper,
           transition: 'all 0.3s ease-in-out',
           borderBottom: '1px solid',
           borderColor: 'divider',
           boxShadow: scrolled 
-            ? '0 4px 20px rgba(0, 0, 0, 0.1)' 
-            : '0 2px 8px rgba(0, 0, 0, 0.08)',
+            ? (theme.palette.mode === 'dark' 
+                ? '0 4px 20px rgba(0, 0, 0, 0.5)' 
+                : '0 4px 20px rgba(0, 0, 0, 0.1)')
+            : (theme.palette.mode === 'dark'
+                ? '0 2px 8px rgba(0, 0, 0, 0.3)'
+                : '0 2px 8px rgba(0, 0, 0, 0.08)'),
           zIndex: 1300,
           width: '100vw',
           maxWidth: '100%',
@@ -482,20 +498,36 @@ const Header: React.FC = () => {
               onClick={() => navigate('/')}
             >
               <Box
-                component="img"
-                src={logo}
-                alt="ArtZyla Logo"
                 sx={{
-                  height: { xs: 100, md: 120 },
-                  width: 'auto',
-                  objectFit: 'contain',
-                  py: 1,
-                  transition: 'opacity 0.3s ease',
+                  position: 'relative',
+                  display: 'inline-block',
+                  px: isDarkMode ? 1.5 : 0,
+                  py: isDarkMode ? 0.5 : 0,
+                  borderRadius: isDarkMode ? 1 : 0,
+                  bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                  transition: 'all 0.3s ease',
                   '&:hover': {
-                    opacity: 0.8,
+                    bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
                   },
                 }}
-              />
+              >
+                <Box
+                  component="img"
+                  src={logo}
+                  alt="ArtZyla Logo"
+                  sx={{
+                    height: { xs: 100, md: 120 },
+                    width: 'auto',
+                    objectFit: 'contain',
+                    py: 1,
+                    display: 'block',
+                    transition: 'opacity 0.3s ease',
+                    '&:hover': {
+                      opacity: 0.9,
+                    },
+                  }}
+                />
+              </Box>
             </Box>
 
             {!isMobile && (

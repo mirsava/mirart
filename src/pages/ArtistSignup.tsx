@@ -16,6 +16,7 @@ import {
   Checkbox,
   Divider,
   CircularProgress,
+  useTheme,
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -28,6 +29,7 @@ import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 
 const ArtistSignup: React.FC = () => {
+  const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { signUp, user, isAuthenticated } = useAuth();
@@ -220,7 +222,9 @@ const ArtistSignup: React.FC = () => {
             mb: 4,
             mt: 3,
             p: { xs: 3, sm: 4, md: 5 },
-            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            background: theme.palette.mode === 'dark'
+              ? `linear-gradient(135deg, rgba(74, 58, 154, 0.15) 0%, rgba(255, 143, 0, 0.1) 100%)`
+              : `linear-gradient(135deg, rgba(74, 58, 154, 0.08) 0%, rgba(255, 143, 0, 0.05) 100%)`,
             borderRadius: 3,
             border: '1px solid',
             borderColor: 'divider',
@@ -233,7 +237,7 @@ const ArtistSignup: React.FC = () => {
             gutterBottom
             sx={{ 
               fontWeight: 600,
-              background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
