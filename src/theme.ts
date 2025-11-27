@@ -9,9 +9,9 @@ export const lightTheme: Theme = createTheme({
       dark: '#3d2d8a',
     },
     secondary: {
-      main: '#DCB8CB',
-      light: '#E8D0DD',
-      dark: '#C9A0B5',
+      main: '#ff8f00',
+      light: '#ffb300',
+      dark: '#ff6f00',
     },
     background: {
       default: '#fafafa',
@@ -90,12 +90,12 @@ export const lightTheme: Theme = createTheme({
       styleOverrides: {
         root: {
           '&:hover': {
-            backgroundColor: 'rgba(74, 58, 154, 0.12)',
+            backgroundColor: 'rgba(255, 143, 0, 0.12)',
           },
           '&.Mui-selected': {
-            backgroundColor: 'rgba(74, 58, 154, 0.2)',
+            backgroundColor: 'rgba(255, 143, 0, 0.2)',
             '&:hover': {
-              backgroundColor: 'rgba(74, 58, 154, 0.28)',
+              backgroundColor: 'rgba(255, 143, 0, 0.28)',
             },
           },
         },
@@ -123,9 +123,9 @@ export const darkTheme: Theme = createTheme({
       dark: '#3d2d8a',
     },
     secondary: {
-      main: '#DCB8CB',
-      light: '#E8D0DD',
-      dark: '#C9A0B5',
+      main: '#ff8f00',
+      light: '#ffb300',
+      dark: '#ff6f00',
     },
     background: {
       default: '#121212',
@@ -240,7 +240,7 @@ export const darkTheme: Theme = createTheme({
     MuiTabs: {
       styleOverrides: {
         indicator: {
-          backgroundColor: '#534bae',
+          backgroundColor: '#ff8f00',
         },
       },
     },
@@ -262,12 +262,12 @@ export const darkTheme: Theme = createTheme({
       styleOverrides: {
         root: {
           '&:hover': {
-            backgroundColor: 'rgba(83, 75, 174, 0.2)',
+            backgroundColor: 'rgba(255, 143, 0, 0.2)',
           },
           '&.Mui-selected': {
-            backgroundColor: 'rgba(83, 75, 174, 0.3)',
+            backgroundColor: 'rgba(255, 143, 0, 0.3)',
             '&:hover': {
-              backgroundColor: 'rgba(83, 75, 174, 0.4)',
+              backgroundColor: 'rgba(255, 143, 0, 0.4)',
             },
           },
         },

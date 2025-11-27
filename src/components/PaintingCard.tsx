@@ -123,14 +123,14 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
                 e.stopPropagation();
                 navigate(`/artist/${painting.artistUsername}`);
               }}
-              sx={{
-                color: 'text.secondary',
-                textDecoration: 'none',
-                '&:hover': {
-                  textDecoration: 'underline',
-                  color: 'primary.main',
-                },
-              }}
+                sx={{
+                  color: 'text.secondary',
+                  textDecoration: 'none',
+                  '&:hover': {
+                    textDecoration: 'underline',
+                    color: 'secondary.main',
+                  },
+                }}
             >
               {painting.artist}
             </MuiLink>
@@ -181,6 +181,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
         <Button
           size="small"
           variant="contained"
+          color="secondary"
           startIcon={<EmailIcon />}
           onClick={handleContactSeller}
         >

@@ -42,16 +42,16 @@ const Footer: React.FC = () => {
               Quick Links
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Link href="/" color="text.secondary" underline="hover">
+              <Link href="/" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 Home
               </Link>
-              <Link href="/gallery" color="text.secondary" underline="hover">
+              <Link href="/gallery" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 Gallery
               </Link>
-              <Link href="/about" color="text.secondary" underline="hover">
+              <Link href="/about" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 About
               </Link>
-              <Link href="/contact" color="text.secondary" underline="hover">
+              <Link href="/contact" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 Contact
               </Link>
             </Box>
@@ -62,16 +62,16 @@ const Footer: React.FC = () => {
               For Artists
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Link href="/artist-signup" color="text.secondary" underline="hover">
+              <Link href="/artist-signup" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 Sell Your Art
               </Link>
-              <Link href="/about" color="text.secondary" underline="hover">
+              <Link href="/about" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 How It Works
               </Link>
-              <Link href="/contact" color="text.secondary" underline="hover">
+              <Link href="/contact" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 FAQ
               </Link>
-              <Link href="/privacy" color="text.secondary" underline="hover">
+              <Link href="/privacy" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 Privacy Policy
               </Link>
             </Box>
@@ -82,16 +82,16 @@ const Footer: React.FC = () => {
               Connect With Us
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-              <IconButton color="primary" size="small">
+              <IconButton color="secondary" size="small">
                 <FacebookIcon />
               </IconButton>
-              <IconButton color="primary" size="small">
+              <IconButton color="secondary" size="small">
                 <InstagramIcon />
               </IconButton>
-              <IconButton color="primary" size="small">
+              <IconButton color="secondary" size="small">
                 <TwitterIcon />
               </IconButton>
-              <IconButton color="primary" size="small">
+              <IconButton color="secondary" size="small">
                 <EmailIcon />
               </IconButton>
             </Box>

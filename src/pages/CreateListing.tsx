@@ -21,6 +21,7 @@ import {
   Stepper,
   Step,
   StepLabel,
+  useTheme,
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -33,8 +34,10 @@ import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
+import PageHeader from '../components/PageHeader';
 
 const CreateListing: React.FC = () => {
+  const theme = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
@@ -331,7 +334,12 @@ const CreateListing: React.FC = () => {
   };
 
   return (
-    <Box sx={{ py: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
+      <PageHeader
+        title="Create New Listing"
+        subtitle="Add a new artwork listing to your portfolio. Fill in the details below to get started."
+        icon={<AddIcon />}
+      />
       <Container maxWidth="lg">
         <Paper
           sx={{
@@ -343,28 +351,18 @@ const CreateListing: React.FC = () => {
             borderRadius: 3,
           }}
         >
-          <Box sx={{ mb: 4 }}>
-            <Typography
-              variant="h4"
-              component="h1"
-              gutterBottom
-              sx={{
-                background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                fontWeight: 700,
-                mb: 1,
-              }}
-            >
-              Create New Listing
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Add a new artwork listing to your portfolio. Fill in the details below to get started.
-            </Typography>
-          </Box>
-
-          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+          <Stepper 
+            activeStep={activeStep} 
+            sx={{ 
+              mb: 4,
+              '& .MuiStepLabel-root .Mui-active': {
+                color: 'secondary.main',
+              },
+              '& .MuiStepLabel-root .Mui-completed': {
+                color: 'secondary.main',
+              },
+            }}
+          >
             {steps.map((label) => (
               <Step key={label}>
                 <StepLabel>{label}</StepLabel>
