@@ -29,3 +29,4 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   INDEX idx_read_at (read_at)
 );
 
+

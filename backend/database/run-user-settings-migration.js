@@ -54,3 +54,4 @@ runUserSettingsMigration()
     process.exit(1);
   });
 
+

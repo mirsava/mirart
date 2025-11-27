@@ -56,3 +56,4 @@ runCommentsMigration()
     process.exit(1);
   });
 
+

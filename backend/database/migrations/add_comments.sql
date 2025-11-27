@@ -14,3 +14,4 @@ CREATE TABLE IF NOT EXISTS listing_comments (
   INDEX idx_created_at (created_at)
 );
 
+
