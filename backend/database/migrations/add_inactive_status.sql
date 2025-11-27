@@ -2,3 +2,4 @@ ALTER TABLE listings MODIFY COLUMN status ENUM('draft', 'active', 'inactive', 's
 
 
 
+

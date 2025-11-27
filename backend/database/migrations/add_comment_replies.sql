@@ -4,3 +4,4 @@ CREATE INDEX idx_parent_comment_id ON listing_comments(parent_comment_id);
 
 
 
+

@@ -4,3 +4,4 @@ ALTER TABLE users ADD COLUMN comment_notifications BOOLEAN DEFAULT TRUE;
 
 
 
+
