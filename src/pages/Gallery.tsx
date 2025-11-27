@@ -258,6 +258,7 @@ const Gallery: React.FC = () => {
             <BrushIcon sx={{ fontSize: 40, color: 'primary.main' }} />
           </Box>
         }
+        disablePattern={true}
       />
 
       <Container maxWidth="lg">
