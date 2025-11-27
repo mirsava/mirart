@@ -3,3 +3,4 @@ ALTER TABLE listing_comments ADD FOREIGN KEY (parent_comment_id) REFERENCES list
 CREATE INDEX idx_parent_comment_id ON listing_comments(parent_comment_id);
 
 
+
