@@ -7,6 +7,7 @@ interface PageHeaderProps {
   subtitle?: string;
   icon?: React.ReactNode;
   backgroundGradient?: string;
+  titleGradient?: string;
   sx?: SxProps<Theme>;
 }
 
@@ -15,6 +16,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   subtitle,
   icon,
   backgroundGradient,
+  titleGradient,
   sx,
 }) => {
   const theme = useTheme();
@@ -23,7 +25,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   const defaultGradient = 'linear-gradient(135deg, rgba(25, 118, 210, 0.04) 0%, rgba(156, 39, 176, 0.04) 50%, rgba(83, 75, 174, 0.04) 100%)';
 
   return (
-    <Box sx={{ mb: { xs: 4, md: 6 }, pt: { xs: 2, md: 3 }, width: '100%', ...sx }}>
+    <Box sx={{ mb: { xs: 4, md: 6 }, pt: { xs: 2, md: 3 }, width: '100%' }}>
       <Fade in={true} timeout={800}>
         <Paper
           elevation={0}
@@ -38,6 +40,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
             borderBottom: '1px solid',
             borderColor: 'divider',
             textAlign: 'center',
+            ...(sx && typeof sx === 'object' && !Array.isArray(sx) ? sx : {}),
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -102,7 +105,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
               gutterBottom
               sx={{
                 fontWeight: 700,
-                background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 50%, #534bae 100%)',
+                background: titleGradient || 'linear-gradient(135deg, #1976d2 0%, #9c27b0 50%, #534bae 100%)',
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',

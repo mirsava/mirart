@@ -43,6 +43,7 @@ import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User } from '../services/api';
 import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider } from '@mui/material';
 import SignatureInput from '../components/SignatureInput';
+import PageHeader from '../components/PageHeader';
 
 const dataURLtoBlob = (dataURL: string): Promise<Blob> => {
   return new Promise((resolve) => {
@@ -399,58 +400,12 @@ const ArtistDashboard: React.FC = () => {
 
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
+      <PageHeader
+        title={`Welcome back, ${user?.name || 'Artist'}!`}
+        subtitle="Manage your listings, track engagement, and grow your art business."
+        icon={<PersonIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
+      />
       <Container maxWidth="lg">
-        {/* Header Section */}
-        <Paper
-          elevation={0}
-          sx={{
-            mb: 4,
-            mt: { xs: 4, sm: 5, md: 6 },
-            p: { xs: 3, sm: 4 },
-            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography 
-                variant="h4" 
-                component="h1" 
-                gutterBottom
-                sx={{ 
-                  fontWeight: 600,
-                  background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  mb: 1
-                }}
-              >
-                Welcome back, {user?.name || 'Artist'}!
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1rem', lineHeight: 1.6 }}>
-                Manage your listings, track engagement, and grow your art business.
-              </Typography>
-            </Box>
-            <Button
-              variant="outlined"
-              startIcon={<LogoutIcon />}
-              onClick={handleSignOut}
-              sx={{ 
-                minWidth: { xs: '100%', sm: 'auto' },
-                borderColor: 'divider',
-                '&:hover': {
-                  borderColor: 'primary.main',
-                  bgcolor: 'action.hover',
-                }
-              }}
-            >
-              Sign Out
-            </Button>
-          </Box>
-        </Paper>
 
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>

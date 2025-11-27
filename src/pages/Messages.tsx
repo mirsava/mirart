@@ -44,6 +44,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import apiService, { Message } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import PageHeader from '../components/PageHeader';
 
 const Messages: React.FC = () => {
   const { user } = useAuth();
@@ -257,40 +258,13 @@ const Messages: React.FC = () => {
   };
 
   return (
-    <Box sx={{ py: 4 }}>
+    <Box sx={{ bgcolor: 'background.default' }}>
+      <PageHeader
+        title="Messages"
+        subtitle="View and manage your communication with buyers and sellers"
+        icon={<EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
+      />
       <Container maxWidth="lg">
-        <Paper
-          elevation={0}
-          sx={{
-            mb: 4,
-            mt: 3,
-            p: { xs: 3, sm: 4, md: 5 },
-            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            textAlign: 'center',
-          }}
-        >
-          <Typography 
-            variant="h4" 
-            component="h1" 
-            gutterBottom
-            sx={{ 
-              fontWeight: 600,
-              background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              mb: 2,
-            }}
-          >
-            Messages
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem', lineHeight: 1.7 }}>
-            View and manage your communication with buyers and sellers
-          </Typography>
-        </Paper>
 
         <Paper sx={{ mb: 3 }}>
           <Tabs value={tabValue} onChange={handleTabChange}>

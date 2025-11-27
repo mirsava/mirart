@@ -33,6 +33,7 @@ import {
   Alert,
   Pagination,
   Avatar,
+  Fade,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -47,6 +48,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 import { useSnackbar } from 'notistack';
+import PageHeader from '../components/PageHeader';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -316,41 +318,147 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
-      <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
-        {/* Header Section */}
+      <Box
+        sx={{
+          width: '100%',
+          mb: 4,
+          pt: { xs: 2, md: 3 },
+          position: 'relative',
+        }}
+      >
         <Paper
           elevation={0}
           sx={{
-            mb: 4,
-            mt: { xs: 4, sm: 5, md: 6 },
-            p: { xs: 3, sm: 4 },
-            background: 'linear-gradient(135deg, rgba(156, 39, 176, 0.08) 0%, rgba(25, 118, 210, 0.08) 100%)',
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
+            position: 'relative',
+            overflow: 'hidden',
+            width: '100%',
+            p: { xs: 4, sm: 5, md: 6 },
+            background: 'linear-gradient(135deg, rgba(220, 184, 203, 0.2) 0%, rgba(156, 39, 176, 0.15) 50%, rgba(25, 118, 210, 0.12) 100%)',
+            borderRadius: 0,
+            border: 'none',
+            borderTop: '4px solid',
+            borderColor: 'secondary.main',
+            borderBottom: '1px solid',
+            borderBottomColor: 'divider',
+            textAlign: 'center',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle at 20% 50%, rgba(220, 184, 203, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(156, 39, 176, 0.12) 0%, transparent 50%)',
+              pointerEvents: 'none',
+            },
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              top: '-50%',
+              left: '-50%',
+              width: '200%',
+              height: '200%',
+              background: 'radial-gradient(circle, rgba(220, 184, 203, 0.08) 0%, transparent 70%)',
+              animation: 'pulse 8s ease-in-out infinite',
+              pointerEvents: 'none',
+            },
+            '@keyframes pulse': {
+              '0%, 100%': {
+                transform: 'scale(1)',
+                opacity: 0.5,
+              },
+              '50%': {
+                transform: 'scale(1.1)',
+                opacity: 0.8,
+              },
+            },
           }}
         >
-          <Box>
-            <Typography 
-              variant="h4" 
-              component="h1" 
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Fade in={true} timeout={1000} style={{ transitionDelay: '200ms' }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  mb: 3,
+                  p: 3,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(220, 184, 203, 0.4) 0%, rgba(156, 39, 176, 0.3) 100%)',
+                  border: '3px solid',
+                  borderColor: 'secondary.main',
+                  boxShadow: '0 4px 20px rgba(220, 184, 203, 0.4), inset 0 0 20px rgba(220, 184, 203, 0.2)',
+                  transform: 'rotate(-5deg)',
+                  transition: 'transform 0.3s ease',
+                  willChange: 'transform',
+                  backfaceVisibility: 'hidden',
+                  '&:hover': {
+                    transform: 'rotate(5deg) scale(1.1)',
+                    boxShadow: '0 6px 30px rgba(220, 184, 203, 0.5), inset 0 0 25px rgba(220, 184, 203, 0.3)',
+                  },
+                }}
+              >
+                <DashboardIcon 
+                  sx={{ 
+                    fontSize: 64, 
+                    color: '#9c27b0',
+                    filter: 'drop-shadow(0 2px 4px rgba(156, 39, 176, 0.5))',
+                  }} 
+                />
+              </Box>
+            </Fade>
+
+            <Typography
+              variant="h2"
+              component="h1"
               gutterBottom
-              sx={{ 
-                fontWeight: 600,
-                background: 'linear-gradient(135deg, #9c27b0 0%, #1976d2 100%)',
+              sx={{
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #DCB8CB 0%, #9c27b0 50%, #1976d2 100%)',
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                mb: 1
+                mb: 2,
+                fontSize: { xs: '2.5rem', sm: '3rem', md: '3.5rem' },
+                lineHeight: 1.2,
+                letterSpacing: '-0.02em',
+                position: 'relative',
+                display: 'inline-block',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: -12,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '80px',
+                  height: '5px',
+                  background: 'linear-gradient(90deg, transparent 0%, #DCB8CB 50%, transparent 100%)',
+                  borderRadius: 2,
+                },
               }}
             >
               Admin Dashboard
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1rem', lineHeight: 1.6 }}>
-              Manage users, listings, and platform content
-            </Typography>
+
+            <Fade in={true} timeout={1000} style={{ transitionDelay: '400ms' }}>
+              <Typography
+                variant="h6"
+                color="text.secondary"
+                sx={{
+                  maxWidth: '800px',
+                  mx: 'auto',
+                  mt: 3,
+                  lineHeight: 1.7,
+                  fontSize: { xs: '1rem', sm: '1.1rem', md: '1.2rem' },
+                  fontWeight: 400,
+                  opacity: 0.9,
+                }}
+              >
+                Manage users, listings, and platform content
+              </Typography>
+            </Fade>
           </Box>
         </Paper>
+      </Box>
+      <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
 
         {stats && (
           <Grid container spacing={3} sx={{ mb: 4 }}>
