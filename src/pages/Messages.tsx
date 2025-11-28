@@ -453,35 +453,60 @@ const Messages: React.FC = () => {
                 </Box>
               </DialogTitle>
               <DialogContent>
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="caption" color="text.secondary">
-                      From
-                    </Typography>
-                    <Typography variant="body1">
-                      {tabValue === 1
-                        ? selectedMessage.recipient_name || `@${selectedMessage.recipient_id}`
-                        : selectedMessage.sender_name_display || selectedMessage.sender_name || `@${selectedMessage.sender_id}`}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {tabValue === 1 
-                        ? selectedMessage.recipient_email_display || `user${selectedMessage.recipient_id}@artzyla.com`
-                        : selectedMessage.sender_email_display || `user${selectedMessage.sender_id}@artzyla.com`}
-                    </Typography>
+                <Box sx={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                  {selectedMessage.replies && selectedMessage.replies.length > 0 && (
+                    <Box sx={{ mb: 3 }}>
+                      {selectedMessage.replies.map((reply, index) => (
+                        <Box key={reply.id} sx={{ mb: 2, pl: 2, borderLeft: '2px solid', borderColor: 'divider' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <Typography variant="subtitle2" fontWeight={600}>
+                              {tabValue === 1
+                                ? reply.recipient_name || `@${reply.recipient_id}`
+                                : reply.sender_name_display || reply.sender_name || `@${reply.sender_id}`}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(reply.created_at).toLocaleString()}
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mb: 1 }}>
+                            {reply.message}
+                          </Typography>
+                          {index < selectedMessage.replies.length - 1 && <Divider sx={{ mt: 2 }} />}
+                        </Box>
+                      ))}
+                      <Divider sx={{ my: 2 }} />
+                    </Box>
+                  )}
+                  <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">
+                        From
+                      </Typography>
+                      <Typography variant="body1">
+                        {tabValue === 1
+                          ? selectedMessage.recipient_name || `@${selectedMessage.recipient_id}`
+                          : selectedMessage.sender_name_display || selectedMessage.sender_name || `@${selectedMessage.sender_id}`}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {tabValue === 1 
+                          ? selectedMessage.recipient_email_display || `user${selectedMessage.recipient_id}@artzyla.com`
+                          : selectedMessage.sender_email_display || `user${selectedMessage.sender_id}@artzyla.com`}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">
+                        Date
+                      </Typography>
+                      <Typography variant="body1">
+                        {new Date(selectedMessage.created_at).toLocaleString()}
+                      </Typography>
+                    </Grid>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="caption" color="text.secondary">
-                      Date
-                    </Typography>
-                    <Typography variant="body1">
-                      {new Date(selectedMessage.created_at).toLocaleString()}
-                    </Typography>
-                  </Grid>
-                </Grid>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {selectedMessage.message}
-                </Typography>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {selectedMessage.message}
+                  </Typography>
+                </Box>
               </DialogContent>
               <DialogActions>
                 <Button onClick={() => setDialogOpen(false)}>Close</Button>

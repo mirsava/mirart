@@ -446,6 +446,8 @@ export interface Message {
   listing_image?: string;
   sender_name_display?: string;
   recipient_name?: string;
+  parent_message_id?: number | null;
+  replies?: Message[];
 }
 
 export const apiService = new ApiService();

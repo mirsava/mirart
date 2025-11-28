@@ -118,7 +118,50 @@ router.get('/user/:cognitoUsername', async (req, res) => {
 
     const [messages] = await pool.execute(query, params);
 
-    res.json({ messages });
+    // Build a map of root messages and their replies
+    // Check if parent_message_id column exists by checking if any message has it
+    const hasParentColumn = messages.length > 0 && 'parent_message_id' in messages[0];
+    
+    if (hasParentColumn) {
+      const messageMap = new Map();
+      const rootMessages = [];
+
+      // First pass: identify root messages (no parent) and build map
+      messages.forEach(msg => {
+        if (!msg.parent_message_id) {
+          msg.replies = [];
+          messageMap.set(msg.id, msg);
+          rootMessages.push(msg);
+        }
+      });
+
+      // Second pass: attach replies to their parent messages
+      messages.forEach(msg => {
+        if (msg.parent_message_id) {
+          const parent = messageMap.get(msg.parent_message_id);
+          if (parent) {
+            parent.replies.push(msg);
+          } else {
+            // If parent not found in current results, treat as root
+            msg.replies = [];
+            messageMap.set(msg.id, msg);
+            rootMessages.push(msg);
+          }
+        }
+      });
+
+      // Sort replies by created_at
+      rootMessages.forEach(msg => {
+        if (msg.replies) {
+          msg.replies.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        }
+      });
+
+      res.json({ messages: rootMessages });
+    } else {
+      // If parent_message_id column doesn't exist, return messages as-is
+      res.json({ messages });
+    }
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -322,13 +365,22 @@ router.post('/:messageId/reply', async (req, res) => {
       ? originalMessage.subject 
       : `Re: ${originalMessage.subject}`;
 
-    // Insert the reply message
-    await pool.execute(
-      `INSERT INTO messages (
+    // Get the root message (if original message is a reply, use its parent, otherwise use the original)
+    const rootMessageId = (originalMessage.parent_message_id !== undefined && originalMessage.parent_message_id !== null) 
+      ? originalMessage.parent_message_id 
+      : originalMessage.id;
+
+    // Check if parent_message_id column exists
+    let insertQuery;
+    let insertParams;
+    
+    try {
+      // Try to insert with parent_message_id
+      insertQuery = `INSERT INTO messages (
         listing_id, sender_id, recipient_id, subject, message,
-        sender_email, sender_name, recipient_email, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent')`,
-      [
+        sender_email, sender_name, recipient_email, status, parent_message_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?)`;
+      insertParams = [
         originalMessage.listing_id,
         newSenderId,
         newRecipientId,
@@ -337,8 +389,31 @@ router.post('/:messageId/reply', async (req, res) => {
         newSenderEmail,
         newSenderName,
         newRecipientEmail,
-      ]
-    );
+        rootMessageId,
+      ];
+      await pool.execute(insertQuery, insertParams);
+    } catch (error) {
+      // If column doesn't exist, insert without parent_message_id
+      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('parent_message_id')) {
+        insertQuery = `INSERT INTO messages (
+          listing_id, sender_id, recipient_id, subject, message,
+          sender_email, sender_name, recipient_email, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent')`;
+        insertParams = [
+          originalMessage.listing_id,
+          newSenderId,
+          newRecipientId,
+          replySubject,
+          message,
+          newSenderEmail,
+          newSenderName,
+          newRecipientEmail,
+        ];
+        await pool.execute(insertQuery, insertParams);
+      } else {
+        throw error;
+      }
+    }
 
     // Send email notification
     try {
