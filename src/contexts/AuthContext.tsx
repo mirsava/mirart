@@ -134,6 +134,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           const dbUser: ApiUser = await apiService.getUser(cognitoUser.username);
           
+          // Convert active to boolean (handle MySQL 0/1)
+          const isActive = dbUser.active !== undefined 
+            ? Boolean(dbUser.active)
+            : true;
+          
           setUser({
             id: cognitoUser.username,
             email: userAttributesObj.email || dbUser.email || '',
@@ -142,7 +147,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               : userAttributesObj.name || (userAttributesObj.given_name ? `${userAttributesObj.given_name} ${userAttributesObj.family_name || ''}`.trim() : ''),
             userRole: userRole,
             groups: groups,
-            attributes: { ...userAttributesObj, ...dbUser } as Record<string, any>,
+            attributes: { ...userAttributesObj, ...dbUser, active: isActive } as Record<string, any>,
           });
         } catch (dbError) {
           setUser({
@@ -151,7 +156,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             name: userAttributesObj.name || (userAttributesObj.given_name ? `${userAttributesObj.given_name} ${userAttributesObj.family_name || ''}`.trim() : ''),
             userRole: userRole,
             groups: groups,
-            attributes: userAttributesObj,
+            attributes: { ...userAttributesObj, active: true },
           });
         }
       }

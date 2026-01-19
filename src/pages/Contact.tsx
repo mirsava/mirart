@@ -66,6 +66,7 @@ const Contact: React.FC = () => {
         title="Contact Us"
         subtitle="Have questions about our paintings or need assistance? We're here to help! Reach out to us through any of the channels below."
         icon={<EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
+        disablePattern={true}
       />
 
       <Container maxWidth="lg">

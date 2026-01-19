@@ -103,6 +103,13 @@ router.get('/users', checkAdminAccess, async (req, res) => {
     query += ` ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`;
 
     const [users] = await pool.execute(query, params);
+    
+    // Add active field if column doesn't exist (default to true)
+    // Convert MySQL TINYINT (0/1) to boolean
+    const usersWithActive = users.map(user => ({
+      ...user,
+      active: user.active !== undefined ? Boolean(user.active) : true
+    }));
     const [countResult] = await pool.execute(
       search 
         ? 'SELECT COUNT(*) as total FROM users WHERE (email LIKE ? OR cognito_username LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR business_name LIKE ?)'
@@ -114,7 +121,7 @@ router.get('/users', checkAdminAccess, async (req, res) => {
     const totalPages = Math.ceil(total / limitNum);
 
     res.json({
-      users,
+      users: usersWithActive,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -340,6 +347,48 @@ router.delete('/listings/:id', checkAdminAccess, async (req, res) => {
   } catch (error) {
     console.error('Error deleting listing:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/users/:userId/activate', checkAdminAccess, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Check if active column exists
+    try {
+      await pool.execute('UPDATE users SET active = 1 WHERE id = ?', [userId]);
+      res.json({ success: true, message: 'User activated successfully' });
+    } catch (error) {
+      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('active')) {
+        res.status(400).json({ error: 'Active column does not exist. Please run the migration first.' });
+      } else {
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('Error activating user:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+router.put('/users/:userId/deactivate', checkAdminAccess, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Check if active column exists
+    try {
+      await pool.execute('UPDATE users SET active = 0 WHERE id = ?', [userId]);
+      res.json({ success: true, message: 'User deactivated successfully' });
+    } catch (error) {
+      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('active')) {
+        res.status(400).json({ error: 'Active column does not exist. Please run the migration first.' });
+      } else {
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('Error deactivating user:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

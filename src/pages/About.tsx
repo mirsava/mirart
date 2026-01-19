@@ -41,6 +41,7 @@ const About: React.FC = () => {
         title="About Our Marketplace"
         subtitle="ArtZyla is a vibrant marketplace connecting talented artists with art lovers worldwide. We empower artists to sell their work through flexible pricing options while providing buyers with access to authentic, handmade art from independent creators."
         icon={<PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
+        disablePattern={true}
       />
 
       <Container maxWidth="lg">

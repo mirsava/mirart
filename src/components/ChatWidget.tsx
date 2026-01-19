@@ -86,6 +86,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -209,6 +210,46 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
     }
     return user.email || user.cognito_username;
   };
+
+  const isUserOnline = (userId: number): boolean => {
+    if (onlineUsers.has(userId)) return true;
+    
+    const conversation = conversations.find(c => c.other_user_id === userId);
+    if (!conversation) return false;
+    
+    const recentMessages = messages.filter(m => 
+      m.sender_id === userId && 
+      new Date(m.created_at).getTime() > Date.now() - 5 * 60 * 1000
+    );
+    
+    return recentMessages.length > 0;
+  };
+
+  useEffect(() => {
+    if (!user?.id || !open) return;
+
+    const updateOnlineStatus = () => {
+      const onlineSet = new Set<number>();
+      
+      conversations.forEach(conv => {
+        const recentMessages = messages.filter(m => 
+          m.sender_id === conv.other_user_id && 
+          new Date(m.created_at).getTime() > Date.now() - 5 * 60 * 1000
+        );
+        
+        if (recentMessages.length > 0) {
+          onlineSet.add(conv.other_user_id);
+        }
+      });
+      
+      setOnlineUsers(onlineSet);
+    };
+
+    updateOnlineStatus();
+    const interval = setInterval(updateOnlineStatus, 30000);
+    
+    return () => clearInterval(interval);
+  }, [conversations, messages, user?.id, open]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -511,9 +552,27 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
                       }}
                     >
                       <ListItemAvatar>
-                        <Avatar src={getImageUrl(resultUser.profile_image_url)}>
-                          {getUserDisplayName(resultUser).charAt(0).toUpperCase()}
-                        </Avatar>
+                        <Badge
+                          overlap="circular"
+                          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                          badgeContent={
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                bgcolor: 'success.main',
+                                border: '2px solid',
+                                borderColor: 'background.paper',
+                              }}
+                            />
+                          }
+                          invisible={!isUserOnline(resultUser.id || 0)}
+                        >
+                          <Avatar src={getImageUrl(resultUser.profile_image_url)}>
+                            {getUserDisplayName(resultUser).charAt(0).toUpperCase()}
+                          </Avatar>
+                        </Badge>
                       </ListItemAvatar>
                       <ListItemText
                         primary={getUserDisplayName(resultUser)}
@@ -567,19 +626,45 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
                     }}
                   >
                     <ListItemAvatar>
-                      <Badge badgeContent={conversation.unread_count} color="error" invisible={conversation.unread_count === 0}>
-                        <Avatar sx={{ width: 32, height: 32 }}>
-                          {conversation.listing_image ? (
-                            <img
-                              src={getImageUrl(conversation.listing_image)}
-                              alt={conversation.listing_title || 'Chat'}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      <Box sx={{ position: 'relative' }}>
+                        <Badge
+                          overlap="circular"
+                          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                          badgeContent={
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                bgcolor: 'success.main',
+                                border: '2px solid',
+                                borderColor: 'background.paper',
+                              }}
                             />
-                          ) : (
-                            <ChatIcon fontSize="small" />
-                          )}
-                        </Avatar>
-                      </Badge>
+                          }
+                          invisible={!isUserOnline(conversation.other_user_id)}
+                        >
+                          <Badge 
+                            badgeContent={conversation.unread_count} 
+                            color="error" 
+                            invisible={conversation.unread_count === 0}
+                            overlap="rectangular"
+                            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                          >
+                            <Avatar sx={{ width: 32, height: 32 }}>
+                              {conversation.listing_image ? (
+                                <img
+                                  src={getImageUrl(conversation.listing_image)}
+                                  alt={conversation.listing_title || 'Chat'}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              ) : (
+                                <ChatIcon fontSize="small" />
+                              )}
+                            </Avatar>
+                          </Badge>
+                        </Badge>
+                      </Box>
                     </ListItemAvatar>
                     <ListItemText
                       primary={
@@ -619,17 +704,35 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
                   value={conversation.id}
                   label={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 24, height: 24 }}>
-                        {conversation.listing_image ? (
-                          <img
-                            src={getImageUrl(conversation.listing_image)}
-                            alt={conversation.listing_title || 'Chat'}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      <Badge
+                        overlap="circular"
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                        badgeContent={
+                          <Box
+                            sx={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: '50%',
+                              bgcolor: 'success.main',
+                              border: '1.5px solid',
+                              borderColor: 'background.paper',
+                            }}
                           />
-                        ) : (
-                          <ChatIcon sx={{ fontSize: 16 }} />
-                        )}
-                      </Avatar>
+                        }
+                        invisible={!isUserOnline(conversation.other_user_id)}
+                      >
+                        <Avatar sx={{ width: 24, height: 24 }}>
+                          {conversation.listing_image ? (
+                            <img
+                              src={getImageUrl(conversation.listing_image)}
+                              alt={conversation.listing_title || 'Chat'}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <ChatIcon sx={{ fontSize: 16 }} />
+                          )}
+                        </Avatar>
+                      </Badge>
                       <Typography variant="body2" noWrap sx={{ maxWidth: 100 }}>
                         {getOtherUserName(conversation)}
                       </Typography>
@@ -671,17 +774,35 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
                     const conv = conversations.find(c => c.id === selectedConversation);
                     return (
                       <>
-                        <Avatar sx={{ width: 32, height: 32 }}>
-                          {conv?.listing_image ? (
-                            <img
-                              src={getImageUrl(conv.listing_image)}
-                              alt={conv.listing_title || 'Chat'}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        <Badge
+                          overlap="circular"
+                          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                          badgeContent={
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                bgcolor: 'success.main',
+                                border: '2px solid',
+                                borderColor: 'background.paper',
+                              }}
                             />
-                          ) : (
-                            <ChatIcon sx={{ fontSize: 18 }} />
-                          )}
-                        </Avatar>
+                          }
+                          invisible={!isUserOnline(conv?.other_user_id || 0)}
+                        >
+                          <Avatar sx={{ width: 32, height: 32 }}>
+                            {conv?.listing_image ? (
+                              <img
+                                src={getImageUrl(conv.listing_image)}
+                                alt={conv.listing_title || 'Chat'}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <ChatIcon sx={{ fontSize: 18 }} />
+                            )}
+                          </Avatar>
+                        </Badge>
                         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                           <Typography variant="subtitle2" fontWeight={600} noWrap>
                             {conv ? getOtherUserName(conv) : 'Chat'}

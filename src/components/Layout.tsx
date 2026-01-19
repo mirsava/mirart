@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import Header from './Header';
 import Footer from './Footer';
 import ChatWidget from './ChatWidget';
+import DeactivatedUserBanner from './DeactivatedUserBanner';
 import { useChat } from '../contexts/ChatContext';
 
 interface LayoutProps {
@@ -22,11 +23,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       }}
     >
       <Header />
+      <DeactivatedUserBanner />
       <Box 
         component="main" 
         sx={{ 
           flexGrow: 1,
-          pt: { xs: 9, sm: 9 },
+          pt: { xs: '72px', sm: '80px' },
         }}
       >
         {children}

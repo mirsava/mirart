@@ -56,6 +56,7 @@ const CreateListing: React.FC = () => {
     status: 'draft' as 'draft',
     shipping_info: '',
     returns_info: '',
+    special_instructions: '',
     allow_comments: true,
   });
 
@@ -71,6 +72,7 @@ const CreateListing: React.FC = () => {
           setFormData(prev => ({
             ...prev,
             allow_comments: data.default_allow_comments !== false,
+            special_instructions: data.default_special_instructions || '',
           }));
         }
       } catch (error) {
@@ -314,8 +316,9 @@ const CreateListing: React.FC = () => {
         year: formData.year ? parseInt(formData.year) : undefined,
         in_stock: formData.in_stock,
         status: 'draft',
-        shipping_info: formData.shipping_info || undefined,
-        returns_info: formData.returns_info || undefined,
+        shipping_info: formData.shipping_info && formData.shipping_info.trim() ? formData.shipping_info.trim() : undefined,
+        returns_info: formData.returns_info && formData.returns_info.trim() ? formData.returns_info.trim() : undefined,
+        special_instructions: formData.special_instructions && formData.special_instructions.trim() ? formData.special_instructions.trim() : undefined,
         allow_comments: formData.allow_comments,
       };
 
@@ -710,6 +713,21 @@ const CreateListing: React.FC = () => {
                         onChange={handleChange}
                         placeholder="e.g., 30-day return policy, Full refund if returned in original condition, Buyer pays return shipping"
                         helperText="Specify your return and refund policy"
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={4}
+                        label="Special Instructions"
+                        name="special_instructions"
+                        value={formData.special_instructions}
+                        onChange={handleChange}
+                        placeholder="Add any special instructions or notes for buyers (e.g., framing recommendations, care instructions, customization options)..."
+                        helperText="This will be prominently displayed on your listing page"
                         sx={{ bgcolor: 'background.default' }}
                       />
                     </Grid>

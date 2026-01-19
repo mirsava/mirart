@@ -130,6 +130,7 @@ const ArtistDashboard: React.FC = () => {
     default_allow_comments: true,
     email_notifications: true,
     comment_notifications: true,
+    default_special_instructions: '',
   });
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -333,7 +334,14 @@ const ArtistDashboard: React.FC = () => {
       const response = await fetch(`${API_BASE_URL}/users/${user.id}/settings`);
       if (!response.ok) throw new Error('Failed to fetch settings');
       const data = await response.json();
-      setSettings(data);
+      setSettings({
+        default_allow_comments: data.default_allow_comments !== undefined ? data.default_allow_comments : true,
+        email_notifications: data.email_notifications !== undefined ? data.email_notifications : true,
+        comment_notifications: data.comment_notifications !== undefined ? data.comment_notifications : true,
+        default_special_instructions: data.default_special_instructions !== undefined && data.default_special_instructions !== null
+          ? String(data.default_special_instructions)
+          : '',
+      });
     } catch (err: any) {
       setSettingsError(err.message || 'Failed to load settings');
     } finally {
@@ -341,11 +349,14 @@ const ArtistDashboard: React.FC = () => {
     }
   };
 
-  const handleSettingsChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSettingsChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const target = event.target as HTMLInputElement;
     setSettings({
       ...settings,
-      [field]: event.target.checked,
+      [field]: target.type === 'checkbox' ? target.checked : target.value,
     });
+    if (settingsError) setSettingsError(null);
+    if (settingsSuccess) setSettingsSuccess(false);
   };
 
   const handleSettingsSubmit = async (event: React.FormEvent) => {
@@ -356,6 +367,13 @@ const ArtistDashboard: React.FC = () => {
     setSettingsError(null);
     setSettingsSuccess(false);
     
+    const payload = {
+      default_allow_comments: settings.default_allow_comments,
+      email_notifications: settings.email_notifications,
+      comment_notifications: settings.comment_notifications,
+      default_special_instructions: settings.default_special_instructions || '',
+    };
+    
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
       const response = await fetch(`${API_BASE_URL}/users/${user.id}/settings`, {
@@ -363,7 +381,7 @@ const ArtistDashboard: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -375,7 +393,15 @@ const ArtistDashboard: React.FC = () => {
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid response from server');
       }
-      setSettings(data);
+      const newSettings = {
+        default_allow_comments: data.default_allow_comments !== undefined ? data.default_allow_comments : settings.default_allow_comments,
+        email_notifications: data.email_notifications !== undefined ? data.email_notifications : settings.email_notifications,
+        comment_notifications: data.comment_notifications !== undefined ? data.comment_notifications : settings.comment_notifications,
+        default_special_instructions: data.default_special_instructions !== undefined && data.default_special_instructions !== null 
+          ? String(data.default_special_instructions) 
+          : (settings.default_special_instructions || ''),
+      };
+      setSettings(newSettings);
       setSettingsSuccess(true);
       enqueueSnackbar('Settings saved successfully!', { variant: 'success' });
       
@@ -1025,6 +1051,27 @@ const ArtistDashboard: React.FC = () => {
                             </Typography>
                           </Box>
                         }
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Divider sx={{ my: 2 }} />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                        Default Special Instructions
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={4}
+                        label="Default Special Instructions"
+                        value={settings.default_special_instructions || ''}
+                        onChange={handleSettingsChange('default_special_instructions')}
+                        placeholder="Enter default special instructions that will be pre-filled for all new listings (e.g., framing recommendations, care instructions, customization options)..."
+                        helperText="This will be automatically filled in when creating new listings. You can edit it for individual listings."
+                        sx={{ bgcolor: 'background.default' }}
                       />
                     </Grid>
 

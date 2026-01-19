@@ -36,6 +36,7 @@ import {
   Comment as CommentIcon,
   Delete as DeleteIcon,
   Reply as ReplyIcon,
+  InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
@@ -52,11 +53,12 @@ const PaintingDetail: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { openChat } = useChat();
   const { enqueueSnackbar } = useSnackbar();
-  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean }) | null>(null);
+  const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; special_instructions?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean }) | null>(null);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [defaultSpecialInstructions, setDefaultSpecialInstructions] = useState<string>('');
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [liking, setLiking] = useState(false);
@@ -81,7 +83,7 @@ const PaintingDetail: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean } => {
+  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; special_instructions?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean } => {
     return {
       id: listing.id,
       title: listing.title,
@@ -100,6 +102,7 @@ const PaintingDetail: React.FC = () => {
       inStock: listing.in_stock,
       shipping_info: listing.shipping_info,
       returns_info: listing.returns_info,
+      special_instructions: listing.special_instructions,
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
       allow_comments: listing.allow_comments !== false && listing.allow_comments !== 0,
@@ -187,6 +190,26 @@ const PaintingDetail: React.FC = () => {
             }
             
             const convertedPainting = convertListingToPainting(listing);
+            
+            // Fetch artist's default special instructions if listing doesn't have one
+            if (!convertedPainting.special_instructions || !convertedPainting.special_instructions.trim()) {
+              try {
+                const artistUsername = convertedPainting.artistUsername;
+                if (artistUsername) {
+                  const settingsUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/users/${artistUsername}/settings`;
+                  const settingsResponse = await fetch(settingsUrl);
+                  if (settingsResponse.ok) {
+                    const settingsData = await settingsResponse.json();
+                    if (settingsData.default_special_instructions && settingsData.default_special_instructions.trim()) {
+                      setDefaultSpecialInstructions(settingsData.default_special_instructions);
+                    }
+                  }
+                }
+              } catch (err) {
+                // Silently fail, use empty default
+              }
+            }
+            
             setPainting(convertedPainting);
             setIsLiked(convertedPainting.isLiked || false);
             setLikeCount(convertedPainting.likeCount || 0);
@@ -749,33 +772,129 @@ const PaintingDetail: React.FC = () => {
                   </Box>
                 </Box>
 
-                {(painting.shipping_info || painting.returns_info) && (
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="h6" gutterBottom>
-                      Shipping & Returns
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Shipping & Returns
+                  </Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Shipping
                     </Typography>
-                    {painting.shipping_info && (
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Shipping
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
-                          {painting.shipping_info}
-                        </Typography>
-                      </Box>
-                    )}
-                    {painting.returns_info && (
-                      <Box>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Returns & Refunds
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
-                          {painting.returns_info}
-                        </Typography>
-                      </Box>
+                    {painting.shipping_info && painting.shipping_info.trim() ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+                        {painting.shipping_info}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', opacity: 0.7 }}>
+                        No shipping information provided by the artist.
+                      </Typography>
                     )}
                   </Box>
-                )}
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Returns & Refunds
+                    </Typography>
+                    {painting.returns_info && painting.returns_info.trim() ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+                        {painting.returns_info}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', opacity: 0.7 }}>
+                        No returns and refunds policy provided by the artist.
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+
+                <Box sx={{ mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 40,
+                        height: 40,
+                        borderRadius: 2,
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                        boxShadow: '0 4px 12px rgba(74, 58, 154, 0.2)',
+                      }}
+                    >
+                      <InfoIcon sx={{ fontSize: 20 }} />
+                    </Box>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontWeight: 600,
+                        color: 'text.primary',
+                        letterSpacing: '-0.01em',
+                      }}
+                    >
+                      Special Instructions
+                    </Typography>
+                  </Box>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 3.5,
+                      bgcolor: 'background.paper',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 3,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      background: 'linear-gradient(135deg, rgba(74, 58, 154, 0.03) 0%, rgba(74, 58, 154, 0.01) 100%)',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: '0 4px 16px rgba(74, 58, 154, 0.08)',
+                        borderColor: 'primary.light',
+                      },
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: 4,
+                        height: '100%',
+                        background: 'linear-gradient(180deg, #4a3a9a 0%, #534bae 100%)',
+                        borderRadius: '3px 0 0 3px',
+                      },
+                    }}
+                  >
+                    {(painting.special_instructions && painting.special_instructions.trim()) || (defaultSpecialInstructions && defaultSpecialInstructions.trim()) ? (
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          whiteSpace: 'pre-line',
+                          lineHeight: 1.8,
+                          color: 'text.primary',
+                          fontSize: '0.95rem',
+                          pl: 1,
+                          fontWeight: 400,
+                        }}
+                      >
+                        {painting.special_instructions && painting.special_instructions.trim() 
+                          ? painting.special_instructions 
+                          : defaultSpecialInstructions}
+                      </Typography>
+                    ) : (
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary" 
+                        sx={{ 
+                          fontStyle: 'italic',
+                          opacity: 0.65,
+                          pl: 1,
+                          lineHeight: 1.7,
+                        }}
+                      >
+                        No special instructions provided by the artist.
+                      </Typography>
+                    )}
+                  </Paper>
+                </Box>
               </Box>
 
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>

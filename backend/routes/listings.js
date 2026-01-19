@@ -288,7 +288,7 @@ router.get('/:id', async (req, res) => {
       [id]
     );
     
-    res.json({
+    const responseData = {
       ...rows[0],
       price: rows[0].price ? parseFloat(rows[0].price) : null,
       like_count: rows[0].like_count || 0,
@@ -324,7 +324,18 @@ router.get('/:id', async (req, res) => {
           return null;
         }
       })()
-    });
+    };
+    
+    // Ensure special_instructions is always included
+    if ('special_instructions' in rows[0]) {
+      responseData.special_instructions = rows[0].special_instructions !== null && rows[0].special_instructions !== undefined
+        ? String(rows[0].special_instructions)
+        : null;
+    } else {
+      responseData.special_instructions = null;
+    }
+    
+    res.json(responseData);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -422,14 +433,14 @@ router.post('/', async (req, res) => {
       }
     }
     
-    const { shipping_info, returns_info } = req.body;
+    const { shipping_info, returns_info, special_instructions } = req.body;
     
     const [result] = await pool.execute(
       `INSERT INTO listings (
         user_id, title, description, category, subcategory,
         price, primary_image_url, image_urls, dimensions, medium, year,
-        in_stock, status, shipping_info, returns_info, allow_comments
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        in_stock, status, shipping_info, returns_info, special_instructions, allow_comments
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user_id,
         title,
@@ -446,6 +457,7 @@ router.post('/', async (req, res) => {
         listingStatus,
         (shipping_info && shipping_info.trim()) || null,
         (returns_info && returns_info.trim()) || null,
+        (special_instructions && special_instructions.trim()) || null,
         allow_comments !== undefined ? Boolean(allow_comments) : true
       ]
     );
@@ -633,7 +645,7 @@ router.put('/:id', async (req, res) => {
     const updateFields = [];
     const updateValues = [];
     
-    const { shipping_info, returns_info } = req.body;
+    const { shipping_info, returns_info, special_instructions } = req.body;
     
     if (title !== undefined) { updateFields.push('title = ?'); updateValues.push(title); }
     if (description !== undefined) { updateFields.push('description = ?'); updateValues.push(description); }
@@ -652,6 +664,7 @@ router.put('/:id', async (req, res) => {
     }
     if (shipping_info !== undefined) { updateFields.push('shipping_info = ?'); updateValues.push((shipping_info && shipping_info.trim()) || null); }
     if (returns_info !== undefined) { updateFields.push('returns_info = ?'); updateValues.push((returns_info && returns_info.trim()) || null); }
+    if (special_instructions !== undefined) { updateFields.push('special_instructions = ?'); updateValues.push((special_instructions && special_instructions.trim()) || null); }
     if (allow_comments !== undefined) { updateFields.push('allow_comments = ?'); updateValues.push(Boolean(allow_comments)); }
     
     updateValues.push(id);

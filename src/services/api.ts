@@ -15,6 +15,7 @@ export interface User {
   bio?: string;
   profile_image_url?: string;
   signature_url?: string;
+  active?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -42,6 +43,7 @@ export interface Listing {
   signature_url?: string;
   shipping_info?: string;
   returns_info?: string;
+  special_instructions?: string;
   like_count?: number;
   is_liked?: boolean;
   allow_comments?: boolean;
@@ -112,7 +114,18 @@ class ApiService {
 
   // User endpoints
   async getUser(cognitoUsername: string): Promise<User> {
-    return this.request<User>(`/users/${cognitoUsername}`);
+    const user = await this.request<User>(`/users/${cognitoUsername}?requestingUser=${cognitoUsername}`);
+    // Ensure active is converted to boolean
+    if (user.active !== undefined) {
+      user.active = Boolean(user.active);
+    }
+    return user;
+  }
+
+  async reactivateUser(cognitoUsername: string): Promise<{ success: boolean; message: string; user: User }> {
+    return this.request<{ success: boolean; message: string; user: User }>(`/users/${cognitoUsername}/reactivate?requestingUser=${cognitoUsername}`, {
+      method: 'PUT',
+    });
   }
 
   async createOrUpdateUser(userData: Partial<User>): Promise<User> {
@@ -377,6 +390,28 @@ class ApiService {
     return this.request<{ success: boolean }>(`/admin/users/${targetCognitoUsername}/user-type?cognitoUsername=${cognitoUsername}`, {
       method: 'PUT',
       body: JSON.stringify({ user_type: userType }),
+    });
+  }
+
+  async activateUser(cognitoUsername: string, userId: number, groups?: string[]): Promise<{ success: boolean; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<{ success: boolean; message: string }>(`/admin/users/${userId}/activate?${params.toString()}`, {
+      method: 'PUT',
+    });
+  }
+
+  async deactivateUser(cognitoUsername: string, userId: number, groups?: string[]): Promise<{ success: boolean; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<{ success: boolean; message: string }>(`/admin/users/${userId}/deactivate?${params.toString()}`, {
+      method: 'PUT',
     });
   }
 

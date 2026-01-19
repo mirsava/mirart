@@ -57,7 +57,7 @@ router.get('/:cognitoUsername', async (req, res) => {
     const { requestingUser } = req.query;
     
     const [rows] = await pool.execute(
-      'SELECT * FROM users WHERE cognito_username = ?',
+      'SELECT *, COALESCE(active, 1) as active FROM users WHERE cognito_username = ?',
       [cognitoUsername]
     );
     
@@ -66,6 +66,8 @@ router.get('/:cognitoUsername', async (req, res) => {
     }
     
     const user = rows[0];
+    // Convert MySQL TINYINT (0/1) to boolean
+    user.active = Boolean(user.active);
     
     if (requestingUser && requestingUser === cognitoUsername) {
       res.json(user);
@@ -184,7 +186,7 @@ router.get('/:cognitoUsername/settings', async (req, res) => {
     const { cognitoUsername } = req.params;
     
     const [rows] = await pool.execute(
-      'SELECT default_allow_comments, email_notifications, comment_notifications FROM users WHERE cognito_username = ?',
+      'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions FROM users WHERE cognito_username = ?',
       [cognitoUsername]
     );
     
@@ -192,11 +194,18 @@ router.get('/:cognitoUsername/settings', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json({
+    const specialInstructions = rows[0].default_special_instructions !== null && rows[0].default_special_instructions !== undefined
+      ? String(rows[0].default_special_instructions)
+      : '';
+    
+    const responseData = {
       default_allow_comments: rows[0].default_allow_comments !== 0,
       email_notifications: rows[0].email_notifications !== 0,
       comment_notifications: rows[0].comment_notifications !== 0,
-    });
+      default_special_instructions: specialInstructions,
+    };
+    
+    res.json(responseData);
   } catch (error) {
     console.error('Error fetching user settings:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -207,39 +216,111 @@ router.get('/:cognitoUsername/settings', async (req, res) => {
 router.put('/:cognitoUsername/settings', async (req, res) => {
   try {
     const { cognitoUsername } = req.params;
-    const { default_allow_comments, email_notifications, comment_notifications } = req.body;
+    const { default_allow_comments, email_notifications, comment_notifications, default_special_instructions } = req.body;
     
-    await pool.execute(
-      `UPDATE users SET 
-        default_allow_comments = ?,
-        email_notifications = ?,
-        comment_notifications = ?
-      WHERE cognito_username = ?`,
-      [
-        default_allow_comments !== undefined ? (default_allow_comments ? 1 : 0) : null,
-        email_notifications !== undefined ? (email_notifications ? 1 : 0) : null,
-        comment_notifications !== undefined ? (comment_notifications ? 1 : 0) : null,
-        cognitoUsername
-      ]
-    );
+    let specialInstructionsValue = null;
+    if (default_special_instructions !== undefined && default_special_instructions !== null) {
+      if (typeof default_special_instructions === 'string') {
+        const trimmed = default_special_instructions.trim();
+        specialInstructionsValue = trimmed.length > 0 ? trimmed : null;
+      } else {
+        specialInstructionsValue = String(default_special_instructions);
+      }
+    }
     
-    const [updated] = await pool.execute(
-      'SELECT default_allow_comments, email_notifications, comment_notifications FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
+    const updateParams = [
+      default_allow_comments !== undefined ? (default_allow_comments ? 1 : 0) : null,
+      email_notifications !== undefined ? (email_notifications ? 1 : 0) : null,
+      comment_notifications !== undefined ? (comment_notifications ? 1 : 0) : null,
+      specialInstructionsValue,
+      cognitoUsername
+    ];
+    
+    let updateResult;
+    try {
+      updateResult = await pool.execute(
+        `UPDATE users SET 
+          default_allow_comments = ?,
+          email_notifications = ?,
+          comment_notifications = ?,
+          default_special_instructions = ?
+        WHERE cognito_username = ?`,
+        updateParams
+      );
+    } catch (updateError) {
+      if (updateError.code === 'ER_BAD_FIELD_ERROR' && updateError.message?.includes('default_special_instructions')) {
+        updateResult = await pool.execute(
+          `UPDATE users SET 
+            default_allow_comments = ?,
+            email_notifications = ?,
+            comment_notifications = ?
+          WHERE cognito_username = ?`,
+          [
+            default_allow_comments !== undefined ? (default_allow_comments ? 1 : 0) : null,
+            email_notifications !== undefined ? (email_notifications ? 1 : 0) : null,
+            comment_notifications !== undefined ? (comment_notifications ? 1 : 0) : null,
+            cognitoUsername
+          ]
+        );
+      } else {
+        throw updateError;
+      }
+    }
+    
+    let updated;
+    let hasSpecialInstructionsColumn = false;
+    try {
+      [updated] = await pool.execute(
+        'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions FROM users WHERE cognito_username = ?',
+        [cognitoUsername]
+      );
+      hasSpecialInstructionsColumn = updated.length > 0 && 'default_special_instructions' in updated[0];
+    } catch (selectError) {
+      if (selectError.code === 'ER_BAD_FIELD_ERROR' && selectError.message?.includes('default_special_instructions')) {
+        [updated] = await pool.execute(
+          'SELECT default_allow_comments, email_notifications, comment_notifications FROM users WHERE cognito_username = ?',
+          [cognitoUsername]
+        );
+        hasSpecialInstructionsColumn = false;
+      } else {
+        throw selectError;
+      }
+    }
     
     if (updated.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json({
+    // ALWAYS include default_special_instructions in response
+    const responseData = {
       default_allow_comments: updated[0].default_allow_comments !== 0,
       email_notifications: updated[0].email_notifications !== 0,
       comment_notifications: updated[0].comment_notifications !== 0,
-    });
+    };
+    
+    // Get default_special_instructions value
+    if (hasSpecialInstructionsColumn && 'default_special_instructions' in updated[0]) {
+      const dbValue = updated[0].default_special_instructions;
+      responseData.default_special_instructions = (dbValue !== null && dbValue !== undefined) 
+        ? String(dbValue) 
+        : '';
+    } else {
+      // Column not in SELECT result - use value from request if available
+      const requestValue = (default_special_instructions && typeof default_special_instructions === 'string') 
+        ? default_special_instructions.trim() 
+        : '';
+      responseData.default_special_instructions = requestValue;
+    }
+    
+    res.json(responseData);
   } catch (error) {
     console.error('Error updating user settings:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    if (error.code === 'ER_BAD_FIELD_ERROR' || error.message?.includes('default_special_instructions')) {
+      return res.status(500).json({ 
+        error: 'Database column missing. Please run the migration: ALTER TABLE users ADD COLUMN default_special_instructions TEXT DEFAULT NULL AFTER comment_notifications;' 
+      });
+    }
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
@@ -292,6 +373,47 @@ router.put('/:cognitoUsername', async (req, res) => {
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Reactivate user account (self-service)
+router.put('/:cognitoUsername/reactivate', async (req, res) => {
+  try {
+    const { cognitoUsername } = req.params;
+    const { requestingUser } = req.query;
+    
+    // Only allow users to reactivate themselves
+    if (!requestingUser || requestingUser !== cognitoUsername) {
+      return res.status(403).json({ error: 'You can only reactivate your own account' });
+    }
+    
+    // Check if active column exists
+    try {
+      await pool.execute('UPDATE users SET active = 1 WHERE cognito_username = ?', [cognitoUsername]);
+      
+      const [updated] = await pool.execute(
+        'SELECT *, COALESCE(active, 1) as active FROM users WHERE cognito_username = ?',
+        [cognitoUsername]
+      );
+      
+      if (updated.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      const user = updated[0];
+      user.active = Boolean(user.active);
+      
+      res.json({ success: true, message: 'Account reactivated successfully', user });
+    } catch (error) {
+      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('active')) {
+        res.status(400).json({ error: 'Active column does not exist. Please contact support.' });
+      } else {
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('Error reactivating user:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

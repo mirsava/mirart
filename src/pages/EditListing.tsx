@@ -47,6 +47,7 @@ const EditListing: React.FC = () => {
     status: 'draft' as 'draft',
     shipping_info: '',
     returns_info: '',
+    special_instructions: '',
     allow_comments: true,
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -141,6 +142,7 @@ const EditListing: React.FC = () => {
         status: listing.status || 'draft',
         shipping_info: listing.shipping_info || '',
         returns_info: listing.returns_info || '',
+        special_instructions: listing.special_instructions || '',
         allow_comments: listing.allow_comments === true || listing.allow_comments === 1 || (listing.allow_comments !== false && listing.allow_comments !== 0),
       });
 
@@ -405,8 +407,9 @@ const EditListing: React.FC = () => {
         year: formData.year ? parseInt(formData.year) : undefined,
         in_stock: formData.in_stock,
         status: formData.status,
-        shipping_info: formData.shipping_info || undefined,
-        returns_info: formData.returns_info || undefined,
+        shipping_info: formData.shipping_info && formData.shipping_info.trim() ? formData.shipping_info.trim() : undefined,
+        returns_info: formData.returns_info && formData.returns_info.trim() ? formData.returns_info.trim() : undefined,
+        special_instructions: formData.special_instructions && formData.special_instructions.trim() ? formData.special_instructions.trim() : undefined,
         allow_comments: Boolean(formData.allow_comments),
       };
 
@@ -722,6 +725,20 @@ const EditListing: React.FC = () => {
                   onChange={handleChange}
                   placeholder="e.g., 30-day return policy, Full refund if returned in original condition, Buyer pays return shipping"
                   helperText="Specify your return and refund policy"
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Special Instructions"
+                  name="special_instructions"
+                  value={formData.special_instructions}
+                  onChange={handleChange}
+                  placeholder="Add any special instructions or notes for buyers (e.g., framing recommendations, care instructions, customization options)..."
+                  helperText="This will be prominently displayed on your listing page"
                 />
               </Grid>
 

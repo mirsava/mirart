@@ -42,6 +42,8 @@ import {
   MoreVert as MoreVertIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
+  Block as BlockIcon,
+  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
@@ -99,6 +101,10 @@ const AdminDashboard: React.FC = () => {
   const [statusChanging, setStatusChanging] = useState<number | null>(null);
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
   const [listingToChangeStatus, setListingToChangeStatus] = useState<{ id: number; currentStatus: string } | null>(null);
+  const [activatingUser, setActivatingUser] = useState<number | null>(null);
+  const [deactivatingUser, setDeactivatingUser] = useState<number | null>(null);
+  const [deactivateUserConfirmOpen, setDeactivateUserConfirmOpen] = useState(false);
+  const [userToDeactivate, setUserToDeactivate] = useState<number | null>(null);
   const [newStatus, setNewStatus] = useState<'draft' | 'active' | 'inactive' | 'sold' | 'archived'>('active');
 
   useEffect(() => {
@@ -221,6 +227,50 @@ const AdminDashboard: React.FC = () => {
     } catch (error: any) {
       enqueueSnackbar(error.message || 'Failed to update user type', { variant: 'error' });
     }
+  };
+
+  const handleActivateUser = async (userId: number): Promise<void> => {
+    if (!user?.id) return;
+
+    setActivatingUser(userId);
+    try {
+      await apiService.activateUser(user.id, userId, user.groups);
+      enqueueSnackbar('User activated successfully', { variant: 'success' });
+      handleUserMenuClose();
+      fetchUsers();
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to activate user', { variant: 'error' });
+    } finally {
+      setActivatingUser(null);
+    }
+  };
+
+  const handleDeactivateUserClick = (userId: number): void => {
+    setUserToDeactivate(userId);
+    setDeactivateUserConfirmOpen(true);
+    handleUserMenuClose();
+  };
+
+  const handleDeactivateUserConfirm = async (): Promise<void> => {
+    if (!user?.id || !userToDeactivate) return;
+
+    setDeactivatingUser(userToDeactivate);
+    try {
+      await apiService.deactivateUser(user.id, userToDeactivate, user.groups);
+      enqueueSnackbar('User deactivated successfully', { variant: 'success' });
+      setDeactivateUserConfirmOpen(false);
+      setUserToDeactivate(null);
+      fetchUsers();
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to deactivate user', { variant: 'error' });
+    } finally {
+      setDeactivatingUser(null);
+    }
+  };
+
+  const handleDeactivateUserCancel = (): void => {
+    setDeactivateUserConfirmOpen(false);
+    setUserToDeactivate(null);
   };
 
   const handleInactivateClick = (listingId: number): void => {
@@ -549,6 +599,7 @@ const AdminDashboard: React.FC = () => {
                     <TableCell>User</TableCell>
                     <TableCell>Email</TableCell>
                     <TableCell>Type</TableCell>
+                    <TableCell>Status</TableCell>
                     <TableCell>Created</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
@@ -580,6 +631,13 @@ const AdminDashboard: React.FC = () => {
                           label={userData.user_type || 'artist'} 
                           size="small"
                           color={userData.user_type === 'admin' ? 'error' : userData.user_type === 'buyer' ? 'info' : 'primary'}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={!userData.active || userData.active === 0 || userData.active === false ? 'Inactive' : 'Active'} 
+                          size="small"
+                          color={!userData.active || userData.active === 0 || userData.active === false ? 'error' : 'success'}
                         />
                       </TableCell>
                       <TableCell>
@@ -791,6 +849,32 @@ const AdminDashboard: React.FC = () => {
             <EditIcon sx={{ mr: 1 }} />
             Change User Type
           </MenuItem>
+          {selectedUser && (selectedUser.active !== false && selectedUser.active !== 0 && selectedUser.active) && (
+            <MenuItem
+              onClick={() => {
+                if (selectedUser) {
+                  handleDeactivateUserClick(selectedUser.id);
+                }
+              }}
+              disabled={deactivatingUser === selectedUser?.id}
+            >
+              <BlockIcon sx={{ mr: 1 }} />
+              Deactivate User
+            </MenuItem>
+          )}
+          {selectedUser && (!selectedUser.active || selectedUser.active === 0 || selectedUser.active === false) && (
+            <MenuItem
+              onClick={() => {
+                if (selectedUser) {
+                  handleActivateUser(selectedUser.id);
+                }
+              }}
+              disabled={activatingUser === selectedUser?.id}
+            >
+              <CheckCircleIcon sx={{ mr: 1 }} />
+              {activatingUser === selectedUser?.id ? 'Activating...' : 'Activate User'}
+            </MenuItem>
+          )}
         </Menu>
 
         <Dialog open={userTypeDialogOpen} onClose={() => setUserTypeDialogOpen(false)}>
@@ -886,6 +970,26 @@ const AdminDashboard: React.FC = () => {
               disabled={statusChanging !== null || newStatus === listingToChangeStatus?.currentStatus}
             >
               {statusChanging ? 'Updating...' : 'Update Status'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={deactivateUserConfirmOpen} onClose={handleDeactivateUserCancel}>
+          <DialogTitle>Deactivate User</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to deactivate this user? They will not be able to access their account until reactivated.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeactivateUserCancel}>Cancel</Button>
+            <Button
+              onClick={handleDeactivateUserConfirm}
+              color="error"
+              variant="contained"
+              disabled={deactivatingUser !== null}
+            >
+              {deactivatingUser ? 'Deactivating...' : 'Deactivate'}
             </Button>
           </DialogActions>
         </Dialog>
