@@ -23,6 +23,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Pagination,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -91,7 +92,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: 3, pb: 4 }}>{children}</Box>}
     </div>
   );
 }
@@ -112,6 +113,9 @@ const ArtistDashboard: React.FC = () => {
     totalLikes: 0,
   });
   const [recentListings, setRecentListings] = useState<Listing[]>([]);
+  const [listingsPage, setListingsPage] = useState(1);
+  const [listingsPagination, setListingsPagination] = useState<{ page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } | null>(null);
+  const [loadingListings, setLoadingListings] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<Listing | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -154,6 +158,12 @@ const ArtistDashboard: React.FC = () => {
     }
   }, [user?.id, tabValue]);
 
+  useEffect(() => {
+    if (user?.id && tabValue === 0) {
+      fetchListings();
+    }
+  }, [user?.id, listingsPage, tabValue]);
+
   const fetchDashboardData = async () => {
     if (!user?.id) return;
     
@@ -163,7 +173,7 @@ const ArtistDashboard: React.FC = () => {
     try {
       const data: DashboardData = await apiService.getDashboardData(user.id);
       setArtistStats(data.stats);
-      setRecentListings(data.recentListings || []);
+      // Don't set recentListings here anymore - we use paginated listings
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard data');
       // Set default values on error
@@ -178,6 +188,47 @@ const ArtistDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchListings = async () => {
+    if (!user?.id) return;
+    
+    setLoadingListings(true);
+    try {
+      const response = await apiService.getListings({
+        cognitoUsername: user.id,
+        page: listingsPage,
+        limit: 12,
+        sortBy: 'created_at',
+        sortOrder: 'DESC',
+      });
+      setRecentListings(response.listings || []);
+      if (response.pagination) {
+        setListingsPagination(response.pagination);
+      } else {
+        // Fallback pagination if API doesn't return it
+        const total = response.listings?.length || 0;
+        setListingsPagination({
+          page: listingsPage,
+          limit: 12,
+          total: total,
+          totalPages: Math.ceil(total / 12),
+          hasNext: false,
+          hasPrev: false,
+        });
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load listings');
+      setRecentListings([]);
+      setListingsPagination(null);
+    } finally {
+      setLoadingListings(false);
+    }
+  };
+
+  const handleListingsPageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
+    setListingsPage(value);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const fetchProfile = async () => {
@@ -311,6 +362,10 @@ const ArtistDashboard: React.FC = () => {
       setListingToDelete(null);
       enqueueSnackbar('Listing deleted successfully!', { variant: 'success' });
       await fetchDashboardData();
+      // Refresh listings if on the listings tab
+      if (tabValue === 0) {
+        await fetchListings();
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to delete listing');
       setDeleteDialogOpen(false);
@@ -557,7 +612,7 @@ const ArtistDashboard: React.FC = () => {
         </Grid>
 
         {/* Main Content Tabs */}
-        <Paper sx={{ width: '100%' }}>
+        <Paper sx={{ width: '100%', mb: 4 }}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="My Listings" />
@@ -568,38 +623,74 @@ const ArtistDashboard: React.FC = () => {
           </Box>
 
           <TabPanel value={tabValue} index={0}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6">Your Artwork</Typography>
-              <Button 
-                variant="contained" 
-                startIcon={<AddIcon />}
-                onClick={() => navigate('/create-listing')}
-              >
-                Add New Listing
-              </Button>
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <ArtTrackIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                      My Listings
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Manage your artwork listings and track their performance
+                    </Typography>
+                  </Box>
+                </Box>
+                <Button 
+                  variant="contained" 
+                  startIcon={<AddIcon />}
+                  onClick={() => navigate('/create-listing')}
+                  sx={{
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    px: 3,
+                    boxShadow: '0 4px 12px rgba(74, 58, 154, 0.2)',
+                    '&:hover': {
+                      boxShadow: '0 6px 16px rgba(74, 58, 154, 0.3)',
+                    },
+                  }}
+                >
+                  Add New Listing
+                </Button>
+              </Box>
             </Box>
             
-            <Grid container spacing={3}>
-              {recentListings.length === 0 ? (
-                <Grid item xs={12}>
-                  <Paper sx={{ p: 4, textAlign: 'center' }}>
-                    <Typography variant="h6" gutterBottom>
-                      No listings yet
+            {loadingListings ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                {listingsPagination && listingsPagination.total > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Showing {((listingsPagination.page - 1) * listingsPagination.limit) + 1} - {Math.min(listingsPagination.page * listingsPagination.limit, listingsPagination.total)} of {listingsPagination.total} listings
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Start selling your art by creating your first listing
-                    </Typography>
-                    <Button 
-                      variant="contained" 
-                      startIcon={<AddIcon />}
-                      onClick={() => navigate('/create-listing')}
-                    >
-                      Add New Listing
-                    </Button>
-                  </Paper>
-                </Grid>
-              ) : (
-                recentListings.map((listing) => (
+                  </Box>
+                )}
+                
+                <Grid container spacing={3}>
+                  {recentListings.length === 0 ? (
+                    <Grid item xs={12}>
+                      <Paper sx={{ p: 4, textAlign: 'center' }}>
+                        <Typography variant="h6" gutterBottom>
+                          No listings yet
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Start selling your art by creating your first listing
+                        </Typography>
+                        <Button 
+                          variant="contained" 
+                          startIcon={<AddIcon />}
+                          onClick={() => navigate('/create-listing')}
+                        >
+                          Add New Listing
+                        </Button>
+                      </Paper>
+                    </Grid>
+                  ) : (
+                    recentListings.map((listing) => (
                 <Grid item xs={12} sm={6} md={4} key={listing.id}>
                   <Card 
                     elevation={0}
@@ -741,9 +832,25 @@ const ArtistDashboard: React.FC = () => {
                     </CardContent>
                   </Card>
                 </Grid>
-                ))
-              )}
-            </Grid>
+                    ))
+                  )}
+                </Grid>
+
+                {listingsPagination && listingsPagination.total > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+                    <Pagination
+                      count={listingsPagination.totalPages || 1}
+                      page={listingsPagination.page || listingsPage}
+                      onChange={handleListingsPageChange}
+                      color="primary"
+                      size="large"
+                      showFirstButton
+                      showLastButton
+                    />
+                  </Box>
+                )}
+              </>
+            )}
           </TabPanel>
 
           <TabPanel value={tabValue} index={1}>
@@ -1105,9 +1212,17 @@ const ArtistDashboard: React.FC = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={2}>
-            <Typography variant="h6" gutterBottom>
-              Artist Profile
-            </Typography>
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <PersonIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  Artist Profile
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Manage your profile information and showcase your artistic identity
+              </Typography>
+            </Box>
 
             {profileError && (
               <Alert severity="error" sx={{ mb: 3 }} onClose={() => setProfileError(null)}>
@@ -1121,161 +1236,340 @@ const ArtistDashboard: React.FC = () => {
               </Alert>
             )}
 
-            <Paper sx={{ p: 4 }}>
-              <form onSubmit={handleProfileSubmit}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="First Name"
-                      value={profileFormData.firstName}
-                      onChange={handleProfileInputChange('firstName')}
-                      required
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Last Name"
-                      value={profileFormData.lastName}
-                      onChange={handleProfileInputChange('lastName')}
-                      required
-                    />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Email"
-                      value={profileData?.email || user?.email || ''}
-                      disabled
-                      helperText="Email cannot be changed"
-                    />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Business/Studio Name"
-                      value={profileFormData.businessName}
-                      onChange={handleProfileInputChange('businessName')}
-                      required
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Phone"
-                      value={profileFormData.phone}
-                      onChange={handleProfileInputChange('phone')}
-                      placeholder="+1234567890"
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Country"
-                      value={profileFormData.country}
-                      onChange={handleProfileInputChange('country')}
-                      required
-                    />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Website"
-                      value={profileFormData.website}
-                      onChange={handleProfileInputChange('website')}
-                      placeholder="https://yourwebsite.com"
-                    />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <FormControl fullWidth>
-                      <InputLabel>Experience Level</InputLabel>
-                      <Select
-                        name="experience"
-                        value={profileFormData.experience}
-                        onChange={handleProfileSelectChange}
-                        label="Experience Level"
+            <form onSubmit={handleProfileSubmit}>
+              <Grid container spacing={3}>
+                {/* Personal Information Section */}
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 4,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 3,
+                      background: 'linear-gradient(135deg, rgba(74, 58, 154, 0.03) 0%, rgba(74, 58, 154, 0.01) 100%)',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 40,
+                          height: 40,
+                          borderRadius: 2,
+                          bgcolor: 'primary.main',
+                          color: 'white',
+                        }}
                       >
-                        <MenuItem value="Just starting out">Just starting out</MenuItem>
-                        <MenuItem value="1-2 years">1-2 years</MenuItem>
-                        <MenuItem value="3-5 years">3-5 years</MenuItem>
-                        <MenuItem value="6-10 years">6-10 years</MenuItem>
-                        <MenuItem value="10+ years">10+ years</MenuItem>
-                        <MenuItem value="Professional">Professional</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Specialties
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {['Painting', 'Woodworking', 'Other'].map((specialty) => (
-                        <Chip
-                          key={specialty}
-                          label={specialty}
-                          onClick={() => handleSpecialtyChange(specialty)}
-                          color={profileFormData.specialties.includes(specialty) ? 'primary' : 'default'}
-                          variant={profileFormData.specialties.includes(specialty) ? 'filled' : 'outlined'}
+                        <PersonIcon sx={{ fontSize: 20 }} />
+                      </Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Personal Information
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ mb: 3 }} />
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="First Name"
+                          value={profileFormData.firstName}
+                          onChange={handleProfileInputChange('firstName')}
+                          required
+                          sx={{ bgcolor: 'background.paper' }}
                         />
-                      ))}
-                    </Box>
-                  </Grid>
+                      </Grid>
 
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={4}
-                      label="Bio"
-                      value={profileFormData.bio}
-                      onChange={handleProfileInputChange('bio')}
-                      placeholder="Tell us about yourself and your artistic journey..."
-                    />
-                  </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Last Name"
+                          value={profileFormData.lastName}
+                          onChange={handleProfileInputChange('lastName')}
+                          required
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
 
-                  <Grid item xs={12}>
-                    <SignatureInput
-                      value={profileFormData.signatureUrl}
-                      onChange={(url) => {
-                        setProfileFormData(prev => ({
-                          ...prev,
-                          signatureUrl: url || '',
-                        }));
-                      }}
-                      disabled={savingProfile}
-                    />
-                  </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label="Email"
+                          value={profileData?.email || user?.email || ''}
+                          disabled
+                          helperText="Email cannot be changed"
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
 
-                  <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={savingProfile}
-                        startIcon={savingProfile ? <CircularProgress size={20} /> : <EditIcon />}
-                      >
-                        {savingProfile ? 'Saving...' : 'Save Changes'}
-                      </Button>
-                    </Box>
-                  </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label="Business/Studio Name"
+                          value={profileFormData.businessName}
+                          onChange={handleProfileInputChange('businessName')}
+                          required
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </Paper>
                 </Grid>
-              </form>
-            </Paper>
+
+                {/* Contact Information Section */}
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 4,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 3,
+                      background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.03) 0%, rgba(33, 150, 243, 0.01) 100%)',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 40,
+                          height: 40,
+                          borderRadius: 2,
+                          bgcolor: 'info.main',
+                          color: 'white',
+                        }}
+                      >
+                        <EmailIcon sx={{ fontSize: 20 }} />
+                      </Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Contact Information
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ mb: 3 }} />
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Phone"
+                          value={profileFormData.phone}
+                          onChange={handleProfileInputChange('phone')}
+                          placeholder="+1234567890"
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Country"
+                          value={profileFormData.country}
+                          onChange={handleProfileInputChange('country')}
+                          required
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label="Website"
+                          value={profileFormData.website}
+                          onChange={handleProfileInputChange('website')}
+                          placeholder="https://yourwebsite.com"
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </Grid>
+
+                {/* Professional Information Section */}
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 4,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 3,
+                      background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.03) 0%, rgba(76, 175, 80, 0.01) 100%)',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 40,
+                          height: 40,
+                          borderRadius: 2,
+                          bgcolor: 'success.main',
+                          color: 'white',
+                        }}
+                      >
+                        <TrendingUpIcon sx={{ fontSize: 20 }} />
+                      </Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Professional Information
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ mb: 3 }} />
+                    <Grid container spacing={3}>
+                      <Grid item xs={12}>
+                        <FormControl fullWidth sx={{ bgcolor: 'background.paper' }}>
+                          <InputLabel>Experience Level</InputLabel>
+                          <Select
+                            name="experience"
+                            value={profileFormData.experience}
+                            onChange={handleProfileSelectChange}
+                            label="Experience Level"
+                          >
+                            <MenuItem value="Just starting out">Just starting out</MenuItem>
+                            <MenuItem value="1-2 years">1-2 years</MenuItem>
+                            <MenuItem value="3-5 years">3-5 years</MenuItem>
+                            <MenuItem value="6-10 years">6-10 years</MenuItem>
+                            <MenuItem value="10+ years">10+ years</MenuItem>
+                            <MenuItem value="Professional">Professional</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600, mb: 1.5 }}>
+                          Specialties
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                          {['Painting', 'Woodworking', 'Other'].map((specialty) => (
+                            <Chip
+                              key={specialty}
+                              label={specialty}
+                              onClick={() => handleSpecialtyChange(specialty)}
+                              color={profileFormData.specialties.includes(specialty) ? 'primary' : 'default'}
+                              variant={profileFormData.specialties.includes(specialty) ? 'filled' : 'outlined'}
+                              sx={{
+                                height: 36,
+                                fontSize: '0.875rem',
+                                fontWeight: profileFormData.specialties.includes(specialty) ? 600 : 400,
+                                transition: 'all 0.2s ease',
+                                '&:hover': {
+                                  transform: 'scale(1.05)',
+                                },
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          multiline
+                          rows={5}
+                          label="Bio"
+                          value={profileFormData.bio}
+                          onChange={handleProfileInputChange('bio')}
+                          placeholder="Tell us about yourself and your artistic journey..."
+                          helperText="Share your story, inspiration, and artistic background"
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </Grid>
+
+                {/* Signature Section */}
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 4,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 3,
+                      background: 'linear-gradient(135deg, rgba(156, 39, 176, 0.03) 0%, rgba(156, 39, 176, 0.01) 100%)',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 40,
+                          height: 40,
+                          borderRadius: 2,
+                          bgcolor: 'secondary.main',
+                          color: 'white',
+                        }}
+                      >
+                        <EditIcon sx={{ fontSize: 20 }} />
+                      </Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Digital Signature
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ mb: 3 }} />
+                    <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2 }}>
+                      <SignatureInput
+                        value={profileFormData.signatureUrl}
+                        onChange={(url) => {
+                          setProfileFormData(prev => ({
+                            ...prev,
+                            signatureUrl: url || '',
+                          }));
+                        }}
+                        disabled={savingProfile}
+                      />
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                {/* Submit Button */}
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      size="large"
+                      disabled={savingProfile}
+                      startIcon={savingProfile ? <CircularProgress size={20} /> : <PersonIcon />}
+                      sx={{
+                        px: 4,
+                        py: 1.5,
+                        borderRadius: 2,
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        boxShadow: '0 4px 12px rgba(74, 58, 154, 0.2)',
+                        '&:hover': {
+                          boxShadow: '0 6px 16px rgba(74, 58, 154, 0.3)',
+                        },
+                      }}
+                    >
+                      {savingProfile ? 'Saving...' : 'Save Profile'}
+                    </Button>
+                  </Box>
+                </Grid>
+              </Grid>
+            </form>
           </TabPanel>
 
           <TabPanel value={tabValue} index={3}>
-            <Typography variant="h6" gutterBottom>
-              Settings
-            </Typography>
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <SettingsIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  Settings
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Configure your account preferences and default listing settings
+              </Typography>
+            </Box>
 
             {settingsError && (
               <Alert severity="error" sx={{ mb: 3 }} onClose={() => setSettingsError(null)}>
