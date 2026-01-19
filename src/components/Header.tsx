@@ -58,6 +58,7 @@ const Header: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMediumScreen = useMediaQuery(theme.breakpoints.between('md', 'lg'));
 
   const menuItems = [
     { label: 'Home', path: '/' },
@@ -535,16 +536,18 @@ const Header: React.FC = () => {
                 <Box 
                   sx={{ 
                     display: 'flex', 
-                    gap: 0.5,
+                    gap: { md: 0.15, lg: 0.3, xl: 0.5 },
                     alignItems: 'center',
                     position: 'absolute',
                     left: '50%',
                     transform: 'translateX(-50%)',
                     bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
                     borderRadius: 3,
-                    p: 0.5,
+                    p: { md: 0.2, lg: 0.3, xl: 0.5 },
                     border: '1px solid',
                     borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+                    maxWidth: { md: 'calc(100% - 320px)', lg: 'calc(100% - 380px)', xl: 'none' },
+                    zIndex: 1,
                   }}
                 >
                   {menuItems.map((item) => (
@@ -556,14 +559,15 @@ const Header: React.FC = () => {
                           ? (isDarkMode ? 'white' : 'primary.main')
                           : (isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'),
                         fontWeight: location.pathname === item.path ? 600 : 500,
-                        fontSize: '0.9rem',
+                        fontSize: { md: '0.75rem', lg: '0.85rem', xl: '0.9rem' },
                         textTransform: 'none',
-                        px: { xs: 2, sm: 2.5 },
-                        py: 0.75,
+                        px: { md: 1, lg: 1.5, xl: 2.5 },
+                        py: { md: 0.4, lg: 0.6, xl: 0.75 },
                         borderRadius: 2.5,
                         position: 'relative',
                         transition: 'all 0.2s ease',
                         minWidth: 'auto',
+                        whiteSpace: 'nowrap',
                         bgcolor: location.pathname === item.path 
                           ? (isDarkMode 
                               ? 'linear-gradient(135deg, rgba(83, 75, 174, 0.3) 0%, rgba(25, 118, 210, 0.3) 100%)'
@@ -611,7 +615,7 @@ const Header: React.FC = () => {
               </Fade>
             )}
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 0.5, md: 0.75, lg: 0.75, xl: 1 }, ml: 'auto', flexShrink: 0 }}>
               {isAuthenticated && user ? (
                 <>
                   <Button
@@ -619,13 +623,32 @@ const Header: React.FC = () => {
                     onClick={() => navigate('/create-listing')}
                     startIcon={<AddIcon />}
                     sx={{
-                      mr: 1,
+                      mr: { xs: 0.5, sm: 0.5, md: 0.5, lg: 0.5, xl: 1 },
                       textTransform: 'none',
                       fontWeight: 500,
+                      display: { xs: 'none', md: 'none', lg: 'flex' },
+                      whiteSpace: 'nowrap',
+                      fontSize: { lg: '0.875rem', xl: '0.9375rem' },
+                      px: { lg: 1.5, xl: 2 },
                     }}
                   >
                     Create Listing
                   </Button>
+                  <IconButton
+                    onClick={() => navigate('/create-listing')}
+                    sx={{
+                      mr: { xs: 0.5, sm: 0.5, md: 0.5, lg: 0 },
+                      display: { xs: 'flex', md: 'flex', lg: 'none' },
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                      '&:hover': {
+                        bgcolor: 'primary.dark',
+                      },
+                    }}
+                    aria-label="Create Listing"
+                  >
+                    <AddIcon />
+                  </IconButton>
                   <Button
                     onClick={handleUserMenuOpen}
                     startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main' }}>
@@ -637,9 +660,11 @@ const Header: React.FC = () => {
                       fontWeight: 500,
                       bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
                       borderRadius: 2,
-                      px: 2,
+                      px: { xs: 1, sm: 2 },
                       py: 0.5,
                       textTransform: 'none',
+                      display: { xs: 'none', md: 'none', lg: 'flex' },
+                      whiteSpace: 'nowrap',
                       '&:hover': {
                         bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
                       },
@@ -647,6 +672,22 @@ const Header: React.FC = () => {
                   >
                     {user.name || user.id || 'User'}
                   </Button>
+                  <IconButton
+                    onClick={handleUserMenuOpen}
+                    sx={{
+                      display: { xs: 'flex', md: 'flex', lg: 'none' },
+                      color: isDarkMode ? 'white' : 'text.primary',
+                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
+                      '&:hover': {
+                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                      },
+                    }}
+                    aria-label="User menu"
+                  >
+                    <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main' }}>
+                      {user.name?.charAt(0).toUpperCase() || user.id?.charAt(0).toUpperCase() || 'U'}
+                    </Avatar>
+                  </IconButton>
                 </>
               ) : null}
               
