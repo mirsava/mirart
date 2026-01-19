@@ -35,6 +35,11 @@ import {
   Person as PersonIcon,
   Logout as LogoutIcon,
   Settings as SettingsIcon,
+  TrendingUp as TrendingUpIcon,
+  ArtTrack as ArtTrackIcon,
+  CheckCircle as CheckCircleIcon,
+  Message as MessageIcon,
+  BarChart as BarChartIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -742,42 +747,356 @@ const ArtistDashboard: React.FC = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={1}>
-            <Typography variant="h6" gutterBottom>
-              Analytics
-            </Typography>
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <BarChartIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  Analytics Overview
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Track your artwork performance and engagement metrics
+              </Typography>
+            </Box>
+
             <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Listing Performance
+              {/* Listing Performance Cards */}
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(74, 58, 154, 0.08) 0%, rgba(74, 58, 154, 0.03) 100%)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(74, 58, 154, 0.15)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 48,
+                        height: 48,
+                        borderRadius: 2,
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                      }}
+                    >
+                      <ArtTrackIcon sx={{ fontSize: 24 }} />
+                    </Box>
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
+                    {artistStats.totalListings}
                   </Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Listings: {artistStats.totalListings}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Active Listings: {artistStats.activeListings}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Draft Listings: {artistStats.draftListings}
+                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                    Total Listings
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(76, 175, 80, 0.03) 100%)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(76, 175, 80, 0.15)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 48,
+                        height: 48,
+                        borderRadius: 2,
+                        bgcolor: 'success.main',
+                        color: 'white',
+                      }}
+                    >
+                      <CheckCircleIcon sx={{ fontSize: 24 }} />
+                    </Box>
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
+                    {artistStats.activeListings}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                    Active Listings
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(255, 152, 0, 0.03) 100%)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(255, 152, 0, 0.15)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 48,
+                        height: 48,
+                        borderRadius: 2,
+                        bgcolor: 'warning.main',
+                        color: 'white',
+                      }}
+                    >
+                      <DraftIcon sx={{ fontSize: 24 }} />
+                    </Box>
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
+                    {artistStats.draftListings}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                    Draft Listings
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.08) 0%, rgba(33, 150, 243, 0.03) 100%)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(33, 150, 243, 0.15)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 48,
+                        height: 48,
+                        borderRadius: 2,
+                        bgcolor: 'info.main',
+                        color: 'white',
+                      }}
+                    >
+                      <VisibilityIcon sx={{ fontSize: 24 }} />
+                    </Box>
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
+                    {artistStats.totalViews.toLocaleString()}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                    Total Views
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              {/* Engagement Cards */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3.5,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(233, 30, 99, 0.08) 0%, rgba(233, 30, 99, 0.03) 100%)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(233, 30, 99, 0.15)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 56,
+                        height: 56,
+                        borderRadius: 2,
+                        bgcolor: 'error.main',
+                        color: 'white',
+                      }}
+                    >
+                      <FavoriteIcon sx={{ fontSize: 28 }} />
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h3" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                        {artistStats.totalLikes.toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                        Total Likes
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box
+                    sx={{
+                      mt: 2,
+                      pt: 2,
+                      borderTop: '1px solid',
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      Average per listing: {artistStats.totalListings > 0 
+                        ? Math.round(artistStats.totalLikes / artistStats.totalListings) 
+                        : 0}
                     </Typography>
                   </Box>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Engagement
-                  </Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Views: {artistStats.totalViews}
+
+              <Grid item xs={12} sm={6} md={4}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3.5,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(156, 39, 176, 0.08) 0%, rgba(156, 39, 176, 0.03) 100%)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(156, 39, 176, 0.15)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 56,
+                        height: 56,
+                        borderRadius: 2,
+                        bgcolor: 'secondary.main',
+                        color: 'white',
+                      }}
+                    >
+                      <MessageIcon sx={{ fontSize: 28 }} />
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h3" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                        {artistStats.messagesReceived.toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                        Messages Received
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box
+                    sx={{
+                      mt: 2,
+                      pt: 2,
+                      borderTop: '1px solid',
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      From potential buyers and interested collectors
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Likes: {artistStats.totalLikes}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Messages Received: {artistStats.messagesReceived}
+                  </Box>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={4}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3.5,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(0, 188, 212, 0.08) 0%, rgba(0, 188, 212, 0.03) 100%)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(0, 188, 212, 0.15)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 56,
+                        height: 56,
+                        borderRadius: 2,
+                        bgcolor: '#00bcd4',
+                        color: 'white',
+                      }}
+                    >
+                      <TrendingUpIcon sx={{ fontSize: 28 }} />
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h3" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                        {artistStats.totalListings > 0 
+                          ? Math.round((artistStats.totalViews / artistStats.totalListings) * 10) / 10 
+                          : 0}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                        Avg Views per Listing
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box
+                    sx={{
+                      mt: 2,
+                      pt: 2,
+                      borderTop: '1px solid',
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      Engagement rate indicator
                     </Typography>
                   </Box>
                 </Paper>

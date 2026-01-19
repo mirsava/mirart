@@ -45,6 +45,7 @@ import { useChat } from '../contexts/ChatContext';
 import { useSnackbar } from 'notistack';
 import apiService, { Listing, Comment } from '../services/api';
 import ContactSellerDialog from '../components/ContactSellerDialog';
+import PageHeader from '../components/PageHeader';
 import { Painting } from '../types';
 
 const PaintingDetail: React.FC = () => {
@@ -191,23 +192,21 @@ const PaintingDetail: React.FC = () => {
             
             const convertedPainting = convertListingToPainting(listing);
             
-            // Fetch artist's default special instructions if listing doesn't have one
-            if (!convertedPainting.special_instructions || !convertedPainting.special_instructions.trim()) {
-              try {
-                const artistUsername = convertedPainting.artistUsername;
-                if (artistUsername) {
-                  const settingsUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/users/${artistUsername}/settings`;
-                  const settingsResponse = await fetch(settingsUrl);
-                  if (settingsResponse.ok) {
-                    const settingsData = await settingsResponse.json();
-                    if (settingsData.default_special_instructions && settingsData.default_special_instructions.trim()) {
-                      setDefaultSpecialInstructions(settingsData.default_special_instructions);
-                    }
+            // Always fetch artist's default special instructions to combine with listing instructions
+            try {
+              const artistUsername = convertedPainting.artistUsername;
+              if (artistUsername) {
+                const settingsUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/users/${artistUsername}/settings`;
+                const settingsResponse = await fetch(settingsUrl);
+                if (settingsResponse.ok) {
+                  const settingsData = await settingsResponse.json();
+                  if (settingsData.default_special_instructions && settingsData.default_special_instructions.trim()) {
+                    setDefaultSpecialInstructions(settingsData.default_special_instructions);
                   }
                 }
-              } catch (err) {
-                // Silently fail, use empty default
               }
+            } catch (err) {
+              // Silently fail, use empty default
             }
             
             setPainting(convertedPainting);
@@ -486,7 +485,12 @@ const PaintingDetail: React.FC = () => {
   };
 
   return (
-    <Box sx={{ py: 4 }}>
+    <Box sx={{ pb: 4 }}>
+      <PageHeader
+        title={painting.title}
+        subtitle={`By ${painting.artist}`}
+        disablePattern={true}
+      />
       <Container maxWidth="lg">
         <Breadcrumbs sx={{ mb: 3 }}>
           <MuiLink
@@ -863,36 +867,56 @@ const PaintingDetail: React.FC = () => {
                       },
                     }}
                   >
-                    {(painting.special_instructions && painting.special_instructions.trim()) || (defaultSpecialInstructions && defaultSpecialInstructions.trim()) ? (
-                      <Typography 
-                        variant="body1" 
-                        sx={{ 
-                          whiteSpace: 'pre-line',
-                          lineHeight: 1.8,
-                          color: 'text.primary',
-                          fontSize: '0.95rem',
-                          pl: 1,
-                          fontWeight: 400,
-                        }}
-                      >
-                        {painting.special_instructions && painting.special_instructions.trim() 
-                          ? painting.special_instructions 
-                          : defaultSpecialInstructions}
-                      </Typography>
-                    ) : (
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary" 
-                        sx={{ 
-                          fontStyle: 'italic',
-                          opacity: 0.65,
-                          pl: 1,
-                          lineHeight: 1.7,
-                        }}
-                      >
-                        No special instructions provided by the artist.
-                      </Typography>
-                    )}
+                    {(() => {
+                      const listingInstructions = painting.special_instructions && painting.special_instructions.trim() 
+                        ? painting.special_instructions.trim() 
+                        : '';
+                      const defaultInstructions = defaultSpecialInstructions && defaultSpecialInstructions.trim() 
+                        ? defaultSpecialInstructions.trim() 
+                        : '';
+                      
+                      // Combine both instructions
+                      let combinedInstructions = '';
+                      if (listingInstructions && defaultInstructions) {
+                        // Both exist - combine them with a separator
+                        combinedInstructions = `${defaultInstructions}\n\n${listingInstructions}`;
+                      } else if (listingInstructions) {
+                        // Only listing instructions
+                        combinedInstructions = listingInstructions;
+                      } else if (defaultInstructions) {
+                        // Only default instructions
+                        combinedInstructions = defaultInstructions;
+                      }
+                      
+                      return combinedInstructions ? (
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                            whiteSpace: 'pre-line',
+                            lineHeight: 1.8,
+                            color: 'text.primary',
+                            fontSize: '0.95rem',
+                            pl: 1,
+                            fontWeight: 400,
+                          }}
+                        >
+                          {combinedInstructions}
+                        </Typography>
+                      ) : (
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary" 
+                          sx={{ 
+                            fontStyle: 'italic',
+                            opacity: 0.65,
+                            pl: 1,
+                            lineHeight: 1.7,
+                          }}
+                        >
+                          No special instructions provided by the artist.
+                        </Typography>
+                      );
+                    })()}
                   </Paper>
                 </Box>
               </Box>
