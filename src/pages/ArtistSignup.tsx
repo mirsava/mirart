@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
   Typography,
   TextField,
   Button,
@@ -16,20 +15,25 @@ import {
   Checkbox,
   Divider,
   CircularProgress,
-  useTheme,
+  Card,
+  CardContent,
+  Radio,
+  RadioGroup,
+  Chip,
 } from '@mui/material';
 import {
   Person as PersonIcon,
   Email as EmailIcon,
   Lock as LockIcon,
   Business as BusinessIcon,
+  Check as CheckIcon,
+  Star as StarIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import apiService from '../services/api';
+import apiService, { SubscriptionPlan } from '../services/api';
 
 const ArtistSignup: React.FC = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { signUp, user, isAuthenticated } = useAuth();
@@ -54,13 +58,54 @@ const ArtistSignup: React.FC = () => {
     experience: '',
     website: '',
     agreeToTerms: false,
+    selectedPlanId: null as number | null,
+    billingPeriod: 'monthly' as 'monthly' | 'yearly',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
   
   // Show message if redirected from sign-in
   const redirectMessage = locationState?.message;
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      if (isCompletingProfile) {
+        setLoadingPlans(false);
+        return;
+      }
+      try {
+        const plans = await apiService.getSubscriptionPlans();
+        console.log('Fetched subscription plans:', plans);
+        if (plans && Array.isArray(plans) && plans.length > 0) {
+          const sortedPlans = plans
+            .map(plan => ({
+              ...plan,
+              price_monthly: typeof plan.price_monthly === 'number' ? plan.price_monthly : parseFloat(plan.price_monthly as any) || 0,
+              price_yearly: typeof plan.price_yearly === 'number' ? plan.price_yearly : parseFloat(plan.price_yearly as any) || 0,
+              max_listings: typeof plan.max_listings === 'number' ? plan.max_listings : parseInt(plan.max_listings as any) || 0,
+              display_order: typeof plan.display_order === 'number' ? plan.display_order : parseInt(plan.display_order as any) || 0,
+            }))
+            .sort((a, b) => a.display_order - b.display_order);
+          setSubscriptionPlans(sortedPlans);
+          if (!formData.selectedPlanId && sortedPlans.length > 0) {
+            setFormData(prev => ({ ...prev, selectedPlanId: sortedPlans[0].id }));
+          }
+        } else {
+          console.warn('No subscription plans returned from API');
+          setSubscriptionPlans([]);
+        }
+      } catch (error) {
+        console.error('Error fetching subscription plans:', error);
+        setSubscriptionPlans([]);
+      } finally {
+        setLoadingPlans(false);
+      }
+    };
+    fetchPlans();
+  }, [isCompletingProfile]);
 
   const specialties = [
     'Painting',
@@ -101,6 +146,10 @@ const ArtistSignup: React.FC = () => {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
+    
+    if (!isCompletingProfile && !formData.selectedPlanId) {
+      newErrors.selectedPlanId = 'Please select a subscription plan';
+    }
 
     // Skip username and password validation if completing profile (already authenticated)
     if (!isCompletingProfile) {
@@ -197,6 +246,22 @@ const ArtistSignup: React.FC = () => {
             specialties: formData.specialties,
             experience_level: formData.experience,
           });
+
+          // Create subscription after user is created
+          if (formData.selectedPlanId) {
+            try {
+              const mockPaymentIntentId = `mock_payment_${Date.now()}`;
+              await apiService.createSubscription(
+                formData.username,
+                formData.selectedPlanId,
+                formData.billingPeriod,
+                mockPaymentIntentId
+              );
+            } catch (subError) {
+              console.error('Error creating subscription:', subError);
+              console.warn('User created but subscription failed. User can subscribe later.');
+            }
+          }
         } catch (dbError) {
           // Log error but don't fail signup - user data can be saved after email confirmation
           console.error('Error saving user data to database:', dbError);
@@ -213,45 +278,55 @@ const ArtistSignup: React.FC = () => {
   };
 
   return (
-    <Box sx={{ py: 8, minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Container maxWidth="md">
-        {/* Header Section */}
-        <Paper
-          elevation={0}
-          sx={{
-            mb: 4,
-            mt: 3,
-            p: { xs: 3, sm: 4, md: 5 },
-            background: theme.palette.mode === 'dark'
-              ? `linear-gradient(135deg, rgba(74, 58, 154, 0.15) 0%, rgba(255, 143, 0, 0.1) 100%)`
-              : `linear-gradient(135deg, rgba(74, 58, 154, 0.08) 0%, rgba(255, 143, 0, 0.05) 100%)`,
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            textAlign: 'center',
+    <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8 }}>
+      <Box 
+        sx={{ 
+          textAlign: 'center',
+          position: 'relative',
+          px: 3,
+          py: 3,
+          bgcolor: 'rgba(74, 58, 154, 0.04)',
+          borderRadius: 1,
+          mb: 4,
+        }}
+      >
+        <Typography 
+          variant="h3" 
+          component="h1" 
+          sx={{ 
+            fontWeight: 700,
+            color: 'primary.main',
+            mb: 2,
+            fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+            lineHeight: 1.2,
+            letterSpacing: '-0.02em',
           }}
         >
-          <Typography 
-            variant="h4" 
-            component="h1" 
-            gutterBottom
-            sx={{ 
-              fontWeight: 600,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              mb: 2,
-            }}
-          >
-            Join Our Artist Community
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem', lineHeight: 1.7 }}>
-            Start selling your artwork to a global audience. Simple pricing, no hidden fees.
-          </Typography>
-        </Paper>
+          Join Our Artist Community
+        </Typography>
+        <Typography 
+          variant="body1" 
+          color="text.secondary" 
+          sx={{ 
+            fontSize: '1.1rem', 
+            lineHeight: 1.7,
+            maxWidth: '800px',
+            mx: 'auto',
+          }}
+        >
+          Start selling your artwork to a global audience. Simple pricing, no hidden fees.
+        </Typography>
+      </Box>
 
-        <Paper sx={{ p: { xs: 3, sm: 4, md: 6 }, borderRadius: 3, boxShadow: 3 }}>
+      <Paper 
+        elevation={0}
+        sx={{ 
+          p: { xs: 3, sm: 4, md: 6 }, 
+          borderRadius: 1,
+          border: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
 
           {redirectMessage && (
             <Alert severity="info" sx={{ mb: 3 }}>
@@ -505,70 +580,253 @@ const ArtistSignup: React.FC = () => {
               )}
             </Grid>
 
-            {/* Pricing Section */}
-            <Paper
-              elevation={0}
-              sx={{
-                p: 4,
-                mt: 4,
-                mb: 4,
-                background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(156, 39, 176, 0.05) 100%)',
-                borderRadius: 2,
-                border: '1px solid',
-                borderColor: 'divider',
-              }}
-            >
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
-                Simple, Transparent Pricing
-              </Typography>
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={4}>
-                  <Box sx={{ textAlign: 'center', p: 2 }}>
-                    <Typography variant="h4" color="primary.main" sx={{ fontWeight: 700, mb: 1 }}>
-                      $10
-                    </Typography>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-                      One-Time Listing Fee
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Pay only when you're ready to publish your listing
-                    </Typography>
+            {/* Subscription Plans Section */}
+            {!isCompletingProfile && (
+              <Box 
+                sx={{ 
+                  mt: 4, 
+                  mb: 4,
+                  p: { xs: 3, sm: 4 },
+                  borderRadius: 1,
+                  bgcolor: 'rgba(74, 58, 154, 0.03)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                  <Box
+                    sx={{
+                      width: 4,
+                      height: 32,
+                      bgcolor: 'primary.main',
+                      borderRadius: 1,
+                    }}
+                  />
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      fontWeight: 700,
+                      color: 'primary.main',
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
+                    Choose Your Subscription Plan
+                  </Typography>
+                </Box>
+                {loadingPlans ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress />
                   </Box>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Box sx={{ textAlign: 'center', p: 2 }}>
-                    <Typography variant="h4" color="primary.main" sx={{ fontWeight: 700, mb: 1 }}>
-                      0%
+                ) : subscriptionPlans.length === 0 ? (
+                  <Alert severity="warning" sx={{ mb: 3 }}>
+                    <Typography variant="body1" gutterBottom>
+                      No subscription plans available.
                     </Typography>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-                      Platform Commission
+                    <Typography variant="body2">
+                      Please ensure the database migration has been run and plans are configured in the admin dashboard.
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Keep 100% of your sale price
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Box sx={{ textAlign: 'center', p: 2 }}>
-                    <Typography variant="h4" color="primary.main" sx={{ fontWeight: 700, mb: 1 }}>
-                      Free
-                    </Typography>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-                      Account Creation
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      No monthly fees or subscriptions
-                    </Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-              <Divider sx={{ my: 3 }} />
-              <Alert severity="info" sx={{ bgcolor: 'transparent' }}>
-                <Typography variant="body2">
-                  <strong>How it works:</strong> Create your listing for free. When you're ready to make it visible to buyers, pay a one-time $10 activation fee. You keep the full sale price - no commission, no hidden fees.
-                </Typography>
-              </Alert>
-            </Paper>
+                  </Alert>
+                ) : (
+                  <>
+                    <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
+                        Billing Period
+                      </Typography>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 0.5,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: '50px',
+                          display: 'inline-flex',
+                          bgcolor: 'background.paper',
+                          position: 'relative',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: 2,
+                            bottom: 2,
+                            left: formData.billingPeriod === 'monthly' ? 2 : '50%',
+                            right: formData.billingPeriod === 'monthly' ? '50%' : 2,
+                            bgcolor: 'primary.main',
+                            borderRadius: '50px',
+                            transition: 'all 0.3s ease',
+                            zIndex: 0,
+                          }}
+                        />
+                        <Button
+                          onClick={() => setFormData(prev => ({ ...prev, billingPeriod: 'monthly' }))}
+                          sx={{
+                            position: 'relative',
+                            zIndex: 1,
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: '50px',
+                            textTransform: 'none',
+                            color: formData.billingPeriod === 'monthly' ? 'white' : 'text.primary',
+                            fontWeight: 600,
+                            minWidth: 120,
+                            transition: 'color 0.3s ease',
+                            '&:hover': {
+                              bgcolor: 'transparent',
+                            },
+                          }}
+                        >
+                          Monthly
+                        </Button>
+                        <Button
+                          onClick={() => setFormData(prev => ({ ...prev, billingPeriod: 'yearly' }))}
+                          sx={{
+                            position: 'relative',
+                            zIndex: 1,
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: '50px',
+                            textTransform: 'none',
+                            color: formData.billingPeriod === 'yearly' ? 'white' : 'text.primary',
+                            fontWeight: 600,
+                            minWidth: 120,
+                            transition: 'color 0.3s ease',
+                            '&:hover': {
+                              bgcolor: 'transparent',
+                            },
+                          }}
+                        >
+                          Yearly
+                        </Button>
+                      </Paper>
+                    </Box>
+                    <Grid container spacing={3} sx={{ mb: 3 }}>
+                      {subscriptionPlans.map((plan, index) => {
+                        const isPopular = index === 1;
+                        const features = plan.features ? plan.features.split('\n').filter(f => f.trim()) : [];
+                        const isSelected = formData.selectedPlanId === plan.id;
+                        const priceMonthly = typeof plan.price_monthly === 'number' ? plan.price_monthly : parseFloat(plan.price_monthly as any) || 0;
+                        const priceYearly = typeof plan.price_yearly === 'number' ? plan.price_yearly : parseFloat(plan.price_yearly as any) || 0;
+                        const price = formData.billingPeriod === 'monthly' ? priceMonthly : priceYearly;
+                        const savings = (priceMonthly * 12) - priceYearly;
+
+                        return (
+                          <Grid item xs={12} md={4} key={plan.id}>
+                            <Paper
+                              elevation={0}
+                              sx={{
+                                height: '100%',
+                                cursor: 'pointer',
+                                border: isSelected ? '2px solid' : '1px solid',
+                                borderColor: isSelected ? 'primary.main' : 'divider',
+                                bgcolor: isSelected ? 'rgba(74, 58, 154, 0.05)' : 'background.paper',
+                                position: 'relative',
+                                borderRadius: 1,
+                                transition: 'border-color 0.2s',
+                                overflow: 'hidden',
+                                '&:hover': {
+                                  borderColor: 'primary.main',
+                                },
+                                ...(isPopular && {
+                                  borderColor: 'secondary.main',
+                                  borderWidth: '2px',
+                                  '&::before': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: 4,
+                                    bgcolor: 'secondary.main',
+                                  },
+                                }),
+                              }}
+                              onClick={() => setFormData(prev => ({ ...prev, selectedPlanId: plan.id }))}
+                            >
+                              {isPopular && (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 12,
+                                    right: 12,
+                                  }}
+                                >
+                                  <Chip
+                                    icon={<StarIcon />}
+                                    label="Popular"
+                                    size="small"
+                                    color="secondary"
+                                    sx={{
+                                      fontWeight: 600,
+                                    }}
+                                  />
+                                </Box>
+                              )}
+                              <Box sx={{ p: 3 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography variant="h5" fontWeight={700} sx={{ mb: 0.5 }}>
+                                      {plan.name}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {plan.tier}
+                                    </Typography>
+                                  </Box>
+                                  <Radio
+                                    checked={isSelected}
+                                    onChange={() => setFormData(prev => ({ ...prev, selectedPlanId: plan.id }))}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </Box>
+                                <Box sx={{ mb: 3, pb: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                                    <Typography variant="h3" fontWeight={700} color="primary.main">
+                                      ${(price || 0).toFixed(2)}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      /{formData.billingPeriod === 'monthly' ? 'mo' : 'yr'}
+                                    </Typography>
+                                  </Box>
+                                  {formData.billingPeriod === 'yearly' && savings > 0 && (
+                                    <Typography variant="caption" color="success.main" sx={{ fontWeight: 600, display: 'block', mt: 0.5 }}>
+                                      Save ${(savings || 0).toFixed(2)} per year
+                                    </Typography>
+                                  )}
+                                </Box>
+                                <Box sx={{ mb: 2 }}>
+                                  <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>
+                                    Up to {plan.max_listings} active listings per month
+                                  </Typography>
+                                  {features.length > 0 && (
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                      {features.map((feature, idx) => (
+                                        <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                                          <CheckIcon sx={{ color: 'success.main', mt: 0.25, fontSize: 18, flexShrink: 0 }} />
+                                          <Typography variant="body2" sx={{ lineHeight: 1.6 }}>{feature.trim()}</Typography>
+                                        </Box>
+                                      ))}
+                                    </Box>
+                                  )}
+                                </Box>
+                              </Box>
+                            </Paper>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
+                    {errors.selectedPlanId && (
+                      <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+                        {errors.selectedPlanId}
+                      </Typography>
+                    )}
+                    <Alert severity="info" sx={{ bgcolor: 'transparent', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                      <Typography variant="body2">
+                        <strong>How it works:</strong> Choose a subscription plan that fits your needs. You can activate up to your plan's listing limit. You keep 100% of your sale price - no commission, no hidden fees.
+                      </Typography>
+                    </Alert>
+                  </>
+                )}
+              </Box>
+            )}
 
             <Box sx={{ textAlign: 'center' }}>
               <Button
@@ -596,7 +854,6 @@ const ArtistSignup: React.FC = () => {
             </form>
           )}
         </Paper>
-      </Container>
     </Box>
   );
 };

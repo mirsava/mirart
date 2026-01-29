@@ -46,7 +46,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
-import apiService, { DashboardData, Listing, Order, User } from '../services/api';
+import apiService, { DashboardData, Listing, Order, User, UserSubscription } from '../services/api';
 import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider } from '@mui/material';
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
@@ -145,12 +145,15 @@ const ArtistDashboard: React.FC = () => {
   });
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+  const [activatingListing, setActivatingListing] = useState<number | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
+      fetchSubscription();
       if (tabValue === 2) {
         fetchProfile();
       }
@@ -196,6 +199,17 @@ const ArtistDashboard: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSubscription = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const subscriptionData = await apiService.getUserSubscription(user.id);
+      setSubscription(subscriptionData.subscription);
+    } catch (err: any) {
+      setSubscription(null);
     }
   };
 
@@ -624,6 +638,56 @@ const ArtistDashboard: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
+          {subscription && (
+            <Grid item xs={12}>
+              <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', bgcolor: 'rgba(74, 58, 154, 0.05)' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                    <Box>
+                      <Typography variant="h6" fontWeight={600}>
+                        {subscription.plan_name} Plan ({subscription.billing_period})
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {subscription.current_listings || 0} / {subscription.max_listings} active listings
+                        {subscription.end_date && ` • Expires: ${new Date(subscription.end_date).toLocaleDateString()}`}
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="outlined"
+                      onClick={() => navigate('/subscription-plans')}
+                    >
+                      Manage Subscription
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
+          {!subscription && (
+            <Grid item xs={12}>
+              <Card elevation={0} sx={{ border: '1px solid', borderColor: 'warning.main', bgcolor: 'rgba(255, 143, 0, 0.05)' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                    <Box>
+                      <Typography variant="h6" fontWeight={600} color="warning.main">
+                        No Active Subscription
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Subscribe to a plan to activate your listings and start selling
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={() => navigate('/subscription-plans')}
+                    >
+                      View Plans
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
         </Grid>
 
         {/* Main Content Tabs */}
@@ -795,33 +859,25 @@ const ArtistDashboard: React.FC = () => {
                             size="small"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (!user?.id) return;
-                              
-                              const activationItem = {
-                                id: listing.id,
-                                title: `Activate: ${listing.title}`,
-                                artist: user.name || 'You',
-                                price: 10,
-                                image: listing.primary_image_url || '',
-                                description: `Listing activation fee for: ${listing.title}`,
-                                category: listing.category as 'Painting' | 'Woodworking',
-                                subcategory: listing.subcategory || '',
-                                dimensions: listing.dimensions || '',
-                                medium: listing.medium || '',
-                                year: listing.year || new Date().getFullYear(),
-                                inStock: true,
-                              };
-                              
-                              addToCart(activationItem, 'activation', listing.id);
-                              enqueueSnackbar('Added to cart. Proceed to checkout to activate.', { variant: 'success' });
+                              handleActivateListing(listing.id);
                             }}
+                            disabled={activatingListing === listing.id}
                             sx={{ mb: 1 }}
                           >
-                            Activate Listing ($10)
+                            {activatingListing === listing.id ? 'Activating...' : 'Activate Listing'}
                           </Button>
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
-                            Pay $10 to make this listing active
-                          </Typography>
+                          {subscription && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
+                              {subscription.listings_remaining !== undefined && subscription.listings_remaining > 0
+                                ? `${subscription.listings_remaining} slots remaining`
+                                : 'Subscription limit reached'}
+                            </Typography>
+                          )}
+                          {!subscription && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
+                              Subscribe to activate listings
+                            </Typography>
+                          )}
                         </Box>
                       )}
                       <Box sx={{ display: 'flex', gap: 1 }}>

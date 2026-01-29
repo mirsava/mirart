@@ -82,6 +82,35 @@ export interface DashboardData {
   recentOrders: Order[];
 }
 
+export interface SubscriptionPlan {
+  id: number;
+  name: string;
+  tier: string;
+  max_listings: number;
+  price_monthly: number;
+  price_yearly: number;
+  features?: string;
+  is_active: boolean;
+  display_order: number;
+}
+
+export interface UserSubscription {
+  id: number;
+  user_id: number;
+  plan_id: number;
+  billing_period: 'monthly' | 'yearly';
+  status: 'active' | 'expired' | 'cancelled';
+  start_date: string;
+  end_date: string;
+  auto_renew: boolean;
+  payment_intent_id?: string;
+  plan_name?: string;
+  tier?: string;
+  max_listings?: number;
+  current_listings?: number;
+  listings_remaining?: number;
+}
+
 class ApiService {
   private async request<T>(
     endpoint: string,
@@ -90,6 +119,7 @@ class ApiService {
     const url = `${API_BASE_URL}${endpoint}`;
     
     try {
+      console.log('API Request:', url, options.method || 'GET');
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -98,16 +128,34 @@ class ApiService {
         },
       });
       
+      console.log('API Response status:', response.status, response.statusText);
+      
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(error.error || `HTTP error! status: ${response.status}`);
+        let errorData;
+        try {
+          const text = await response.text();
+          console.log('Error response body:', text);
+          errorData = JSON.parse(text);
+        } catch (parseError) {
+          errorData = { error: `HTTP error! status: ${response.status}`, status: response.status };
+        }
+        const errorMessage = errorData.error || errorData.message || `HTTP error! status: ${response.status}`;
+        const error: any = new Error(errorMessage);
+        error.status = response.status;
+        error.error = errorData.error || errorMessage;
+        error.details = errorData.details || errorData;
+        console.error('API Error:', error);
+        throw error;
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log('API Response data:', data);
+      return data;
     } catch (error: any) {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         throw new Error('Failed to connect to server. Please check if the backend is running.');
       }
+      console.error('Request error:', error);
       throw error;
     }
   }
@@ -203,12 +251,11 @@ class ApiService {
     });
   }
 
-  async activateListing(id: number, cognitoUsername: string, paymentIntentId?: string): Promise<Listing> {
+  async activateListing(id: number, cognitoUsername: string): Promise<Listing> {
     return this.request<Listing>(`/listings/${id}/activate`, {
       method: 'POST',
       body: JSON.stringify({
         cognito_username: cognitoUsername,
-        payment_intent_id: paymentIntentId
       }),
     });
   }
@@ -445,6 +492,65 @@ class ApiService {
       params.append('groups', JSON.stringify(groups));
     }
     return this.request<{ success: boolean; message: string }>(`/admin/listings/${listingId}?${params.toString()}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Subscription endpoints
+  async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+    return this.request<SubscriptionPlan[]>('/subscriptions/plans');
+  }
+
+  async getUserSubscription(cognitoUsername: string): Promise<{ subscription: UserSubscription | null }> {
+    return this.request<{ subscription: UserSubscription | null }>(`/subscriptions/user/${cognitoUsername}`);
+  }
+
+  async createSubscription(cognitoUsername: string, planId: number, billingPeriod: 'monthly' | 'yearly', paymentIntentId?: string): Promise<{ subscription: UserSubscription }> {
+    return this.request<{ subscription: UserSubscription }>(`/subscriptions/user/${cognitoUsername}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        plan_id: planId,
+        billing_period: billingPeriod,
+        payment_intent_id: paymentIntentId,
+        auto_renew: true,
+      }),
+    });
+  }
+
+  async cancelSubscription(cognitoUsername: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/subscriptions/user/${cognitoUsername}/cancel`, {
+      method: 'PUT',
+    });
+  }
+
+  // Admin subscription endpoints
+  async getAdminSubscriptionPlans(cognitoUsername: string, groups?: string[]): Promise<SubscriptionPlan[]> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    const url = `/subscriptions/admin/plans?${params.toString()}`;
+    console.log('Calling subscription plans API:', url);
+    console.log('With params:', { cognitoUsername, groups });
+    return this.request<SubscriptionPlan[]>(url);
+  }
+
+  async saveSubscriptionPlan(cognitoUsername: string, groups: string[], plan: Partial<SubscriptionPlan> & { name: string; tier: string; max_listings: number; price_monthly: number; price_yearly: number }): Promise<{ message: string; id: number }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    params.append('groups', JSON.stringify(groups));
+    return this.request<{ message: string; id: number }>(`/subscriptions/admin/plans?${params.toString()}`, {
+      method: 'POST',
+      body: JSON.stringify(plan),
+    });
+  }
+
+  async deleteSubscriptionPlan(cognitoUsername: string, groups: string[], planId: number): Promise<{ message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    params.append('groups', JSON.stringify(groups));
+    return this.request<{ message: string }>(`/subscriptions/admin/plans/${planId}?${params.toString()}`, {
       method: 'DELETE',
     });
   }

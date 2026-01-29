@@ -844,7 +844,6 @@ const PaintingDetail: React.FC = () => {
                       borderColor: 'divider',
                       borderRadius: 1,
                       position: 'relative',
-                      bgcolor: 'background.paper',
                     }}
                   >
                     {(() => {

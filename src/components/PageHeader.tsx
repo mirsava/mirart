@@ -40,7 +40,19 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       }}
     >
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
-        <Box sx={{ textAlign: { xs: 'center', md: alignment } }}>
+        <Box 
+          sx={{ 
+            textAlign: { xs: 'center', md: alignment },
+            position: 'relative',
+            pl: { xs: 3, md: align === 'left' ? 4 : 3 },
+            pr: { xs: 3, md: 3 },
+            py: 3,
+            borderLeft: { xs: 'none', md: align === 'left' ? '4px solid' : 'none' },
+            borderLeftColor: { xs: 'transparent', md: align === 'left' ? 'primary.main' : 'transparent' },
+            bgcolor: 'rgba(74, 58, 154, 0.04)',
+            borderRadius: 1,
+          }}
+        >
           <Typography
             variant={isMobile ? 'h3' : 'h2'}
             component="h1"

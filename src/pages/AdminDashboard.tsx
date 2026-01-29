@@ -31,6 +31,8 @@ import {
   CircularProgress,
   Pagination,
   Avatar,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -42,9 +44,10 @@ import {
   Edit as EditIcon,
   Block as BlockIcon,
   CheckCircle as CheckCircleIcon,
+  CreditCard as CreditCardIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
-import apiService from '../services/api';
+import apiService, { SubscriptionPlan } from '../services/api';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../components/PageHeader';
 
@@ -105,6 +108,11 @@ const AdminDashboard: React.FC = () => {
   const [deactivateUserConfirmOpen, setDeactivateUserConfirmOpen] = useState(false);
   const [userToDeactivate, setUserToDeactivate] = useState<number | null>(null);
   const [newStatus, setNewStatus] = useState<'draft' | 'active' | 'inactive' | 'sold' | 'archived'>('active');
+  const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
+  const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [planFormData, setPlanFormData] = useState<Partial<SubscriptionPlan>>({});
+  const [deletingPlan, setDeletingPlan] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -126,6 +134,11 @@ const AdminDashboard: React.FC = () => {
     if (!user?.id) return;
     fetchMessages();
   }, [user?.id, messagesPage]);
+
+  useEffect(() => {
+    if (!user?.id || tabValue !== 3) return;
+    fetchSubscriptionPlans();
+  }, [user?.id, tabValue]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -197,6 +210,96 @@ const AdminDashboard: React.FC = () => {
       const errorMessage = error.message || error.error || 'Failed to fetch messages';
       enqueueSnackbar(errorMessage, { variant: 'error' });
       console.error('Error fetching messages:', error);
+    }
+  };
+
+  const fetchSubscriptionPlans = async (): Promise<void> => {
+    if (!user?.id) {
+      console.log('No user ID available');
+      return;
+    }
+    try {
+      console.log('Fetching subscription plans for user:', user.id, 'groups:', user.groups);
+      const plans = await apiService.getAdminSubscriptionPlans(user.id, user.groups);
+      console.log('Received plans:', plans);
+      setSubscriptionPlans(plans || []);
+    } catch (error: any) {
+      console.error('Error fetching subscription plans:', error);
+      console.error('Error details:', {
+        message: error.message,
+        error: error.error,
+        status: error.status,
+        details: error.details,
+        stack: error.stack
+      });
+      
+      let errorMessage = 'Failed to fetch subscription plans';
+      if (error.status === 403) {
+        errorMessage = 'Admin access required. Please ensure you have admin privileges.';
+      } else if (error.status === 401) {
+        errorMessage = 'Authentication required. Please sign in again.';
+      } else if (error.error) {
+        errorMessage = error.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      enqueueSnackbar(errorMessage, { variant: 'error' });
+      setSubscriptionPlans([]);
+    }
+  };
+
+  const handlePlanEdit = (plan: SubscriptionPlan): void => {
+    setEditingPlan(plan);
+    setPlanFormData(plan);
+    setPlanDialogOpen(true);
+  };
+
+  const handlePlanCreate = (): void => {
+    setEditingPlan(null);
+    setPlanFormData({
+      name: '',
+      tier: '',
+      max_listings: 5,
+      price_monthly: 0,
+      price_yearly: 0,
+      features: '',
+      is_active: true,
+      display_order: 0,
+    });
+    setPlanDialogOpen(true);
+  };
+
+  const handlePlanSave = async (): Promise<void> => {
+    if (!user?.id) return;
+    if (!planFormData.name || !planFormData.tier || planFormData.max_listings === undefined || planFormData.price_monthly === undefined || planFormData.price_yearly === undefined) {
+      enqueueSnackbar('Please fill in all required fields', { variant: 'error' });
+      return;
+    }
+
+    try {
+      await apiService.saveSubscriptionPlan(user.id, user.groups, planFormData as SubscriptionPlan);
+      enqueueSnackbar(editingPlan ? 'Plan updated successfully' : 'Plan created successfully', { variant: 'success' });
+      setPlanDialogOpen(false);
+      fetchSubscriptionPlans();
+    } catch (error: any) {
+      const errorMessage = error.message || error.error || 'Failed to save plan';
+      enqueueSnackbar(errorMessage, { variant: 'error' });
+    }
+  };
+
+  const handlePlanDelete = async (planId: number): Promise<void> => {
+    if (!user?.id) return;
+    setDeletingPlan(planId);
+    try {
+      await apiService.deleteSubscriptionPlan(user.id, user.groups, planId);
+      enqueueSnackbar('Plan deleted successfully', { variant: 'success' });
+      fetchSubscriptionPlans();
+    } catch (error: any) {
+      const errorMessage = error.message || error.error || 'Failed to delete plan';
+      enqueueSnackbar(errorMessage, { variant: 'error' });
+    } finally {
+      setDeletingPlan(null);
     }
   };
 
@@ -456,6 +559,7 @@ const AdminDashboard: React.FC = () => {
             <Tab icon={<PeopleIcon />} iconPosition="start" label="Users" />
             <Tab icon={<InventoryIcon />} iconPosition="start" label="Listings" />
             <Tab icon={<EmailIcon />} iconPosition="start" label="Messages" />
+            <Tab icon={<CreditCardIcon />} iconPosition="start" label="Subscriptions" />
           </Tabs>
 
           <TabPanel value={tabValue} index={0}>
@@ -712,7 +816,171 @@ const AdminDashboard: React.FC = () => {
               </Box>
             )}
           </TabPanel>
+
+          <TabPanel value={tabValue} index={3}>
+            <Box sx={{ px: 3, pb: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6">Subscription Plans</Typography>
+                <Button variant="contained" onClick={handlePlanCreate} startIcon={<EditIcon />}>
+                  Create Plan
+                </Button>
+              </Box>
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Tier</TableCell>
+                      <TableCell>Max Listings</TableCell>
+                      <TableCell>Monthly Price</TableCell>
+                      <TableCell>Yearly Price</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Order</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {subscriptionPlans.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} align="center">
+                          <Typography variant="body2" color="text.secondary">
+                            No subscription plans found
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      subscriptionPlans.map((plan) => {
+                        const monthlyPrice = typeof plan.price_monthly === 'number' 
+                          ? plan.price_monthly 
+                          : parseFloat(plan.price_monthly || '0');
+                        const yearlyPrice = typeof plan.price_yearly === 'number' 
+                          ? plan.price_yearly 
+                          : parseFloat(plan.price_yearly || '0');
+                        
+                        return (
+                          <TableRow key={plan.id}>
+                            <TableCell>{plan.name}</TableCell>
+                            <TableCell>{plan.tier}</TableCell>
+                            <TableCell>{plan.max_listings}</TableCell>
+                            <TableCell>${monthlyPrice.toFixed(2)}</TableCell>
+                            <TableCell>${yearlyPrice.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Chip
+                                label={plan.is_active ? 'Active' : 'Inactive'}
+                                color={plan.is_active ? 'success' : 'default'}
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>{plan.display_order}</TableCell>
+                        <TableCell align="right">
+                          <IconButton
+                            size="small"
+                            onClick={() => handlePlanEdit(plan)}
+                            sx={{ mr: 1 }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => handlePlanDelete(plan.id)}
+                            disabled={deletingPlan === plan.id}
+                            color="error"
+                          >
+                            {deletingPlan === plan.id ? (
+                              <CircularProgress size={20} />
+                            ) : (
+                              <DeleteIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                          </TableCell>
+                        </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          </TabPanel>
         </Paper>
+
+        <Dialog open={planDialogOpen} onClose={() => setPlanDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>{editingPlan ? 'Edit Plan' : 'Create Plan'}</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <TextField
+                label="Plan Name"
+                fullWidth
+                value={planFormData.name || ''}
+                onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })}
+                required
+              />
+              <TextField
+                label="Tier (e.g., starter, professional, enterprise)"
+                fullWidth
+                value={planFormData.tier || ''}
+                onChange={(e) => setPlanFormData({ ...planFormData, tier: e.target.value })}
+                required
+              />
+              <TextField
+                label="Max Listings"
+                type="number"
+                fullWidth
+                value={planFormData.max_listings || ''}
+                onChange={(e) => setPlanFormData({ ...planFormData, max_listings: parseInt(e.target.value) || 0 })}
+                required
+              />
+              <TextField
+                label="Monthly Price ($)"
+                type="number"
+                fullWidth
+                value={planFormData.price_monthly || ''}
+                onChange={(e) => setPlanFormData({ ...planFormData, price_monthly: parseFloat(e.target.value) || 0 })}
+                required
+              />
+              <TextField
+                label="Yearly Price ($)"
+                type="number"
+                fullWidth
+                value={planFormData.price_yearly || ''}
+                onChange={(e) => setPlanFormData({ ...planFormData, price_yearly: parseFloat(e.target.value) || 0 })}
+                required
+              />
+              <TextField
+                label="Features (one per line)"
+                multiline
+                rows={4}
+                fullWidth
+                value={planFormData.features || ''}
+                onChange={(e) => setPlanFormData({ ...planFormData, features: e.target.value })}
+              />
+              <TextField
+                label="Display Order"
+                type="number"
+                fullWidth
+                value={planFormData.display_order || 0}
+                onChange={(e) => setPlanFormData({ ...planFormData, display_order: parseInt(e.target.value) || 0 })}
+              />
+              <FormControl>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={planFormData.is_active !== false}
+                      onChange={(e) => setPlanFormData({ ...planFormData, is_active: e.target.checked })}
+                    />
+                  }
+                  label="Active"
+                />
+              </FormControl>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPlanDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handlePlanSave} variant="contained">
+              {editingPlan ? 'Update' : 'Create'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Menu
           anchorEl={userMenuAnchor}

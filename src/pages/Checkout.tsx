@@ -133,7 +133,7 @@ const Checkout: React.FC = () => {
       if (activationItems.length > 0) {
         for (const item of activationItems) {
           if (item.listingId) {
-            await apiService.activateListing(item.listingId, user.id, mockPaymentIntentId);
+            await apiService.activateListing(item.listingId, user.id);
           }
         }
         enqueueSnackbar('Listings activated successfully!', { variant: 'success' });

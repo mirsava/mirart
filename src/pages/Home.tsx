@@ -381,11 +381,42 @@ const Home: React.FC = () => {
 
 
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8 }}>
-        <Box sx={{ textAlign: 'center', mb: 6 }}>
-          <Typography variant="h4" component="h2" gutterBottom>
+        <Box 
+          sx={{ 
+            mb: 6,
+            position: 'relative',
+            pl: { xs: 3, md: 4 },
+            pr: 3,
+            py: 3,
+            borderLeft: { xs: 'none', md: '4px solid' },
+            borderLeftColor: { xs: 'transparent', md: 'primary.main' },
+            bgcolor: 'rgba(74, 58, 154, 0.04)',
+            borderRadius: 1,
+          }}
+        >
+          <Typography 
+            variant="h4" 
+            component="h2" 
+            sx={{ 
+              fontWeight: 700,
+              color: 'primary.main',
+              mb: 1.5,
+              fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
+              lineHeight: 1.2,
+              letterSpacing: '-0.02em',
+            }}
+          >
             Featured Paintings
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '600px', mx: 'auto' }}>
+          <Typography 
+            variant="body1" 
+            color="text.secondary" 
+            sx={{ 
+              maxWidth: '800px',
+              lineHeight: 1.6,
+              fontSize: { xs: '0.95rem', sm: '1.05rem', md: '1.15rem' },
+            }}
+          >
             Discover original paintings from talented artists in our community.
           </Typography>
         </Box>
@@ -484,11 +515,42 @@ const Home: React.FC = () => {
 
       <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
         <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
-          <Box sx={{ textAlign: 'center', mb: 6 }}>
-            <Typography variant="h4" component="h2" gutterBottom>
+          <Box 
+            sx={{ 
+              mb: 6,
+              position: 'relative',
+              pl: { xs: 3, md: 4 },
+              pr: 3,
+              py: 3,
+              borderLeft: { xs: 'none', md: '4px solid' },
+              borderLeftColor: { xs: 'transparent', md: 'primary.main' },
+              bgcolor: 'rgba(74, 58, 154, 0.04)',
+              borderRadius: 1,
+            }}
+          >
+            <Typography 
+              variant="h4" 
+              component="h2" 
+              sx={{ 
+                fontWeight: 700,
+                color: 'primary.main',
+                mb: 1.5,
+                fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
+                lineHeight: 1.2,
+                letterSpacing: '-0.02em',
+              }}
+            >
               Featured Woodworking
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '600px', mx: 'auto' }}>
+            <Typography 
+              variant="body1" 
+              color="text.secondary" 
+              sx={{ 
+                maxWidth: '800px',
+                lineHeight: 1.6,
+                fontSize: { xs: '0.95rem', sm: '1.05rem', md: '1.15rem' },
+              }}
+            >
               Handcrafted woodworking pieces from skilled artisans in our marketplace.
             </Typography>
           </Box>

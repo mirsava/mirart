@@ -441,19 +441,13 @@ const Header: React.FC = () => {
     <>
       <AppBar 
         position="fixed" 
-        elevation={scrolled ? 4 : 2}
+        elevation={0}
         sx={{
           background: theme.palette.background.paper,
           transition: 'all 0.3s ease-in-out',
           borderBottom: '1px solid',
-          borderColor: 'divider',
-          boxShadow: scrolled 
-            ? (theme.palette.mode === 'dark' 
-                ? '0 4px 20px rgba(0, 0, 0, 0.5)' 
-                : '0 4px 20px rgba(0, 0, 0, 0.1)')
-            : (theme.palette.mode === 'dark'
-                ? '0 2px 8px rgba(0, 0, 0, 0.3)'
-                : '0 2px 8px rgba(0, 0, 0, 0.08)'),
+          borderColor: 'primary.main',
+          boxShadow: 'none',
           zIndex: 1300,
           width: '100vw',
           maxWidth: '100%',

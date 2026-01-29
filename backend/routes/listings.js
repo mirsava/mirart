@@ -559,18 +559,14 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Activate listing (after payment of $10 fee)
+// Activate listing (check subscription limits)
 router.post('/:id/activate', async (req, res) => {
   try {
     const { id } = req.params;
-    const { cognito_username, payment_intent_id } = req.body;
+    const { cognito_username } = req.body;
 
     if (!cognito_username) {
       return res.status(400).json({ error: 'cognito_username is required' });
-    }
-
-    if (!payment_intent_id) {
-      return res.status(400).json({ error: 'payment_intent_id is required. Payment must be completed before activation.' });
     }
 
     // Get listing and verify ownership
@@ -594,6 +590,41 @@ router.post('/:id/activate', async (req, res) => {
 
     if (listing.status === 'sold') {
       return res.status(400).json({ error: 'Cannot activate a sold listing' });
+    }
+
+    // Check subscription limits
+    const [subscriptions] = await pool.execute(
+      `SELECT us.*, sp.max_listings
+       FROM user_subscriptions us
+       JOIN subscription_plans sp ON us.plan_id = sp.id
+       WHERE us.user_id = ? AND us.status = 'active' AND us.end_date >= CURDATE()
+       ORDER BY us.created_at DESC
+       LIMIT 1`,
+      [listing.user_id]
+    );
+
+    if (subscriptions.length === 0) {
+      return res.status(403).json({ 
+        error: 'No active subscription found',
+        message: 'You need an active subscription to activate listings. Please subscribe to a plan first.'
+      });
+    }
+
+    const subscription = subscriptions[0];
+
+    // Count current active listings
+    const [activeCount] = await pool.execute(
+      'SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = "active"',
+      [listing.user_id]
+    );
+
+    const currentActive = activeCount[0].count;
+
+    if (currentActive >= subscription.max_listings) {
+      return res.status(403).json({ 
+        error: 'Listing limit reached',
+        message: `You have reached your subscription limit of ${subscription.max_listings} active listings. Please upgrade your plan or deactivate existing listings.`
+      });
     }
 
     // Update listing status to active
@@ -620,6 +651,7 @@ router.post('/:id/activate', async (req, res) => {
       message: 'Listing activated successfully'
     });
   } catch (error) {
+    console.error('Error activating listing:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

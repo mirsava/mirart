@@ -28,6 +28,7 @@ import ConfirmSignup from './pages/ConfirmSignup';
 import Messages from './pages/Messages';
 import AdminDashboard from './pages/AdminDashboard';
 import Chat from './pages/Chat';
+import SubscriptionPlans from './pages/SubscriptionPlans';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UserRole } from './types/userRoles';
 

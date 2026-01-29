@@ -20,6 +20,7 @@
     "migrate-comments": "node database/run-comments-migration.js",
     "migrate-user-settings": "node database/run-user-settings-migration.js",
     "migrate-default-special-instructions": "node database/run-default-special-instructions-migration.js",
+    "migrate-subscriptions": "node database/run-subscription-migration.js",
     "rename-column": "node rename-column.js",
     "reset-db": "node scripts/reset-database.js",
     "set-admin": "node scripts/set-admin.js"
