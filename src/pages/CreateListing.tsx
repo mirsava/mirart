@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
   Typography,
   TextField,
   Button,
@@ -342,15 +341,16 @@ const CreateListing: React.FC = () => {
         icon={<AddIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
       />
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 4 }}>
         <Paper
+          elevation={0}
           sx={{
             p: { xs: 3, sm: 4, md: 5 },
             mb: 4,
-            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
+            bgcolor: 'background.paper',
             border: '1px solid',
             borderColor: 'divider',
-            borderRadius: 3,
+            borderRadius: 1,
           }}
         >
           <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
@@ -377,7 +377,7 @@ const CreateListing: React.FC = () => {
                     bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 2,
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
@@ -468,7 +468,7 @@ const CreateListing: React.FC = () => {
                     bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 2,
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
@@ -527,7 +527,7 @@ const CreateListing: React.FC = () => {
                     bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 2,
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
@@ -545,7 +545,7 @@ const CreateListing: React.FC = () => {
                   sx={{
                     border: '2px dashed',
                     borderColor: isDragging ? 'primary.main' : 'divider',
-                    borderRadius: 2,
+                    borderRadius: 1,
                     p: 4,
                     textAlign: 'center',
                     bgcolor: isDragging ? 'action.hover' : 'transparent',
@@ -676,7 +676,7 @@ const CreateListing: React.FC = () => {
                     bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 2,
+                    borderRadius: 1,
                   }}
                 >
                   <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -743,7 +743,7 @@ const CreateListing: React.FC = () => {
                     bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 2,
+                    borderRadius: 1,
                   }}
                 >
                   <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -857,7 +857,7 @@ const CreateListing: React.FC = () => {
             </Grid>
           </form>
         </Paper>
-      </Container>
+      </Box>
     </Box>
   );
 };

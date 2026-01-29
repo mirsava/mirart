@@ -101,6 +101,7 @@ const ArtistDashboard: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
+  const { addToCart } = useCart();
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +115,7 @@ const ArtistDashboard: React.FC = () => {
   });
   const [recentListings, setRecentListings] = useState<Listing[]>([]);
   const [listingsPage, setListingsPage] = useState(1);
+  const [listingsStatusFilter, setListingsStatusFilter] = useState<string>('all');
   const [listingsPagination, setListingsPagination] = useState<{ page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } | null>(null);
   const [loadingListings, setLoadingListings] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -162,7 +164,14 @@ const ArtistDashboard: React.FC = () => {
     if (user?.id && tabValue === 0) {
       fetchListings();
     }
-  }, [user?.id, listingsPage, tabValue]);
+  }, [user?.id, listingsPage, listingsStatusFilter, tabValue]);
+
+  useEffect(() => {
+    // Reset to page 1 when filter changes
+    if (tabValue === 0) {
+      setListingsPage(1);
+    }
+  }, [listingsStatusFilter, tabValue]);
 
   const fetchDashboardData = async () => {
     if (!user?.id) return;
@@ -195,13 +204,20 @@ const ArtistDashboard: React.FC = () => {
     
     setLoadingListings(true);
     try {
-      const response = await apiService.getListings({
+      const filters: any = {
         cognitoUsername: user.id,
         page: listingsPage,
         limit: 12,
         sortBy: 'created_at',
         sortOrder: 'DESC',
-      });
+      };
+      
+      // Add status filter if not 'all'
+      if (listingsStatusFilter && listingsStatusFilter !== 'all') {
+        filters.status = listingsStatusFilter;
+      }
+      
+      const response = await apiService.getListings(filters);
       setRecentListings(response.listings || []);
       if (response.pagination) {
         setListingsPagination(response.pagination);
@@ -491,8 +507,7 @@ const ArtistDashboard: React.FC = () => {
         subtitle="Manage your listings, track engagement, and grow your art business."
         icon={<PersonIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
       />
-      <Container maxWidth="lg">
-
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             {error}
@@ -506,9 +521,9 @@ const ArtistDashboard: React.FC = () => {
         ) : (
           <>
             {/* Stats Overview */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid container spacing={2} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={4}>
-            <Card>
+            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Avatar sx={{ bgcolor: 'primary.main' }}>
@@ -525,7 +540,7 @@ const ArtistDashboard: React.FC = () => {
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
-            <Card>
+            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Avatar sx={{ bgcolor: 'success.main' }}>
@@ -542,7 +557,7 @@ const ArtistDashboard: React.FC = () => {
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
-            <Card>
+            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Avatar sx={{ bgcolor: 'info.main' }}>
@@ -559,7 +574,7 @@ const ArtistDashboard: React.FC = () => {
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
-            <Card>
+            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Avatar sx={{ bgcolor: 'warning.main' }}>
@@ -576,7 +591,7 @@ const ArtistDashboard: React.FC = () => {
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
-            <Card>
+            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Avatar sx={{ bgcolor: 'error.main' }}>
@@ -593,7 +608,7 @@ const ArtistDashboard: React.FC = () => {
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
-            <Card>
+            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Avatar sx={{ bgcolor: 'secondary.main' }}>
@@ -612,7 +627,7 @@ const ArtistDashboard: React.FC = () => {
         </Grid>
 
         {/* Main Content Tabs */}
-        <Paper sx={{ width: '100%', mb: 4 }}>
+        <Paper elevation={0} sx={{ width: '100%', mb: 4, border: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="My Listings" />
@@ -641,19 +656,40 @@ const ArtistDashboard: React.FC = () => {
                   startIcon={<AddIcon />}
                   onClick={() => navigate('/create-listing')}
                   sx={{
-                    borderRadius: 2,
+                    borderRadius: 1,
                     fontWeight: 600,
                     textTransform: 'none',
                     px: 3,
-                    boxShadow: '0 4px 12px rgba(74, 58, 154, 0.2)',
-                    '&:hover': {
-                      boxShadow: '0 6px 16px rgba(74, 58, 154, 0.3)',
-                    },
                   }}
                 >
                   Add New Listing
                 </Button>
               </Box>
+            </Box>
+            
+            {/* Filter Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <InputLabel>Filter by Status</InputLabel>
+                <Select
+                  value={listingsStatusFilter}
+                  label="Filter by Status"
+                  onChange={(e) => setListingsStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All Listings</MenuItem>
+                  <MenuItem value="draft">Draft</MenuItem>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                  <MenuItem value="sold">Sold</MenuItem>
+                  <MenuItem value="archived">Archived</MenuItem>
+                </Select>
+              </FormControl>
+              
+              {listingsPagination && listingsPagination.total > 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((listingsPagination.page - 1) * listingsPagination.limit) + 1} - {Math.min(listingsPagination.page * listingsPagination.limit, listingsPagination.total)} of {listingsPagination.total} listings
+                </Typography>
+              )}
             </Box>
             
             {loadingListings ? (
@@ -662,18 +698,11 @@ const ArtistDashboard: React.FC = () => {
               </Box>
             ) : (
               <>
-                {listingsPagination && listingsPagination.total > 0 && (
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Showing {((listingsPagination.page - 1) * listingsPagination.limit) + 1} - {Math.min(listingsPagination.page * listingsPagination.limit, listingsPagination.total)} of {listingsPagination.total} listings
-                    </Typography>
-                  </Box>
-                )}
                 
-                <Grid container spacing={3}>
+                <Grid container spacing={2}>
                   {recentListings.length === 0 ? (
                     <Grid item xs={12}>
-                      <Paper sx={{ p: 4, textAlign: 'center' }}>
+                      <Paper elevation={0} sx={{ p: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                         <Typography variant="h6" gutterBottom>
                           No listings yet
                         </Typography>
@@ -701,7 +730,6 @@ const ArtistDashboard: React.FC = () => {
                       overflow: 'hidden',
                       border: '1px solid',
                       borderColor: 'divider',
-                      boxShadow: 'none',
                       '& .MuiCardMedia-root': {
                         margin: 0,
                         padding: 0,
@@ -874,15 +902,10 @@ const ArtistDashboard: React.FC = () => {
                   sx={{
                     p: 3,
                     height: '100%',
-                    background: 'linear-gradient(135deg, rgba(74, 58, 154, 0.08) 0%, rgba(74, 58, 154, 0.03) 100%)',
+                    bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(74, 58, 154, 0.15)',
-                    },
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -916,15 +939,10 @@ const ArtistDashboard: React.FC = () => {
                   sx={{
                     p: 3,
                     height: '100%',
-                    background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(76, 175, 80, 0.03) 100%)',
+                    bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(76, 175, 80, 0.15)',
-                    },
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -958,15 +976,10 @@ const ArtistDashboard: React.FC = () => {
                   sx={{
                     p: 3,
                     height: '100%',
-                    background: 'linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(255, 152, 0, 0.03) 100%)',
+                    bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(255, 152, 0, 0.15)',
-                    },
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -1000,15 +1013,10 @@ const ArtistDashboard: React.FC = () => {
                   sx={{
                     p: 3,
                     height: '100%',
-                    background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.08) 0%, rgba(33, 150, 243, 0.03) 100%)',
+                    bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(33, 150, 243, 0.15)',
-                    },
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -1043,15 +1051,10 @@ const ArtistDashboard: React.FC = () => {
                   sx={{
                     p: 3.5,
                     height: '100%',
-                    background: 'linear-gradient(135deg, rgba(233, 30, 99, 0.08) 0%, rgba(233, 30, 99, 0.03) 100%)',
+                    bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(233, 30, 99, 0.15)',
-                    },
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -1101,15 +1104,10 @@ const ArtistDashboard: React.FC = () => {
                   sx={{
                     p: 3.5,
                     height: '100%',
-                    background: 'linear-gradient(135deg, rgba(156, 39, 176, 0.08) 0%, rgba(156, 39, 176, 0.03) 100%)',
+                    bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(156, 39, 176, 0.15)',
-                    },
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -1157,15 +1155,10 @@ const ArtistDashboard: React.FC = () => {
                   sx={{
                     p: 3.5,
                     height: '100%',
-                    background: 'linear-gradient(135deg, rgba(0, 188, 212, 0.08) 0%, rgba(0, 188, 212, 0.03) 100%)',
+                    bgcolor: 'background.paper',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(0, 188, 212, 0.15)',
-                    },
+                    borderRadius: 1,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -1246,8 +1239,8 @@ const ArtistDashboard: React.FC = () => {
                       p: 4,
                       border: '1px solid',
                       borderColor: 'divider',
-                      borderRadius: 3,
-                      background: 'linear-gradient(135deg, rgba(74, 58, 154, 0.03) 0%, rgba(74, 58, 154, 0.01) 100%)',
+                      borderRadius: 1,
+                      bgcolor: 'background.paper',
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
@@ -1270,7 +1263,7 @@ const ArtistDashboard: React.FC = () => {
                       </Typography>
                     </Box>
                     <Divider sx={{ mb: 3 }} />
-                    <Grid container spacing={3}>
+                    <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
@@ -1326,8 +1319,8 @@ const ArtistDashboard: React.FC = () => {
                       p: 4,
                       border: '1px solid',
                       borderColor: 'divider',
-                      borderRadius: 3,
-                      background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.03) 0%, rgba(33, 150, 243, 0.01) 100%)',
+                      borderRadius: 1,
+                      bgcolor: 'background.paper',
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
@@ -1350,7 +1343,7 @@ const ArtistDashboard: React.FC = () => {
                       </Typography>
                     </Box>
                     <Divider sx={{ mb: 3 }} />
-                    <Grid container spacing={3}>
+                    <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
@@ -1395,8 +1388,8 @@ const ArtistDashboard: React.FC = () => {
                       p: 4,
                       border: '1px solid',
                       borderColor: 'divider',
-                      borderRadius: 3,
-                      background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.03) 0%, rgba(76, 175, 80, 0.01) 100%)',
+                      borderRadius: 1,
+                      bgcolor: 'background.paper',
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
@@ -1419,7 +1412,7 @@ const ArtistDashboard: React.FC = () => {
                       </Typography>
                     </Box>
                     <Divider sx={{ mb: 3 }} />
-                    <Grid container spacing={3}>
+                    <Grid container spacing={2}>
                       <Grid item xs={12}>
                         <FormControl fullWidth sx={{ bgcolor: 'background.paper' }}>
                           <InputLabel>Experience Level</InputLabel>
@@ -1490,8 +1483,8 @@ const ArtistDashboard: React.FC = () => {
                       p: 4,
                       border: '1px solid',
                       borderColor: 'divider',
-                      borderRadius: 3,
-                      background: 'linear-gradient(135deg, rgba(156, 39, 176, 0.03) 0%, rgba(156, 39, 176, 0.01) 100%)',
+                      borderRadius: 1,
+                      bgcolor: 'background.paper',
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
@@ -1544,10 +1537,6 @@ const ArtistDashboard: React.FC = () => {
                         borderRadius: 2,
                         fontWeight: 600,
                         textTransform: 'none',
-                        boxShadow: '0 4px 12px rgba(74, 58, 154, 0.2)',
-                        '&:hover': {
-                          boxShadow: '0 6px 16px rgba(74, 58, 154, 0.3)',
-                        },
                       }}
                     >
                       {savingProfile ? 'Saving...' : 'Save Profile'}
@@ -1588,9 +1577,9 @@ const ArtistDashboard: React.FC = () => {
                 <CircularProgress />
               </Box>
             ) : (
-              <Paper sx={{ p: 4 }}>
+              <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                 <form onSubmit={handleSettingsSubmit}>
-                  <Grid container spacing={3}>
+                  <Grid container spacing={2}>
                     <Grid item xs={12}>
                       <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
                         Comment Settings
@@ -1708,7 +1697,7 @@ const ArtistDashboard: React.FC = () => {
         </Paper>
           </>
         )}
-        </Container>
+      </Box>
 
         <Dialog
           open={deleteDialogOpen}

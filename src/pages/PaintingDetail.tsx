@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
   Typography,
   Grid,
   Button,
@@ -306,15 +305,15 @@ const PaintingDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <CircularProgress />
-      </Container>
+      </Box>
     );
   }
 
   if (error || !painting) {
     return (
-      <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8, textAlign: 'center' }}>
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             {error}
@@ -329,7 +328,7 @@ const PaintingDetail: React.FC = () => {
         <Button variant="contained" onClick={() => navigate('/gallery')}>
           Back to Gallery
         </Button>
-      </Container>
+      </Box>
     );
   }
 
@@ -491,7 +490,7 @@ const PaintingDetail: React.FC = () => {
         subtitle={`By ${painting.artist}`}
         disablePattern={true}
       />
-      <Container maxWidth="lg">
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Breadcrumbs sx={{ mb: 3 }}>
           <MuiLink
             component="button"
@@ -520,8 +519,7 @@ const PaintingDetail: React.FC = () => {
               <Paper
                 sx={{
                   overflow: 'hidden',
-                  borderRadius: 2,
-                  boxShadow: 3,
+                  borderRadius: 1,
                   position: 'relative',
                 }}
               >
@@ -613,7 +611,7 @@ const PaintingDetail: React.FC = () => {
                     },
                     '&::-webkit-scrollbar-thumb': {
                       bgcolor: 'divider',
-                      borderRadius: 3,
+                      borderRadius: 1,
                     },
                   }}
                 >
@@ -819,10 +817,9 @@ const PaintingDetail: React.FC = () => {
                         justifyContent: 'center',
                         width: 40,
                         height: 40,
-                        borderRadius: 2,
+                        borderRadius: 1,
                         bgcolor: 'primary.main',
                         color: 'white',
-                        boxShadow: '0 4px 12px rgba(74, 58, 154, 0.2)',
                       }}
                     >
                       <InfoIcon sx={{ fontSize: 20 }} />
@@ -845,26 +842,9 @@ const PaintingDetail: React.FC = () => {
                       bgcolor: 'background.paper',
                       border: '1px solid',
                       borderColor: 'divider',
-                      borderRadius: 3,
+                      borderRadius: 1,
                       position: 'relative',
-                      overflow: 'hidden',
-                      background: 'linear-gradient(135deg, rgba(74, 58, 154, 0.03) 0%, rgba(74, 58, 154, 0.01) 100%)',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        boxShadow: '0 4px 16px rgba(74, 58, 154, 0.08)',
-                        borderColor: 'primary.light',
-                      },
-                      '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: 4,
-                        height: '100%',
-                        background: 'linear-gradient(180deg, #4a3a9a 0%, #534bae 100%)',
-                        borderRadius: '3px 0 0 3px',
-                      },
+                      bgcolor: 'background.paper',
                     }}
                   >
                     {(() => {
@@ -1174,7 +1154,7 @@ const PaintingDetail: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
-      </Container>
+      </Box>
     </Box>
   );
 };

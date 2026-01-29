@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
   Typography,
   Tabs,
   Tab,
@@ -264,9 +263,8 @@ const Messages: React.FC = () => {
         subtitle="View and manage your communication with buyers and sellers"
         icon={<EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
       />
-      <Container maxWidth="lg">
-
-        <Paper sx={{ mb: 3 }}>
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
+        <Paper elevation={0} sx={{ mb: 3, border: '1px solid', borderColor: 'divider' }}>
           <Tabs value={tabValue} onChange={handleTabChange}>
             <Tab icon={<EmailIcon />} iconPosition="start" label="All Messages" />
             <Tab icon={<SendIcon />} iconPosition="start" label="Sent" />
@@ -678,7 +676,7 @@ const Messages: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
-      </Container>
+      </Box>
     </Box>
   );
 };

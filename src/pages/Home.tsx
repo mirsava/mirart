@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
   Typography,
   Button,
   Grid,
@@ -125,7 +124,7 @@ const Home: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.primary.dark} 100%)`,
+            bgcolor: 'primary.main',
             overflow: 'hidden',
             '&::before': {
               content: '""',
@@ -170,7 +169,7 @@ const Home: React.FC = () => {
               border: `2px solid rgba(255, 255, 255, 0.15)`,
               borderRadius: '20px',
               transform: 'rotate(25deg)',
-              background: `linear-gradient(135deg, ${theme.palette.primary.main}40, ${theme.palette.primary.light}20)`,
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
               pointerEvents: 'none',
             }}
           />
@@ -184,7 +183,7 @@ const Home: React.FC = () => {
               border: `2px solid rgba(255, 143, 0, 0.2)`,
               borderRadius: '20px',
               transform: 'rotate(-15deg)',
-              background: `linear-gradient(135deg, ${theme.palette.secondary.main}30, transparent)`,
+              bgcolor: 'rgba(255, 255, 255, 0.08)',
               pointerEvents: 'none',
             }}
           />
@@ -229,7 +228,7 @@ const Home: React.FC = () => {
               height: '150px',
               border: `2px solid rgba(255, 255, 255, 0.1)`,
               borderRadius: '50%',
-              background: `radial-gradient(circle, ${theme.palette.primary.light}25, transparent)`,
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
               pointerEvents: 'none',
             }}
           />
@@ -242,7 +241,7 @@ const Home: React.FC = () => {
               height: '180px',
               border: `2px solid rgba(255, 143, 0, 0.15)`,
               borderRadius: '50%',
-              background: `radial-gradient(circle, ${theme.palette.secondary.main}20, transparent)`,
+              bgcolor: 'rgba(255, 255, 255, 0.08)',
               pointerEvents: 'none',
             }}
           />
@@ -255,13 +254,13 @@ const Home: React.FC = () => {
               height: '140px',
               border: `2px solid rgba(255, 255, 255, 0.12)`,
               transform: 'rotate(45deg)',
-              background: `linear-gradient(135deg, ${theme.palette.primary.main}30, ${theme.palette.secondary.main}20)`,
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
               pointerEvents: 'none',
             }}
           />
         </Box>
         
-        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
+        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, position: 'relative', zIndex: 2 }}>
           <Grid container spacing={6} alignItems="center" justifyContent="center">
             <Grid item xs={12} md={8}>
               <Fade in={true} timeout={1000}>
@@ -360,18 +359,11 @@ const Home: React.FC = () => {
                         color: 'white',
                         px: 5,
                         py: 2,
-                        borderRadius: 2,
+                        borderRadius: 1,
                         textTransform: 'none',
                         fontWeight: 500,
                         fontSize: '1rem',
                         letterSpacing: '0.5px',
-                        boxShadow: '0 4px 20px rgba(255, 143, 0, 0.25)',
-                        '&:hover': {
-                          bgcolor: 'secondary.dark',
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 6px 30px rgba(255, 143, 0, 0.35)',
-                        },
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
                       onClick={() => navigate('/artist-signup')}
                     >
@@ -383,12 +375,12 @@ const Home: React.FC = () => {
             </Grid>
             
           </Grid>
-        </Container>
+        </Box>
 
       </Box>
 
 
-      <Container maxWidth="lg" sx={{ py: 8 }}>
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8 }}>
         <Box sx={{ textAlign: 'center', mb: 6 }}>
           <Typography variant="h4" component="h2" gutterBottom>
             Featured Paintings
@@ -476,28 +468,22 @@ const Home: React.FC = () => {
               color: 'white',
               px: 4,
               py: 1.5,
-              borderRadius: 3,
+              borderRadius: 1,
               textTransform: 'none',
               fontWeight: 600,
-              '&:hover': {
-                bgcolor: 'primary.dark',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
-              },
               '&:focus': {
                 bgcolor: 'primary.dark',
               },
-              transition: 'all 0.3s ease',
             }}
             onClick={() => navigate('/gallery?category=Painting')}
           >
             View All Paintings
           </Button>
         </Box>
-      </Container>
+      </Box>
 
       <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
-        <Container maxWidth="lg">
+        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
           <Box sx={{ textAlign: 'center', mb: 6 }}>
             <Typography variant="h4" component="h2" gutterBottom>
               Featured Woodworking
@@ -574,14 +560,9 @@ const Home: React.FC = () => {
                 color: 'white',
                 px: 4,
                 py: 1.5,
-                borderRadius: 3,
+                borderRadius: 1,
                 textTransform: 'none',
                 fontWeight: 600,
-                '&:hover': {
-                  bgcolor: 'primary.dark',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
-                },
                 '&:focus': {
                   bgcolor: 'primary.dark',
                 },
@@ -592,11 +573,11 @@ const Home: React.FC = () => {
               View All Woodworking
             </Button>
           </Box>
-        </Container>
+        </Box>
       </Box>
 
       <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
-        <Container maxWidth="lg">
+        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
           <Grid container spacing={6} alignItems="center">
             <Grid item xs={12} md={6}>
               <Typography variant="h4" component="h2" gutterBottom>
@@ -656,13 +637,12 @@ const Home: React.FC = () => {
                   backgroundImage: `url(${joinCommunityBg})`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
-                  borderRadius: 2,
-                  boxShadow: 3,
+                  borderRadius: 1,
                 }}
               />
             </Grid>
           </Grid>
-        </Container>
+        </Box>
       </Box>
     </Box>
   );

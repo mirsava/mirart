@@ -80,15 +80,14 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
 
   return (
     <Card
+      elevation={0}
       sx={{
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         cursor: 'pointer',
-        transition: 'transform 0.2s ease-in-out',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-        },
+        border: '1px solid',
+        borderColor: 'divider',
       }}
       onClick={contactDialogOpen ? undefined : handleViewDetails}
     >

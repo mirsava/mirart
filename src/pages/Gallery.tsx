@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
   Typography,
   Grid,
   TextField,
@@ -261,7 +260,7 @@ const Gallery: React.FC = () => {
         disablePattern={true}
       />
 
-      <Container maxWidth="lg">
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Box sx={{ mb: 4 }}>
           <Grid container spacing={3} alignItems="center">
             <Grid item xs={12} md={6}>
@@ -378,11 +377,9 @@ const Gallery: React.FC = () => {
                       border: '2px dashed',
                       borderColor: 'divider',
                       bgcolor: 'background.paper',
-                      transition: 'all 0.3s ease',
                       '&:hover': {
                         borderColor: 'primary.main',
                         bgcolor: 'action.hover',
-                        transform: 'translateY(-4px)',
                       },
                     }}
                   >
@@ -435,7 +432,7 @@ const Gallery: React.FC = () => {
             )}
           </>
         )}
-      </Container>
+      </Box>
     </Box>
   );
 };

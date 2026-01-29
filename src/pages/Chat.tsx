@@ -193,15 +193,15 @@ const Chat: React.FC = () => {
 
   return (
     <Box sx={{ py: 4 }}>
-      <Container maxWidth="lg">
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Paper
           elevation={0}
           sx={{
             mb: 4,
             mt: 3,
             p: { xs: 3, sm: 4, md: 5 },
-            background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(156, 39, 176, 0.08) 100%)',
-            borderRadius: 3,
+            bgcolor: 'background.paper',
+            borderRadius: 1,
             border: '1px solid',
             borderColor: 'divider',
             textAlign: 'center',
@@ -213,10 +213,6 @@ const Chat: React.FC = () => {
             gutterBottom
             sx={{ 
               fontWeight: 600,
-              background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
               mb: 2,
             }}
           >
@@ -378,7 +374,7 @@ const Chat: React.FC = () => {
             )}
           </Grid>
         </Grid>
-      </Container>
+      </Box>
     </Box>
   );
 };

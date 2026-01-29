@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Box,
-  Container,
   Typography,
   Grid,
   Paper,
@@ -42,9 +41,10 @@ const About: React.FC = () => {
         subtitle="ArtZyla is a vibrant marketplace connecting talented artists with art lovers worldwide. We empower artists to sell their work through flexible pricing options while providing buyers with access to authentic, handmade art from independent creators."
         icon={<PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
+        align="left"
       />
 
-      <Container maxWidth="lg">
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Grid container spacing={6} sx={{ mb: 8 }}>
           <Grid item xs={12} md={6}>
             <Paper
@@ -53,20 +53,9 @@ const About: React.FC = () => {
                 backgroundImage: 'url(https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=800&h=600&fit=crop&q=80)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                borderRadius: 2,
-                boxShadow: 3,
+                borderRadius: 1,
                 position: 'relative',
                 overflow: 'hidden',
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: `linear-gradient(135deg, rgba(74, 58, 154, 0.2) 0%, rgba(255, 143, 0, 0.15) 100%)`,
-                  mixBlendMode: 'overlay',
-                },
               }}
             />
           </Grid>
@@ -169,7 +158,7 @@ const About: React.FC = () => {
             </Box>
           </Box>
         </Paper>
-      </Container>
+      </Box>
     </Box>
   );
 };

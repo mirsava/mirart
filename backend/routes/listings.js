@@ -31,6 +31,16 @@ router.get('/', async (req, res) => {
     const limitNum = parseInt(limit) || 12;
     const offset = (pageNum - 1) * limitNum;
     
+    // Check if user is fetching their own listings (by cognitoUsername)
+    // When cognitoUsername is provided without userId, assume they want to see all their listings
+    const hasUserId = userId && userId !== 'undefined' && userId !== 'null' && userId !== '';
+    const isFetchingOwnListings = Boolean(cognitoUsername && !hasUserId);
+    
+    // Debug logging (can be removed in production)
+    if (cognitoUsername) {
+      console.log('Listings query - cognitoUsername:', cognitoUsername, 'userId:', userId, 'status:', status, 'isFetchingOwnListings:', isFetchingOwnListings);
+    }
+    
     let baseQuery = `
       SELECT l.*, 
         COALESCE(
@@ -58,16 +68,24 @@ router.get('/', async (req, res) => {
       params.push(String(subcategory));
     }
     
+    // Only apply default "active" filter if not fetching own listings
+    // When fetching own listings without status filter, show all statuses
     if (status) {
       baseQuery += ' AND l.status = ?';
       params.push(String(status));
-    } else {
+    } else if (!isFetchingOwnListings) {
+      // Default: only show active listings for public views
       baseQuery += ' AND l.status = "active"';
     }
+    // If isFetchingOwnListings is true and status is not provided, no status filter is applied (shows all)
     
-    if (userId) {
+    if (hasUserId) {
       baseQuery += ' AND l.user_id = ?';
       params.push(String(userId));
+    } else if (isFetchingOwnListings) {
+      // Add filter to only show listings owned by this user
+      baseQuery += ' AND u.cognito_username = ?';
+      params.push(String(cognitoUsername));
     }
     
     if (search) {
@@ -96,16 +114,24 @@ router.get('/', async (req, res) => {
       countParams.push(String(subcategory));
     }
     
+    // Only apply default "active" filter if not fetching own listings
+    // When fetching own listings without status filter, show all statuses
     if (status) {
       countQuery += ' AND l.status = ?';
       countParams.push(String(status));
-    } else {
+    } else if (!isFetchingOwnListings) {
+      // Default: only show active listings for public views
       countQuery += ' AND l.status = "active"';
     }
+    // If isFetchingOwnListings is true and status is not provided, no status filter is applied (shows all)
     
-    if (userId) {
+    if (hasUserId) {
       countQuery += ' AND l.user_id = ?';
       countParams.push(String(userId));
+    } else if (isFetchingOwnListings) {
+      // Add filter to only show listings owned by this user
+      countQuery += ' AND u.cognito_username = ?';
+      countParams.push(String(cognitoUsername));
     }
     
     if (search) {

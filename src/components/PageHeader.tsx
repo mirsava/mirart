@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Container, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Typography, useTheme, useMediaQuery } from '@mui/material';
 import { SxProps, Theme } from '@mui/material/styles';
 
 interface PageHeaderProps {
@@ -9,6 +9,7 @@ interface PageHeaderProps {
   backgroundGradient?: string;
   titleGradient?: string;
   disablePattern?: boolean;
+  align?: 'left' | 'center';
   sx?: SxProps<Theme>;
 }
 
@@ -19,10 +20,14 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   backgroundGradient,
   titleGradient,
   disablePattern = false,
+  align = 'left',
   sx,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const alignment = align === 'center' ? 'center' : 'left';
+  const justifyContent = align === 'center' ? 'center' : 'flex-start';
 
   return (
     <Box 
@@ -34,43 +39,22 @@ const PageHeader: React.FC<PageHeaderProps> = ({
         ...(sx && typeof sx === 'object' && !Array.isArray(sx) ? sx : {}),
       }}
     >
-      <Container maxWidth="lg">
-        <Box sx={{ textAlign: { xs: 'center', md: 'left' } }}>
-          <Box
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
+        <Box sx={{ textAlign: { xs: 'center', md: alignment } }}>
+          <Typography
+            variant={isMobile ? 'h3' : 'h2'}
+            component="h1"
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2,
-              justifyContent: { xs: 'center', md: 'flex-start' },
+              fontWeight: 700,
+              color: theme.palette.primary.main,
+              fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+              lineHeight: 1.2,
+              letterSpacing: '-0.02em',
               mb: subtitle ? 1.5 : 0,
             }}
           >
-            {icon && (
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: theme.palette.primary.main,
-                  opacity: 0.7,
-                }}
-              >
-                {icon}
-              </Box>
-            )}
-            <Typography
-              variant={isMobile ? 'h3' : 'h2'}
-              component="h1"
-              sx={{
-                fontWeight: 700,
-                color: theme.palette.primary.main,
-                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                lineHeight: 1.2,
-                letterSpacing: '-0.02em',
-              }}
-            >
-              {title}
-            </Typography>
-          </Box>
+            {title}
+          </Typography>
 
           {subtitle && (
             <Typography
@@ -78,19 +62,19 @@ const PageHeader: React.FC<PageHeaderProps> = ({
               color="text.secondary"
               sx={{
                 maxWidth: { xs: '100%', md: '800px' },
-                mx: { xs: 'auto', md: 0 },
+                mx: { xs: 'auto', md: align === 'center' ? 'auto' : 0 },
                 mt: 1.5,
                 lineHeight: 1.6,
                 fontSize: { xs: '0.95rem', sm: '1.05rem', md: '1.15rem' },
                 fontWeight: 400,
-                textAlign: { xs: 'center', md: 'left' },
+                textAlign: { xs: 'center', md: alignment },
               }}
             >
               {subtitle}
             </Typography>
           )}
         </Box>
-      </Container>
+      </Box>
     </Box>
   );
 };

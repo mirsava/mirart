@@ -21,6 +21,7 @@ export const lightTheme: Theme = createTheme({
       primary: '#212121',
       secondary: '#757575',
     },
+    divider: 'rgba(0, 0, 0, 0.15)',
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
@@ -50,7 +51,7 @@ export const lightTheme: Theme = createTheme({
     },
   },
   shape: {
-    borderRadius: 8,
+    borderRadius: 1,
   },
   components: {
     MuiAppBar: {
@@ -82,7 +83,7 @@ export const lightTheme: Theme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          borderRadius: 8,
+          borderRadius: 1,
         },
       },
     },
@@ -102,11 +103,33 @@ export const lightTheme: Theme = createTheme({
       },
     },
     MuiCard: {
+      defaultProps: {
+        elevation: 0,
+      },
       styleOverrides: {
         root: {
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          border: '1px solid',
+          borderColor: 'rgba(0, 0, 0, 0.12)',
+          transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           '&:hover': {
-            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            borderColor: 'rgba(74, 58, 154, 0.5)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          },
+        },
+      },
+    },
+    MuiPaper: {
+      defaultProps: {
+        elevation: 0,
+      },
+      styleOverrides: {
+        root: {
+          border: '1px solid',
+          borderColor: 'rgba(0, 0, 0, 0.12)',
+          transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+          '&:hover': {
+            borderColor: 'rgba(74, 58, 154, 0.5)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           },
         },
       },
@@ -135,6 +158,7 @@ export const darkTheme: Theme = createTheme({
       primary: '#ffffff',
       secondary: '#e0e0e0',
     },
+    divider: 'rgba(255, 255, 255, 0.15)',
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
@@ -164,7 +188,7 @@ export const darkTheme: Theme = createTheme({
     },
   },
   shape: {
-    borderRadius: 8,
+    borderRadius: 1,
   },
   components: {
     MuiAppBar: {
@@ -196,7 +220,7 @@ export const darkTheme: Theme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          borderRadius: 8,
+          borderRadius: 1,
           '&.MuiButton-text': {
             color: '#ffffff',
             '&:hover': {
@@ -215,11 +239,33 @@ export const darkTheme: Theme = createTheme({
       },
     },
     MuiCard: {
+      defaultProps: {
+        elevation: 0,
+      },
       styleOverrides: {
         root: {
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          border: '1px solid',
+          borderColor: 'rgba(255, 255, 255, 0.12)',
+          transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           '&:hover': {
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            borderColor: 'rgba(124, 107, 197, 0.6)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+          },
+        },
+      },
+    },
+    MuiPaper: {
+      defaultProps: {
+        elevation: 0,
+      },
+      styleOverrides: {
+        root: {
+          border: '1px solid',
+          borderColor: 'rgba(255, 255, 255, 0.12)',
+          transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+          '&:hover': {
+            borderColor: 'rgba(124, 107, 197, 0.6)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
           },
         },
       },

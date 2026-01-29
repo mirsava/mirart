@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Container,
   Typography,
   Grid,
   TextField,
@@ -67,9 +66,10 @@ const Contact: React.FC = () => {
         subtitle="Have questions about our paintings or need assistance? We're here to help! Reach out to us through any of the channels below."
         icon={<EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
+        align="left"
       />
 
-      <Container maxWidth="lg">
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Grid container spacing={6}>
           <Grid item xs={12} md={8}>
             <Paper sx={{ p: 4 }}>
@@ -228,7 +228,7 @@ const Contact: React.FC = () => {
             </Grid>
           </Grid>
         </Box>
-      </Container>
+      </Box>
     </Box>
   );
 };
