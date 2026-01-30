@@ -20,7 +20,7 @@ const About: React.FC = () => {
     {
       icon: <PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
       title: 'Flexible Pricing',
-      description: 'List your work for a fixed price with a simple $10 activation fee and keep the full sale amount.',
+      description: 'Choose a subscription plan that fits your business needs. List your work at a fixed price and keep the full sale amount. No activation fees per listing.',
     },
     {
       icon: <BuildIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
@@ -70,10 +70,10 @@ const About: React.FC = () => {
                 to showcase and sell their work directly to art lovers worldwide.
               </Typography>
               <Typography variant="body1" paragraph>
-                Our mission is to support independent artists by offering transparent, affordable pricing. 
-                Artists list their work at a fixed price and pay a straightforward $10 activation fee when 
-                they are ready to publish. No ongoing commissions or surprise charges—artists keep the full 
-                sale price and maintain control over their business.
+                Our mission is to support independent artists by offering transparent, affordable subscription-based pricing. 
+                Artists choose a subscription plan that fits their needs, list their work at a fixed price, and 
+                activate listings within their plan limits. No per-listing activation fees or surprise charges—artists 
+                keep the full sale price and maintain control over their business.
               </Typography>
               <Typography variant="body1">
                 We empower artists to maintain control over their sales process, including shipping, 
@@ -119,17 +119,17 @@ const About: React.FC = () => {
             How It Works
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph>
-            ArtZyla provides a simple, transparent marketplace for artists and buyers. Artists create 
-            listings, pay a flat $10 activation fee to make them visible, and manage shipping and 
+            ArtZyla provides a simple, transparent marketplace for artists and buyers. Artists choose a 
+            subscription plan, create listings within their plan limits, and manage shipping and 
             customer service directly with collectors. Buyers purchase authentic art straight from the source.
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 4, flexWrap: 'wrap', mt: 4 }}>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h6" color="primary.main">
-                $10
+                Subscription-Based
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Fixed Price Listing Fee
+                Flexible Plans Available
               </Typography>
             </Box>
             <Box sx={{ textAlign: 'center' }}>

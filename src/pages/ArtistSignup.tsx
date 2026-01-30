@@ -314,7 +314,7 @@ const ArtistSignup: React.FC = () => {
             mx: 'auto',
           }}
         >
-          Start selling your artwork to a global audience. Simple pricing, no hidden fees.
+          Start selling your artwork to a global audience. Choose a subscription plan that fits your needs and start listing your work today. No activation fees, transparent pricing.
         </Typography>
       </Box>
 

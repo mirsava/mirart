@@ -81,6 +81,7 @@ const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [listings, setListings] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [userSubscriptions, setUserSubscriptions] = useState<Record<number, any>>({});
   const [usersPage, setUsersPage] = useState(1);
   const [listingsPage, setListingsPage] = useState(1);
   const [messagesPage, setMessagesPage] = useState(1);
@@ -170,8 +171,26 @@ const AdminDashboard: React.FC = () => {
         limit: 20,
         search: searchTerm || undefined,
       }, user.groups);
-      setUsers(response.users || []);
+      const fetchedUsers = response.users || [];
+      setUsers(fetchedUsers);
       setUsersPagination(response.pagination);
+      
+      const subscriptions: Record<number, any> = {};
+      const subscriptionPromises = fetchedUsers
+        .filter(userData => userData.cognito_username)
+        .map(async (userData) => {
+          try {
+            const subResponse = await apiService.getUserSubscription(userData.cognito_username);
+            if (subResponse.subscription) {
+              subscriptions[userData.id] = subResponse.subscription;
+            }
+          } catch (err) {
+            console.error(`Error fetching subscription for user ${userData.id}:`, err);
+          }
+        });
+      
+      await Promise.all(subscriptionPromises);
+      setUserSubscriptions(subscriptions);
     } catch (error: any) {
       const errorMessage = error.message || error.error || 'Failed to fetch users';
       enqueueSnackbar(errorMessage, { variant: 'error' });
@@ -466,26 +485,16 @@ const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
+    <Box sx={{ width: '100%' }}>
       <PageHeader
         title="Admin Dashboard"
         subtitle="Manage users, listings, and platform content"
-        icon={<DashboardIcon sx={{ fontSize: 40, color: 'secondary.main' }} />}
         align="left"
         sx={{
-          position: 'relative',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: '4px',
-            bgcolor: 'secondary.main',
+          '& > div > div': {
+            borderLeftColor: 'secondary.main',
+            bgcolor: 'rgba(255, 143, 0, 0.04)',
           },
-          bgcolor: 'rgba(255, 143, 0, 0.04)',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
         }}
       />
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
@@ -583,6 +592,7 @@ const AdminDashboard: React.FC = () => {
                     <TableCell>Email</TableCell>
                     <TableCell>Type</TableCell>
                     <TableCell>Status</TableCell>
+                    <TableCell>Subscription</TableCell>
                     <TableCell>Created</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
@@ -622,6 +632,33 @@ const AdminDashboard: React.FC = () => {
                           size="small"
                           color={!userData.active || userData.active === 0 || userData.active === false ? 'error' : 'success'}
                         />
+                      </TableCell>
+                      <TableCell>
+                        {userSubscriptions[userData.id] ? (
+                          <Box>
+                            <Chip 
+                              label={userSubscriptions[userData.id].plan_name || 'Unknown Plan'} 
+                              size="small"
+                              color="primary"
+                              sx={{ mb: 0.5 }}
+                            />
+                            <Typography variant="caption" display="block" color="text.secondary">
+                              {userSubscriptions[userData.id].billing_period === 'monthly' ? 'Monthly' : 'Yearly'}
+                              {userSubscriptions[userData.id].current_listings !== undefined && (
+                                ` • ${userSubscriptions[userData.id].current_listings}/${userSubscriptions[userData.id].max_listings} listings`
+                              )}
+                            </Typography>
+                            {userSubscriptions[userData.id].end_date && (
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                Expires: {new Date(userSubscriptions[userData.id].end_date).toLocaleDateString()}
+                              </Typography>
+                            )}
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No subscription
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         {new Date(userData.created_at).toLocaleDateString()}

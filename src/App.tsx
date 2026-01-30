@@ -125,6 +125,7 @@ function AppContent(): JSX.Element {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/subscription-plans" element={<SubscriptionPlans />} />
             </Routes>
           </Layout>
         </Router>

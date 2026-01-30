@@ -661,7 +661,7 @@ const Home: React.FC = () => {
                     }}
                   />
                   <Typography variant="body2">
-                    Simple pricing: $10 activation fee per listing
+                    Simple pricing: Choose a subscription plan that fits your needs
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

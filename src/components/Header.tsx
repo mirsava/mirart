@@ -63,6 +63,7 @@ const Header: React.FC = () => {
   const menuItems = [
     { label: 'Home', path: '/' },
     { label: 'Gallery', path: '/gallery' },
+    { label: 'Pricing', path: '/subscription-plans' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },
   ];
