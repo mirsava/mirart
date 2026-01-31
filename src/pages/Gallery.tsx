@@ -25,13 +25,14 @@ import {
   AccordionSummary,
   AccordionDetails,
   Badge,
+  InputAdornment,
 } from '@mui/material';
 import { 
   Search as SearchIcon, 
   Add as AddIcon, 
   Palette as PaletteIcon, 
   Brush as BrushIcon,
-  FilterList as FilterListIcon,
+  Tune as FilterIcon,
   Close as CloseIcon,
   ExpandMore as ExpandMoreIcon,
   Clear as ClearIcon,
@@ -532,7 +533,7 @@ const Gallery: React.FC = () => {
                       width: '56px',
                     }}
                   >
-                    <FilterListIcon sx={{ color: hasActiveFilters() ? 'primary.main' : 'inherit' }} />
+                    <FilterIcon sx={{ color: hasActiveFilters() ? 'primary.main' : 'inherit' }} />
                   </IconButton>
                 </Badge>
                 <TextField
@@ -541,7 +542,22 @@ const Gallery: React.FC = () => {
                   value={searchInput}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   InputProps={{
-                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchInput && (
+                      <InputAdornment position="end">
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleSearchChange('')}
+                          sx={{ p: 0.5 }}
+                        >
+                          <ClearIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
                   }}
                   sx={{ maxWidth: 400 }}
                 />
