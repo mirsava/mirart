@@ -18,14 +18,19 @@ import {
 import {
   PlayArrow as PlayIcon,
   Add as AddIcon,
+  ArrowForward as ArrowForwardIcon,
+  Palette as PaletteIcon,
+  Build as BuildIcon,
+  CreditCard as CreditCardIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
-import apiService, { Listing } from '../services/api';
+import apiService, { Listing, SubscriptionPlan } from '../services/api';
 import { Painting } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import joinCommunityBg from '../assets/images/bg/join_our_community.png';
+import { Check as CheckIcon, Star as StarIcon } from '@mui/icons-material';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -37,6 +42,8 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [paintingPlaceholders, setPaintingPlaceholders] = useState(0);
   const [woodworkingPlaceholders, setWoodworkingPlaceholders] = useState(0);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -102,6 +109,31 @@ const Home: React.FC = () => {
     };
 
     fetchFeaturedListings();
+    
+    const fetchPlans = async () => {
+      try {
+        const plans = await apiService.getSubscriptionPlans();
+        if (plans && Array.isArray(plans) && plans.length > 0) {
+          const formattedPlans = plans
+            .map(plan => ({
+              ...plan,
+              price_monthly: typeof plan.price_monthly === 'number' ? plan.price_monthly : parseFloat(String(plan.price_monthly)) || 0,
+              price_yearly: typeof plan.price_yearly === 'number' ? plan.price_yearly : parseFloat(String(plan.price_yearly)) || 0,
+              max_listings: typeof plan.max_listings === 'number' ? plan.max_listings : parseInt(String(plan.max_listings)) || 0,
+              display_order: typeof plan.display_order === 'number' ? plan.display_order : parseInt(String(plan.display_order)) || 0,
+            }))
+            .sort((a, b) => a.display_order - b.display_order)
+            .slice(0, 3);
+          setSubscriptionPlans(formattedPlans);
+        }
+      } catch (error) {
+        console.error('Error fetching subscription plans:', error);
+      } finally {
+        setLoadingPlans(false);
+      }
+    };
+    
+    fetchPlans();
   }, []);
 
 
@@ -381,44 +413,34 @@ const Home: React.FC = () => {
 
 
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8 }}>
-        <Box 
-          sx={{ 
-            mb: 6,
-            position: 'relative',
-            pl: { xs: 3, md: 4 },
-            pr: 3,
-            py: 3,
-            borderLeft: { xs: 'none', md: '4px solid' },
-            borderLeftColor: { xs: 'transparent', md: 'primary.main' },
-            bgcolor: 'rgba(74, 58, 154, 0.04)',
-            borderRadius: 1,
-          }}
-        >
-          <Typography 
-            variant="h4" 
-            component="h2" 
-            sx={{ 
-              fontWeight: 700,
-              color: 'primary.main',
-              mb: 1.5,
-              fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
-              lineHeight: 1.2,
-              letterSpacing: '-0.02em',
-            }}
-          >
-            Featured Paintings
-          </Typography>
-          <Typography 
-            variant="body1" 
-            color="text.secondary" 
-            sx={{ 
-              maxWidth: '800px',
-              lineHeight: 1.6,
-              fontSize: { xs: '0.95rem', sm: '1.05rem', md: '1.15rem' },
-            }}
-          >
-            Discover original paintings from talented artists in our community.
-          </Typography>
+        <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+          <PaletteIcon sx={{ color: 'primary.main', fontSize: { xs: 32, md: 40 }, mt: 0.5 }} />
+          <Box sx={{ flex: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Typography 
+                variant="h4" 
+                component="h2" 
+                sx={{ 
+                  fontWeight: 600,
+                  color: 'text.primary',
+                  fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                }}
+              >
+                Featured Paintings
+              </Typography>
+              <ArrowForwardIcon sx={{ color: 'primary.main', fontSize: { xs: 20, md: 24 }, opacity: 0.7 }} />
+            </Box>
+            <Typography 
+              variant="body1" 
+              color="text.secondary" 
+              sx={{ 
+                maxWidth: '800px',
+                lineHeight: 1.6,
+              }}
+            >
+              Discover original paintings from talented artists in our community.
+            </Typography>
+          </Box>
         </Box>
 
         {loading ? (
@@ -515,44 +537,34 @@ const Home: React.FC = () => {
 
       <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
         <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
-          <Box 
-            sx={{ 
-              mb: 6,
-              position: 'relative',
-              pl: { xs: 3, md: 4 },
-              pr: 3,
-              py: 3,
-              borderLeft: { xs: 'none', md: '4px solid' },
-              borderLeftColor: { xs: 'transparent', md: 'primary.main' },
-              bgcolor: 'rgba(74, 58, 154, 0.04)',
-              borderRadius: 1,
-            }}
-          >
-            <Typography 
-              variant="h4" 
-              component="h2" 
-              sx={{ 
-                fontWeight: 700,
-                color: 'primary.main',
-                mb: 1.5,
-                fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
-                lineHeight: 1.2,
-                letterSpacing: '-0.02em',
-              }}
-            >
-              Featured Woodworking
-            </Typography>
-            <Typography 
-              variant="body1" 
-              color="text.secondary" 
-              sx={{ 
-                maxWidth: '800px',
-                lineHeight: 1.6,
-                fontSize: { xs: '0.95rem', sm: '1.05rem', md: '1.15rem' },
-              }}
-            >
-              Handcrafted woodworking pieces from skilled artisans in our marketplace.
-            </Typography>
+          <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+            <BuildIcon sx={{ color: 'primary.main', fontSize: { xs: 32, md: 40 }, mt: 0.5 }} />
+            <Box sx={{ flex: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Typography 
+                  variant="h4" 
+                  component="h2" 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: 'text.primary',
+                    fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                  }}
+                >
+                  Featured Woodworking
+                </Typography>
+                <ArrowForwardIcon sx={{ color: 'primary.main', fontSize: { xs: 20, md: 24 }, opacity: 0.7 }} />
+              </Box>
+              <Typography 
+                variant="body1" 
+                color="text.secondary" 
+                sx={{ 
+                  maxWidth: '800px',
+                  lineHeight: 1.6,
+                }}
+              >
+                Handcrafted woodworking pieces from skilled artisans in our marketplace.
+              </Typography>
+            </Box>
           </Box>
 
           <Grid container spacing={4}>
@@ -633,6 +645,137 @@ const Home: React.FC = () => {
               onClick={() => navigate('/gallery?category=Woodworking')}
             >
               View All Woodworking
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+
+      <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
+        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
+          <Box sx={{ mb: 4, textAlign: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
+              <CreditCardIcon sx={{ color: 'primary.main', fontSize: { xs: 28, md: 36 } }} />
+              <Typography 
+                variant="h4" 
+                component="h2" 
+                sx={{ 
+                  fontWeight: 600,
+                  color: 'text.primary',
+                  fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                }}
+              >
+                Simple, Transparent Pricing
+              </Typography>
+              <ArrowForwardIcon sx={{ color: 'primary.main', fontSize: { xs: 20, md: 24 }, opacity: 0.7 }} />
+            </Box>
+            <Typography 
+              variant="body1" 
+              color="text.secondary" 
+              sx={{ 
+                maxWidth: '800px',
+                mx: 'auto',
+                lineHeight: 1.6,
+              }}
+            >
+              Choose a subscription plan that fits your needs. No hidden fees, no per-listing charges.
+            </Typography>
+          </Box>
+
+          {loadingPlans ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography variant="body2" color="text.secondary">
+                Loading pricing plans...
+              </Typography>
+            </Box>
+          ) : subscriptionPlans.length > 0 ? (
+            <Grid container spacing={3} sx={{ mb: 6 }}>
+              {subscriptionPlans.map((plan, index) => {
+                const isPopular = index === 1;
+                const features = plan.features ? plan.features.split('\n').filter(f => f.trim()) : [];
+                
+                return (
+                  <Grid item xs={12} md={4} key={plan.id}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        border: '1px solid',
+                        borderColor: isPopular ? 'primary.main' : 'divider',
+                        borderRadius: 1,
+                        ...(isPopular && {
+                          borderWidth: '2px',
+                        }),
+                      }}
+                    >
+                      {isPopular && (
+                        <Chip
+                          icon={<StarIcon />}
+                          label="Most Popular"
+                          color="primary"
+                          size="small"
+                          sx={{
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            fontWeight: 600,
+                          }}
+                        />
+                      )}
+                      <Box sx={{ p: 3, pt: isPopular ? 5 : 3 }}>
+                        <Typography variant="h5" fontWeight={700} gutterBottom>
+                          {plan.name}
+                        </Typography>
+                        <Box sx={{ my: 2 }}>
+                          <Typography variant="h4" fontWeight={700} color="primary.main">
+                            ${plan.price_monthly.toFixed(2)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            per month
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Up to {plan.max_listings} active listings
+                        </Typography>
+                        {features.length > 0 && (
+                          <Box sx={{ mb: 2 }}>
+                            {features.slice(0, 3).map((feature, idx) => (
+                              <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+                                <CheckIcon sx={{ color: 'success.main', mr: 1, mt: 0.5, fontSize: 18 }} />
+                                <Typography variant="body2">{feature.trim()}</Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                        <Button
+                          variant={isPopular ? 'contained' : 'outlined'}
+                          fullWidth
+                          onClick={() => navigate('/subscription-plans')}
+                          sx={{ mt: 'auto' }}
+                        >
+                          View Plan
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          ) : null}
+
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Button
+              variant="outlined"
+              size="large"
+              onClick={() => navigate('/subscription-plans')}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+              }}
+            >
+              View All Plans
             </Button>
           </Box>
         </Box>

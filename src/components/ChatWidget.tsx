@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -29,6 +29,7 @@ import {
   Image as ImageIcon,
   PersonAdd as PersonAddIcon,
   Search as SearchIcon,
+  Cancel as CancelIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
@@ -87,6 +88,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set());
+  const [closedConversations, setClosedConversations] = useState<Set<number>>(new Set());
+  const closedConversationsRef = useRef<Set<number>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -106,6 +109,22 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const fetchConversations = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      const response = await apiService.getChatConversations(user.id);
+      const filteredConversations = response.conversations.filter(
+        conv => !closedConversationsRef.current.has(conv.id)
+      );
+      setConversations(filteredConversations);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load conversations');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -119,7 +138,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
       setSelectedConversation(initialConversationId);
       fetchMessages(initialConversationId);
     }
-  }, [user?.id, open, initialConversationId]);
+  }, [user?.id, open, initialConversationId, fetchConversations]);
 
   useEffect(() => {
     if (!user?.id || !selectedConversation || !open || minimized) return;
@@ -135,20 +154,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [user?.id, selectedConversation, open, minimized]);
-
-  const fetchConversations = async () => {
-    if (!user?.id) return;
-
-    try {
-      const response = await apiService.getChatConversations(user.id);
-      setConversations(response.conversations);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load conversations');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [user?.id, selectedConversation, open, minimized, fetchConversations]);
 
   const fetchMessages = async (conversationId: number) => {
     if (!user?.id) return;
@@ -165,6 +171,24 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
   const handleSelectConversation = (conversationId: number) => {
     setSelectedConversation(conversationId);
     fetchMessages(conversationId);
+  };
+
+  const handleCloseTab = (e: React.MouseEvent, conversationId: number) => {
+    e.stopPropagation();
+    closedConversationsRef.current.add(conversationId);
+    setClosedConversations(new Set(closedConversationsRef.current));
+    const remainingConversations = conversations.filter(c => c.id !== conversationId);
+    setConversations(remainingConversations);
+    
+    if (selectedConversation === conversationId) {
+      if (remainingConversations.length > 0) {
+        setSelectedConversation(remainingConversations[0].id);
+        fetchMessages(remainingConversations[0].id);
+      } else {
+        setSelectedConversation(null);
+        setMessages([]);
+      }
+    }
   };
 
   const handleSendMessage = async () => {
@@ -703,7 +727,15 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
                   key={conversation.id}
                   value={conversation.id}
                   label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box 
+                      sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1,
+                        position: 'relative',
+                        pr: 1,
+                      }}
+                    >
                       <Badge
                         overlap="circular"
                         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
@@ -744,6 +776,21 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
                           sx={{ height: 18, fontSize: '0.7rem', minWidth: 18 }}
                         />
                       )}
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleCloseTab(e, conversation.id)}
+                        sx={{
+                          ml: 0.5,
+                          p: 0.25,
+                          opacity: 0.6,
+                          '&:hover': {
+                            opacity: 1,
+                            bgcolor: 'action.hover',
+                          },
+                        }}
+                      >
+                        <CancelIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
                     </Box>
                   }
                   onClick={() => handleSelectConversation(conversation.id)}
