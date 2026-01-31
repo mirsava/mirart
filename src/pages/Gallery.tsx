@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -15,8 +15,27 @@ import {
   CardContent,
   Button,
   Pagination,
+  Menu,
+  Drawer,
+  IconButton,
+  Divider,
+  Checkbox,
+  FormControlLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Badge,
 } from '@mui/material';
-import { Search as SearchIcon, Add as AddIcon, Palette as PaletteIcon, Brush as BrushIcon } from '@mui/icons-material';
+import { 
+  Search as SearchIcon, 
+  Add as AddIcon, 
+  Palette as PaletteIcon, 
+  Brush as BrushIcon,
+  FilterList as FilterListIcon,
+  Close as CloseIcon,
+  ExpandMore as ExpandMoreIcon,
+  Clear as ClearIcon,
+} from '@mui/icons-material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PaintingCard from '../components/PaintingCard';
 import apiService, { Listing } from '../services/api';
@@ -31,13 +50,34 @@ const Gallery: React.FC = () => {
   const [searchInput, setSearchInput] = useState<string>(searchParams.get('search') || '');
   const [searchTerm, setSearchTerm] = useState<string>(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || 'All');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>(searchParams.get('subcategory') || '');
   const [sortBy, setSortBy] = useState<string>(searchParams.get('sortBy') || 'created_at');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>(searchParams.get('sortOrder') === 'ASC' ? 'ASC' : 'DESC');
   const [paintings, setPaintings] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState<number>(parseInt(searchParams.get('page') || '1', 10));
-  const [itemsPerPage, setItemsPerPage] = useState<number>(parseInt(searchParams.get('limit') || '5', 10));
+  const [itemsPerPage, setItemsPerPage] = useState<number>(parseInt(searchParams.get('limit') || '25', 10));
   const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } | null>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState<boolean>(false);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
+  const [yearRange, setYearRange] = useState<[number, number]>([1900, new Date().getFullYear()]);
+  const isApplyingFiltersRef = useRef(false);
+  
+  const [pendingSelectedCategory, setPendingSelectedCategory] = useState<string>('All');
+  const [pendingSelectedSubcategory, setPendingSelectedSubcategory] = useState<string>('');
+  const [pendingSelectedMedium, setPendingSelectedMedium] = useState<string[]>([]);
+  const [pendingInStockOnly, setPendingInStockOnly] = useState<boolean>(false);
+  const [pendingMinPrice, setPendingMinPrice] = useState<string>('');
+  const [pendingMaxPrice, setPendingMaxPrice] = useState<string>('');
+  const [pendingMinYear, setPendingMinYear] = useState<string>('');
+  const [pendingMaxYear, setPendingMaxYear] = useState<string>('');
+  
+  const [selectedMedium, setSelectedMedium] = useState<string[]>([]);
+  const [inStockOnly, setInStockOnly] = useState<boolean>(false);
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
+  const [minYear, setMinYear] = useState<string>('');
+  const [maxYear, setMaxYear] = useState<string>('');
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -103,63 +143,149 @@ const Gallery: React.FC = () => {
     return () => clearTimeout(debounceTimer);
   }, [searchInput, searchTerm, searchParams, setSearchParams]);
 
-  useEffect(() => {
-    const fetchListings = async () => {
-      setLoading(true);
-      try {
-        const filters: any = {
-          status: 'active',
-          page,
-          limit: itemsPerPage,
-          sortBy,
-          sortOrder,
-        };
-        
-        if (selectedCategory !== 'All') {
-          filters.category = selectedCategory;
-        }
-        
-        if (searchTerm) {
-          filters.search = searchTerm;
-        }
-        
-        if (user?.id) {
-          filters.cognitoUsername = user.id;
-        }
-        
-        const response = await apiService.getListings(filters);
-        const dbPaintings = response.listings.map(convertListingToPainting);
-        setPaintings(dbPaintings);
-        if (response.pagination) {
-          setPagination(response.pagination);
-        } else {
-          setPagination({
-            page: page,
-            limit: itemsPerPage,
-            total: dbPaintings.length,
-            totalPages: Math.ceil(dbPaintings.length / itemsPerPage),
-            hasNext: false,
-            hasPrev: false
-          });
-        }
-        
-      } catch (error) {
-        console.error('Error fetching listings:', error);
-        setPaintings([]);
-        setPagination(null);
-      } finally {
-        setLoading(false);
+  const fetchListingsWithFilters = async (filterValues: {
+    category?: string;
+    subcategory?: string;
+    minPrice: string;
+    maxPrice: string;
+    minYear: string;
+    maxYear: string;
+    selectedMedium: string[];
+    inStockOnly: boolean;
+    pageNum: number;
+  }) => {
+    setLoading(true);
+    try {
+      const filters: any = {
+        status: 'active',
+        page: filterValues.pageNum,
+        limit: itemsPerPage,
+        sortBy,
+        sortOrder,
+      };
+      
+      const categoryToUse = filterValues.category !== undefined ? filterValues.category : selectedCategory;
+      const subcategoryToUse = filterValues.subcategory !== undefined ? filterValues.subcategory : selectedSubcategory;
+      
+      if (categoryToUse !== 'All') {
+        filters.category = categoryToUse;
       }
-    };
+      
+      if (subcategoryToUse) {
+        filters.subcategory = subcategoryToUse;
+      }
+      
+      if (searchTerm) {
+        filters.search = searchTerm;
+      }
+      
+      if (filterValues.minPrice && filterValues.minPrice.trim() !== '') {
+        const minPriceNum = parseFloat(filterValues.minPrice);
+        if (!isNaN(minPriceNum)) {
+          filters.minPrice = minPriceNum;
+        }
+      }
+      
+      if (filterValues.maxPrice && filterValues.maxPrice.trim() !== '') {
+        const maxPriceNum = parseFloat(filterValues.maxPrice);
+        if (!isNaN(maxPriceNum)) {
+          filters.maxPrice = maxPriceNum;
+        }
+      }
+      
+      if (filterValues.minYear && filterValues.minYear.trim() !== '') {
+        const minYearNum = parseInt(filterValues.minYear);
+        if (!isNaN(minYearNum)) {
+          filters.minYear = minYearNum;
+        }
+      }
+      
+      if (filterValues.maxYear && filterValues.maxYear.trim() !== '') {
+        const maxYearNum = parseInt(filterValues.maxYear);
+        if (!isNaN(maxYearNum)) {
+          filters.maxYear = maxYearNum;
+        }
+      }
+      
+      if (filterValues.selectedMedium.length > 0) {
+        filters.medium = filterValues.selectedMedium.join(',');
+      }
+      
+      if (filterValues.inStockOnly) {
+        filters.inStock = true;
+      }
+      
+      const response = await apiService.getListings(filters);
+      const dbPaintings = response.listings.map(convertListingToPainting);
+      setPaintings(dbPaintings);
+      if (response.pagination) {
+        setPagination(response.pagination);
+      } else {
+        setPagination({
+          page: filterValues.pageNum,
+          limit: itemsPerPage,
+          total: dbPaintings.length,
+          totalPages: Math.ceil(dbPaintings.length / itemsPerPage),
+          hasNext: false,
+          hasPrev: false
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error fetching listings:', error);
+      setPaintings([]);
+      setPagination(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchListings();
-  }, [page, itemsPerPage, selectedCategory, searchTerm, sortBy, sortOrder, user?.id]);
+  const fetchListings = React.useCallback(async () => {
+    await fetchListingsWithFilters({
+      minPrice,
+      maxPrice,
+      minYear,
+      maxYear,
+      selectedMedium,
+      inStockOnly,
+      pageNum: page
+    });
+  }, [page, itemsPerPage, selectedCategory, selectedSubcategory, searchTerm, sortBy, sortOrder, minPrice, maxPrice, minYear, maxYear, selectedMedium, inStockOnly]);
+
+  useEffect(() => {
+    if (!isApplyingFiltersRef.current) {
+      fetchListings();
+    } else {
+      isApplyingFiltersRef.current = false;
+    }
+  }, [fetchListings]);
+
+  useEffect(() => {
+    const limitParam = searchParams.get('limit');
+    const limitNum = limitParam ? parseInt(limitParam, 10) : null;
+    
+    if (!limitParam || isNaN(limitNum!) || ![10, 25, 50].includes(limitNum!)) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('limit', '25');
+      setSearchParams(newParams, { replace: true });
+      if (itemsPerPage !== 25) {
+        setItemsPerPage(25);
+      }
+    } else if (limitNum !== itemsPerPage) {
+      setItemsPerPage(limitNum);
+    }
+  }, []);
 
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category');
+    const subcategoryFromUrl = searchParams.get('subcategory') || '';
+    
     if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
       setSelectedCategory(categoryFromUrl);
-      setPage(1);
+    }
+    
+    if (subcategoryFromUrl !== selectedSubcategory) {
+      setSelectedSubcategory(subcategoryFromUrl);
     }
     
     const pageParam = searchParams.get('page');
@@ -174,7 +300,7 @@ const Gallery: React.FC = () => {
     
     if (limitParam) {
       const limitNum = parseInt(limitParam, 10);
-      if (!isNaN(limitNum) && [2, 5, 10].includes(limitNum) && limitNum !== itemsPerPage) {
+      if (!isNaN(limitNum) && [10, 25, 50].includes(limitNum) && limitNum !== itemsPerPage) {
         setItemsPerPage(limitNum);
         if (page !== 1) {
           setPage(1);
@@ -183,20 +309,39 @@ const Gallery: React.FC = () => {
     }
   }, [searchParams]);
 
-  const categories = ['All', 'Painting', 'Woodworking', 'Other'];
+  const categoryStructure = {
+    'All': [],
+    'Painting': ['Abstract', 'Figurative', 'Impressionism', 'Realism', 'Pop Art'],
+    'Woodworking': ['Furniture', 'Decorative Items', 'Kitchenware', 'Outdoor', 'Storage', 'Lighting', 'Toys & Games'],
+    'Other': []
+  };
+
+  const handleCategoryMenuOpen = (event: React.MouseEvent<HTMLElement>, category: string) => {
+    setCategoryMenuAnchor(prev => ({ ...prev, [category]: event.currentTarget }));
+  };
 
   const handleCategoryClick = (category: string): void => {
-    setSelectedCategory(category);
-    setPage(1);
-    const newParams = new URLSearchParams(searchParams);
     if (category === 'All') {
+      setSelectedCategory('All');
+      setSelectedSubcategory('');
+      setPage(1);
+      const newParams = new URLSearchParams(searchParams);
       newParams.delete('category');
+      newParams.delete('subcategory');
+      newParams.set('page', '1');
+      setSearchParams(newParams);
     } else {
+      setSelectedCategory(category);
+      setSelectedSubcategory('');
+      setPage(1);
+      const newParams = new URLSearchParams(searchParams);
       newParams.set('category', category);
+      newParams.delete('subcategory');
+      newParams.set('page', '1');
+      setSearchParams(newParams);
     }
-    newParams.set('page', '1');
-    setSearchParams(newParams);
   };
+
 
   const handleSearchChange = (value: string): void => {
     setSearchInput(value);
@@ -246,6 +391,98 @@ const Gallery: React.FC = () => {
     );
   };
 
+  const hasActiveFilters = (): boolean => {
+    return (
+      (selectedCategory !== 'All') ||
+      selectedSubcategory !== '' ||
+      minPrice !== '' ||
+      maxPrice !== '' ||
+      minYear !== '' ||
+      maxYear !== '' ||
+      selectedMedium.length > 0 ||
+      inStockOnly
+    );
+  };
+
+  const getActiveFilterCount = (): number => {
+    let count = 0;
+    if (selectedCategory !== 'All') count++;
+    if (selectedSubcategory !== '') count++;
+    if (minPrice !== '') count++;
+    if (maxPrice !== '') count++;
+    if (minYear !== '') count++;
+    if (maxYear !== '') count++;
+    if (selectedMedium.length > 0) count += selectedMedium.length;
+    if (inStockOnly) count++;
+    return count;
+  };
+
+  const handleRemoveFilter = async (filterType: string, value?: string) => {
+    isApplyingFiltersRef.current = true;
+    
+    let newCategory = selectedCategory;
+    let newSubcategory = selectedSubcategory;
+    let newMinPrice = minPrice;
+    let newMaxPrice = maxPrice;
+    let newMinYear = minYear;
+    let newMaxYear = maxYear;
+    let newSelectedMedium = [...selectedMedium];
+    let newInStockOnly = inStockOnly;
+    
+    switch (filterType) {
+      case 'category':
+        newCategory = 'All';
+        newSubcategory = '';
+        setSelectedCategory('All');
+        setSelectedSubcategory('');
+        break;
+      case 'subcategory':
+        newSubcategory = '';
+        setSelectedSubcategory('');
+        break;
+      case 'minPrice':
+        newMinPrice = '';
+        setMinPrice('');
+        break;
+      case 'maxPrice':
+        newMaxPrice = '';
+        setMaxPrice('');
+        break;
+      case 'minYear':
+        newMinYear = '';
+        setMinYear('');
+        break;
+      case 'maxYear':
+        newMaxYear = '';
+        setMaxYear('');
+        break;
+      case 'medium':
+        if (value) {
+          newSelectedMedium = selectedMedium.filter(m => m !== value);
+          setSelectedMedium(newSelectedMedium);
+        }
+        break;
+      case 'inStock':
+        newInStockOnly = false;
+        setInStockOnly(false);
+        break;
+    }
+    
+    setPage(1);
+    
+    await fetchListingsWithFilters({
+      category: newCategory,
+      subcategory: newSubcategory,
+      minPrice: newMinPrice,
+      maxPrice: newMaxPrice,
+      minYear: newMinYear,
+      maxYear: newMaxYear,
+      selectedMedium: newSelectedMedium,
+      inStockOnly: newInStockOnly,
+      pageNum: 1
+    });
+  };
+
   return (
     <Box sx={{ bgcolor: 'background.default' }}>
       <PageHeader
@@ -260,20 +497,55 @@ const Gallery: React.FC = () => {
         disablePattern={true}
       />
 
-      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: { xs: 4, sm: 5, md: 6 } }}>
         <Box sx={{ mb: 4 }}>
           <Grid container spacing={3} alignItems="center">
             <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                placeholder="Search artwork..."
-                value={searchInput}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-                }}
-                sx={{ maxWidth: 400 }}
-              />
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Badge
+                  badgeContent={hasActiveFilters() ? getActiveFilterCount() : 0}
+                  color="primary"
+                  sx={{
+                    '& .MuiBadge-badge': {
+                      right: 4,
+                      top: 4,
+                    },
+                  }}
+                >
+                  <IconButton
+                    onClick={() => {
+                      setPendingSelectedCategory(selectedCategory);
+                      setPendingSelectedSubcategory(selectedSubcategory);
+                      setPendingMinPrice(minPrice);
+                      setPendingMaxPrice(maxPrice);
+                      setPendingMinYear(minYear);
+                      setPendingMaxYear(maxYear);
+                      setPendingSelectedMedium(selectedMedium);
+                      setPendingInStockOnly(inStockOnly);
+                      setFilterDrawerOpen(true);
+                    }}
+                    sx={{
+                      border: '1px solid',
+                      borderColor: hasActiveFilters() ? 'primary.main' : 'divider',
+                      borderRadius: 1,
+                      height: '56px',
+                      width: '56px',
+                    }}
+                  >
+                    <FilterListIcon sx={{ color: hasActiveFilters() ? 'primary.main' : 'inherit' }} />
+                  </IconButton>
+                </Badge>
+                <TextField
+                  fullWidth
+                  placeholder="Search artwork..."
+                  value={searchInput}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  InputProps={{
+                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
+                  sx={{ maxWidth: 400 }}
+                />
+              </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               <Box sx={{ display: 'flex', gap: 2, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
@@ -284,9 +556,9 @@ const Gallery: React.FC = () => {
                     label="Items per page"
                     onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
                   >
-                    <MenuItem value={2}>2</MenuItem>
-                    <MenuItem value={5}>5</MenuItem>
                     <MenuItem value={10}>10</MenuItem>
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
                   </Select>
                 </FormControl>
                 <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -310,22 +582,118 @@ const Gallery: React.FC = () => {
             </Grid>
           </Grid>
 
+          {hasActiveFilters() && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ mb: 1 }}>
+                Active Filters:
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {selectedCategory !== 'All' && (
+                  <Chip
+                    label={`Category: ${selectedCategory}`}
+                    onDelete={() => handleRemoveFilter('category')}
+                    color="primary"
+                    size="small"
+                  />
+                )}
+                {selectedSubcategory && (
+                  <Chip
+                    label={`Subcategory: ${selectedSubcategory}`}
+                    onDelete={() => handleRemoveFilter('subcategory')}
+                    color="primary"
+                    size="small"
+                  />
+                )}
+                {minPrice && (
+                  <Chip
+                    label={`Min Price: $${minPrice}`}
+                    onDelete={() => handleRemoveFilter('minPrice')}
+                    color="primary"
+                    size="small"
+                  />
+                )}
+                {maxPrice && (
+                  <Chip
+                    label={`Max Price: $${maxPrice}`}
+                    onDelete={() => handleRemoveFilter('maxPrice')}
+                    color="primary"
+                    size="small"
+                  />
+                )}
+                {minYear && (
+                  <Chip
+                    label={`Min Year: ${minYear}`}
+                    onDelete={() => handleRemoveFilter('minYear')}
+                    color="primary"
+                    size="small"
+                  />
+                )}
+                {maxYear && (
+                  <Chip
+                    label={`Max Year: ${maxYear}`}
+                    onDelete={() => handleRemoveFilter('maxYear')}
+                    color="primary"
+                    size="small"
+                  />
+                )}
+                {selectedMedium.map((medium) => (
+                  <Chip
+                    key={medium}
+                    label={`Medium: ${medium}`}
+                    onDelete={() => handleRemoveFilter('medium', medium)}
+                    color="primary"
+                    size="small"
+                  />
+                ))}
+                {inStockOnly && (
+                  <Chip
+                    label="In Stock Only"
+                    onDelete={() => handleRemoveFilter('inStock')}
+                    color="primary"
+                    size="small"
+                  />
+                )}
+              </Stack>
+            </Box>
+          )}
+
           <Box sx={{ mt: 3 }}>
             <Typography variant="subtitle2" gutterBottom>
               Categories:
             </Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              {categories.map((category) => (
+              {Object.keys(categoryStructure).map((category) => {
+                const isSelected = selectedCategory === category && !selectedSubcategory;
+                
+                return (
+                  <Chip
+                    key={category}
+                    label={category}
+                    onClick={() => handleCategoryClick(category)}
+                    color={isSelected ? 'primary' : 'default'}
+                    variant={isSelected ? 'filled' : 'outlined'}
+                    sx={{ mb: 1 }}
+                  />
+                );
+              })}
+            </Stack>
+            {selectedSubcategory && (
+              <Box sx={{ mt: 2 }}>
                 <Chip
-                  key={category}
-                  label={category}
-                  onClick={() => handleCategoryClick(category)}
-                  color={selectedCategory === category ? 'primary' : 'default'}
-                  variant={selectedCategory === category ? 'filled' : 'outlined'}
+                  label={`${selectedCategory} > ${selectedSubcategory}`}
+                  onDelete={() => {
+                    setSelectedSubcategory('');
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete('subcategory');
+                    newParams.set('page', '1');
+                    setSearchParams(newParams);
+                  }}
+                  color="primary"
+                  variant="filled"
                   sx={{ mb: 1 }}
                 />
-              ))}
-            </Stack>
+              </Box>
+            )}
           </Box>
         </Box>
 
@@ -334,7 +702,7 @@ const Gallery: React.FC = () => {
             {pagination ? (
               <>
                 Showing {((page - 1) * itemsPerPage) + 1} - {Math.min(page * itemsPerPage, pagination.total)} of {pagination.total} pieces
-                {selectedCategory !== 'All' && ` in ${selectedCategory}`}
+                {selectedCategory !== 'All' && ` in ${selectedCategory}${selectedSubcategory ? ` > ${selectedSubcategory}` : ''}`}
                 {searchTerm && ` matching "${searchTerm}"`}
               </>
             ) : (
@@ -433,6 +801,295 @@ const Gallery: React.FC = () => {
           </>
         )}
       </Box>
+
+      <Drawer
+        anchor="left"
+        open={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: { xs: '85%', sm: 400 },
+            pt: 2,
+          },
+        }}
+      >
+        <Box sx={{ px: 3, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" fontWeight={600}>
+            Filters
+          </Typography>
+          <IconButton onClick={() => setFilterDrawerOpen(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        <Divider />
+        
+        <Box sx={{ px: 3, py: 2, overflow: 'auto', maxHeight: 'calc(100vh - 80px)' }}>
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle1" fontWeight={600}>Category</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Stack spacing={1}>
+                {Object.keys(categoryStructure).map((category) => {
+                  const subcategories = categoryStructure[category as keyof typeof categoryStructure];
+                  const hasSubcategories = subcategories.length > 0;
+                  const isSelected = pendingSelectedCategory === category && !pendingSelectedSubcategory;
+                  
+                  return (
+                    <Box key={category}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => {
+                              if (category === 'All') {
+                                setPendingSelectedCategory('All');
+                                setPendingSelectedSubcategory('');
+                              } else {
+                                setPendingSelectedCategory(category);
+                                setPendingSelectedSubcategory('');
+                              }
+                            }}
+                          />
+                        }
+                        label={category}
+                      />
+                      {hasSubcategories && pendingSelectedCategory === category && (
+                        <Box sx={{ pl: 4, pt: 1 }}>
+                          {subcategories.map((subcategory) => (
+                            <FormControlLabel
+                              key={subcategory}
+                              control={
+                                <Checkbox
+                                  checked={pendingSelectedSubcategory === subcategory}
+                                  onChange={() => {
+                                    setPendingSelectedSubcategory(subcategory);
+                                  }}
+                                />
+                              }
+                              label={subcategory}
+                            />
+                          ))}
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle1" fontWeight={600}>Price Range</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <TextField
+                  label="Min Price"
+                  type="number"
+                  value={pendingMinPrice}
+                  onChange={(e) => setPendingMinPrice(e.target.value)}
+                  size="small"
+                  fullWidth
+                />
+                <TextField
+                  label="Max Price"
+                  type="number"
+                  value={pendingMaxPrice}
+                  onChange={(e) => setPendingMaxPrice(e.target.value)}
+                  size="small"
+                  fullWidth
+                />
+              </Box>
+              <Button
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={() => {
+                  setPendingMinPrice('');
+                  setPendingMaxPrice('');
+                }}
+                sx={{ mt: 1 }}
+              >
+                Clear
+              </Button>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle1" fontWeight={600}>Year Range</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <TextField
+                  label="Min Year"
+                  type="number"
+                  value={pendingMinYear}
+                  onChange={(e) => setPendingMinYear(e.target.value)}
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 1900, max: new Date().getFullYear() }}
+                />
+                <TextField
+                  label="Max Year"
+                  type="number"
+                  value={pendingMaxYear}
+                  onChange={(e) => setPendingMaxYear(e.target.value)}
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 1900, max: new Date().getFullYear() }}
+                />
+              </Box>
+              <Button
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={() => {
+                  setPendingMinYear('');
+                  setPendingMaxYear('');
+                }}
+                sx={{ mt: 1 }}
+              >
+                Clear
+              </Button>
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle1" fontWeight={600}>Medium</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Stack spacing={1}>
+                {['Oil', 'Acrylic', 'Watercolor', 'Pastel', 'Charcoal', 'Pencil', 'Mixed Media', 'Wood', 'Metal', 'Other'].map((medium) => (
+                  <FormControlLabel
+                    key={medium}
+                    control={
+                      <Checkbox
+                        checked={pendingSelectedMedium.includes(medium)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setPendingSelectedMedium([...pendingSelectedMedium, medium]);
+                          } else {
+                            setPendingSelectedMedium(pendingSelectedMedium.filter(m => m !== medium));
+                          }
+                        }}
+                      />
+                    }
+                    label={medium}
+                  />
+                ))}
+              </Stack>
+              {pendingSelectedMedium.length > 0 && (
+                <Button
+                  size="small"
+                  startIcon={<ClearIcon />}
+                  onClick={() => {
+                    setPendingSelectedMedium([]);
+                  }}
+                  sx={{ mt: 2 }}
+                >
+                  Clear
+                </Button>
+              )}
+            </AccordionDetails>
+          </Accordion>
+
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle1" fontWeight={600}>Availability</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={pendingInStockOnly}
+                    onChange={(e) => {
+                      setPendingInStockOnly(e.target.checked);
+                    }}
+                  />
+                }
+                label="In Stock Only"
+              />
+            </AccordionDetails>
+          </Accordion>
+
+          <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={async () => {
+                setPendingSelectedCategory('All');
+                setPendingSelectedSubcategory('');
+                setPendingMinPrice('');
+                setPendingMaxPrice('');
+                setPendingMinYear('');
+                setPendingMaxYear('');
+                setPendingSelectedMedium([]);
+                setPendingInStockOnly(false);
+                setSelectedCategory('All');
+                setSelectedSubcategory('');
+                setMinPrice('');
+                setMaxPrice('');
+                setMinYear('');
+                setMaxYear('');
+                setSelectedMedium([]);
+                setInStockOnly(false);
+                setPage(1);
+                
+                isApplyingFiltersRef.current = true;
+                await fetchListingsWithFilters({
+                  category: 'All',
+                  subcategory: '',
+                  minPrice: '',
+                  maxPrice: '',
+                  minYear: '',
+                  maxYear: '',
+                  selectedMedium: [],
+                  inStockOnly: false,
+                  pageNum: 1
+                });
+              }}
+            >
+              Clear All Filters
+            </Button>
+            <Button
+              variant="contained"
+              fullWidth
+              onClick={async () => {
+                isApplyingFiltersRef.current = true;
+                
+                const newFilters = {
+                  category: pendingSelectedCategory,
+                  subcategory: pendingSelectedSubcategory,
+                  minPrice: pendingMinPrice || '',
+                  maxPrice: pendingMaxPrice || '',
+                  minYear: pendingMinYear || '',
+                  maxYear: pendingMaxYear || '',
+                  selectedMedium: pendingSelectedMedium,
+                  inStockOnly: pendingInStockOnly,
+                  pageNum: 1
+                };
+                
+                setSelectedCategory(pendingSelectedCategory);
+                setSelectedSubcategory(pendingSelectedSubcategory);
+                setMinPrice(newFilters.minPrice);
+                setMaxPrice(newFilters.maxPrice);
+                setMinYear(newFilters.minYear);
+                setMaxYear(newFilters.maxYear);
+                setSelectedMedium(newFilters.selectedMedium.length > 0 ? [...newFilters.selectedMedium] : []);
+                setInStockOnly(newFilters.inStockOnly);
+                setPage(1);
+                setFilterDrawerOpen(false);
+                
+                await fetchListingsWithFilters(newFilters);
+              }}
+            >
+              Apply Filters
+            </Button>
+          </Box>
+        </Box>
+      </Drawer>
     </Box>
   );
 };

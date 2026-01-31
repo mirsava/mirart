@@ -202,11 +202,19 @@ class ApiService {
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
     cognitoUsername?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minYear?: number;
+    maxYear?: number;
+    medium?: string;
+    inStock?: boolean;
   }): Promise<{ listings: Listing[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } }> {
     const params = new URLSearchParams();
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) params.append(key, value.toString());
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value.toString());
+        }
       });
     }
     const queryString = params.toString();
@@ -334,10 +342,16 @@ class ApiService {
     return this.request<{ conversation: any; messages: any[] }>(`/chat/conversation/${conversationId}?cognitoUsername=${encodeURIComponent(cognitoUsername)}`);
   }
 
-  async createChatConversation(cognitoUsername: string, otherUserId: number, listingId: number | null, message: string): Promise<{ success: boolean; conversationId: number }> {
+  async createChatConversation(cognitoUsername: string, otherUserId: number, listingId: number | null, message: string, otherUserCognitoUsername?: string): Promise<{ success: boolean; conversationId: number }> {
     return this.request<{ success: boolean; conversationId: number }>(`/chat/conversation`, {
       method: 'POST',
-      body: JSON.stringify({ cognitoUsername, otherUserId, listingId, message }),
+      body: JSON.stringify({ 
+        cognitoUsername, 
+        otherUserId: otherUserId || undefined, 
+        otherUserCognitoUsername,
+        listingId, 
+        message 
+      }),
     });
   }
 

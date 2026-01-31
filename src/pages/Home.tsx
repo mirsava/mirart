@@ -22,6 +22,7 @@ import {
   Palette as PaletteIcon,
   Build as BuildIcon,
   CreditCard as CreditCardIcon,
+  Category as CategoryIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { artworks } from '../data/paintings';
@@ -538,7 +539,7 @@ const Home: React.FC = () => {
       <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
         <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
           <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-            <BuildIcon sx={{ color: 'primary.main', fontSize: { xs: 32, md: 40 }, mt: 0.5 }} />
+            <CategoryIcon sx={{ color: 'primary.main', fontSize: { xs: 32, md: 40 }, mt: 0.5 }} />
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Typography 

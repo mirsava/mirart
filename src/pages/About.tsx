@@ -50,7 +50,7 @@ const About: React.FC = () => {
             <Paper
               sx={{
                 height: 400,
-                backgroundImage: 'url(https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=800&h=600&fit=crop&q=80)',
+                backgroundImage: 'url(https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=800&h=600&fit=crop&q=80)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 borderRadius: 1,

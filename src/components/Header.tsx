@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -19,6 +19,7 @@ import {
   MenuItem,
   Avatar,
   Divider,
+  Popover,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -57,16 +58,62 @@ const Header: React.FC = () => {
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [galleryMenuAnchor, setGalleryMenuAnchor] = useState<null | HTMLElement>(null);
+  const galleryCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isMediumScreen = useMediaQuery(theme.breakpoints.between('md', 'lg'));
 
+  const gallerySubcategories = {
+    'Painting': ['Abstract', 'Figurative', 'Impressionism', 'Realism', 'Pop Art'],
+    'Woodworking': ['Furniture', 'Decorative Items', 'Kitchenware', 'Outdoor', 'Storage', 'Lighting', 'Toys & Games'],
+  };
+
   const menuItems = [
     { label: 'Home', path: '/' },
-    { label: 'Gallery', path: '/gallery' },
+    { label: 'Gallery', path: '/gallery', hasSubmenu: true },
     { label: 'Pricing', path: '/subscription-plans' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },
   ];
+
+  const galleryButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleGalleryMouseEnter = (event: React.MouseEvent<HTMLElement>) => {
+    if (galleryCloseTimeoutRef.current) {
+      clearTimeout(galleryCloseTimeoutRef.current);
+      galleryCloseTimeoutRef.current = null;
+    }
+    const target = event.currentTarget.querySelector('button') || event.currentTarget;
+    setGalleryMenuAnchor(target as HTMLElement);
+  };
+
+  const handleGalleryMouseLeave = () => {
+    galleryCloseTimeoutRef.current = setTimeout(() => {
+      setGalleryMenuAnchor(null);
+    }, 150);
+  };
+
+  const handleGalleryMenuMouseEnter = () => {
+    if (galleryCloseTimeoutRef.current) {
+      clearTimeout(galleryCloseTimeoutRef.current);
+      galleryCloseTimeoutRef.current = null;
+    }
+  };
+
+  const handleGalleryMenuMouseLeave = () => {
+    galleryCloseTimeoutRef.current = setTimeout(() => {
+      setGalleryMenuAnchor(null);
+    }, 150);
+  };
+
+  const handleGallerySubcategoryClick = (category: string, subcategory?: string) => {
+    if (subcategory) {
+      navigate(`/gallery?category=${category}&subcategory=${subcategory}`);
+    } else {
+      navigate(`/gallery?category=${category}`);
+    }
+    setGalleryMenuAnchor(null);
+  };
 
   const artistMenuItems = isAuthenticated
     ? [
@@ -536,53 +583,118 @@ const Header: React.FC = () => {
                     position: 'absolute',
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                    borderRadius: 3,
-                    p: { md: 0.2, lg: 0.3, xl: 0.5 },
-                    border: '1px solid',
-                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
                     maxWidth: { md: 'calc(100% - 320px)', lg: 'calc(100% - 380px)', xl: 'none' },
                     zIndex: 1,
+                    willChange: 'auto',
                   }}
                 >
                   {menuItems.map((item) => (
-                    <Button
+                    <Box
                       key={item.label}
-                      onClick={() => handleNavigation(item.path)}
-                      sx={{
-                        color: location.pathname === item.path 
-                          ? (isDarkMode ? 'white' : 'primary.main')
-                          : (isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'),
-                        fontWeight: location.pathname === item.path ? 600 : 500,
-                        fontSize: { md: '0.75rem', lg: '0.85rem', xl: '0.9rem' },
-                        textTransform: 'none',
-                        px: { md: 1, lg: 1.5, xl: 2.5 },
-                        py: { md: 0.4, lg: 0.6, xl: 0.75 },
-                        borderRadius: 2.5,
-                        position: 'relative',
-                        transition: 'all 0.2s ease',
-                        minWidth: 'auto',
-                        whiteSpace: 'nowrap',
-                        bgcolor: location.pathname === item.path 
-                          ? (isDarkMode 
-                              ? 'linear-gradient(135deg, rgba(83, 75, 174, 0.3) 0%, rgba(25, 118, 210, 0.3) 100%)'
-                              : 'linear-gradient(135deg, rgba(25, 118, 210, 0.12) 0%, rgba(156, 39, 176, 0.12) 100%)')
-                          : 'transparent',
-                        '&:hover': {
-                          bgcolor: location.pathname === item.path
-                            ? (isDarkMode 
-                                ? 'linear-gradient(135deg, rgba(83, 75, 174, 0.4) 0%, rgba(25, 118, 210, 0.4) 100%)'
-                                : 'linear-gradient(135deg, rgba(25, 118, 210, 0.18) 0%, rgba(156, 39, 176, 0.18) 100%)')
-                            : (isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)'),
-                          color: location.pathname === item.path 
-                            ? (isDarkMode ? 'white' : 'primary.main')
-                            : (isDarkMode ? 'white' : 'text.primary'),
-                          transform: 'scale(1.05)',
-                        },
+                      sx={{ 
+                        position: 'relative', 
+                        display: 'inline-block',
+                        flexShrink: 0,
                       }}
+                      onMouseEnter={item.hasSubmenu ? handleGalleryMouseEnter : undefined}
+                      onMouseLeave={item.hasSubmenu ? handleGalleryMouseLeave : undefined}
                     >
-                      {item.label}
-                    </Button>
+                      <Button
+                        ref={item.hasSubmenu && item.label === 'Gallery' ? galleryButtonRef : undefined}
+                        onClick={() => !item.hasSubmenu && handleNavigation(item.path)}
+                        sx={{
+                          color: location.pathname === item.path 
+                            ? 'primary.main'
+                            : (isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'),
+                          fontWeight: location.pathname === item.path ? 600 : 500,
+                          fontSize: { md: '0.75rem', lg: '0.85rem', xl: '0.9rem' },
+                          textTransform: 'none',
+                          px: { md: 1, lg: 1.5, xl: 2.5 },
+                          py: { md: 0.4, lg: 0.6, xl: 0.75 },
+                          position: 'relative',
+                          transition: 'color 0.2s ease, border-color 0.2s ease',
+                          minWidth: 'auto',
+                          whiteSpace: 'nowrap',
+                          bgcolor: 'transparent',
+                          borderBottom: location.pathname === item.path ? '2px solid' : '2px solid transparent',
+                          borderColor: location.pathname === item.path ? 'primary.main' : 'transparent',
+                          borderRadius: 0,
+                          flexShrink: 0,
+                          contain: 'layout style',
+                          '&:hover': {
+                            bgcolor: 'transparent',
+                            color: location.pathname === item.path 
+                              ? 'primary.main'
+                              : (isDarkMode ? 'white' : 'text.primary'),
+                          },
+                        }}
+                      >
+                        {item.label}
+                        {item.hasSubmenu && <ExpandMoreIcon sx={{ ml: 0.5, fontSize: 16, flexShrink: 0 }} />}
+                      </Button>
+                      {item.hasSubmenu && (
+                        <Popover
+                          open={Boolean(galleryMenuAnchor)}
+                          anchorEl={galleryMenuAnchor || galleryButtonRef.current}
+                          onClose={() => setGalleryMenuAnchor(null)}
+                          anchorOrigin={{
+                            vertical: 'bottom',
+                            horizontal: 'left',
+                          }}
+                          transformOrigin={{
+                            vertical: 'top',
+                            horizontal: 'left',
+                          }}
+                          disableRestoreFocus
+                          disableAutoFocus
+                          disableEnforceFocus
+                          disableScrollLock
+                          PaperProps={{
+                            onMouseEnter: handleGalleryMenuMouseEnter,
+                            onMouseLeave: handleGalleryMenuMouseLeave,
+                            sx: {
+                              mt: 0.5,
+                              minWidth: 600,
+                              maxWidth: 800,
+                            },
+                          }}
+                          slotProps={{
+                            root: {
+                              style: {
+                                position: 'fixed',
+                              },
+                            },
+                          }}
+                        >
+                          <Box sx={{ py: 1, px: 1 }}>
+                            <MenuItem onClick={() => handleNavigation('/gallery')} sx={{ py: 1, mb: 1, borderBottom: 1, borderColor: 'divider' }}>
+                              <ListItemText primary="All Artwork" />
+                            </MenuItem>
+                            <Box sx={{ display: 'flex', gap: 3 }}>
+                              {Object.entries(gallerySubcategories).map(([category, subcategories]) => (
+                                <Box key={category} sx={{ flex: 1 }}>
+                                  <MenuItem 
+                                    onClick={() => handleGallerySubcategoryClick(category)}
+                                    sx={{ py: 1, fontWeight: 600, px: 2 }}
+                                  >
+                                    <ListItemText primary={category} />
+                                  </MenuItem>
+                                  {subcategories.map((subcategory) => (
+                                    <MenuItem
+                                      key={subcategory}
+                                      onClick={() => handleGallerySubcategoryClick(category, subcategory)}
+                                      sx={{ py: 0.75, pl: 2 }}
+                                    >
+                                      <ListItemText primary={subcategory} />
+                                    </MenuItem>
+                                  ))}
+                                </Box>
+                              ))}
+                            </Box>
+                          </Box>
+                        </Popover>
+                      )}
+                    </Box>
                   ))}
                   
                   {!isAuthenticated && (

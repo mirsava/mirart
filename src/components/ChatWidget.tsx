@@ -68,7 +68,7 @@ interface ChatWidgetProps {
 }
 
 const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversationId = null }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { openChat: openChatFromContext } = useChat();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<number | null>(initialConversationId);
@@ -307,7 +307,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
   }, [searchQuery, user?.id]);
 
   const handleStartChatWithUser = async (otherUser: User) => {
-    if (!user?.id || !otherUser.id) {
+    if (!user?.id || !otherUser.cognito_username) {
       setError('User information not available');
       return;
     }
@@ -318,9 +318,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
       const message = `Hi! I'd like to connect with you.`;
       const response = await apiService.createChatConversation(
         user.id,
-        otherUser.id,
+        otherUser.id || 0,
         null,
-        message
+        message,
+        otherUser.cognito_username
       );
       
       if (response && response.conversationId) {
@@ -334,6 +335,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
         setError('Failed to create conversation');
       }
     } catch (err: any) {
+      console.error('Error starting chat:', err);
       const errorMessage = err?.response?.data?.error || err?.message || 'Failed to start chat';
       setError(errorMessage);
     } finally {
@@ -385,6 +387,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
       document.body.style.userSelect = '';
     };
   }, [isResizingWindow, resizeType, windowWidth]);
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <>
@@ -487,7 +493,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
               py: 0,
             }}>
               <Typography variant="h6" sx={{ flexGrow: 1, fontSize: '1rem', fontWeight: 600, pl: { xs: 0.5, sm: 1 } }}>
-                Chat {totalUnread > 0 && `(${totalUnread})`}
+                {selectedConversation ? (() => {
+                  const conv = conversations.find(c => c.id === selectedConversation);
+                  return conv ? getOtherUserName(conv) : `Chat ${totalUnread > 0 ? `(${totalUnread})` : ''}`;
+                })() : `Chat ${totalUnread > 0 ? `(${totalUnread})` : ''}`}
               </Typography>
               <IconButton 
                 color="inherit" 

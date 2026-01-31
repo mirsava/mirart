@@ -25,21 +25,27 @@ router.get('/', async (req, res) => {
       }
     }
     
-    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC', cognitoUsername } = req.query;
+    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC', cognitoUsername, minPrice, maxPrice, minYear, maxYear, medium, inStock } = req.query;
     
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 12;
     const offset = (pageNum - 1) * limitNum;
     
     // Check if user is fetching their own listings (by cognitoUsername)
-    // When cognitoUsername is provided without userId, assume they want to see all their listings
+    // Gallery page should always show all listings, regardless of login status
+    // Only treat as "own listings" if cognitoUsername is provided, no userId, AND explicitly requesting own listings
     const hasUserId = userId && userId !== 'undefined' && userId !== 'null' && userId !== '';
-    const isFetchingOwnListings = Boolean(cognitoUsername && !hasUserId);
     
-    // Debug logging (can be removed in production)
-    if (cognitoUsername) {
-      console.log('Listings query - cognitoUsername:', cognitoUsername, 'userId:', userId, 'status:', status, 'isFetchingOwnListings:', isFetchingOwnListings);
-    }
+    // Check for filters - these indicate a public gallery search
+    const hasPriceFilter = (minPrice && minPrice !== '' && minPrice !== 'undefined') || (maxPrice && maxPrice !== '' && maxPrice !== 'undefined');
+    const hasYearFilter = (minYear && minYear !== '' && minYear !== 'undefined') || (maxYear && maxYear !== '' && maxYear !== 'undefined');
+    const hasMediumFilter = (medium && medium !== '' && medium !== 'undefined');
+    const hasStockFilter = (inStock === 'true' || inStock === true || inStock === '1');
+    const hasFilters = hasPriceFilter || hasYearFilter || hasMediumFilter || hasStockFilter;
+    
+    // Only treat as "own listings" if cognitoUsername is provided, no userId, AND no filters
+    // If filters are present, it's a public gallery search - ignore cognitoUsername
+    const isFetchingOwnListings = Boolean(cognitoUsername && !hasUserId && !hasFilters);
     
     let baseQuery = `
       SELECT l.*, 
@@ -75,7 +81,9 @@ router.get('/', async (req, res) => {
       params.push(String(status));
     } else if (!isFetchingOwnListings) {
       // Default: only show active listings for public views
-      baseQuery += ' AND l.status = "active"';
+      // Use parameterized query for consistency
+      baseQuery += ' AND l.status = ?';
+      params.push('active');
     }
     // If isFetchingOwnListings is true and status is not provided, no status filter is applied (shows all)
     
@@ -92,6 +100,55 @@ router.get('/', async (req, res) => {
       baseQuery += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)';
       const searchTerm = `%${String(search)}%`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+    
+    if (minPrice !== undefined && minPrice !== null && minPrice !== '' && minPrice !== 'undefined') {
+      const minPriceNum = parseFloat(String(minPrice));
+      if (!isNaN(minPriceNum) && minPriceNum > 0) {
+        baseQuery += ' AND l.price IS NOT NULL AND l.price >= ?';
+        params.push(minPriceNum);
+      }
+    }
+    
+    if (maxPrice !== undefined && maxPrice !== null && maxPrice !== '' && maxPrice !== 'undefined') {
+      const maxPriceNum = parseFloat(String(maxPrice));
+      if (!isNaN(maxPriceNum) && maxPriceNum > 0) {
+        baseQuery += ' AND l.price IS NOT NULL AND l.price <= ?';
+        params.push(maxPriceNum);
+      }
+    }
+    
+    if (minYear !== undefined && minYear !== null && minYear !== '') {
+      const minYearNum = parseInt(String(minYear));
+      if (!isNaN(minYearNum)) {
+        baseQuery += ' AND l.year >= ?';
+        params.push(minYearNum);
+      }
+    }
+    
+    if (maxYear !== undefined && maxYear !== null && maxYear !== '') {
+      const maxYearNum = parseInt(String(maxYear));
+      if (!isNaN(maxYearNum)) {
+        baseQuery += ' AND l.year <= ?';
+        params.push(maxYearNum);
+      }
+    }
+    
+    if (medium && medium !== '') {
+      const mediums = String(medium).split(',').map(m => m.trim()).filter(m => m !== '');
+      if (mediums.length > 0) {
+        baseQuery += ' AND l.medium IS NOT NULL AND (';
+        mediums.forEach((m, index) => {
+          if (index > 0) baseQuery += ' OR ';
+          baseQuery += 'LOWER(l.medium) LIKE LOWER(?)';
+          params.push(`%${m}%`);
+        });
+        baseQuery += ')';
+      }
+    }
+    
+    if (inStock === 'true' || inStock === true || inStock === '1') {
+      baseQuery += ' AND l.in_stock = 1';
     }
     
     // Get total count (before adding ORDER BY, LIMIT, OFFSET)
@@ -138,6 +195,55 @@ router.get('/', async (req, res) => {
       countQuery += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)';
       const searchTerm = `%${String(search)}%`;
       countParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+    
+    if (minPrice !== undefined && minPrice !== null && minPrice !== '') {
+      const minPriceNum = parseFloat(String(minPrice));
+      if (!isNaN(minPriceNum)) {
+        countQuery += ' AND l.price IS NOT NULL AND l.price >= ?';
+        countParams.push(minPriceNum);
+      }
+    }
+    
+    if (maxPrice !== undefined && maxPrice !== null && maxPrice !== '') {
+      const maxPriceNum = parseFloat(String(maxPrice));
+      if (!isNaN(maxPriceNum)) {
+        countQuery += ' AND l.price IS NOT NULL AND l.price <= ?';
+        countParams.push(maxPriceNum);
+      }
+    }
+    
+    if (minYear !== undefined && minYear !== null && minYear !== '') {
+      const minYearNum = parseInt(String(minYear));
+      if (!isNaN(minYearNum)) {
+        countQuery += ' AND l.year >= ?';
+        countParams.push(minYearNum);
+      }
+    }
+    
+    if (maxYear !== undefined && maxYear !== null && maxYear !== '') {
+      const maxYearNum = parseInt(String(maxYear));
+      if (!isNaN(maxYearNum)) {
+        countQuery += ' AND l.year <= ?';
+        countParams.push(maxYearNum);
+      }
+    }
+    
+    if (medium && medium !== '') {
+      const mediums = String(medium).split(',').map(m => m.trim()).filter(m => m !== '');
+      if (mediums.length > 0) {
+        countQuery += ' AND l.medium IS NOT NULL AND (';
+        mediums.forEach((m, index) => {
+          if (index > 0) countQuery += ' OR ';
+          countQuery += 'l.medium LIKE ?';
+          countParams.push(`%${m}%`);
+        });
+        countQuery += ')';
+      }
+    }
+    
+    if (inStock === 'true' || inStock === true || inStock === '1') {
+      countQuery += ' AND l.in_stock = 1';
     }
     
     const [countResult] = await pool.execute(countQuery, countParams);
