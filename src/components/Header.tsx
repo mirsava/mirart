@@ -60,6 +60,7 @@ const Header: React.FC = () => {
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [galleryMenuAnchor, setGalleryMenuAnchor] = useState<null | HTMLElement>(null);
   const galleryCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [artists, setArtists] = useState<Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }>>([]);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isMediumScreen = useMediaQuery(theme.breakpoints.between('md', 'lg'));
 
@@ -67,6 +68,24 @@ const Header: React.FC = () => {
     'Painting': ['Abstract', 'Figurative', 'Impressionism', 'Realism', 'Pop Art'],
     'Woodworking': ['Furniture', 'Decorative Items', 'Kitchenware', 'Outdoor', 'Storage', 'Lighting', 'Toys & Games'],
   };
+
+  useEffect(() => {
+    const fetchArtists = async () => {
+      try {
+        console.log('Fetching artists...');
+        const response = await apiService.getArtists();
+        console.log('Fetched artists response:', response);
+        console.log('Artists array:', response.artists);
+        console.log('Artists length:', response.artists?.length || 0);
+        setArtists(response.artists || []);
+        console.log('Artists state set, length:', response.artists?.length || 0);
+      } catch (error) {
+        console.error('Error fetching artists:', error);
+        setArtists([]);
+      }
+    };
+    fetchArtists();
+  }, []);
 
   const menuItems = [
     { label: 'Home', path: '/' },
@@ -113,6 +132,23 @@ const Header: React.FC = () => {
       navigate(`/gallery?category=${category}`);
     }
     setGalleryMenuAnchor(null);
+  };
+
+  const handleArtistClick = (cognitoUsername: string) => {
+    navigate(`/gallery?artist=${cognitoUsername}`);
+    setGalleryMenuAnchor(null);
+  };
+
+  const groupArtistsByLetter = () => {
+    const grouped: Record<string, Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }>> = {};
+    artists.forEach(artist => {
+      const firstLetter = artist.artist_name.charAt(0).toUpperCase();
+      if (!grouped[firstLetter]) {
+        grouped[firstLetter] = [];
+      }
+      grouped[firstLetter].push(artist);
+    });
+    return grouped;
   };
 
   const artistMenuItems = isAuthenticated
@@ -654,8 +690,10 @@ const Header: React.FC = () => {
                             onMouseLeave: handleGalleryMenuMouseLeave,
                             sx: {
                               mt: 0.5,
-                              minWidth: 600,
-                              maxWidth: 800,
+                              minWidth: 800,
+                              maxWidth: 1000,
+                              borderRadius: 2,
+                              boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
                             },
                           }}
                           slotProps={{
@@ -666,30 +704,178 @@ const Header: React.FC = () => {
                             },
                           }}
                         >
-                          <Box sx={{ py: 1, px: 1 }}>
-                            <MenuItem onClick={() => handleNavigation('/gallery')} sx={{ py: 1, mb: 1, borderBottom: 1, borderColor: 'divider' }}>
-                              <ListItemText primary="All Artwork" />
+                          <Box sx={{ py: 2, px: 2 }}>
+                            <MenuItem 
+                              onClick={() => handleNavigation('/gallery')} 
+                              sx={{ 
+                                py: 1.5, 
+                                mb: 2, 
+                                borderRadius: 1,
+                                borderBottom: '2px solid',
+                                borderColor: 'primary.main',
+                                '&:hover': {
+                                  bgcolor: 'action.hover',
+                                },
+                              }}
+                            >
+                              <ListItemText 
+                                primary="All Artwork"
+                                primaryTypographyProps={{ 
+                                  fontWeight: 600,
+                                  fontSize: '0.95rem',
+                                }}
+                              />
                             </MenuItem>
-                            <Box sx={{ display: 'flex', gap: 3 }}>
+                            <Box sx={{ display: 'flex', gap: 4 }}>
                               {Object.entries(gallerySubcategories).map(([category, subcategories]) => (
-                                <Box key={category} sx={{ flex: 1 }}>
+                                <Box key={category} sx={{ flex: 1, minWidth: 180 }}>
                                   <MenuItem 
                                     onClick={() => handleGallerySubcategoryClick(category)}
-                                    sx={{ py: 1, fontWeight: 600, px: 2 }}
+                                    sx={{ 
+                                      py: 1.25, 
+                                      fontWeight: 700, 
+                                      px: 2,
+                                      mb: 0.5,
+                                      color: 'primary.main',
+                                      borderRadius: 1,
+                                      transition: 'all 0.2s ease',
+                                      '&:hover': {
+                                        bgcolor: 'primary.light',
+                                        color: 'primary.contrastText',
+                                        transform: 'translateX(4px)',
+                                      },
+                                    }}
                                   >
-                                    <ListItemText primary={category} />
+                                    <ListItemText 
+                                      primary={category}
+                                      primaryTypographyProps={{ 
+                                        fontWeight: 700,
+                                        fontSize: '0.9rem',
+                                        letterSpacing: '0.5px',
+                                      }}
+                                    />
                                   </MenuItem>
                                   {subcategories.map((subcategory) => (
                                     <MenuItem
                                       key={subcategory}
                                       onClick={() => handleGallerySubcategoryClick(category, subcategory)}
-                                      sx={{ py: 0.75, pl: 2 }}
+                                      sx={{ 
+                                        py: 0.875, 
+                                        pl: 3.5,
+                                        borderRadius: 1,
+                                        transition: 'all 0.2s ease',
+                                        '&:hover': {
+                                          bgcolor: 'action.hover',
+                                          transform: 'translateX(4px)',
+                                          pl: 4,
+                                        },
+                                      }}
                                     >
-                                      <ListItemText primary={subcategory} />
+                                      <ListItemText 
+                                        primary={subcategory}
+                                        primaryTypographyProps={{
+                                          fontSize: '0.875rem',
+                                          color: 'text.secondary',
+                                        }}
+                                      />
                                     </MenuItem>
                                   ))}
                                 </Box>
                               ))}
+                              <Box sx={{ flex: 1, minWidth: 200 }}>
+                                <MenuItem 
+                                  sx={{ 
+                                    py: 1.25, 
+                                    fontWeight: 700, 
+                                    px: 2,
+                                    mb: 0.5,
+                                    color: 'primary.main',
+                                    borderRadius: 1,
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': {
+                                      bgcolor: 'primary.light',
+                                      color: 'primary.contrastText',
+                                      transform: 'translateX(4px)',
+                                    },
+                                  }}
+                                >
+                                  <ListItemText 
+                                    primary="Shop by Artist"
+                                    primaryTypographyProps={{ 
+                                      fontWeight: 700,
+                                      fontSize: '0.9rem',
+                                      letterSpacing: '0.5px',
+                                    }}
+                                  />
+                                </MenuItem>
+                                {artists.length > 0 ? (
+                                  <Box sx={{ maxHeight: 400, overflowY: 'auto', pr: 1 }}>
+                                    {Object.entries(groupArtistsByLetter())
+                                      .sort(([a], [b]) => a.localeCompare(b))
+                                      .map(([letter, letterArtists]) => (
+                                        <Box key={letter}>
+                                          <MenuItem 
+                                            sx={{ 
+                                              py: 0.75, 
+                                              pl: 2.5,
+                                              mt: 0.5,
+                                              fontWeight: 600,
+                                              color: 'text.disabled',
+                                              borderRadius: 1,
+                                            }}
+                                            disabled
+                                          >
+                                            <ListItemText 
+                                              primary={letter}
+                                              primaryTypographyProps={{ 
+                                                fontSize: '0.7rem', 
+                                                fontWeight: 700,
+                                                letterSpacing: '1px',
+                                                textTransform: 'uppercase',
+                                              }}
+                                            />
+                                          </MenuItem>
+                                          {letterArtists.map((artist) => (
+                                            <MenuItem
+                                              key={artist.id}
+                                              onClick={() => handleArtistClick(artist.cognito_username)}
+                                              sx={{ 
+                                                py: 0.875, 
+                                                pl: 3.5,
+                                                borderRadius: 1,
+                                                transition: 'all 0.2s ease',
+                                                '&:hover': {
+                                                  bgcolor: 'action.hover',
+                                                  transform: 'translateX(4px)',
+                                                  pl: 4,
+                                                },
+                                              }}
+                                            >
+                                              <ListItemText 
+                                                primary={artist.artist_name}
+                                                primaryTypographyProps={{
+                                                  fontSize: '0.875rem',
+                                                  color: 'text.secondary',
+                                                }}
+                                              />
+                                            </MenuItem>
+                                          ))}
+                                        </Box>
+                                      ))}
+                                  </Box>
+                                ) : (
+                                  <MenuItem disabled sx={{ py: 0.875, pl: 2.5 }}>
+                                    <ListItemText 
+                                      primary="Loading artists..."
+                                      primaryTypographyProps={{ 
+                                        fontSize: '0.875rem', 
+                                        color: 'text.disabled',
+                                        fontStyle: 'italic',
+                                      }}
+                                    />
+                                  </MenuItem>
+                                )}
+                              </Box>
                             </Box>
                           </Box>
                         </Popover>

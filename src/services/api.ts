@@ -190,6 +190,10 @@ class ApiService {
     });
   }
 
+  async getArtists(): Promise<{ artists: Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }> }> {
+    return this.request<{ artists: Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }> }>('/users/artists/list');
+  }
+
   // Listing endpoints
   async getListings(filters?: {
     category?: string;

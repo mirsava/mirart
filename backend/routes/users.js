@@ -50,6 +50,35 @@ router.get('/search', async (req, res) => {
   }
 });
 
+// Get all artists (users with active listings)
+router.get('/artists/list', async (req, res) => {
+  try {
+    const [artists] = await pool.execute(
+      `SELECT DISTINCT
+        u.id,
+        u.cognito_username,
+        u.first_name,
+        u.last_name,
+        u.business_name,
+        u.profile_image_url,
+        COALESCE(
+          u.business_name,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
+          u.cognito_username
+        ) as artist_name
+      FROM users u
+      INNER JOIN listings l ON u.id = l.user_id
+      WHERE l.status = 'active'
+      ORDER BY artist_name ASC`
+    );
+    
+    res.json({ artists: artists || [] });
+  } catch (error) {
+    console.error('Error fetching artists:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get user by Cognito username
 router.get('/:cognitoUsername', async (req, res) => {
   try {

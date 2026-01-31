@@ -52,6 +52,7 @@ const Gallery: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || 'All');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>(searchParams.get('subcategory') || '');
+  const [selectedArtist, setSelectedArtist] = useState<string>(searchParams.get('artist') || '');
   const [sortBy, setSortBy] = useState<string>(searchParams.get('sortBy') || 'created_at');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>(searchParams.get('sortOrder') === 'ASC' ? 'ASC' : 'DESC');
   const [paintings, setPaintings] = useState<Artwork[]>([]);
@@ -118,12 +119,18 @@ const Gallery: React.FC = () => {
       setPage(1);
     }
     
+    const artistFromUrl = searchParams.get('artist') || '';
+    if (artistFromUrl !== selectedArtist) {
+      setSelectedArtist(artistFromUrl);
+      setPage(1);
+    }
+    
     const searchFromUrl = searchParams.get('search') || '';
     if (searchFromUrl !== searchInput) {
       setSearchInput(searchFromUrl);
       setSearchTerm(searchFromUrl);
     }
-  }, [searchParams]);
+  }, [searchParams, selectedCategory, selectedArtist, searchInput]);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -178,6 +185,11 @@ const Gallery: React.FC = () => {
       
       if (searchTerm) {
         filters.search = searchTerm;
+      }
+      
+      const artistFromUrl = searchParams.get('artist');
+      if (artistFromUrl) {
+        filters.cognitoUsername = artistFromUrl;
       }
       
       if (filterValues.minPrice && filterValues.minPrice.trim() !== '') {

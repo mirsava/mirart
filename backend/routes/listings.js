@@ -94,6 +94,10 @@ router.get('/', async (req, res) => {
       // Add filter to only show listings owned by this user
       baseQuery += ' AND u.cognito_username = ?';
       params.push(String(cognitoUsername));
+    } else if (cognitoUsername && !hasUserId) {
+      // Filter by artist for public gallery search
+      baseQuery += ' AND u.cognito_username = ?';
+      params.push(String(cognitoUsername));
     }
     
     if (search) {
