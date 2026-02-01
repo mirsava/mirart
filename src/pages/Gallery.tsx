@@ -834,30 +834,124 @@ const Gallery: React.FC = () => {
         anchor="left"
         open={filterDrawerOpen}
         onClose={() => setFilterDrawerOpen(false)}
+        hideBackdrop={false}
+        ModalProps={{
+          sx: {
+            zIndex: 1299,
+          },
+        }}
         PaperProps={{
           sx: {
             width: { xs: '85%', sm: 400 },
-            pt: 2,
+            height: { xs: 'calc(100% - 114px)', sm: 'calc(100% - 120px)' },
+            position: 'fixed',
+            top: { xs: 114, sm: 120 },
+            left: 0,
+            boxShadow: '4px 0 24px rgba(0,0,0,0.1)',
+            borderRight: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            bgcolor: 'background.paper',
           },
         }}
       >
-        <Box sx={{ px: 3, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" fontWeight={600}>
-            Filters
-          </Typography>
-          <IconButton onClick={() => setFilterDrawerOpen(false)} size="small">
-            <CloseIcon />
+        <Box 
+          sx={{ 
+            px: 2.5, 
+            py: 2, 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
+            borderBottom: '2px solid',
+            borderColor: 'primary.dark',
+            flexShrink: 0,
+            minHeight: 56,
+            width: '100%',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+            <FilterIcon sx={{ fontSize: 22 }} />
+            <Typography variant="subtitle1" fontWeight={700} sx={{ letterSpacing: '0.3px', fontSize: '1rem' }}>
+              Filters
+            </Typography>
+            {hasActiveFilters() && (
+              <Chip 
+                label={getActiveFilterCount()} 
+                size="small" 
+                sx={{ 
+                  bgcolor: 'primary.contrastText',
+                  color: 'primary.main',
+                  fontWeight: 700,
+                  height: 22,
+                  fontSize: '0.75rem',
+                }} 
+              />
+            )}
+          </Box>
+          <IconButton 
+            onClick={() => setFilterDrawerOpen(false)} 
+            size="medium"
+            sx={{
+              color: 'primary.contrastText',
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.2)',
+              },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 22 }} />
           </IconButton>
         </Box>
-        <Divider />
         
-        <Box sx={{ px: 3, py: 2, overflow: 'auto', maxHeight: 'calc(100vh - 80px)' }}>
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1" fontWeight={600}>Category</Typography>
+        <Box sx={{ px: 3, py: 3, overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'calc(100vh - 210px)' } }}>
+          <Accordion 
+            defaultExpanded
+            sx={{
+              mb: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              '&:before': { display: 'none' },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              '&.Mui-expanded': {
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              },
+            }}
+          >
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                height: 35,
+                minHeight: 35,
+                borderRadius: 2,
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+                '&.Mui-expanded': {
+                  bgcolor: 'action.selected',
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                  height: 35,
+                  minHeight: 35,
+                },
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
+                Category
+              </Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <Stack spacing={1}>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+                gap: 1,
+                columnGap: 2
+              }}>
                 {Object.keys(categoryStructure).map((category) => {
                   const subcategories = categoryStructure[category as keyof typeof categoryStructure];
                   const hasSubcategories = subcategories.length > 0;
@@ -881,6 +975,7 @@ const Gallery: React.FC = () => {
                           />
                         }
                         label={category}
+                        sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.875rem' } }}
                       />
                       {hasSubcategories && pendingSelectedCategory === category && (
                         <Box sx={{ pl: 4, pt: 1 }}>
@@ -896,6 +991,7 @@ const Gallery: React.FC = () => {
                                 />
                               }
                               label={subcategory}
+                              sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.875rem' } }}
                             />
                           ))}
                         </Box>
@@ -903,13 +999,47 @@ const Gallery: React.FC = () => {
                     </Box>
                   );
                 })}
-              </Stack>
+              </Box>
             </AccordionDetails>
           </Accordion>
 
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1" fontWeight={600}>Price Range</Typography>
+          <Accordion 
+            defaultExpanded
+            sx={{
+              mb: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              '&:before': { display: 'none' },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              '&.Mui-expanded': {
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              },
+            }}
+          >
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                height: 35,
+                minHeight: 35,
+                borderRadius: 2,
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+                '&.Mui-expanded': {
+                  bgcolor: 'action.selected',
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                  height: 35,
+                  minHeight: 35,
+                },
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
+                Price Range
+              </Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
@@ -920,6 +1050,10 @@ const Gallery: React.FC = () => {
                   onChange={(e) => setPendingMinPrice(e.target.value)}
                   size="small"
                   fullWidth
+                  sx={{
+                    '& .MuiInputLabel-root': { fontSize: '0.875rem' },
+                    '& .MuiInputBase-input': { fontSize: '0.875rem' },
+                  }}
                 />
                 <TextField
                   label="Max Price"
@@ -928,6 +1062,10 @@ const Gallery: React.FC = () => {
                   onChange={(e) => setPendingMaxPrice(e.target.value)}
                   size="small"
                   fullWidth
+                  sx={{
+                    '& .MuiInputLabel-root': { fontSize: '0.875rem' },
+                    '& .MuiInputBase-input': { fontSize: '0.875rem' },
+                  }}
                 />
               </Box>
               <Button
@@ -944,9 +1082,43 @@ const Gallery: React.FC = () => {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1" fontWeight={600}>Year Range</Typography>
+          <Accordion 
+            defaultExpanded
+            sx={{
+              mb: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              '&:before': { display: 'none' },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              '&.Mui-expanded': {
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              },
+            }}
+          >
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                height: 35,
+                minHeight: 35,
+                borderRadius: 2,
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+                '&.Mui-expanded': {
+                  bgcolor: 'action.selected',
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                  height: 35,
+                  minHeight: 35,
+                },
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
+                Year Range
+              </Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
@@ -958,6 +1130,10 @@ const Gallery: React.FC = () => {
                   size="small"
                   fullWidth
                   inputProps={{ min: 1900, max: new Date().getFullYear() }}
+                  sx={{
+                    '& .MuiInputLabel-root': { fontSize: '0.875rem' },
+                    '& .MuiInputBase-input': { fontSize: '0.875rem' },
+                  }}
                 />
                 <TextField
                   label="Max Year"
@@ -967,6 +1143,10 @@ const Gallery: React.FC = () => {
                   size="small"
                   fullWidth
                   inputProps={{ min: 1900, max: new Date().getFullYear() }}
+                  sx={{
+                    '& .MuiInputLabel-root': { fontSize: '0.875rem' },
+                    '& .MuiInputBase-input': { fontSize: '0.875rem' },
+                  }}
                 />
               </Box>
               <Button
@@ -983,12 +1163,50 @@ const Gallery: React.FC = () => {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1" fontWeight={600}>Medium</Typography>
+          <Accordion
+            sx={{
+              mb: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              '&:before': { display: 'none' },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              '&.Mui-expanded': {
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              },
+            }}
+          >
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                height: 35,
+                minHeight: 35,
+                borderRadius: 2,
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+                '&.Mui-expanded': {
+                  bgcolor: 'action.selected',
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                  height: 35,
+                  minHeight: 35,
+                },
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
+                Medium
+              </Typography>
             </AccordionSummary>
-            <AccordionDetails>
-              <Stack spacing={1}>
+            <AccordionDetails sx={{ px: 2, py: 2 }}>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+                gap: 1.5,
+                columnGap: 2
+              }}>
                 {['Oil', 'Acrylic', 'Watercolor', 'Pastel', 'Charcoal', 'Pencil', 'Mixed Media', 'Wood', 'Metal', 'Other'].map((medium) => (
                   <FormControlLabel
                     key={medium}
@@ -1005,9 +1223,10 @@ const Gallery: React.FC = () => {
                       />
                     }
                     label={medium}
+                    sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.875rem' } }}
                   />
                 ))}
-              </Stack>
+              </Box>
               {pendingSelectedMedium.length > 0 && (
                 <Button
                   size="small"
@@ -1023,11 +1242,44 @@ const Gallery: React.FC = () => {
             </AccordionDetails>
           </Accordion>
 
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1" fontWeight={600}>Availability</Typography>
+          <Accordion
+            sx={{
+              mb: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              '&:before': { display: 'none' },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              '&.Mui-expanded': {
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              },
+            }}
+          >
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                height: 35,
+                minHeight: 35,
+                borderRadius: 2,
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+                '&.Mui-expanded': {
+                  bgcolor: 'action.selected',
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                  height: 35,
+                  minHeight: 35,
+                },
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
+                Availability
+              </Typography>
             </AccordionSummary>
-            <AccordionDetails>
+            <AccordionDetails sx={{ px: 2, py: 2 }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -1038,83 +1290,122 @@ const Gallery: React.FC = () => {
                   />
                 }
                 label="In Stock Only"
+                sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
               />
             </AccordionDetails>
           </Accordion>
 
-          <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={async () => {
-                setPendingSelectedCategory('All');
-                setPendingSelectedSubcategory('');
-                setPendingMinPrice('');
-                setPendingMaxPrice('');
-                setPendingMinYear('');
-                setPendingMaxYear('');
-                setPendingSelectedMedium([]);
-                setPendingInStockOnly(false);
-                setSelectedCategory('All');
-                setSelectedSubcategory('');
-                setMinPrice('');
-                setMaxPrice('');
-                setMinYear('');
-                setMaxYear('');
-                setSelectedMedium([]);
-                setInStockOnly(false);
-                setPage(1);
-                
-                isApplyingFiltersRef.current = true;
-                await fetchListingsWithFilters({
-                  category: 'All',
-                  subcategory: '',
-                  minPrice: '',
-                  maxPrice: '',
-                  minYear: '',
-                  maxYear: '',
-                  selectedMedium: [],
-                  inStockOnly: false,
-                  pageNum: 1
-                });
-              }}
-            >
-              Clear All Filters
-            </Button>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={async () => {
-                isApplyingFiltersRef.current = true;
-                
-                const newFilters = {
-                  category: pendingSelectedCategory,
-                  subcategory: pendingSelectedSubcategory,
-                  minPrice: pendingMinPrice || '',
-                  maxPrice: pendingMaxPrice || '',
-                  minYear: pendingMinYear || '',
-                  maxYear: pendingMaxYear || '',
-                  selectedMedium: pendingSelectedMedium,
-                  inStockOnly: pendingInStockOnly,
-                  pageNum: 1
-                };
-                
-                setSelectedCategory(pendingSelectedCategory);
-                setSelectedSubcategory(pendingSelectedSubcategory);
-                setMinPrice(newFilters.minPrice);
-                setMaxPrice(newFilters.maxPrice);
-                setMinYear(newFilters.minYear);
-                setMaxYear(newFilters.maxYear);
-                setSelectedMedium(newFilters.selectedMedium.length > 0 ? [...newFilters.selectedMedium] : []);
-                setInStockOnly(newFilters.inStockOnly);
-                setPage(1);
-                setFilterDrawerOpen(false);
-                
-                await fetchListingsWithFilters(newFilters);
-              }}
-            >
-              Apply Filters
-            </Button>
+          <Box 
+            sx={{ 
+              mt: 3, 
+              px: 1,
+              pb: 1,
+              position: 'sticky',
+              bottom: 0,
+              bgcolor: 'background.paper',
+              borderTop: '2px solid',
+              borderColor: 'divider',
+              pt: 2.5,
+              boxShadow: '0 -4px 12px rgba(0,0,0,0.05)',
+            }}
+          >
+            <Stack spacing={1.5}>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={async () => {
+                  isApplyingFiltersRef.current = true;
+                  
+                  const newFilters = {
+                    category: pendingSelectedCategory,
+                    subcategory: pendingSelectedSubcategory,
+                    minPrice: pendingMinPrice || '',
+                    maxPrice: pendingMaxPrice || '',
+                    minYear: pendingMinYear || '',
+                    maxYear: pendingMaxYear || '',
+                    selectedMedium: pendingSelectedMedium,
+                    inStockOnly: pendingInStockOnly,
+                    pageNum: 1
+                  };
+                  
+                  setSelectedCategory(pendingSelectedCategory);
+                  setSelectedSubcategory(pendingSelectedSubcategory);
+                  setMinPrice(newFilters.minPrice);
+                  setMaxPrice(newFilters.maxPrice);
+                  setMinYear(newFilters.minYear);
+                  setMaxYear(newFilters.maxYear);
+                  setSelectedMedium(newFilters.selectedMedium.length > 0 ? [...newFilters.selectedMedium] : []);
+                  setInStockOnly(newFilters.inStockOnly);
+                  setPage(1);
+                  setFilterDrawerOpen(false);
+                  
+                  await fetchListingsWithFilters(newFilters);
+                }}
+                sx={{
+                  py: 1.5,
+                  fontWeight: 600,
+                  fontSize: '0.95rem',
+                  textTransform: 'none',
+                  borderRadius: 2,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  '&:hover': {
+                    boxShadow: '0 6px 16px rgba(0,0,0,0.2)',
+                  },
+                }}
+              >
+                Apply Filters
+              </Button>
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={async () => {
+                  setPendingSelectedCategory('All');
+                  setPendingSelectedSubcategory('');
+                  setPendingMinPrice('');
+                  setPendingMaxPrice('');
+                  setPendingMinYear('');
+                  setPendingMaxYear('');
+                  setPendingSelectedMedium([]);
+                  setPendingInStockOnly(false);
+                  setSelectedCategory('All');
+                  setSelectedSubcategory('');
+                  setMinPrice('');
+                  setMaxPrice('');
+                  setMinYear('');
+                  setMaxYear('');
+                  setSelectedMedium([]);
+                  setInStockOnly(false);
+                  setPage(1);
+                  
+                  isApplyingFiltersRef.current = true;
+                  await fetchListingsWithFilters({
+                    category: 'All',
+                    subcategory: '',
+                    minPrice: '',
+                    maxPrice: '',
+                    minYear: '',
+                    maxYear: '',
+                    selectedMedium: [],
+                    inStockOnly: false,
+                    pageNum: 1
+                  });
+                }}
+                sx={{
+                  py: 1.25,
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  textTransform: 'none',
+                  borderRadius: 2,
+                  borderWidth: 2,
+                  '&:hover': {
+                    borderWidth: 2,
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                Clear All Filters
+              </Button>
+            </Stack>
           </Box>
         </Box>
       </Drawer>
