@@ -284,10 +284,6 @@ const Header: React.FC = () => {
               sx={{
                 position: 'relative',
                 display: 'inline-block',
-                px: isDarkMode ? 1.5 : 0,
-                py: isDarkMode ? 0.5 : 0,
-                borderRadius: isDarkMode ? 1 : 0,
-                bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
               }}
             >
               <Box
@@ -529,8 +525,6 @@ const Header: React.FC = () => {
         sx={{
           background: theme.palette.background.paper,
           transition: 'all 0.3s ease-in-out',
-          borderBottom: '1px solid',
-          borderColor: 'primary.main',
           boxShadow: 'none',
           zIndex: 1300,
           width: '100vw',
@@ -580,14 +574,6 @@ const Header: React.FC = () => {
                 sx={{
                   position: 'relative',
                   display: 'inline-block',
-                  px: isDarkMode ? 1.5 : 0,
-                  py: isDarkMode ? 0.5 : 0,
-                  borderRadius: isDarkMode ? 1 : 0,
-                  bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-                  },
                 }}
               >
                 <Box

@@ -31,6 +31,7 @@ import {
   Search as SearchIcon,
   Cancel as CancelIcon,
 } from '@mui/icons-material';
+import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import apiService, { User } from '../services/api';
@@ -68,6 +69,7 @@ interface ChatWidgetProps {
 }
 
 const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversationId = null }) => {
+  const theme = useTheme();
   const { user, isAuthenticated } = useAuth();
   const { openChat: openChatFromContext } = useChat();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -890,12 +892,12 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
                             maxWidth: '70%',
                             p: 1.5,
                             borderRadius: 2,
-                            bgcolor: isOwn ? 'primary.main' : 'grey.200',
+                            bgcolor: isOwn ? 'primary.main' : (theme.palette.mode === 'dark' ? 'grey.800' : 'grey.200'),
                             color: isOwn ? 'white' : 'text.primary',
                           }}
                         >
-                          <Typography variant="body2">{message.message}</Typography>
-                          <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mt: 0.5 }}>
+                          <Typography variant="body2" sx={{ color: isOwn ? 'white' : 'text.primary' }}>{message.message}</Typography>
+                          <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mt: 0.5, color: isOwn ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary' }}>
                             {formatTime(message.created_at)}
                           </Typography>
                         </Box>
