@@ -51,6 +51,8 @@ router.post('/contact-seller', async (req, res) => {
       message: message,
       listingTitle: listing.title,
       listingId: listingId,
+      source: 'Artwork Inquiry',
+      sourceDetail: `Contact form from gallery — ${listing.title}`,
     });
 
     const [buyers] = await pool.execute(

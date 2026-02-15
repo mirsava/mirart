@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import { writeFileSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import usersRouter from './routes/users.js';
 import listingsRouter from './routes/listings.js';
@@ -54,7 +55,32 @@ app.use(express.urlencoded({ extended: true }));
 // Serve uploaded files statically
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Generate email previews at startup (so /email-previews/ works without running script)
+const emailPreviewsDir = path.join(__dirname, 'email-previews');
+try {
+  const { buildTemplate, templates } = await import('./services/emailService.js');
+  const sampleData = {
+    contact: { listingTitle: 'Sunset Over the Mountains', listingId: 42, message: "Hi! I'm very interested in this piece.\n\nCould you tell me more?", fromName: 'Jane Doe', from: 'jane@example.com' },
+    messageReply: { listingTitle: 'Abstract Blue #3', listingId: 18, message: "Thanks! Yes, the piece is still available.", fromName: 'John Smith', from: 'john@example.com' },
+    welcome: { userName: 'Alex', loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173' },
+    verificationCode: { userName: 'Alex', code: '847291', expiresInMinutes: 24 },
+    passwordReset: { userName: 'Alex', code: '382916', expiresInMinutes: 60 },
+    passwordChanged: { userName: 'Alex' },
+  };
+  mkdirSync(emailPreviewsDir, { recursive: true });
+  for (const [name, builder] of Object.entries(templates)) {
+    const template = builder(sampleData[name] || {});
+    writeFileSync(path.join(emailPreviewsDir, `${name}.html`), buildTemplate(template).html.trim(), 'utf8');
+  }
+  const indexHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Email Previews</title><style>body{font-family:system-ui;padding:2rem;max-width:800px;margin:0 auto}h1{color:#4a3a9a}ul{list-style:none;padding:0}li{margin:0.5rem 0}a{color:#534bae;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><h1>Email Template Previews</h1><p>Sample HTML for each template.</p><ul>${Object.keys(templates).map((n) => `<li><a href="${n}.html">${n}.html</a></li>`).join('')}</ul></body></html>`;
+  writeFileSync(path.join(emailPreviewsDir, 'index.html'), indexHtml, 'utf8');
+} catch (err) {
+  console.warn('Could not generate email previews:', err.message);
+}
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/email-previews', express.static(emailPreviewsDir));
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {

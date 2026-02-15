@@ -417,15 +417,20 @@ router.post('/:messageId/reply', async (req, res) => {
 
     // Send email notification
     try {
-      const { sendContactEmail } = await import('../services/emailService.js');
-      await sendContactEmail({
+      const { sendEmail, templates } = await import('../services/emailService.js');
+      const listingTitle = originalMessage.listing_title || 'Artwork';
+      await sendEmail({
         to: newRecipientEmail,
-        from: newSenderEmail,
-        fromName: newSenderName,
         subject: replySubject,
-        message: message,
-        listingTitle: originalMessage.listing_title || 'Artwork',
-        listingId: originalMessage.listing_id,
+        template: templates.messageReply({
+          listingTitle,
+          listingId: originalMessage.listing_id,
+          message,
+          fromName: newSenderName,
+          from: newSenderEmail,
+        }),
+        replyTo: newSenderEmail,
+        replyToName: newSenderName,
       });
     } catch (emailError) {
       console.error('Error sending reply email:', emailError);
