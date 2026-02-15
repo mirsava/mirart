@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -16,6 +16,7 @@ import {
   Step,
   StepLabel,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   CreditCard as CreditCardIcon,
@@ -23,6 +24,7 @@ import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { PayPalButtons } from '@paypal/react-paypal-js';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
@@ -36,6 +38,7 @@ const Checkout: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
   const [activeStep, setActiveStep] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  const [paypalOrderId, setPaypalOrderId] = useState<string | null>(null);
   const hasActivationItems = cartItems.some(item => item.type === 'activation');
   const hasArtworkItems = cartItems.some(item => item.type !== 'activation');
   const [formData, setFormData] = useState<FormData>({
@@ -55,7 +58,7 @@ const Checkout: React.FC = () => {
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
 
-  const steps = ['Shipping Information', 'Payment Details', 'Review & Confirm'];
+  const steps = ['Shipping Information', 'Payment', 'Review & Confirm'];
 
   const handleInputChange = (field: keyof FormData) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -85,11 +88,6 @@ const Checkout: React.FC = () => {
       } else if (hasActivationItems) {
         if (!formData.email) newErrors.email = 'Email is required';
       }
-    } else if (activeStep === 1) {
-      if (!formData.cardNumber) newErrors.cardNumber = 'Card number is required';
-      if (!formData.expiryDate) newErrors.expiryDate = 'Expiry date is required';
-      if (!formData.cvv) newErrors.cvv = 'CVV is required';
-      if (!formData.cardName) newErrors.cardName = 'Cardholder name is required';
     }
 
     setErrors(newErrors);
@@ -104,6 +102,94 @@ const Checkout: React.FC = () => {
 
   const handleBack = (): void => {
     setActiveStep((prevStep) => prevStep - 1);
+  };
+
+  const handlePayPalApprove = async (data: any, actions: any): Promise<void> => {
+    console.log('PayPal approval triggered:', data);
+    
+    if (!user?.id) {
+      enqueueSnackbar('Please sign in to complete your purchase', { variant: 'error' });
+      navigate('/artist-signin');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const activationItems = cartItems.filter(item => item.type === 'activation');
+      const artworkItems = cartItems.filter(item => item.type !== 'activation');
+
+      if (activationItems.length > 0) {
+        for (const item of activationItems) {
+          if (item.listingId) {
+            await apiService.activateListing(item.listingId, user.id);
+          }
+        }
+      }
+
+      if (artworkItems.length > 0) {
+        const shippingAddress = `${formData.firstName} ${formData.lastName}\n${formData.address}\n${formData.city}, ${formData.state} ${formData.zipCode}\n${formData.country}`;
+
+        const orderData = {
+          items: artworkItems.map(item => ({
+            listing_id: item.id,
+            quantity: item.quantity
+          })),
+          shipping_address: shippingAddress,
+          cognito_username: user.id
+        };
+
+        console.log('Capturing PayPal order:', data.orderID);
+        const result = await apiService.capturePayPalOrder(data.orderID, orderData);
+        console.log('Capture result:', result);
+        
+        if (result.success) {
+          enqueueSnackbar('Order placed successfully!', { variant: 'success' });
+          clearCart();
+          
+          if (activationItems.length > 0 && artworkItems.length === 0) {
+            navigate('/artist-dashboard');
+          } else {
+            navigate('/order-success');
+          }
+        } else {
+          throw new Error('Payment capture was not successful');
+        }
+      } else if (activationItems.length > 0) {
+        enqueueSnackbar('Listings activated successfully!', { variant: 'success' });
+        clearCart();
+        navigate('/artist-dashboard');
+      }
+    } catch (error: any) {
+      console.error('Error processing payment:', error);
+      enqueueSnackbar(error.message || error.details || 'Failed to process payment. Please try again.', { variant: 'error' });
+      setLoading(false);
+    }
+  };
+
+  const createPayPalOrder = async (): Promise<string> => {
+    const artworkItems = cartItems.filter(item => item.type !== 'activation');
+    if (artworkItems.length === 0) throw new Error('No items to purchase');
+    const items = artworkItems.map(item => ({
+      name: item.title || 'Artwork',
+      price: item.price || 0,
+      quantity: item.quantity
+    }));
+    const shippingAddressObj = {
+      address_line_1: formData.address,
+      city: formData.city,
+      state: formData.state,
+      zipCode: formData.zipCode,
+      country: formData.country
+    };
+    try {
+      const result = await apiService.createPayPalOrder(items, shippingAddressObj);
+      setPaypalOrderId(result.id);
+      return result.id;
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to initialize payment. Please try again.', { variant: 'error' });
+      throw err;
+    }
   };
 
   const handleSubmit = async (): Promise<void> => {
@@ -122,52 +208,25 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    setLoading(true);
+    const activationItems = cartItems.filter(item => item.type === 'activation');
+    const artworkItems = cartItems.filter(item => item.type !== 'activation');
 
-    try {
-      const mockPaymentIntentId = `mock_payment_${Date.now()}`;
-      
-      const activationItems = cartItems.filter(item => item.type === 'activation');
-      const artworkItems = cartItems.filter(item => item.type !== 'activation');
-
-      if (activationItems.length > 0) {
+    if (activationItems.length > 0 && artworkItems.length === 0) {
+      setLoading(true);
+      try {
         for (const item of activationItems) {
           if (item.listingId) {
             await apiService.activateListing(item.listingId, user.id);
           }
         }
         enqueueSnackbar('Listings activated successfully!', { variant: 'success' });
-      }
-
-      if (artworkItems.length > 0) {
-        const shippingAddress = `${formData.firstName} ${formData.lastName}\n${formData.address}\n${formData.city}, ${formData.state} ${formData.zipCode}\n${formData.country}`;
-
-        const orderPromises = artworkItems.map(item =>
-          apiService.createOrder({
-            cognito_username: user.id,
-            listing_id: item.id,
-            quantity: item.quantity,
-            shipping_address: shippingAddress,
-            payment_intent_id: mockPaymentIntentId
-          })
-        );
-
-        await Promise.all(orderPromises);
-        enqueueSnackbar('Order placed successfully!', { variant: 'success' });
-      }
-
-      clearCart();
-      
-      if (activationItems.length > 0 && artworkItems.length === 0) {
+        clearCart();
         navigate('/artist-dashboard');
-      } else {
-        navigate('/order-success');
+      } catch (error: any) {
+        enqueueSnackbar(error.message || 'Failed to activate listings.', { variant: 'error' });
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      console.error('Error processing payment:', error);
-      enqueueSnackbar(error.message || 'Failed to process payment. Please try again.', { variant: 'error' });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -303,57 +362,46 @@ const Checkout: React.FC = () => {
     );
   };
 
-  const renderPaymentForm = () => (
-    <Grid container spacing={3}>
-      <Grid item xs={12}>
-        <TextField
-          required
-          fullWidth
-          label="Card Number"
-          placeholder="1234 5678 9012 3456"
-          value={formData.cardNumber}
-          onChange={handleInputChange('cardNumber')}
-          error={!!errors.cardNumber}
-          helperText={errors.cardNumber}
-        />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          required
-          fullWidth
-          label="Expiry Date"
-          placeholder="MM/YY"
-          value={formData.expiryDate}
-          onChange={handleInputChange('expiryDate')}
-          error={!!errors.expiryDate}
-          helperText={errors.expiryDate}
-        />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          required
-          fullWidth
-          label="CVV"
-          placeholder="123"
-          value={formData.cvv}
-          onChange={handleInputChange('cvv')}
-          error={!!errors.cvv}
-          helperText={errors.cvv}
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <TextField
-          required
-          fullWidth
-          label="Cardholder Name"
-          value={formData.cardName}
-          onChange={handleInputChange('cardName')}
-          error={!!errors.cardName}
-          helperText={errors.cardName}
-        />
-      </Grid>
-    </Grid>
-  );
+  const renderPaymentForm = () => {
+    const artworkItems = cartItems.filter(item => item.type !== 'activation');
+    
+    if (artworkItems.length === 0) {
+      return (
+        <Alert severity="info">
+          No payment required for listing activations.
+        </Alert>
+      );
+    }
+
+    return (
+      <Box>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Complete your payment securely with PayPal
+        </Alert>
+        <PayPalButtons
+              createOrder={(data, actions) => {
+                console.log('PayPal createOrder called');
+                return createPayPalOrder();
+              }}
+              onApprove={(data, actions) => {
+                console.log('PayPal onApprove called with data:', data);
+                return handlePayPalApprove(data, actions);
+              }}
+              onError={(err) => {
+                console.error('PayPal error:', err);
+                enqueueSnackbar('Payment failed. Please try again.', { variant: 'error' });
+              }}
+              onCancel={() => {}}
+              style={{
+                layout: 'vertical',
+                color: 'blue',
+                shape: 'rect',
+                label: 'paypal'
+              }}
+            />
+      </Box>
+    );
+  };
 
   const renderOrderSummary = () => {
     const activationItems = cartItems.filter(item => item.type === 'activation');
@@ -460,7 +508,7 @@ const Checkout: React.FC = () => {
                 <Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <CreditCardIcon sx={{ mr: 1, color: 'primary.main' }} />
-                    <Typography variant="h6">Payment Details</Typography>
+                    <Typography variant="h6">Payment</Typography>
                   </Box>
                   {renderPaymentForm()}
                 </Box>
@@ -486,13 +534,30 @@ const Checkout: React.FC = () => {
                 >
                   Back
                 </Button>
-                <Button
-                  variant="contained"
-                  onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext}
-                  disabled={loading}
-                >
-                  {loading ? 'Processing...' : activeStep === steps.length - 1 ? 'Place Order' : 'Next'}
-                </Button>
+                {activeStep === 1 ? (
+                  <Button
+                    variant="outlined"
+                    onClick={handleBack}
+                  >
+                    Back
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      disabled={activeStep === 0}
+                      onClick={handleBack}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext}
+                      disabled={loading}
+                    >
+                      {loading ? 'Processing...' : activeStep === steps.length - 1 ? 'Place Order' : 'Next'}
+                    </Button>
+                  </>
+                )}
               </Box>
             </Paper>
           </Grid>

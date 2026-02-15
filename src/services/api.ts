@@ -300,6 +300,20 @@ class ApiService {
     return this.request<Order[]>(`/orders/user/${cognitoUsername}${params}`);
   }
 
+  async createPayPalOrder(items: Array<{ name: string; price: number; quantity: number }>, shippingAddress?: any, isSubscription?: boolean): Promise<{ id: string }> {
+    return this.request<{ id: string }>('/paypal/create-order', {
+      method: 'POST',
+      body: JSON.stringify({ items, shipping_address: shippingAddress, is_subscription: isSubscription }),
+    });
+  }
+
+  async capturePayPalOrder(orderId: string, orderData: { items: Array<{ listing_id: number; quantity: number }>; shipping_address: string; cognito_username: string; isSubscription?: boolean; subscriptionData?: { plan_id: number; billing_period: string; amount: number } }): Promise<{ success: boolean; transactionId: string; orders?: Order[]; subscription?: any }> {
+    return this.request<{ success: boolean; transactionId: string; orders?: Order[]; subscription?: any }>('/paypal/capture-order', {
+      method: 'POST',
+      body: JSON.stringify({ orderId, orderData }),
+    });
+  }
+
   async getMessages(cognitoUsername: string, type: 'all' | 'sent' | 'received' | 'archived' = 'all'): Promise<{ messages: Message[] }> {
     return this.request<{ messages: Message[] }>(`/messages/user/${cognitoUsername}?type=${type}`);
   }
@@ -477,6 +491,17 @@ class ApiService {
     }
     return this.request<{ success: boolean; message: string }>(`/admin/users/${userId}/deactivate?${params.toString()}`, {
       method: 'PUT',
+    });
+  }
+
+  async deleteUser(cognitoUsername: string, userId: number, groups?: string[]): Promise<{ success: boolean; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<{ success: boolean; message: string }>(`/admin/users/${userId}?${params.toString()}`, {
+      method: 'DELETE',
     });
   }
 

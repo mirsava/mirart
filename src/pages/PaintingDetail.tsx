@@ -651,6 +651,31 @@ const PaintingDetail: React.FC = () => {
                 </Box>
               )}
               
+              {isAuthenticated && (
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 1,
+                  mt: 2,
+                  pt: 2,
+                  borderTop: 1,
+                  borderColor: 'divider',
+                }}>
+                  <IconButton
+                    sx={{
+                      color: isLiked ? 'error.main' : 'text.secondary',
+                    }}
+                    onClick={handleLike}
+                    disabled={liking}
+                  >
+                    {isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                  </IconButton>
+                  <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+                  </Typography>
+                </Box>
+              )}
+              
               <Box
                 sx={{
                   position: 'absolute',
@@ -661,19 +686,6 @@ const PaintingDetail: React.FC = () => {
                   zIndex: 1,
                 }}
               >
-                {isAuthenticated && (
-                  <IconButton
-                    sx={{
-                      bgcolor: 'rgba(255,255,255,0.9)',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,1)' },
-                      color: isLiked ? 'error.main' : 'inherit',
-                    }}
-                    onClick={handleLike}
-                    disabled={liking}
-                  >
-                    {isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-                  </IconButton>
-                )}
                 <IconButton
                   sx={{
                     bgcolor: 'rgba(255,255,255,0.9)',
@@ -690,11 +702,33 @@ const PaintingDetail: React.FC = () => {
           <Grid item xs={12} md={6}>
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box sx={{ flexGrow: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                   <Chip label={painting.category} color="primary" size="small" />
                   <Typography variant="body2" color="text.secondary">
                     {painting.year}
                   </Typography>
+                  {isAuthenticated && (
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 0.5,
+                      ml: 'auto',
+                    }}>
+                      <IconButton
+                        size="small"
+                        sx={{
+                          color: isLiked ? 'error.main' : 'text.secondary',
+                        }}
+                        onClick={handleLike}
+                        disabled={liking}
+                      >
+                        {isLiked ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+                      </IconButton>
+                      <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                        {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
 
                 <Typography variant="h4" component="h1" gutterBottom>

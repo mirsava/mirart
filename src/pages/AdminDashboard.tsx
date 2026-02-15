@@ -106,8 +106,11 @@ const AdminDashboard: React.FC = () => {
   const [listingToChangeStatus, setListingToChangeStatus] = useState<{ id: number; currentStatus: string } | null>(null);
   const [activatingUser, setActivatingUser] = useState<number | null>(null);
   const [deactivatingUser, setDeactivatingUser] = useState<number | null>(null);
+  const [deletingUser, setDeletingUser] = useState<number | null>(null);
   const [deactivateUserConfirmOpen, setDeactivateUserConfirmOpen] = useState(false);
+  const [deleteUserConfirmOpen, setDeleteUserConfirmOpen] = useState(false);
   const [userToDeactivate, setUserToDeactivate] = useState<number | null>(null);
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [newStatus, setNewStatus] = useState<'draft' | 'active' | 'inactive' | 'sold' | 'archived'>('active');
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
@@ -392,6 +395,36 @@ const AdminDashboard: React.FC = () => {
   const handleDeactivateUserCancel = (): void => {
     setDeactivateUserConfirmOpen(false);
     setUserToDeactivate(null);
+  };
+
+  const handleDeleteUserClick = (userId: number): void => {
+    setUserToDelete(userId);
+    setDeleteUserConfirmOpen(true);
+    handleUserMenuClose();
+  };
+
+  const handleDeleteUserConfirm = async (): Promise<void> => {
+    if (!user?.id || !userToDelete) return;
+
+    setDeletingUser(userToDelete);
+    try {
+      await apiService.deleteUser(user.id, userToDelete, user.groups);
+      enqueueSnackbar('User deleted successfully', { variant: 'success' });
+      setDeleteUserConfirmOpen(false);
+      setUserToDelete(null);
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Delete user error:', error);
+      const errorMessage = error.details || error.message || error.error || 'Failed to delete user';
+      enqueueSnackbar(errorMessage, { variant: 'error' });
+    } finally {
+      setDeletingUser(null);
+    }
+  };
+
+  const handleDeleteUserCancel = (): void => {
+    setDeleteUserConfirmOpen(false);
+    setUserToDelete(null);
   };
 
   const handleInactivateClick = (listingId: number): void => {
@@ -1059,6 +1092,18 @@ const AdminDashboard: React.FC = () => {
               {activatingUser === selectedUser?.id ? 'Activating...' : 'Activate User'}
             </MenuItem>
           )}
+          <MenuItem
+            onClick={() => {
+              if (selectedUser) {
+                handleDeleteUserClick(selectedUser.id);
+              }
+            }}
+            disabled={deletingUser === selectedUser?.id}
+            sx={{ color: 'error.main' }}
+          >
+            <DeleteIcon sx={{ mr: 1 }} />
+            {deletingUser === selectedUser?.id ? 'Deleting...' : 'Delete User'}
+          </MenuItem>
         </Menu>
 
         <Dialog open={userTypeDialogOpen} onClose={() => setUserTypeDialogOpen(false)}>
@@ -1174,6 +1219,26 @@ const AdminDashboard: React.FC = () => {
               disabled={deactivatingUser !== null}
             >
               {deactivatingUser ? 'Deactivating...' : 'Deactivate'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={deleteUserConfirmOpen} onClose={handleDeleteUserCancel}>
+          <DialogTitle>Delete User</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to permanently delete this user? This will remove them from both the database and Cognito. This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteUserCancel}>Cancel</Button>
+            <Button
+              onClick={handleDeleteUserConfirm}
+              color="error"
+              variant="contained"
+              disabled={deletingUser !== null}
+            >
+              {deletingUser ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogActions>
         </Dialog>

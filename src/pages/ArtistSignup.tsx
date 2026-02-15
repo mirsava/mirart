@@ -8,6 +8,7 @@ import {
   Paper,
   Alert,
   FormControl,
+  FormHelperText,
   InputLabel,
   Select,
   MenuItem,
@@ -30,7 +31,9 @@ import {
   Star as StarIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { PayPalButtons } from '@paypal/react-paypal-js';
 import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from 'notistack';
 import apiService, { SubscriptionPlan } from '../services/api';
 
 const ArtistSignup: React.FC = () => {
@@ -58,6 +61,7 @@ const ArtistSignup: React.FC = () => {
     experience: '',
     website: '',
     agreeToTerms: false,
+    paymentOption: 'payLater' as 'payNow' | 'payLater',
     selectedPlanId: null as number | null,
     billingPeriod: 'monthly' as 'monthly' | 'yearly',
   });
@@ -66,6 +70,8 @@ const ArtistSignup: React.FC = () => {
   const [signupSuccess, setSignupSuccess] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
+  const [paymentStep, setPaymentStep] = useState(false);
+  const [paypalOrderId, setPaypalOrderId] = useState<string | null>(null);
   
   // Show message if redirected from sign-in
   const redirectMessage = locationState?.message;
@@ -147,9 +153,7 @@ const ArtistSignup: React.FC = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     
-    if (!isCompletingProfile && !formData.selectedPlanId) {
-      newErrors.selectedPlanId = 'Please select a subscription plan';
-    }
+    // Subscription is optional at signup - artists pay when they activate listings
 
     // Skip username and password validation if completing profile (already authenticated)
     if (!isCompletingProfile) {
@@ -171,107 +175,200 @@ const ArtistSignup: React.FC = () => {
     if (!formData.country.trim()) newErrors.country = 'Country is required';
     if (formData.specialties.length === 0) newErrors.specialties = 'Please select at least one specialty';
     if (!isCompletingProfile && !formData.agreeToTerms) newErrors.agreeToTerms = 'You must agree to the terms and conditions';
+    if (!isCompletingProfile && formData.paymentOption === 'payNow' && !formData.selectedPlanId) {
+      newErrors.selectedPlanId = 'Please select a subscription plan';
+    }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return { valid: Object.keys(newErrors).length === 0, errors: newErrors };
   };
+
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     
-    if (!validateForm()) return;
+    const validation = validateForm();
+    if (!validation.valid) {
+      const firstErrorId = Object.keys(validation.errors).find(k => k !== 'general' && validation.errors[k]);
+      if (firstErrorId) {
+        setTimeout(() => {
+          document.getElementById(`field-${firstErrorId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }
+      return;
+    }
 
+    if (isCompletingProfile && user?.id) {
+      setIsLoading(true);
+      try {
+        await apiService.createOrUpdateUser({
+          cognito_username: user.id,
+          email: user.email || formData.email || '',
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          business_name: formData.businessName,
+          phone: formData.phone || null,
+          country: formData.country,
+          website: formData.website || null,
+          specialties: formData.specialties,
+          experience_level: formData.experience,
+        });
+        navigate('/artist-dashboard');
+      } catch (dbError) {
+        console.error('Error saving user data to database:', dbError);
+        setErrors({ general: 'Failed to save profile. Please try again.' });
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // If Pay Now with plan selected, go to payment; otherwise sign up directly (Pay Later)
+    if (formData.paymentOption === 'payNow' && formData.selectedPlanId) {
+      setPaymentStep(true);
+      return;
+    }
+
+    // Direct signup without subscription - artists can list arts as draft and subscribe when activating
     setIsLoading(true);
-    
     try {
       const attributes: Record<string, string> = {
         name: `${formData.firstName} ${formData.lastName}`,
         given_name: formData.firstName,
         family_name: formData.lastName,
-        // Custom attributes need to be configured in Cognito User Pool first
-        // For now, we'll only use standard attributes
-        // Additional profile data can be stored in a separate database/API later
       };
-
-      // Only add phone number if it's provided and properly formatted
-      if (formData.phone && formData.phone.trim() !== '') {
-        // Format phone number for Cognito (E.164 format)
+      if (formData.phone?.trim()) {
         let formattedPhone = formData.phone.trim();
         if (!formattedPhone.startsWith('+')) {
-          // Add +1 for US numbers if no country code provided
+          formattedPhone = '+1' + formattedPhone.replace(/\D/g, '');
+        }
+        attributes.phone_number = formattedPhone;
+      }
+      await signUp(formData.email, formData.password, attributes, formData.username);
+      await apiService.createOrUpdateUser({
+        cognito_username: formData.username,
+        email: formData.email,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        business_name: formData.businessName,
+        phone: formData.phone || null,
+        country: formData.country,
+        website: formData.website || null,
+        specialties: formData.specialties,
+        experience_level: formData.experience,
+      });
+      setSignupSuccess(true);
+      enqueueSnackbar('Account created! Please check your email to verify your account.', { variant: 'success' });
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      setErrors({ general: err.message || 'Failed to create account. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createPayPalOrder = async (): Promise<string> => {
+    if (!formData.selectedPlanId) throw new Error('No subscription plan selected');
+    const selectedPlan = subscriptionPlans.find(p => p.id === formData.selectedPlanId);
+    if (!selectedPlan) throw new Error('Selected plan not found');
+    const price = formData.billingPeriod === 'monthly'
+      ? (typeof selectedPlan.price_monthly === 'number' ? selectedPlan.price_monthly : parseFloat(selectedPlan.price_monthly as any) || 0)
+      : (typeof selectedPlan.price_yearly === 'number' ? selectedPlan.price_yearly : parseFloat(selectedPlan.price_yearly as any) || 0);
+    const items = [{ name: `${selectedPlan.name} Plan (${formData.billingPeriod})`, price, quantity: 1 }];
+    try {
+      const result = await apiService.createPayPalOrder(items, undefined, true);
+      setPaypalOrderId(result.id);
+      return result.id;
+    } catch (error: any) {
+      enqueueSnackbar('Failed to initialize payment. Please try again.', { variant: 'error' });
+      throw error;
+    }
+  };
+
+  const handlePayPalApprove = async (data: any, actions: any): Promise<void> => {
+    setIsLoading(true);
+    
+    try {
+      if (!formData.selectedPlanId) {
+        throw new Error('No subscription plan selected');
+      }
+
+      const selectedPlan = subscriptionPlans.find(p => p.id === formData.selectedPlanId);
+      if (!selectedPlan) {
+        throw new Error('Selected plan not found');
+      }
+
+      const price = formData.billingPeriod === 'monthly' 
+        ? (typeof selectedPlan.price_monthly === 'number' ? selectedPlan.price_monthly : parseFloat(selectedPlan.price_monthly as any) || 0)
+        : (typeof selectedPlan.price_yearly === 'number' ? selectedPlan.price_yearly : parseFloat(selectedPlan.price_yearly as any) || 0);
+
+      const capture = await apiService.capturePayPalOrder(data.orderID, {
+        items: [],
+        shipping_address: '',
+        cognito_username: formData.username,
+        isSubscription: true,
+        subscriptionData: {
+          plan_id: formData.selectedPlanId,
+          billing_period: formData.billingPeriod,
+          amount: price
+        }
+      });
+
+      if (!capture.success || !capture.transactionId) {
+        throw new Error('Payment capture failed');
+      }
+
+      const transactionId = capture.transactionId;
+
+      const attributes: Record<string, string> = {
+        name: `${formData.firstName} ${formData.lastName}`,
+        given_name: formData.firstName,
+        family_name: formData.lastName,
+      };
+
+      if (formData.phone && formData.phone.trim() !== '') {
+        let formattedPhone = formData.phone.trim();
+        if (!formattedPhone.startsWith('+')) {
           formattedPhone = '+1' + formattedPhone.replace(/\D/g, '');
         }
         attributes.phone_number = formattedPhone;
       }
 
-      // If user is already authenticated (redirected from sign-in), just save to database
-      if (isCompletingProfile && user?.id) {
-        // User is already logged in, just update/create their database record
-        try {
-          await apiService.createOrUpdateUser({
-            cognito_username: user.id,
-            email: user.email || formData.email || '',
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            business_name: formData.businessName,
-            phone: formData.phone || null,
-            country: formData.country,
-            website: formData.website || null,
-            specialties: formData.specialties,
-            experience_level: formData.experience,
-          });
-          // Redirect to dashboard after profile completion
-          navigate('/artist-dashboard');
-          return;
-        } catch (dbError) {
-          console.error('Error saving user data to database:', dbError);
-          setErrors({ general: 'Failed to save profile. Please try again.' });
-          return;
-        }
-      } else {
-        // Normal signup flow - create Cognito account
-        await signUp(formData.email, formData.password, attributes, formData.username);
-        
-        // Save user data to database (non-blocking)
-        try {
-          await apiService.createOrUpdateUser({
-            cognito_username: formData.username,
-            email: formData.email,
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            business_name: formData.businessName,
-            phone: formData.phone || null,
-            country: formData.country,
-            website: formData.website || null,
-            specialties: formData.specialties,
-            experience_level: formData.experience,
-          });
+      await signUp(formData.email, formData.password, attributes, formData.username);
+      
+      try {
+        await apiService.createOrUpdateUser({
+          cognito_username: formData.username,
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          business_name: formData.businessName,
+          phone: formData.phone || null,
+          country: formData.country,
+          website: formData.website || null,
+          specialties: formData.specialties,
+          experience_level: formData.experience,
+        });
 
-          // Create subscription after user is created
-          if (formData.selectedPlanId) {
-            try {
-              const mockPaymentIntentId = `mock_payment_${Date.now()}`;
-              await apiService.createSubscription(
-                formData.username,
-                formData.selectedPlanId,
-                formData.billingPeriod,
-                mockPaymentIntentId
-              );
-            } catch (subError) {
-              console.error('Error creating subscription:', subError);
-              console.warn('User created but subscription failed. User can subscribe later.');
-            }
-          }
-        } catch (dbError) {
-          // Log error but don't fail signup - user data can be saved after email confirmation
-          console.error('Error saving user data to database:', dbError);
-          console.warn('User signed up in Cognito but database save failed. Data will need to be saved after email confirmation.');
-        }
-        
+        await apiService.createSubscription(
+          formData.username,
+          formData.selectedPlanId,
+          formData.billingPeriod,
+          transactionId
+        );
+
         setSignupSuccess(true);
+        enqueueSnackbar('Account created successfully! Please check your email to confirm your account.', { variant: 'success' });
+      } catch (dbError) {
+        console.error('Error saving user data to database:', dbError);
+        setErrors({ general: 'Account created but failed to save profile. Please contact support.' });
       }
     } catch (error: any) {
-      setErrors({ general: error.message || 'Signup failed. Please try again.' });
+      console.error('Error processing payment:', error);
+      enqueueSnackbar(error.message || 'Failed to process payment. Please try again.', { variant: 'error' });
+      setErrors({ general: error.message || 'Payment failed. Please try again.' });
+      setPaymentStep(false);
     } finally {
       setIsLoading(false);
     }
@@ -379,14 +476,30 @@ const ArtistSignup: React.FC = () => {
               </Box>
             </Box>
           ) : (
-            <form onSubmit={handleSubmit}>
+            <form ref={formRef} onSubmit={handleSubmit} noValidate>
               {errors.general && (
-                <Alert severity="error" sx={{ mb: 3 }}>
+                <Alert severity="error" sx={{ mb: 3 }} onClose={() => setErrors(prev => ({ ...prev, general: '' }))}>
                   {errors.general}
                 </Alert>
               )}
+              {Object.entries(errors).filter(([k, msg]) => k !== 'general' && msg).length > 0 && (
+                <Alert severity="error" sx={{ mb: 3 }} icon={false}>
+                  <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                    Please fix the following errors:
+                  </Typography>
+                  <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+                    {Object.entries(errors)
+                      .filter(([k, msg]) => k !== 'general' && msg)
+                      .map(([key, msg]) => (
+                        <li key={key}>
+                          <Typography variant="body2">{msg}</Typography>
+                        </li>
+                      ))}
+                  </Box>
+                </Alert>
+              )}
               <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} id="field-firstName">
                 <TextField
                   fullWidth
                   label="First Name"
@@ -397,7 +510,7 @@ const ArtistSignup: React.FC = () => {
                   required
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} id="field-lastName">
                 <TextField
                   fullWidth
                   label="Last Name"
@@ -410,7 +523,7 @@ const ArtistSignup: React.FC = () => {
               </Grid>
               {!isCompletingProfile && (
                 <>
-                  <Grid item xs={12}>
+                  <Grid item xs={12} id="field-email">
                     <TextField
                       fullWidth
                       label="Email Address"
@@ -422,7 +535,7 @@ const ArtistSignup: React.FC = () => {
                       required
                     />
                   </Grid>
-                  <Grid item xs={12}>
+                  <Grid item xs={12} id="field-username">
                     <TextField
                       fullWidth
                       label="Username"
@@ -437,7 +550,7 @@ const ArtistSignup: React.FC = () => {
                       }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12} sm={6} id="field-password">
                     <TextField
                       fullWidth
                       label="Password"
@@ -449,7 +562,7 @@ const ArtistSignup: React.FC = () => {
                       required
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12} sm={6} id="field-confirmPassword">
                     <TextField
                       fullWidth
                       label="Confirm Password"
@@ -463,7 +576,7 @@ const ArtistSignup: React.FC = () => {
                   </Grid>
                 </>
               )}
-              <Grid item xs={12}>
+              <Grid item xs={12} id="field-businessName">
                 <TextField
                   fullWidth
                   label="Business/Studio Name"
@@ -484,7 +597,7 @@ const ArtistSignup: React.FC = () => {
                   helperText="Include country code (e.g., +1 for US)"
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} id="field-country">
                 <TextField
                   fullWidth
                   label="Country"
@@ -504,33 +617,36 @@ const ArtistSignup: React.FC = () => {
                   placeholder="https://yourwebsite.com"
                 />
               </Grid>
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Art Specialties *
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Select all that apply to your work
-                </Typography>
-                <Grid container spacing={1}>
-                  {specialties.map((specialty) => (
-                    <Grid item xs={6} sm={4} md={3} key={specialty}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={formData.specialties.includes(specialty)}
-                            onChange={() => handleSpecialtyChange(specialty)}
-                          />
-                        }
-                        label={specialty}
-                      />
-                    </Grid>
-                  ))}
-                </Grid>
-                {errors.specialties && (
-                  <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-                    {errors.specialties}
+              <Grid item xs={12} id="field-specialties">
+                <FormControl error={!!errors.specialties} fullWidth>
+                  <Typography variant="h6" gutterBottom>
+                    Art Specialties *
                   </Typography>
-                )}
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Select all that apply to your work
+                  </Typography>
+                  <Box sx={{ p: 2 }}>
+                    <Grid container spacing={1}>
+                      {specialties.map((specialty) => (
+                        <Grid item xs={6} sm={4} md={3} key={specialty}>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={formData.specialties.includes(specialty)}
+                                onChange={() => handleSpecialtyChange(specialty)}
+                                color={errors.specialties ? 'error' : 'primary'}
+                              />
+                            }
+                            label={specialty}
+                          />
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                  <FormHelperText error={!!errors.specialties} sx={{ mt: 1 }}>
+                    {errors.specialties}
+                  </FormHelperText>
+                </FormControl>
               </Grid>
               <Grid item xs={12}>
                 <FormControl fullWidth>
@@ -549,38 +665,39 @@ const ArtistSignup: React.FC = () => {
                 </FormControl>
               </Grid>
               {!isCompletingProfile && (
-                <Grid item xs={12}>
+                <Grid item xs={12} id="field-agreeToTerms">
                   <Divider sx={{ my: 2 }} />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={formData.agreeToTerms}
-                        onChange={(e) => setFormData(prev => ({ ...prev, agreeToTerms: e.target.checked }))}
-                      />
-                    }
-                    label={
-                      <Typography variant="body2">
-                        I agree to the{' '}
-                        <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
-                          Terms of Service
-                        </Button>{' '}
-                        and{' '}
-                        <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
-                          Privacy Policy
-                        </Button>
-                      </Typography>
-                    }
-                  />
-                  {errors.agreeToTerms && (
-                    <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-                      {errors.agreeToTerms}
-                    </Typography>
-                  )}
+                  <FormControl error={!!errors.agreeToTerms} component="fieldset" fullWidth>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={formData.agreeToTerms}
+                          onChange={(e) => setFormData(prev => ({ ...prev, agreeToTerms: e.target.checked }))}
+                          color={errors.agreeToTerms ? 'error' : 'primary'}
+                        />
+                      }
+                      label={
+                        <Typography variant="body2" color={errors.agreeToTerms ? 'error' : 'inherit'}>
+                          I agree to the{' '}
+                          <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
+                            Terms of Service
+                          </Button>{' '}
+                          and{' '}
+                          <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
+                            Privacy Policy
+                          </Button>
+                        </Typography>
+                      }
+                    />
+                    {errors.agreeToTerms && (
+                      <FormHelperText error>{errors.agreeToTerms}</FormHelperText>
+                    )}
+                  </FormControl>
                 </Grid>
               )}
             </Grid>
 
-            {/* Subscription Plans Section */}
+            {/* Payment Option: Pay Now vs Pay Later */}
             {!isCompletingProfile && (
               <Box 
                 sx={{ 
@@ -610,10 +727,61 @@ const ArtistSignup: React.FC = () => {
                       letterSpacing: '-0.02em',
                     }}
                   >
-                    Choose Your Subscription Plan
+                    When would you like to subscribe?
                   </Typography>
                 </Box>
-                {loadingPlans ? (
+                <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+                  <Paper
+                    elevation={0}
+                    onClick={() => setFormData(prev => ({ ...prev, paymentOption: 'payLater' }))}
+                    sx={{
+                      p: 2,
+                      flex: 1,
+                      minWidth: 200,
+                      cursor: 'pointer',
+                      border: '2px solid',
+                      borderColor: formData.paymentOption === 'payLater' ? 'primary.main' : 'divider',
+                      bgcolor: formData.paymentOption === 'payLater' ? 'rgba(74, 58, 154, 0.08)' : 'background.paper',
+                      borderRadius: 1,
+                      '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(74, 58, 154, 0.04)' },
+                    }}
+                  >
+                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                      Pay Later
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Sign up now for free. Subscribe when you activate your first listing. Listings start as drafts until you have an active subscription.
+                    </Typography>
+                  </Paper>
+                  <Paper
+                    elevation={0}
+                    onClick={() => setFormData(prev => ({ ...prev, paymentOption: 'payNow' }))}
+                    sx={{
+                      p: 2,
+                      flex: 1,
+                      minWidth: 200,
+                      cursor: 'pointer',
+                      border: '2px solid',
+                      borderColor: formData.paymentOption === 'payNow' ? 'primary.main' : 'divider',
+                      bgcolor: formData.paymentOption === 'payNow' ? 'rgba(74, 58, 154, 0.08)' : 'background.paper',
+                      borderRadius: 1,
+                      '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(74, 58, 154, 0.04)' },
+                    }}
+                  >
+                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                      Pay Now
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Subscribe during signup and start activating listings immediately after verification.
+                    </Typography>
+                  </Paper>
+                </Box>
+                {formData.paymentOption === 'payNow' && (
+                  <Box id="field-selectedPlanId">
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Choose a plan below. You'll complete payment after filling in your details.
+                    </Typography>
+                    {loadingPlans ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                     <CircularProgress />
                   </Box>
@@ -699,7 +867,8 @@ const ArtistSignup: React.FC = () => {
                         </Button>
                       </Paper>
                     </Box>
-                    <Grid container spacing={3} sx={{ mb: 3 }}>
+                    <Box sx={{ mb: 3 }}>
+                    <Grid container spacing={3}>
                       {subscriptionPlans.map((plan, index) => {
                         const isPopular = index === 1;
                         const features = plan.features ? plan.features.split('\n').filter(f => f.trim()) : [];
@@ -813,10 +982,11 @@ const ArtistSignup: React.FC = () => {
                         );
                       })}
                     </Grid>
+                    </Box>
                     {errors.selectedPlanId && (
-                      <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+                      <FormHelperText error sx={{ mb: 2, fontSize: '0.875rem' }}>
                         {errors.selectedPlanId}
-                      </Typography>
+                      </FormHelperText>
                     )}
                     <Alert severity="info" sx={{ bgcolor: 'transparent', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                       <Typography variant="body2">
@@ -825,32 +995,70 @@ const ArtistSignup: React.FC = () => {
                     </Alert>
                   </>
                 )}
+                  </Box>
+                )}
               </Box>
             )}
 
-            <Box sx={{ textAlign: 'center' }}>
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                disabled={isLoading}
-                sx={{ px: 6, py: 1.5 }}
-              >
-                {isLoading ? (isCompletingProfile ? 'Saving Profile...' : 'Creating Account...') : (isCompletingProfile ? 'Complete Profile' : 'Join as Artist')}
-              </Button>
-              
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                Already have an account?{' '}
-                <Button 
-                  variant="text" 
-                  size="small" 
-                  sx={{ p: 0, minWidth: 'auto' }}
-                  onClick={() => navigate('/artist-signin')}
+            {paymentStep ? (
+              <Box sx={{ mt: 4, p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                  Complete Payment
+                </Typography>
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  Please complete your payment to create your account. Your subscription will be activated immediately after payment.
+                </Alert>
+                <PayPalButtons
+                      createOrder={createPayPalOrder}
+                      onApprove={handlePayPalApprove}
+                      onError={(err) => {
+                        console.error('PayPal error:', err);
+                        enqueueSnackbar('Payment failed. Please try again.', { variant: 'error' });
+                      }}
+                      onCancel={() => setPaymentStep(false)}
+                      style={{
+                        layout: 'vertical',
+                        color: 'blue',
+                        shape: 'rect',
+                        label: 'paypal'
+                      }}
+                    />
+                <Button
+                  variant="outlined"
+                  onClick={() => setPaymentStep(false)}
+                  sx={{ mt: 2 }}
                 >
-                  Sign in here
+                  Back
                 </Button>
-              </Typography>
-            </Box>
+              </Box>
+            ) : (
+              <Box sx={{ textAlign: 'center' }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  disabled={isLoading}
+                  sx={{ px: 6, py: 1.5 }}
+                >
+                  {isLoading
+                    ? (isCompletingProfile ? 'Saving Profile...' : (formData.paymentOption === 'payNow' && formData.selectedPlanId ? 'Loading...' : 'Creating Account...'))
+                    : (isCompletingProfile ? 'Complete Profile' : (formData.paymentOption === 'payNow' && formData.selectedPlanId ? 'Continue to Payment' : 'Create Account'))
+                  }
+                </Button>
+                
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  Already have an account?{' '}
+                  <Button 
+                    variant="text" 
+                    size="small" 
+                    sx={{ p: 0, minWidth: 'auto' }}
+                    onClick={() => navigate('/artist-signin')}
+                  >
+                    Sign in here
+                  </Button>
+                </Typography>
+              </Box>
+            )}
             </form>
           )}
         </Paper>

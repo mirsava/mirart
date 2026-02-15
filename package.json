@@ -10,6 +10,7 @@
     "@mui/icons-material": "^5.14.19",
     "@mui/material": "^5.14.20",
     "@mui/system": "^5.14.20",
+    "@paypal/react-paypal-js": "^8.9.2",
     "aws-amplify": "^6.15.7",
     "nodemailer": "^7.0.10",
     "notistack": "^3.0.2",

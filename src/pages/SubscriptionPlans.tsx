@@ -8,6 +8,10 @@ import {
   Paper,
   CircularProgress,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   Check as CheckIcon,
@@ -19,7 +23,8 @@ import {
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { PayPalButtons } from '@paypal/react-paypal-js';
 import apiService, { SubscriptionPlan, UserSubscription } from '../services/api';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../components/PageHeader';
@@ -27,13 +32,17 @@ import PageHeader from '../components/PageHeader';
 const SubscriptionPlans: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { enqueueSnackbar } = useSnackbar();
+  const locationState = location.state as { listingIdToActivate?: number } | null;
+  const listingIdToActivate = locationState?.listingIdToActivate;
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [currentSubscription, setCurrentSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [paymentPlan, setPaymentPlan] = useState<{ plan: SubscriptionPlan; billingPeriod: 'monthly' | 'yearly' } | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -91,23 +100,60 @@ const SubscriptionPlans: React.FC = () => {
     }
   };
 
-  const handleSubscribe = async (plan: SubscriptionPlan, billingPeriod: 'monthly' | 'yearly'): Promise<void> => {
+  const handleSubscribeClick = (plan: SubscriptionPlan, billingPeriod: 'monthly' | 'yearly'): void => {
     if (!user?.id) {
       enqueueSnackbar('Please sign in to subscribe', { variant: 'error' });
       navigate('/artist-signin');
       return;
     }
+    setPaymentPlan({ plan, billingPeriod });
+  };
 
-    setSubscribing(plan.id);
+  const createPayPalOrder = async (): Promise<string> => {
+    if (!paymentPlan || !user?.id) throw new Error('No plan selected');
     try {
-      const mockPaymentIntentId = `mock_payment_${Date.now()}`;
-      await apiService.createSubscription(user.id, plan.id, billingPeriod, mockPaymentIntentId);
+      const price = paymentPlan.billingPeriod === 'monthly'
+        ? (typeof paymentPlan.plan.price_monthly === 'number' ? paymentPlan.plan.price_monthly : parseFloat(String(paymentPlan.plan.price_monthly)) || 0)
+        : (typeof paymentPlan.plan.price_yearly === 'number' ? paymentPlan.plan.price_yearly : parseFloat(String(paymentPlan.plan.price_yearly)) || 0);
+      const items = [{
+        name: `${paymentPlan.plan.name} Plan (${paymentPlan.billingPeriod})`,
+        price,
+        quantity: 1,
+      }];
+      const result = await apiService.createPayPalOrder(items, undefined, true);
+      return result.id;
+    } catch (err: any) {
+      enqueueSnackbar('Failed to initialize payment. Please try again.', { variant: 'error' });
+      throw err;
+    }
+  };
+
+  const handlePayPalApprove = async (data: { orderID: string }): Promise<void> => {
+    if (!paymentPlan || !user?.id) return;
+    const price = paymentPlan.billingPeriod === 'monthly'
+      ? (typeof paymentPlan.plan.price_monthly === 'number' ? paymentPlan.plan.price_monthly : parseFloat(String(paymentPlan.plan.price_monthly)) || 0)
+      : (typeof paymentPlan.plan.price_yearly === 'number' ? paymentPlan.plan.price_yearly : parseFloat(String(paymentPlan.plan.price_yearly)) || 0);
+    try {
+      const capture = await apiService.capturePayPalOrder(data.orderID, {
+        items: [],
+        shipping_address: '',
+        cognito_username: user.id,
+        isSubscription: true,
+        subscriptionData: {
+          plan_id: paymentPlan.plan.id,
+          billing_period: paymentPlan.billingPeriod,
+          amount: price,
+        },
+      });
+      if (!capture.success) throw new Error('Payment capture failed');
+      setPaymentPlan(null);
       enqueueSnackbar('Subscription activated successfully!', { variant: 'success' });
       await fetchCurrentSubscription();
-    } catch (error: any) {
-      enqueueSnackbar(error.message || 'Failed to subscribe', { variant: 'error' });
-    } finally {
-      setSubscribing(null);
+      if (listingIdToActivate) {
+        navigate('/artist-dashboard', { state: { listingIdToActivate } });
+      }
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to complete payment', { variant: 'error' });
     }
   };
 
@@ -147,6 +193,14 @@ const SubscriptionPlans: React.FC = () => {
         align="left"
       />
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: 6 }}>
+        {listingIdToActivate && (
+          <Alert severity="info" sx={{ mb: 4 }}>
+            <Typography variant="body1">
+              Subscribe to a plan to activate your listing. After payment, your listing will be activated automatically.
+            </Typography>
+          </Alert>
+        )}
+
         {error && (
           <Alert severity="error" sx={{ mb: 4 }}>
             <Typography variant="body1" gutterBottom>
@@ -336,7 +390,7 @@ const SubscriptionPlans: React.FC = () => {
                         <Button
                           variant={isPopular ? 'contained' : 'outlined'}
                           fullWidth
-                          onClick={() => handleSubscribe(plan, 'monthly')}
+                          onClick={() => handleSubscribeClick(plan, 'monthly')}
                           disabled={subscribing === plan.id}
                           sx={{ flex: 1 }}
                         >
@@ -345,7 +399,7 @@ const SubscriptionPlans: React.FC = () => {
                         <Button
                           variant={isPopular ? 'contained' : 'outlined'}
                           fullWidth
-                          onClick={() => handleSubscribe(plan, 'yearly')}
+                          onClick={() => handleSubscribeClick(plan, 'yearly')}
                           disabled={subscribing === plan.id}
                           sx={{ flex: 1 }}
                         >
@@ -452,6 +506,37 @@ const SubscriptionPlans: React.FC = () => {
           )}
         </Box>
       </Box>
+
+      <Dialog open={!!paymentPlan} onClose={() => setPaymentPlan(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Complete Payment - {paymentPlan?.plan.name} ({paymentPlan?.billingPeriod})
+        </DialogTitle>
+        <DialogContent>
+          {paymentPlan && (
+            <Box sx={{ py: 2 }}>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+                ${(paymentPlan.billingPeriod === 'monthly'
+                  ? (typeof paymentPlan.plan.price_monthly === 'number' ? paymentPlan.plan.price_monthly : parseFloat(String(paymentPlan.plan.price_monthly)) || 0)
+                  : (typeof paymentPlan.plan.price_yearly === 'number' ? paymentPlan.plan.price_yearly : parseFloat(String(paymentPlan.plan.price_yearly)) || 0)
+                ).toFixed(2)} / {paymentPlan.billingPeriod === 'monthly' ? 'month' : 'year'}
+              </Typography>
+              <PayPalButtons
+                    createOrder={createPayPalOrder}
+                    onApprove={(data) => handlePayPalApprove(data)}
+                    onError={(err) => {
+                      console.error('PayPal error:', err);
+                      enqueueSnackbar('Payment failed. Please try again.', { variant: 'error' });
+                    }}
+                    onCancel={() => setPaymentPlan(null)}
+                    style={{ layout: 'vertical', color: 'blue', shape: 'rect', label: 'paypal' }}
+                  />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPaymentPlan(null)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

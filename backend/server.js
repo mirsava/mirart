@@ -15,6 +15,7 @@ import adminRouter from './routes/admin.js';
 import chatRouter from './routes/chat.js';
 import commentsRouter from './routes/comments.js';
 import subscriptionsRouter from './routes/subscriptions.js';
+import paypalRouter from './routes/paypal.js';
 
 dotenv.config();
 
@@ -81,6 +82,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/comments', commentsRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
+app.use('/api/paypal', paypalRouter);
 
 // 404 handler - must be after all routes
 app.use((req, res, next) => {

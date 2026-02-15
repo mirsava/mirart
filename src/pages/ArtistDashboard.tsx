@@ -44,7 +44,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User, UserSubscription } from '../services/api';
 import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider } from '@mui/material';
@@ -100,6 +100,7 @@ function TabPanel(props: TabPanelProps) {
 const ArtistDashboard: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { enqueueSnackbar } = useSnackbar();
   const { addToCart } = useCart();
   const [tabValue, setTabValue] = useState(0);
@@ -168,6 +169,32 @@ const ArtistDashboard: React.FC = () => {
       fetchListings();
     }
   }, [user?.id, listingsPage, listingsStatusFilter, tabValue]);
+
+  // Auto-activate listing when returning from subscription payment with listingIdToActivate
+  useEffect(() => {
+    const state = location.state as { listingIdToActivate?: number } | null;
+    const listingIdToActivate = state?.listingIdToActivate;
+    if (!listingIdToActivate || !subscription || !user?.id) return;
+    let cancelled = false;
+    const activateAndClear = async () => {
+      try {
+        await apiService.activateListing(listingIdToActivate, user.id);
+        if (!cancelled) {
+          enqueueSnackbar('Listing activated successfully!', { variant: 'success' });
+          await fetchListings();
+          await fetchDashboardData();
+          navigate(location.pathname, { replace: true, state: {} });
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          enqueueSnackbar(err.message || 'Failed to activate listing', { variant: 'error' });
+          navigate(location.pathname, { replace: true, state: {} });
+        }
+      }
+    };
+    activateAndClear();
+    return () => { cancelled = true; };
+  }, [subscription?.id, (location.state as any)?.listingIdToActivate, user?.id]);
 
   useEffect(() => {
     // Reset to page 1 when filter changes
@@ -408,6 +435,26 @@ const ArtistDashboard: React.FC = () => {
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setListingToDelete(null);
+  };
+
+  const handleActivateListing = async (listingId: number) => {
+    if (!user?.id) return;
+    if (!subscription) {
+      navigate('/subscription-plans', { state: { listingIdToActivate: listingId } });
+      return;
+    }
+    setActivatingListing(listingId);
+    try {
+      await apiService.activateListing(listingId, user.id);
+      enqueueSnackbar('Listing activated successfully!', { variant: 'success' });
+      await fetchListings();
+      await fetchDashboardData();
+      await fetchSubscription();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to activate listing', { variant: 'error' });
+    } finally {
+      setActivatingListing(null);
+    }
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
