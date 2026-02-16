@@ -12,9 +12,11 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import { Favorite, FavoriteBorder, Email as EmailIcon, Edit as EditIcon, PhotoLibrary as PhotoLibraryIcon } from '@mui/icons-material';
+import { Favorite, FavoriteBorder, Email as EmailIcon, Edit as EditIcon, PhotoLibrary as PhotoLibraryIcon, ShoppingCart as ShoppingCartIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
+import { useSnackbar } from 'notistack';
 import apiService from '../services/api';
 import ContactSellerDialog from './ContactSellerDialog';
 import { Artwork } from '../types';
@@ -27,6 +29,8 @@ interface PaintingCardProps {
 const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { addToCart } = useCart();
+  const { enqueueSnackbar } = useSnackbar();
   const [isLiked, setIsLiked] = useState(painting.isLiked || false);
   const [likeCount, setLikeCount] = useState(painting.likeCount || 0);
   const [liking, setLiking] = useState(false);
@@ -48,6 +52,18 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
     e.stopPropagation();
     e.preventDefault();
     navigate(`/edit-listing/${painting.id}`);
+  };
+
+  const handleBuyNow = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      addToCart(painting, 'artwork', painting.id);
+      enqueueSnackbar('Added to cart', { variant: 'success' });
+      navigate('/checkout');
+    } catch (err: unknown) {
+      enqueueSnackbar(err instanceof Error ? err.message : 'Could not add to cart', { variant: 'error' });
+    }
   };
 
   const handleLike = async (e: React.MouseEvent): Promise<void> => {
@@ -193,7 +209,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
           </Typography>
         )}
       </CardContent>
-      <CardActions sx={{ p: 2, pt: 0 }}>
+      <CardActions sx={{ p: 2, pt: 0, flexWrap: 'wrap', gap: 0.5 }}>
         <Button
           size="small"
           variant="outlined"
@@ -209,15 +225,28 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
             </IconButton>
           </Tooltip>
         ) : (
-          <Button
-            size="small"
-            variant="contained"
-            color="secondary"
-            startIcon={<EmailIcon />}
-            onClick={handleContactSeller}
-          >
-            Contact Seller
-          </Button>
+          <>
+            {painting.inStock && (
+              <Button
+                size="small"
+                variant="contained"
+                color="primary"
+                startIcon={<ShoppingCartIcon />}
+                onClick={handleBuyNow}
+              >
+                Buy Now
+              </Button>
+            )}
+            <Button
+              size="small"
+              variant="contained"
+              color="secondary"
+              startIcon={<EmailIcon />}
+              onClick={handleContactSeller}
+            >
+              Contact Seller
+            </Button>
+          </>
         )}
       </CardActions>
       

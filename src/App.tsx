@@ -29,6 +29,7 @@ import Messages from './pages/Messages';
 import AdminDashboard from './pages/AdminDashboard';
 import Chat from './pages/Chat';
 import SubscriptionPlans from './pages/SubscriptionPlans';
+import Orders from './pages/Orders';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UserRole } from './types/userRoles';
 
@@ -69,6 +70,7 @@ function AppContent(): JSX.Element {
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order-success" element={<OrderSuccess />} />
+            <Route path="/orders" element={<Orders />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy" element={<Privacy />} />

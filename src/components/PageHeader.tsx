@@ -42,7 +42,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Box 
           sx={{ 
-            textAlign: { xs: 'center', md: alignment },
+            textAlign: alignment,
             position: 'relative',
             pl: { xs: 3, md: align === 'left' ? 4 : 3 },
             pr: { xs: 3, md: 3 },
@@ -74,12 +74,12 @@ const PageHeader: React.FC<PageHeaderProps> = ({
               color="text.secondary"
               sx={{
                 maxWidth: { xs: '100%', md: '800px' },
-                mx: { xs: 'auto', md: align === 'center' ? 'auto' : 0 },
+                mx: align === 'center' ? 'auto' : 0,
                 mt: 1.5,
                 lineHeight: 1.6,
                 fontSize: { xs: '0.95rem', sm: '1.05rem', md: '1.15rem' },
                 fontWeight: 400,
-                textAlign: { xs: 'center', md: alignment },
+                textAlign: alignment,
               }}
             >
               {subtitle}

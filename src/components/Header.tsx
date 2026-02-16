@@ -35,6 +35,7 @@ import {
   AdminPanelSettings as AdminIcon,
   Chat as ChatIcon,
   ShoppingCart as ShoppingCartIcon,
+  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
@@ -90,6 +91,7 @@ const Header: React.FC = () => {
   const menuItems = [
     { label: 'Home', path: '/' },
     { label: 'Gallery', path: '/gallery', hasSubmenu: true },
+    { label: 'Orders', path: '/orders' },
     { label: 'Pricing', path: '/subscription-plans' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },
@@ -155,6 +157,7 @@ const Header: React.FC = () => {
     ? [
         { label: 'My Dashboard', path: '/artist-dashboard' },
         { label: 'Create Listing', path: '/create-listing' },
+        { label: 'Orders', path: '/orders' },
         { label: 'Messages', path: '/messages' },
         { label: 'Chat', path: null, onClick: () => openChat() },
       ]
@@ -432,6 +435,32 @@ const Header: React.FC = () => {
                 primary="Messages"
                 primaryTypographyProps={{
                   fontWeight: location.pathname === '/messages' ? 600 : 400,
+                }}
+              />
+            </ListItem>
+            <ListItem 
+              onClick={() => {
+                handleNavigation('/orders');
+                handleDrawerToggle();
+              }}
+              sx={{
+                borderRadius: 2,
+                mb: 1,
+                cursor: 'pointer',
+                bgcolor: location.pathname === '/orders' ? 'primary.main' : 'transparent',
+                color: location.pathname === '/orders' ? 'white' : 'inherit',
+                '&:hover': {
+                  bgcolor: location.pathname === '/orders' ? 'primary.dark' : 'action.hover',
+                },
+              }}
+            >
+              <ListItemIcon>
+                <ReceiptIcon />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Orders"
+                primaryTypographyProps={{
+                  fontWeight: location.pathname === '/orders' ? 600 : 400,
                 }}
               />
             </ListItem>
@@ -1145,6 +1174,20 @@ const Header: React.FC = () => {
         >
           <EmailIcon sx={{ mr: 2, fontSize: 20 }} />
           Messages
+        </MenuItem>
+        <MenuItem 
+          onClick={() => {
+            handleUserMenuClose();
+            navigate('/orders');
+          }}
+          sx={{ 
+            py: 1.5,
+            px: 2,
+            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
+          }}
+        >
+          <ReceiptIcon sx={{ mr: 2, fontSize: 20 }} />
+          Orders
         </MenuItem>
         {user?.userRole === UserRole.SITE_ADMIN && (
           <>

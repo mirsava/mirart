@@ -43,6 +43,9 @@ import {
   BarChart as BarChartIcon,
   Cancel as CancelIcon,
   CreditCard as CreditCardIcon,
+  Receipt as ReceiptIcon,
+  ShoppingBag as ShoppingBagIcon,
+  Store as StoreIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -154,15 +157,19 @@ const ArtistDashboard: React.FC = () => {
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
   const [cancelSubscriptionDialogOpen, setCancelSubscriptionDialogOpen] = useState(false);
+  const [purchasesOrders, setPurchasesOrders] = useState<Order[]>([]);
+  const [salesOrders, setSalesOrders] = useState<Order[]>([]);
+  const [ordersSubTab, setOrdersSubTab] = useState(0);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
       fetchSubscription();
-      if (tabValue === 3) {
+      if (tabValue === 4) {
         fetchProfile();
       }
-      if (tabValue === 4) {
+      if (tabValue === 5) {
         fetchSettings();
       }
     }
@@ -211,10 +218,32 @@ const ArtistDashboard: React.FC = () => {
   useEffect(() => {
     const state = location.state as { tab?: string } | null;
     if (state?.tab === 'subscription') {
-      setTabValue(2);
+      setTabValue(3);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state]);
+
+  useEffect(() => {
+    if (user?.id && tabValue === 1) {
+      const fetchOrders = async () => {
+        setLoadingOrders(true);
+        try {
+          const [purchases, sales] = await Promise.all([
+            apiService.getUserOrders(user.id, 'buyer'),
+            apiService.getUserOrders(user.id, 'seller'),
+          ]);
+          setPurchasesOrders(purchases || []);
+          setSalesOrders(sales || []);
+        } catch {
+          setPurchasesOrders([]);
+          setSalesOrders([]);
+        } finally {
+          setLoadingOrders(false);
+        }
+      };
+      fetchOrders();
+    }
+  }, [user?.id, tabValue]);
 
   const fetchDashboardData = async () => {
     if (!user?.id) return;
@@ -771,6 +800,7 @@ const ArtistDashboard: React.FC = () => {
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="My Listings" />
+              <Tab label="Orders" />
               <Tab label="Analytics" />
               <Tab label="Subscription" />
               <Tab label="Profile" />
@@ -1015,6 +1045,156 @@ const ArtistDashboard: React.FC = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={1}>
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <ReceiptIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                      Orders
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      View your purchases and sales
+                    </Typography>
+                  </Box>
+                </Box>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/orders')}
+                  sx={{ textTransform: 'none' }}
+                >
+                  View All Orders
+                </Button>
+              </Box>
+            </Box>
+            <Tabs value={ordersSubTab} onChange={(_, v) => setOrdersSubTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <Tab icon={<ShoppingBagIcon />} iconPosition="start" label={`Purchases (${purchasesOrders.length})`} />
+              <Tab icon={<StoreIcon />} iconPosition="start" label={`Sales (${salesOrders.length})`} />
+            </Tabs>
+            {loadingOrders ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress />
+              </Box>
+            ) : ordersSubTab === 0 ? (
+              purchasesOrders.length === 0 ? (
+                <Paper elevation={0} sx={{ p: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <ShoppingBagIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                  <Typography variant="h6" gutterBottom>
+                    No purchases yet
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Items you buy will appear here.
+                  </Typography>
+                  <Button variant="outlined" onClick={() => navigate('/gallery')}>
+                    Browse Gallery
+                  </Button>
+                </Paper>
+              ) : (
+                <Box>
+                  {purchasesOrders.slice(0, 5).map((order) => (
+                    <Card
+                      key={order.id}
+                      sx={{
+                        display: 'flex',
+                        mb: 2,
+                        cursor: 'pointer',
+                        '&:hover': { boxShadow: 2 },
+                      }}
+                      onClick={() => navigate(`/painting/${order.listing_id}`)}
+                    >
+                      <CardMedia
+                        component="img"
+                        sx={{ width: 80, objectFit: 'cover' }}
+                        image={getImageUrl(order.primary_image_url) || ''}
+                        alt={order.listing_title}
+                      />
+                      <CardContent sx={{ flex: 1, py: 1.5 }}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                          {order.order_number}
+                        </Typography>
+                        <Typography variant="subtitle1" fontWeight={600}>
+                          {order.listing_title}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Seller: {order.seller_email}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
+                          <Chip label={order.status} size="small" color="primary" variant="outlined" />
+                          <Typography variant="body2" fontWeight={600}>
+                            ${order.total_price?.toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {purchasesOrders.length > 5 && (
+                    <Button fullWidth variant="outlined" onClick={() => navigate('/orders')} sx={{ mt: 2 }}>
+                      View all {purchasesOrders.length} purchases
+                    </Button>
+                  )}
+                </Box>
+              )
+            ) : salesOrders.length === 0 ? (
+              <Paper elevation={0} sx={{ p: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <StoreIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  No sales yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  When buyers purchase your artwork, orders will appear here.
+                </Typography>
+                <Button variant="outlined" onClick={() => navigate('/orders')}>
+                  View Orders Page
+                </Button>
+              </Paper>
+            ) : (
+              <Box>
+                {salesOrders.slice(0, 5).map((order) => (
+                  <Card
+                    key={order.id}
+                    sx={{
+                      display: 'flex',
+                      mb: 2,
+                      cursor: 'pointer',
+                      '&:hover': { boxShadow: 2 },
+                    }}
+                    onClick={() => navigate(`/painting/${order.listing_id}`)}
+                  >
+                    <CardMedia
+                      component="img"
+                      sx={{ width: 80, objectFit: 'cover' }}
+                      image={getImageUrl(order.primary_image_url) || ''}
+                      alt={order.listing_title}
+                    />
+                    <CardContent sx={{ flex: 1, py: 1.5 }}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        {order.order_number}
+                      </Typography>
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        {order.listing_title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Buyer: {order.buyer_email}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
+                        <Chip label={order.status} size="small" color="primary" variant="outlined" />
+                        <Typography variant="body2" fontWeight={600}>
+                          ${order.total_price?.toFixed(2)}
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+                {salesOrders.length > 5 && (
+                  <Button fullWidth variant="outlined" onClick={() => navigate('/orders')} sx={{ mt: 2 }}>
+                    View all {salesOrders.length} sales
+                  </Button>
+                )}
+              </Box>
+            )}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={2}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <BarChartIcon sx={{ fontSize: 28, color: 'primary.main' }} />
@@ -1337,7 +1517,7 @@ const ArtistDashboard: React.FC = () => {
             </Grid>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={2}>
+          <TabPanel value={tabValue} index={3}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <CreditCardIcon sx={{ fontSize: 28, color: 'primary.main' }} />
@@ -1439,7 +1619,7 @@ const ArtistDashboard: React.FC = () => {
             )}
           </TabPanel>
 
-          <TabPanel value={tabValue} index={3}>
+          <TabPanel value={tabValue} index={4}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <PersonIcon sx={{ fontSize: 28, color: 'primary.main' }} />
@@ -1782,7 +1962,7 @@ const ArtistDashboard: React.FC = () => {
             </form>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={4}>
+          <TabPanel value={tabValue} index={5}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <SettingsIcon sx={{ fontSize: 28, color: 'primary.main' }} />

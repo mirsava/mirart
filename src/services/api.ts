@@ -67,6 +67,8 @@ export interface Order {
   updated_at: string;
   listing_title?: string;
   buyer_email?: string;
+  seller_email?: string;
+  primary_image_url?: string;
 }
 
 export interface DashboardData {

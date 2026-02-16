@@ -118,7 +118,7 @@ const Checkout: React.FC = () => {
         name: item.title || 'Artwork',
         price: item.price || 0,
         quantity: item.quantity,
-        image_url: item.imageUrl,
+        image_url: item.image,
       }));
       const shippingAddress = {
         address_line_1: formData.address,
