@@ -310,7 +310,28 @@ router.put('/user/:cognitoUsername/cancel', async (req, res) => {
 
     const userId = users[0].id;
 
-    // Only stop auto-renewal; user keeps access until end_date
+    // Get current subscription to find Stripe subscription ID
+    const [subs] = await pool.execute(
+      `SELECT id, payment_intent_id FROM user_subscriptions 
+       WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    const stripeSubId = subs.length > 0 && subs[0].payment_intent_id
+      ? String(subs[0].payment_intent_id).trim()
+      : null;
+
+    // Cancel at period end in Stripe if we have a subscription ID (sub_xxx)
+    if (stripe && stripeSubId && stripeSubId.startsWith('sub_')) {
+      try {
+        await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: true });
+      } catch (stripeErr) {
+        console.error('Stripe cancel_at_period_end failed (continuing with DB update):', stripeErr.message);
+        // Still update our DB so user sees cancelled; Stripe may need manual handling
+      }
+    }
+
+    // Only stop auto-renewal in our DB; user keeps access until end_date
     await pool.execute(
       `UPDATE user_subscriptions 
        SET auto_renew = FALSE
