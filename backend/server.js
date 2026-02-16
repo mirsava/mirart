@@ -123,7 +123,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server
+// Export app for testing (supertest)
+export { app };
+
+// Start server (skip when running tests)
+if (process.env.NODE_ENV !== 'test') {
 app.listen(PORT, () => {
   console.log(`\n=== SERVER STARTED ===`);
   console.log(`Server is running on port ${PORT}`);
@@ -146,4 +150,5 @@ app.listen(PORT, () => {
   }
   console.log(`\n`);
 });
+}
 
