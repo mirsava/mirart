@@ -128,9 +128,16 @@ export { app };
 
 // Start server (skip when running tests)
 if (process.env.NODE_ENV !== 'test') {
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`\n=== SERVER STARTED ===`);
   console.log(`Server is running on port ${PORT}`);
+
+  try {
+    const { runSubscriptionExpirationJob } = await import('./services/subscriptionExpiration.js');
+    await runSubscriptionExpirationJob();
+  } catch (err) {
+    console.warn('[Startup] Subscription expiration job failed:', err?.message || err);
+  }
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`\n=== REGISTERED ROUTES ===`);
   console.log(`Subscriptions routes registered at /api/subscriptions`);

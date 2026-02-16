@@ -346,6 +346,58 @@ router.put('/user/:cognitoUsername/cancel', async (req, res) => {
   }
 });
 
+// Undo cancellation / resume subscription
+router.put('/user/:cognitoUsername/resume', async (req, res) => {
+  try {
+    const { cognitoUsername } = req.params;
+
+    const [users] = await pool.execute(
+      'SELECT id FROM users WHERE cognito_username = ?',
+      [cognitoUsername]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = users[0].id;
+
+    const [subs] = await pool.execute(
+      `SELECT id, payment_intent_id FROM user_subscriptions 
+       WHERE user_id = ? AND status = 'active' AND end_date >= CURDATE() ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    if (subs.length === 0) {
+      return res.status(404).json({ error: 'No active subscription found to resume' });
+    }
+
+    const stripeSubId = subs[0].payment_intent_id
+      ? String(subs[0].payment_intent_id).trim()
+      : null;
+
+    if (stripe && stripeSubId && stripeSubId.startsWith('sub_')) {
+      try {
+        await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: false });
+      } catch (stripeErr) {
+        console.error('Stripe resume failed (continuing with DB update):', stripeErr.message);
+      }
+    }
+
+    await pool.execute(
+      `UPDATE user_subscriptions 
+       SET auto_renew = TRUE
+       WHERE user_id = ? AND status = 'active'`,
+      [userId]
+    );
+
+    res.json({ message: 'Subscription resumed. Your subscription will renew automatically at the end of your billing period.' });
+  } catch (error) {
+    console.error('Error resuming subscription:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Admin: Create or update subscription plan
 router.post('/admin/plans', async (req, res) => {
   try {

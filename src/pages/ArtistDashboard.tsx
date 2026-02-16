@@ -156,6 +156,7 @@ const ArtistDashboard: React.FC = () => {
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
+  const [resumingSubscription, setResumingSubscription] = useState(false);
   const [cancelSubscriptionDialogOpen, setCancelSubscriptionDialogOpen] = useState(false);
   const [purchasesOrders, setPurchasesOrders] = useState<Order[]>([]);
   const [salesOrders, setSalesOrders] = useState<Order[]>([]);
@@ -516,6 +517,20 @@ const ArtistDashboard: React.FC = () => {
       enqueueSnackbar(err.message || 'Failed to cancel subscription', { variant: 'error' });
     } finally {
       setCancellingSubscription(false);
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    if (!user?.id) return;
+    setResumingSubscription(true);
+    try {
+      await apiService.resumeSubscription(user.id);
+      enqueueSnackbar('Subscription resumed. Your subscription will renew automatically.', { variant: 'success' });
+      await fetchSubscription();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to resume subscription', { variant: 'error' });
+    } finally {
+      setResumingSubscription(false);
     }
   };
 
@@ -1565,7 +1580,17 @@ const ArtistDashboard: React.FC = () => {
                   <Button variant="outlined" onClick={() => navigate('/subscription-plans')}>
                     Change Plan
                   </Button>
-                  {subscription.auto_renew !== false && subscription.auto_renew !== 0 && (
+                  {(subscription.auto_renew === false || subscription.auto_renew === 0) ? (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<CheckCircleIcon />}
+                      onClick={handleResumeSubscription}
+                      disabled={resumingSubscription}
+                    >
+                      {resumingSubscription ? 'Resuming...' : 'Resume Subscription'}
+                    </Button>
+                  ) : (
                     <Button
                       variant="outlined"
                       color="error"

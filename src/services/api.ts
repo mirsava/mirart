@@ -589,6 +589,12 @@ class ApiService {
     });
   }
 
+  async resumeSubscription(cognitoUsername: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/subscriptions/user/${cognitoUsername}/resume`, {
+      method: 'PUT',
+    });
+  }
+
   // Admin subscription endpoints
   async getAdminSubscriptionPlans(cognitoUsername: string, groups?: string[]): Promise<SubscriptionPlan[]> {
     const params = new URLSearchParams();

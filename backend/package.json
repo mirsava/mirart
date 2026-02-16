@@ -27,7 +27,8 @@
     "migrate-payment-intent-id": "node database/run-payment-intent-migration.js",
     "rename-column": "node rename-column.js",
     "reset-db": "node scripts/reset-database.js",
-    "set-admin": "node scripts/set-admin.js"
+    "set-admin": "node scripts/set-admin.js",
+    "expire-subscriptions": "node scripts/expire-subscriptions.js"
   },
   "keywords": [],
   "author": "",
