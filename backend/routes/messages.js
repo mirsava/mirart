@@ -355,8 +355,9 @@ router.post('/:messageId/reply', async (req, res) => {
     // Determine new sender and recipient (swap them)
     const newSenderId = originalMessage.recipient_id;
     const newRecipientId = originalMessage.sender_id;
-    const newSenderEmail = originalMessage.recipient_email_display;
-    const newRecipientEmail = originalMessage.sender_email_display;
+    // Use real emails from messages table for sending (display fields are masked for UI)
+    const newSenderEmail = originalMessage.recipient_email || currentUser.email;
+    const newRecipientEmail = originalMessage.sender_email;
     const newSenderName = originalMessage.recipient_name_display || currentUser.business_name || 
       `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.cognito_username;
 

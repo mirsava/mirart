@@ -300,18 +300,38 @@ class ApiService {
     return this.request<Order[]>(`/orders/user/${cognitoUsername}${params}`);
   }
 
-  async createPayPalOrder(items: Array<{ name: string; price: number; quantity: number }>, shippingAddress?: any, isSubscription?: boolean): Promise<{ id: string }> {
-    return this.request<{ id: string }>('/paypal/create-order', {
+  async createStripeCheckoutSession(
+    items: Array<{ name: string; price: number; quantity: number; image_url?: string }>,
+    options?: {
+      shippingAddress?: Record<string, string>;
+      metadata?: Record<string, string | object>;
+    }
+  ): Promise<{ url: string; sessionId: string }> {
+    const { shippingAddress, metadata } = options || {};
+    const res = await this.request<{ url: string; sessionId: string }>('/stripe/create-checkout-session', {
       method: 'POST',
-      body: JSON.stringify({ items, shipping_address: shippingAddress, is_subscription: isSubscription }),
+      body: JSON.stringify({
+        items,
+        shipping_address: shippingAddress,
+        metadata: metadata ? Object.fromEntries(
+          Object.entries(metadata).map(([k, v]) => [k, typeof v === 'object' ? v : v])
+        ) : undefined,
+        return_url_base: typeof window !== 'undefined' ? window.location.origin : undefined,
+      }),
     });
+    return res;
   }
 
-  async capturePayPalOrder(orderId: string, orderData: { items: Array<{ listing_id: number; quantity: number }>; shipping_address: string; cognito_username: string; isSubscription?: boolean; subscriptionData?: { plan_id: number; billing_period: string; amount: number } }): Promise<{ success: boolean; transactionId: string; orders?: Order[]; subscription?: any }> {
-    return this.request<{ success: boolean; transactionId: string; orders?: Order[]; subscription?: any }>('/paypal/capture-order', {
-      method: 'POST',
-      body: JSON.stringify({ orderId, orderData }),
-    });
+  async confirmStripeSession(sessionId: string): Promise<{
+    success: boolean;
+    transactionId: string;
+    orders?: Order[];
+    subscription?: any;
+    requiresUserCreation?: boolean;
+    subscriptionData?: { plan_id: number; billing_period: string };
+    payer?: { email: string; name: string };
+  }> {
+    return this.request(`/stripe/confirm-session?session_id=${encodeURIComponent(sessionId)}`);
   }
 
   async getMessages(cognitoUsername: string, type: 'all' | 'sent' | 'received' | 'archived' = 'all'): Promise<{ messages: Message[] }> {
@@ -548,13 +568,13 @@ class ApiService {
     return this.request<{ subscription: UserSubscription | null }>(`/subscriptions/user/${cognitoUsername}`);
   }
 
-  async createSubscription(cognitoUsername: string, planId: number, billingPeriod: 'monthly' | 'yearly', paymentIntentId?: string): Promise<{ subscription: UserSubscription }> {
+  async createSubscription(cognitoUsername: string, planId: number, billingPeriod: 'monthly' | 'yearly', sessionId: string): Promise<{ subscription: UserSubscription }> {
     return this.request<{ subscription: UserSubscription }>(`/subscriptions/user/${cognitoUsername}`, {
       method: 'POST',
       body: JSON.stringify({
         plan_id: planId,
         billing_period: billingPeriod,
-        payment_intent_id: paymentIntentId,
+        session_id: sessionId,
         auto_renew: true,
       }),
     });

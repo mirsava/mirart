@@ -37,11 +37,12 @@ router.get('/', async (req, res) => {
     const hasUserId = userId && userId !== 'undefined' && userId !== 'null' && userId !== '';
     
     // Check for filters - these indicate a public gallery search
+    const hasCategoryOrStatus = (category && category !== '') || (status && status !== '');
     const hasPriceFilter = (minPrice && minPrice !== '' && minPrice !== 'undefined') || (maxPrice && maxPrice !== '' && maxPrice !== 'undefined');
     const hasYearFilter = (minYear && minYear !== '' && minYear !== 'undefined') || (maxYear && maxYear !== '' && maxYear !== 'undefined');
     const hasMediumFilter = (medium && medium !== '' && medium !== 'undefined');
     const hasStockFilter = (inStock === 'true' || inStock === true || inStock === '1');
-    const hasFilters = hasPriceFilter || hasYearFilter || hasMediumFilter || hasStockFilter;
+    const hasFilters = hasCategoryOrStatus || hasPriceFilter || hasYearFilter || hasMediumFilter || hasStockFilter;
     
     // Only treat as "own listings" if cognitoUsername is provided, no userId, AND no filters
     // If filters are present, it's a public gallery search - ignore cognitoUsername

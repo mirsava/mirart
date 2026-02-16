@@ -41,6 +41,8 @@ import {
   CheckCircle as CheckCircleIcon,
   Message as MessageIcon,
   BarChart as BarChartIcon,
+  Cancel as CancelIcon,
+  CreditCard as CreditCardIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -150,15 +152,17 @@ const ArtistDashboard: React.FC = () => {
   const [activatingListing, setActivatingListing] = useState<number | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
+  const [cancellingSubscription, setCancellingSubscription] = useState(false);
+  const [cancelSubscriptionDialogOpen, setCancelSubscriptionDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
       fetchSubscription();
-      if (tabValue === 2) {
+      if (tabValue === 3) {
         fetchProfile();
       }
-      if (tabValue === 3) {
+      if (tabValue === 4) {
         fetchSettings();
       }
     }
@@ -202,6 +206,15 @@ const ArtistDashboard: React.FC = () => {
       setListingsPage(1);
     }
   }, [listingsStatusFilter, tabValue]);
+
+  // Open Subscription tab when navigating from Subscription Plans
+  useEffect(() => {
+    const state = location.state as { tab?: string } | null;
+    if (state?.tab === 'subscription') {
+      setTabValue(2);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state]);
 
   const fetchDashboardData = async () => {
     if (!user?.id) return;
@@ -459,6 +472,21 @@ const ArtistDashboard: React.FC = () => {
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!user?.id) return;
+    setCancellingSubscription(true);
+    try {
+      await apiService.cancelSubscription(user.id);
+      enqueueSnackbar('Subscription cancelled. You will retain access until the end of your billing period.', { variant: 'success' });
+      setCancelSubscriptionDialogOpen(false);
+      await fetchSubscription();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to cancel subscription', { variant: 'error' });
+    } finally {
+      setCancellingSubscription(false);
+    }
   };
 
   const fetchSettings = async () => {
@@ -743,6 +771,7 @@ const ArtistDashboard: React.FC = () => {
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="My Listings" />
               <Tab label="Analytics" />
+              <Tab label="Subscription" />
               <Tab label="Profile" />
               <Tab label="Settings" />
             </Tabs>
@@ -1310,6 +1339,108 @@ const ArtistDashboard: React.FC = () => {
           <TabPanel value={tabValue} index={2}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <CreditCardIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  Subscription
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Manage your subscription plan and billing
+              </Typography>
+            </Box>
+
+            {subscription && subscription.status === 'active' ? (
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 4,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  mb: 3,
+                }}
+              >
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Current Plan: {subscription.plan_name} ({subscription.billing_period})
+                </Typography>
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Active listings: {subscription.current_listings || 0} / {subscription.max_listings}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      {subscription.end_date && `Access until: ${new Date(subscription.end_date).toLocaleDateString()}`}
+                    </Typography>
+                  </Grid>
+                  {(subscription.auto_renew === false || subscription.auto_renew === 0) && (
+                    <Grid item xs={12}>
+                      <Chip label="Cancels at end of period" color="warning" size="small" />
+                    </Grid>
+                  )}
+                </Grid>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <Button variant="outlined" onClick={() => navigate('/subscription-plans')}>
+                    Change Plan
+                  </Button>
+                  {subscription.auto_renew !== false && subscription.auto_renew !== 0 && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<CancelIcon />}
+                      onClick={() => setCancelSubscriptionDialogOpen(true)}
+                      disabled={cancellingSubscription}
+                    >
+                      Cancel Subscription
+                    </Button>
+                  )}
+                </Box>
+                <Dialog open={cancelSubscriptionDialogOpen} onClose={() => !cancellingSubscription && setCancelSubscriptionDialogOpen(false)}>
+                  <DialogTitle>Cancel subscription?</DialogTitle>
+                  <DialogContent>
+                    <DialogContentText>
+                      Your subscription will remain active until {subscription.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'the end of your billing period'}.
+                      You won&apos;t be charged again and can resubscribe anytime. You won&apos;t be able to activate new listings after this period.
+                    </DialogContentText>
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={() => setCancelSubscriptionDialogOpen(false)} disabled={cancellingSubscription}>
+                      Keep Subscription
+                    </Button>
+                    <Button variant="contained" color="error" onClick={handleCancelSubscription} disabled={cancellingSubscription}>
+                      {cancellingSubscription ? 'Cancelling...' : 'Cancel Subscription'}
+                    </Button>
+                  </DialogActions>
+                </Dialog>
+              </Paper>
+            ) : (
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 4,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  textAlign: 'center',
+                }}
+              >
+                <Typography variant="h6" gutterBottom>
+                  No Active Subscription
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  Subscribe to a plan to activate your listings and start selling your artwork.
+                </Typography>
+                <Button variant="contained" onClick={() => navigate('/subscription-plans')}>
+                  View Subscription Plans
+                </Button>
+              </Paper>
+            )}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={3}>
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <PersonIcon sx={{ fontSize: 28, color: 'primary.main' }} />
                 <Typography variant="h5" sx={{ fontWeight: 600 }}>
                   Artist Profile
@@ -1650,7 +1781,7 @@ const ArtistDashboard: React.FC = () => {
             </form>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={3}>
+          <TabPanel value={tabValue} index={4}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <SettingsIcon sx={{ fontSize: 28, color: 'primary.main' }} />

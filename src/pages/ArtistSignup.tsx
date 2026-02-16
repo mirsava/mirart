@@ -31,7 +31,6 @@ import {
   Star as StarIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { PayPalButtons } from '@paypal/react-paypal-js';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
 import apiService, { SubscriptionPlan } from '../services/api';
@@ -71,7 +70,6 @@ const ArtistSignup: React.FC = () => {
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [paymentStep, setPaymentStep] = useState(false);
-  const [paypalOrderId, setPaypalOrderId] = useState<string | null>(null);
   
   // Show message if redirected from sign-in
   const redirectMessage = locationState?.message;
@@ -268,108 +266,39 @@ const ArtistSignup: React.FC = () => {
     }
   };
 
-  const createPayPalOrder = async (): Promise<string> => {
-    if (!formData.selectedPlanId) throw new Error('No subscription plan selected');
+  const handleStripePayNow = async (): Promise<void> => {
+    if (!formData.selectedPlanId) {
+      setErrors({ ...errors, selectedPlanId: 'Please select a plan' });
+      return;
+    }
     const selectedPlan = subscriptionPlans.find(p => p.id === formData.selectedPlanId);
-    if (!selectedPlan) throw new Error('Selected plan not found');
+    if (!selectedPlan) return;
     const price = formData.billingPeriod === 'monthly'
       ? (typeof selectedPlan.price_monthly === 'number' ? selectedPlan.price_monthly : parseFloat(selectedPlan.price_monthly as any) || 0)
       : (typeof selectedPlan.price_yearly === 'number' ? selectedPlan.price_yearly : parseFloat(selectedPlan.price_yearly as any) || 0);
-    const items = [{ name: `${selectedPlan.name} Plan (${formData.billingPeriod})`, price, quantity: 1 }];
-    try {
-      const result = await apiService.createPayPalOrder(items, undefined, true);
-      setPaypalOrderId(result.id);
-      return result.id;
-    } catch (error: any) {
-      enqueueSnackbar('Failed to initialize payment. Please try again.', { variant: 'error' });
-      throw error;
-    }
-  };
-
-  const handlePayPalApprove = async (data: any, actions: any): Promise<void> => {
     setIsLoading(true);
-    
     try {
-      if (!formData.selectedPlanId) {
-        throw new Error('No subscription plan selected');
-      }
-
-      const selectedPlan = subscriptionPlans.find(p => p.id === formData.selectedPlanId);
-      if (!selectedPlan) {
-        throw new Error('Selected plan not found');
-      }
-
-      const price = formData.billingPeriod === 'monthly' 
-        ? (typeof selectedPlan.price_monthly === 'number' ? selectedPlan.price_monthly : parseFloat(selectedPlan.price_monthly as any) || 0)
-        : (typeof selectedPlan.price_yearly === 'number' ? selectedPlan.price_yearly : parseFloat(selectedPlan.price_yearly as any) || 0);
-
-      const capture = await apiService.capturePayPalOrder(data.orderID, {
-        items: [],
-        shipping_address: '',
-        cognito_username: formData.username,
-        isSubscription: true,
-        subscriptionData: {
-          plan_id: formData.selectedPlanId,
+      sessionStorage.setItem('signupFormData', JSON.stringify({
+        ...formData,
+        password: formData.password,
+      }));
+      const items = [{ name: `${selectedPlan.name} Plan (${formData.billingPeriod})`, price, quantity: 1 }];
+      const result = await apiService.createStripeCheckoutSession(items, {
+        metadata: {
+          is_subscription: 'true',
+          plan_id: String(formData.selectedPlanId),
           billing_period: formData.billingPeriod,
-          amount: price
-        }
-      });
-
-      if (!capture.success || !capture.transactionId) {
-        throw new Error('Payment capture failed');
-      }
-
-      const transactionId = capture.transactionId;
-
-      const attributes: Record<string, string> = {
-        name: `${formData.firstName} ${formData.lastName}`,
-        given_name: formData.firstName,
-        family_name: formData.lastName,
-      };
-
-      if (formData.phone && formData.phone.trim() !== '') {
-        let formattedPhone = formData.phone.trim();
-        if (!formattedPhone.startsWith('+')) {
-          formattedPhone = '+1' + formattedPhone.replace(/\D/g, '');
-        }
-        attributes.phone_number = formattedPhone;
-      }
-
-      await signUp(formData.email, formData.password, attributes, formData.username);
-      
-      try {
-        await apiService.createOrUpdateUser({
           cognito_username: formData.username,
-          email: formData.email,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          business_name: formData.businessName,
-          phone: formData.phone || null,
-          country: formData.country,
-          website: formData.website || null,
-          specialties: formData.specialties,
-          experience_level: formData.experience,
-        });
-
-        await apiService.createSubscription(
-          formData.username,
-          formData.selectedPlanId,
-          formData.billingPeriod,
-          transactionId
-        );
-
-        setSignupSuccess(true);
-        enqueueSnackbar('Account created successfully! Please check your email to confirm your account.', { variant: 'success' });
-      } catch (dbError) {
-        console.error('Error saving user data to database:', dbError);
-        setErrors({ general: 'Account created but failed to save profile. Please contact support.' });
+          cancel_url: '/artist-signup',
+        },
+      });
+      if (result?.url) {
+        window.location.href = result.url;
+      } else {
+        throw new Error('Failed to create checkout session');
       }
     } catch (error: any) {
-      console.error('Error processing payment:', error);
-      enqueueSnackbar(error.message || 'Failed to process payment. Please try again.', { variant: 'error' });
-      setErrors({ general: error.message || 'Payment failed. Please try again.' });
-      setPaymentStep(false);
-    } finally {
+      enqueueSnackbar(error.message || 'Failed to start payment', { variant: 'error' });
       setIsLoading(false);
     }
   };
@@ -1008,21 +937,16 @@ const ArtistSignup: React.FC = () => {
                 <Alert severity="info" sx={{ mb: 3 }}>
                   Please complete your payment to create your account. Your subscription will be activated immediately after payment.
                 </Alert>
-                <PayPalButtons
-                      createOrder={createPayPalOrder}
-                      onApprove={handlePayPalApprove}
-                      onError={(err) => {
-                        console.error('PayPal error:', err);
-                        enqueueSnackbar('Payment failed. Please try again.', { variant: 'error' });
-                      }}
-                      onCancel={() => setPaymentStep(false)}
-                      style={{
-                        layout: 'vertical',
-                        color: 'blue',
-                        shape: 'rect',
-                        label: 'paypal'
-                      }}
-                    />
+                <Button
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  onClick={handleStripePayNow}
+                  disabled={isLoading}
+                  sx={{ py: 1.5, mb: 2 }}
+                >
+                  {isLoading ? 'Redirecting...' : 'Pay with Card (Stripe)'}
+                </Button>
                 <Button
                   variant="outlined"
                   onClick={() => setPaymentStep(false)}

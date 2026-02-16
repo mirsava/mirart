@@ -24,7 +24,6 @@ import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { PayPalButtons } from '@paypal/react-paypal-js';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
@@ -38,7 +37,6 @@ const Checkout: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
   const [activeStep, setActiveStep] = useState<number>(0);
   const [loading, setLoading] = useState(false);
-  const [paypalOrderId, setPaypalOrderId] = useState<string | null>(null);
   const hasActivationItems = cartItems.some(item => item.type === 'activation');
   const hasArtworkItems = cartItems.some(item => item.type !== 'activation');
   const [formData, setFormData] = useState<FormData>({
@@ -104,91 +102,49 @@ const Checkout: React.FC = () => {
     setActiveStep((prevStep) => prevStep - 1);
   };
 
-  const handlePayPalApprove = async (data: any, actions: any): Promise<void> => {
-    console.log('PayPal approval triggered:', data);
-    
+  const handleStripeCheckout = async (): Promise<void> => {
     if (!user?.id) {
       enqueueSnackbar('Please sign in to complete your purchase', { variant: 'error' });
       navigate('/artist-signin');
       return;
     }
 
+    const artworkItems = cartItems.filter(item => item.type !== 'activation');
+    if (artworkItems.length === 0) return;
+
     setLoading(true);
-
     try {
-      const activationItems = cartItems.filter(item => item.type === 'activation');
-      const artworkItems = cartItems.filter(item => item.type !== 'activation');
-
-      if (activationItems.length > 0) {
-        for (const item of activationItems) {
-          if (item.listingId) {
-            await apiService.activateListing(item.listingId, user.id);
-          }
-        }
-      }
-
-      if (artworkItems.length > 0) {
-        const shippingAddress = `${formData.firstName} ${formData.lastName}\n${formData.address}\n${formData.city}, ${formData.state} ${formData.zipCode}\n${formData.country}`;
-
-        const orderData = {
-          items: artworkItems.map(item => ({
-            listing_id: item.id,
-            quantity: item.quantity
-          })),
-          shipping_address: shippingAddress,
-          cognito_username: user.id
-        };
-
-        console.log('Capturing PayPal order:', data.orderID);
-        const result = await apiService.capturePayPalOrder(data.orderID, orderData);
-        console.log('Capture result:', result);
-        
-        if (result.success) {
-          enqueueSnackbar('Order placed successfully!', { variant: 'success' });
-          clearCart();
-          
-          if (activationItems.length > 0 && artworkItems.length === 0) {
-            navigate('/artist-dashboard');
-          } else {
-            navigate('/order-success');
-          }
-        } else {
-          throw new Error('Payment capture was not successful');
-        }
-      } else if (activationItems.length > 0) {
-        enqueueSnackbar('Listings activated successfully!', { variant: 'success' });
-        clearCart();
-        navigate('/artist-dashboard');
+      const items = artworkItems.map(item => ({
+        name: item.title || 'Artwork',
+        price: item.price || 0,
+        quantity: item.quantity,
+        image_url: item.imageUrl,
+      }));
+      const shippingAddress = {
+        address_line_1: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode,
+        country: formData.country,
+      };
+      const orderData = {
+        items: artworkItems.map(item => ({ listing_id: item.id, quantity: item.quantity })),
+        shipping_address: `${formData.firstName} ${formData.lastName}\n${formData.address}\n${formData.city}, ${formData.state} ${formData.zipCode}\n${formData.country}`,
+        cognito_username: user.id,
+      };
+      const result = await apiService.createStripeCheckoutSession(items, {
+        shippingAddress,
+        metadata: { order_data: orderData },
+      });
+      if (result?.url) {
+        window.location.href = result.url;
+      } else {
+        throw new Error('Failed to create checkout session');
       }
     } catch (error: any) {
-      console.error('Error processing payment:', error);
-      enqueueSnackbar(error.message || error.details || 'Failed to process payment. Please try again.', { variant: 'error' });
+      console.error('Stripe checkout error:', error);
+      enqueueSnackbar(error.message || error.details || 'Failed to start checkout. Please try again.', { variant: 'error' });
       setLoading(false);
-    }
-  };
-
-  const createPayPalOrder = async (): Promise<string> => {
-    const artworkItems = cartItems.filter(item => item.type !== 'activation');
-    if (artworkItems.length === 0) throw new Error('No items to purchase');
-    const items = artworkItems.map(item => ({
-      name: item.title || 'Artwork',
-      price: item.price || 0,
-      quantity: item.quantity
-    }));
-    const shippingAddressObj = {
-      address_line_1: formData.address,
-      city: formData.city,
-      state: formData.state,
-      zipCode: formData.zipCode,
-      country: formData.country
-    };
-    try {
-      const result = await apiService.createPayPalOrder(items, shippingAddressObj);
-      setPaypalOrderId(result.id);
-      return result.id;
-    } catch (err: any) {
-      enqueueSnackbar(err.message || 'Failed to initialize payment. Please try again.', { variant: 'error' });
-      throw err;
     }
   };
 
@@ -376,29 +332,18 @@ const Checkout: React.FC = () => {
     return (
       <Box>
         <Alert severity="info" sx={{ mb: 3 }}>
-          Complete your payment securely with PayPal
+          Complete your payment securely with Stripe. You will be redirected to the payment page.
         </Alert>
-        <PayPalButtons
-              createOrder={(data, actions) => {
-                console.log('PayPal createOrder called');
-                return createPayPalOrder();
-              }}
-              onApprove={(data, actions) => {
-                console.log('PayPal onApprove called with data:', data);
-                return handlePayPalApprove(data, actions);
-              }}
-              onError={(err) => {
-                console.error('PayPal error:', err);
-                enqueueSnackbar('Payment failed. Please try again.', { variant: 'error' });
-              }}
-              onCancel={() => {}}
-              style={{
-                layout: 'vertical',
-                color: 'blue',
-                shape: 'rect',
-                label: 'paypal'
-              }}
-            />
+        <Button
+          variant="contained"
+          size="large"
+          fullWidth
+          onClick={handleStripeCheckout}
+          disabled={loading}
+          sx={{ py: 1.5 }}
+        >
+          {loading ? 'Redirecting...' : 'Pay with Card (Stripe)'}
+        </Button>
       </Box>
     );
   };

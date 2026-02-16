@@ -81,9 +81,10 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchFeaturedListings = async () => {
       try {
+        // Featured listings must show ALL artists - do NOT pass cognitoUsername
         const [paintingsResponse, woodworkingResponse] = await Promise.all([
-          apiService.getListings({ status: 'active', category: 'Painting', limit: 3, cognitoUsername: user?.id }),
-          apiService.getListings({ status: 'active', category: 'Woodworking', limit: 3, cognitoUsername: user?.id }),
+          apiService.getListings({ status: 'active', category: 'Painting', limit: 3 }),
+          apiService.getListings({ status: 'active', category: 'Woodworking', limit: 3 }),
         ]);
         
         const dbPaintings = paintingsResponse.listings.map(listing => convertListingToPainting(listing, 'Painting'));

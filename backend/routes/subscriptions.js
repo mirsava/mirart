@@ -1,5 +1,6 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { stripe } from '../config/stripe.js';
 
 const router = express.Router();
 
@@ -168,14 +169,62 @@ router.get('/user/:cognitoUsername', async (req, res) => {
   }
 });
 
-// Create or update user subscription
+// Create user subscription - REQUIRES valid Stripe checkout session (payment verification)
+// Subscriptions can only be created after successful Stripe payment
 router.post('/user/:cognitoUsername', async (req, res) => {
   try {
     const { cognitoUsername } = req.params;
-    const { plan_id, billing_period, payment_intent_id, auto_renew = true } = req.body;
+    const { plan_id, billing_period, session_id, auto_renew = true } = req.body;
 
     if (!plan_id || !billing_period) {
       return res.status(400).json({ error: 'plan_id and billing_period are required' });
+    }
+
+    if (!session_id) {
+      return res.status(400).json({
+        error: 'Stripe payment required',
+        message: 'Subscription requires payment. Please complete checkout via Stripe.',
+      });
+    }
+
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe not configured' });
+    }
+
+    // Verify Stripe session - payment must be completed
+    const session = await stripe.checkout.sessions.retrieve(session_id, {
+      expand: ['line_items'],
+    });
+
+    if (session.payment_status !== 'paid') {
+      return res.status(400).json({
+        error: 'Payment not completed',
+        message: 'Please complete your payment before activating your subscription.',
+      });
+    }
+
+    const metadata = session.metadata || {};
+    if (metadata.is_subscription !== 'true' || !metadata.plan_id || !metadata.billing_period) {
+      return res.status(400).json({
+        error: 'Invalid session',
+        message: 'This checkout session is not for a subscription. Please subscribe through the subscription plans page.',
+      });
+    }
+
+    const sessionPlanId = parseInt(metadata.plan_id, 10);
+    const sessionBillingPeriod = metadata.billing_period;
+    if (sessionPlanId !== parseInt(plan_id, 10) || sessionBillingPeriod !== billing_period) {
+      return res.status(400).json({
+        error: 'Session mismatch',
+        message: 'Checkout session does not match the requested plan.',
+      });
+    }
+
+    if (metadata.cognito_username && metadata.cognito_username !== cognitoUsername) {
+      return res.status(403).json({
+        error: 'User mismatch',
+        message: 'This payment was made by a different user.',
+      });
     }
 
     const [users] = await pool.execute(
@@ -198,7 +247,12 @@ router.post('/user/:cognitoUsername', async (req, res) => {
       return res.status(404).json({ error: 'Subscription plan not found' });
     }
 
-    const plan = plans[0];
+    const getStripeId = (val) => {
+      if (!val) return null;
+      if (typeof val === 'string') return val;
+      return val?.id || null;
+    };
+    const transactionId = (getStripeId(session.subscription) || getStripeId(session.payment_intent) || session.id || '').slice(0, 255);
 
     const startDate = new Date();
     const endDate = new Date();
@@ -219,7 +273,7 @@ router.post('/user/:cognitoUsername', async (req, res) => {
       `INSERT INTO user_subscriptions 
        (user_id, plan_id, billing_period, start_date, end_date, auto_renew, payment_intent_id, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
-      [userId, plan_id, billing_period, startDate, endDate, auto_renew, payment_intent_id || null]
+      [userId, plan_id, billing_period, startDate, endDate, auto_renew, transactionId]
     );
 
     const [newSubscription] = await pool.execute(
@@ -233,6 +287,9 @@ router.post('/user/:cognitoUsername', async (req, res) => {
     res.json({ subscription: newSubscription[0] });
   } catch (error) {
     console.error('Error creating subscription:', error);
+    if (error.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({ error: 'Invalid Stripe session', message: error.message });
+    }
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -253,14 +310,15 @@ router.put('/user/:cognitoUsername/cancel', async (req, res) => {
 
     const userId = users[0].id;
 
+    // Only stop auto-renewal; user keeps access until end_date
     await pool.execute(
       `UPDATE user_subscriptions 
-       SET auto_renew = FALSE, status = 'cancelled'
+       SET auto_renew = FALSE
        WHERE user_id = ? AND status = 'active'`,
       [userId]
     );
 
-    res.json({ message: 'Subscription cancelled successfully' });
+    res.json({ message: 'Subscription cancelled. You will retain access until the end of your billing period.' });
   } catch (error) {
     console.error('Error cancelling subscription:', error);
     res.status(500).json({ error: 'Internal server error' });

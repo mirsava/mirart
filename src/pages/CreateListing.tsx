@@ -27,6 +27,7 @@ import {
   Image as ImageIcon,
   Info as InfoIcon,
   Settings as SettingsIcon,
+  Science as ScienceIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
@@ -113,6 +114,61 @@ const CreateListing: React.FC = () => {
       'Toys & Games',
     ],
     Other: [],
+  };
+
+  const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+  const fillWithTestData = () => {
+    const paintingSubs = subcategories.Painting;
+    const woodSubs = subcategories.Woodworking;
+    const category = pick(['Painting', 'Woodworking']);
+    const subcategory = category === 'Painting' ? pick(paintingSubs) : pick(woodSubs);
+
+    const titles = [
+      'Sunset Over the Mountains', 'Abstract Blue No. 3', 'Morning Light', 'Ocean Dreams',
+      'Rustic Oak Side Table', 'Handcrafted Walnut Bowl', 'Coastal Driftwood Sculpture',
+      'Golden Hour', 'Forest Path', 'Urban Reflections', 'Cherry Blossom Branch',
+    ];
+    const descriptions = [
+      'A vibrant piece capturing the essence of natural beauty. Created with care and attention to detail.',
+      'This artwork explores the interplay of light and shadow. Each brushstroke tells a story.',
+      'Handcrafted with sustainably sourced materials. A unique addition to any space.',
+      'Inspired by the changing seasons and the beauty of the natural world.',
+    ];
+    const dimensions = ['24×36 inches', '18×24 inches', '12×16 inches', '36×48 inches', '20×30 inches', '16×20 inches'];
+    const mediums = ['Oil on Canvas', 'Acrylic on Canvas', 'Watercolor', 'Mixed media', 'Charcoal', 'Oil on Wood', 'Hand-carved wood', 'Reclaimed wood'];
+    const shippingOptions = [
+      'Free shipping within the US. International shipping available. Estimated delivery: 5-7 business days.',
+      'Ships within 3-5 business days. Secure packaging with insurance. Tracking included.',
+    ];
+    const returnPolicies = [
+      '30-day return policy. Full refund if returned in original condition. Buyer pays return shipping.',
+      '14-day return policy for unused items. Contact for return authorization.',
+    ];
+    const specialInstr = [
+      'Framing recommended. Handle with care. Avoid direct sunlight.',
+      'Ready to hang. Includes care instructions.',
+    ];
+
+    setFormData({
+      title: pick(titles),
+      description: pick(descriptions),
+      category,
+      subcategory,
+      price: String(Math.floor(Math.random() * 4500) + 50),
+      primary_image_url: '',
+      image_urls: [],
+      dimensions: pick(dimensions),
+      medium: pick(mediums),
+      year: String(2020 + Math.floor(Math.random() * 5)),
+      in_stock: Math.random() > 0.2,
+      status: 'draft',
+      shipping_info: pick(shippingOptions),
+      returns_info: pick(returnPolicies),
+      special_instructions: pick(specialInstr),
+      allow_comments: Math.random() > 0.3,
+    });
+    enqueueSnackbar('Form filled with test data', { variant: 'info' });
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -334,6 +390,17 @@ const CreateListing: React.FC = () => {
             borderRadius: 1,
           }}
         >
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<ScienceIcon />}
+              onClick={fillWithTestData}
+              sx={{ textTransform: 'none' }}
+            >
+              Fill with test data
+            </Button>
+          </Box>
           <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
             {steps.map((label) => (
               <Step key={label}>

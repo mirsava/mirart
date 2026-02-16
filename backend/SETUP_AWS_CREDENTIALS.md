@@ -59,7 +59,8 @@ After this, users will need to sign out and sign back in to get a fresh token wi
          {
            "Effect": "Allow",
            "Action": [
-             "cognito-idp:AdminListGroupsForUser"
+             "cognito-idp:AdminListGroupsForUser",
+             "cognito-idp:AdminDeleteUser"
            ],
            "Resource": "arn:aws:cognito-idp:us-east-1:*:userpool/us-east-1_c9TqRAcz9"
          }

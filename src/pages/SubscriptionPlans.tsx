@@ -24,7 +24,6 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { PayPalButtons } from '@paypal/react-paypal-js';
 import apiService, { SubscriptionPlan, UserSubscription } from '../services/api';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../components/PageHeader';
@@ -109,51 +108,36 @@ const SubscriptionPlans: React.FC = () => {
     setPaymentPlan({ plan, billingPeriod });
   };
 
-  const createPayPalOrder = async (): Promise<string> => {
-    if (!paymentPlan || !user?.id) throw new Error('No plan selected');
+  const handleStripeSubscribe = async (): Promise<void> => {
+    if (!paymentPlan || !user?.id) return;
+    if (listingIdToActivate) {
+      sessionStorage.setItem('listingIdToActivate', String(listingIdToActivate));
+    }
+    const price = paymentPlan.billingPeriod === 'monthly'
+      ? (typeof paymentPlan.plan.price_monthly === 'number' ? paymentPlan.plan.price_monthly : parseFloat(String(paymentPlan.plan.price_monthly)) || 0)
+      : (typeof paymentPlan.plan.price_yearly === 'number' ? paymentPlan.plan.price_yearly : parseFloat(String(paymentPlan.plan.price_yearly)) || 0);
     try {
-      const price = paymentPlan.billingPeriod === 'monthly'
-        ? (typeof paymentPlan.plan.price_monthly === 'number' ? paymentPlan.plan.price_monthly : parseFloat(String(paymentPlan.plan.price_monthly)) || 0)
-        : (typeof paymentPlan.plan.price_yearly === 'number' ? paymentPlan.plan.price_yearly : parseFloat(String(paymentPlan.plan.price_yearly)) || 0);
       const items = [{
         name: `${paymentPlan.plan.name} Plan (${paymentPlan.billingPeriod})`,
         price,
         quantity: 1,
       }];
-      const result = await apiService.createPayPalOrder(items, undefined, true);
-      return result.id;
-    } catch (err: any) {
-      enqueueSnackbar('Failed to initialize payment. Please try again.', { variant: 'error' });
-      throw err;
-    }
-  };
-
-  const handlePayPalApprove = async (data: { orderID: string }): Promise<void> => {
-    if (!paymentPlan || !user?.id) return;
-    const price = paymentPlan.billingPeriod === 'monthly'
-      ? (typeof paymentPlan.plan.price_monthly === 'number' ? paymentPlan.plan.price_monthly : parseFloat(String(paymentPlan.plan.price_monthly)) || 0)
-      : (typeof paymentPlan.plan.price_yearly === 'number' ? paymentPlan.plan.price_yearly : parseFloat(String(paymentPlan.plan.price_yearly)) || 0);
-    try {
-      const capture = await apiService.capturePayPalOrder(data.orderID, {
-        items: [],
-        shipping_address: '',
-        cognito_username: user.id,
-        isSubscription: true,
-        subscriptionData: {
-          plan_id: paymentPlan.plan.id,
+      const result = await apiService.createStripeCheckoutSession(items, {
+        metadata: {
+          is_subscription: 'true',
+          plan_id: String(paymentPlan.plan.id),
           billing_period: paymentPlan.billingPeriod,
-          amount: price,
+          cognito_username: user.id,
+          cancel_url: '/subscription-plans',
         },
       });
-      if (!capture.success) throw new Error('Payment capture failed');
-      setPaymentPlan(null);
-      enqueueSnackbar('Subscription activated successfully!', { variant: 'success' });
-      await fetchCurrentSubscription();
-      if (listingIdToActivate) {
-        navigate('/artist-dashboard', { state: { listingIdToActivate } });
+      if (result?.url) {
+        window.location.href = result.url;
+      } else {
+        throw new Error('Failed to create checkout session');
       }
     } catch (err: any) {
-      enqueueSnackbar(err.message || 'Failed to complete payment', { variant: 'error' });
+      enqueueSnackbar(err.message || 'Failed to start payment', { variant: 'error' });
     }
   };
 
@@ -209,16 +193,38 @@ const SubscriptionPlans: React.FC = () => {
           </Alert>
         )}
 
-        {currentSubscription && (
-          <Alert severity="info" sx={{ mb: 4 }}>
-            <Typography variant="body1" fontWeight={600}>
-              Current Plan: {currentSubscription.plan_name} ({currentSubscription.billing_period})
-            </Typography>
-            <Typography variant="body2">
-              {currentSubscription.current_listings || 0} / {currentSubscription.max_listings} listings active
-              {currentSubscription.end_date && ` • Expires: ${new Date(currentSubscription.end_date).toLocaleDateString()}`}
-            </Typography>
-          </Alert>
+        {currentSubscription && currentSubscription.status === 'active' && (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              mb: 4,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              bgcolor: 'rgba(74, 58, 154, 0.04)',
+            }}
+          >
+            <Box>
+              <Typography variant="h6" fontWeight={600}>
+                Current Plan: {currentSubscription.plan_name} ({currentSubscription.billing_period})
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {currentSubscription.current_listings || 0} / {currentSubscription.max_listings} listings active
+                {currentSubscription.end_date && ` • Access until: ${new Date(currentSubscription.end_date).toLocaleDateString()}`}
+                {(currentSubscription.auto_renew === false || currentSubscription.auto_renew === 0) && (
+                  <Chip label="Cancels at end of period" size="small" color="warning" sx={{ ml: 1 }} />
+                )}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Manage or cancel your subscription from your{' '}
+                <Button variant="text" size="small" onClick={() => navigate('/artist-dashboard', { state: { tab: 'subscription' } })} sx={{ p: 0, minWidth: 0 }}>
+                  Artist Dashboard
+                </Button>
+                .
+              </Typography>
+            </Box>
+          </Paper>
         )}
 
         {plans.length === 0 && !loading && !error && (
@@ -520,16 +526,15 @@ const SubscriptionPlans: React.FC = () => {
                   : (typeof paymentPlan.plan.price_yearly === 'number' ? paymentPlan.plan.price_yearly : parseFloat(String(paymentPlan.plan.price_yearly)) || 0)
                 ).toFixed(2)} / {paymentPlan.billingPeriod === 'monthly' ? 'month' : 'year'}
               </Typography>
-              <PayPalButtons
-                    createOrder={createPayPalOrder}
-                    onApprove={(data) => handlePayPalApprove(data)}
-                    onError={(err) => {
-                      console.error('PayPal error:', err);
-                      enqueueSnackbar('Payment failed. Please try again.', { variant: 'error' });
-                    }}
-                    onCancel={() => setPaymentPlan(null)}
-                    style={{ layout: 'vertical', color: 'blue', shape: 'rect', label: 'paypal' }}
-                  />
+              <Button
+                variant="contained"
+                size="large"
+                fullWidth
+                onClick={handleStripeSubscribe}
+                sx={{ py: 1.5 }}
+              >
+                Pay with Card (Stripe)
+              </Button>
             </Box>
           )}
         </DialogContent>

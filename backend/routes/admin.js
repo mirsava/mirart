@@ -365,7 +365,7 @@ router.delete('/users/:userId', checkAdminAccess, async (req, res) => {
     const { cognitoUsername: adminCognitoUsername } = req.query;
 
     const [users] = await pool.execute(
-      'SELECT cognito_username, user_type FROM users WHERE id = ?',
+      'SELECT cognito_username, email, user_type FROM users WHERE id = ?',
       [userId]
     );
 
@@ -375,13 +375,38 @@ router.delete('/users/:userId', checkAdminAccess, async (req, res) => {
 
     const user = users[0];
     const cognitoUsername = user.cognito_username;
+    const userEmail = user.email;
+    const cognitoUsernameToUse = cognitoUsername || userEmail;
 
     if (cognitoUsername === adminCognitoUsername) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    if (!cognitoUsername) {
-      return res.status(400).json({ error: 'User does not have a Cognito username' });
+    if (!cognitoUsernameToUse) {
+      return res.status(400).json({ error: 'User does not have a Cognito username or email' });
+    }
+
+    // Try to delete from Cognito (requires IAM). If credentials not configured, proceed with DB-only delete.
+    let cognitoDeleted = false;
+    try {
+      const command = new AdminDeleteUserCommand({
+        UserPoolId: USER_POOL_ID,
+        Username: cognitoUsernameToUse,
+      });
+      await cognitoClient.send(command);
+      cognitoDeleted = true;
+    } catch (cognitoError) {
+      if (cognitoError.name === 'UserNotFoundException') {
+        console.warn(`User ${cognitoUsernameToUse} not found in Cognito, proceeding with database deletion`);
+      } else if (cognitoError.name === 'CredentialsProviderError' || cognitoError.message?.includes('credentials')) {
+        console.warn('AWS credentials not configured. Deleting from database only. User may still exist in Cognito.');
+      } else {
+        console.error('Cognito delete error:', cognitoError);
+        return res.status(502).json({
+          error: 'Failed to delete user from Cognito',
+          details: cognitoError.message || 'Cognito API error',
+        });
+      }
     }
 
     connection = await pool.getConnection();
@@ -389,30 +414,13 @@ router.delete('/users/:userId', checkAdminAccess, async (req, res) => {
 
     try {
       await connection.execute('DELETE FROM orders WHERE buyer_id = ? OR seller_id = ?', [userId, userId]);
-      
       await connection.execute('DELETE FROM users WHERE id = ?', [userId]);
-
       await connection.commit();
 
-      try {
-        const command = new AdminDeleteUserCommand({
-          UserPoolId: USER_POOL_ID,
-          Username: cognitoUsername,
-        });
-
-        await cognitoClient.send(command);
-      } catch (cognitoError) {
-        if (cognitoError.name === 'UserNotFoundException') {
-          console.warn(`User ${cognitoUsername} not found in Cognito, database deletion completed`);
-        } else if (cognitoError.name === 'CredentialsProviderError' || cognitoError.message?.includes('credentials')) {
-          console.warn('AWS credentials not configured. Cannot delete from Cognito.');
-          console.warn('Database deletion completed.');
-        } else {
-          console.error('Error deleting from Cognito:', cognitoError);
-        }
-      }
-
-      res.json({ success: true, message: 'User deleted successfully' });
+      res.json({
+        success: true,
+        message: cognitoDeleted ? 'User deleted successfully' : 'User removed from database. (Cognito deletion skipped — add AWS credentials to delete from Cognito too.)',
+      });
     } catch (dbError) {
       if (connection) {
         await connection.rollback();
