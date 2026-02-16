@@ -206,6 +206,7 @@ class ApiService {
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
     cognitoUsername?: string;
+    requestingUser?: string;
     minPrice?: number;
     maxPrice?: number;
     minYear?: number;

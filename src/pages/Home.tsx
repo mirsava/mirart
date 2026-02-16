@@ -28,6 +28,7 @@ import { useNavigate } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
 import apiService, { Listing, SubscriptionPlan } from '../services/api';
+import { getListingImageCount } from '../utils/listingUtils';
 import { Painting } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import joinCommunityBg from '../assets/images/bg/join_our_community.png';
@@ -75,6 +76,7 @@ const Home: React.FC = () => {
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
       artistEmail: (listing as any).artist_email,
+      imageCount: getListingImageCount(listing),
     };
   };
 
@@ -82,9 +84,14 @@ const Home: React.FC = () => {
     const fetchFeaturedListings = async () => {
       try {
         // Featured listings must show ALL artists - do NOT pass cognitoUsername
+        const listingFilters = (category: string) => {
+          const f: { status: string; category: string; limit: number; requestingUser?: string } = { status: 'active', category, limit: 3 };
+          if (user?.id) f.requestingUser = user.id;
+          return f;
+        };
         const [paintingsResponse, woodworkingResponse] = await Promise.all([
-          apiService.getListings({ status: 'active', category: 'Painting', limit: 3 }),
-          apiService.getListings({ status: 'active', category: 'Woodworking', limit: 3 }),
+          apiService.getListings(listingFilters('Painting')),
+          apiService.getListings(listingFilters('Woodworking')),
         ]);
         
         const dbPaintings = paintingsResponse.listings.map(listing => convertListingToPainting(listing, 'Painting'));
@@ -136,7 +143,7 @@ const Home: React.FC = () => {
     };
     
     fetchPlans();
-  }, []);
+  }, [user?.id]);
 
 
   return (

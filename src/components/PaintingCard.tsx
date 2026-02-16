@@ -12,7 +12,7 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import { Favorite, FavoriteBorder, Email as EmailIcon } from '@mui/icons-material';
+import { Favorite, FavoriteBorder, Email as EmailIcon, Edit as EditIcon, PhotoLibrary as PhotoLibraryIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
@@ -40,6 +40,14 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
     e.stopPropagation();
     e.preventDefault();
     setContactDialogOpen(true);
+  };
+
+  const isOwnListing = Boolean(isAuthenticated && user?.id && painting.artistUsername && user.id === painting.artistUsername);
+
+  const handleEdit = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    e.preventDefault();
+    navigate(`/edit-listing/${painting.id}`);
   };
 
   const handleLike = async (e: React.MouseEvent): Promise<void> => {
@@ -91,15 +99,32 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
       }}
       onClick={contactDialogOpen ? undefined : handleViewDetails}
     >
-      <CardMedia
-        component="img"
-        height="300"
-        image={painting.image}
-        alt={painting.title}
-        sx={{
-          objectFit: 'cover',
-        }}
-      />
+      <Box sx={{ position: 'relative' }}>
+        <CardMedia
+          component="img"
+          height="300"
+          image={painting.image}
+          alt={painting.title}
+          sx={{
+            objectFit: 'cover',
+          }}
+        />
+        {painting.imageCount != null && painting.imageCount > 0 && (
+          <Chip
+            icon={<PhotoLibraryIcon sx={{ fontSize: 16 }} />}
+            label={painting.imageCount}
+            size="small"
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              bgcolor: 'rgba(0,0,0,0.6)',
+              color: 'white',
+              '& .MuiChip-icon': { color: 'white' },
+            }}
+          />
+        )}
+      </Box>
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
           <Typography variant="h6" component="h2" noWrap>
@@ -177,15 +202,23 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
         >
           View Details
         </Button>
-        <Button
-          size="small"
-          variant="contained"
-          color="secondary"
-          startIcon={<EmailIcon />}
-          onClick={handleContactSeller}
-        >
-          Contact Seller
-        </Button>
+        {isOwnListing ? (
+          <Tooltip title="Edit listing">
+            <IconButton size="small" onClick={handleEdit} color="primary" aria-label="Edit listing">
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Button
+            size="small"
+            variant="contained"
+            color="secondary"
+            startIcon={<EmailIcon />}
+            onClick={handleContactSeller}
+          >
+            Contact Seller
+          </Button>
+        )}
       </CardActions>
       
       {contactDialogOpen && (

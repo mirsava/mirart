@@ -40,6 +40,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PaintingCard from '../components/PaintingCard';
 import apiService, { Listing } from '../services/api';
+import { getListingImageCount } from '../utils/listingUtils';
 import { Artwork } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/PageHeader';
@@ -109,6 +110,7 @@ const Gallery: React.FC = () => {
       inStock: listing.in_stock,
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
+      imageCount: getListingImageCount(listing),
     };
   };
 
@@ -154,6 +156,7 @@ const Gallery: React.FC = () => {
   const fetchListingsWithFilters = async (filterValues: {
     category?: string;
     subcategory?: string;
+    cognitoUsername?: string;
     minPrice: string;
     maxPrice: string;
     minYear: string;
@@ -187,9 +190,11 @@ const Gallery: React.FC = () => {
         filters.search = searchTerm;
       }
       
-      const artistFromUrl = searchParams.get('artist');
-      if (artistFromUrl) {
-        filters.cognitoUsername = artistFromUrl;
+      const artistToUse = filterValues.cognitoUsername !== undefined
+        ? filterValues.cognitoUsername
+        : searchParams.get('artist') || '';
+      if (artistToUse) {
+        filters.cognitoUsername = artistToUse;
       }
       
       if (filterValues.minPrice && filterValues.minPrice.trim() !== '') {
@@ -228,6 +233,10 @@ const Gallery: React.FC = () => {
         filters.inStock = true;
       }
       
+      if (user?.id) {
+        filters.requestingUser = user.id;
+      }
+      
       const response = await apiService.getListings(filters);
       const dbPaintings = response.listings.map(convertListingToPainting);
       setPaintings(dbPaintings);
@@ -263,7 +272,7 @@ const Gallery: React.FC = () => {
       inStockOnly,
       pageNum: page
     });
-  }, [page, itemsPerPage, selectedCategory, selectedSubcategory, searchTerm, sortBy, sortOrder, minPrice, maxPrice, minYear, maxYear, selectedMedium, inStockOnly]);
+  }, [page, itemsPerPage, selectedCategory, selectedSubcategory, selectedArtist, searchTerm, sortBy, sortOrder, minPrice, maxPrice, minYear, maxYear, selectedMedium, inStockOnly, user?.id]);
 
   useEffect(() => {
     if (!isApplyingFiltersRef.current) {
@@ -408,6 +417,7 @@ const Gallery: React.FC = () => {
     return (
       (selectedCategory !== 'All') ||
       selectedSubcategory !== '' ||
+      selectedArtist !== '' ||
       minPrice !== '' ||
       maxPrice !== '' ||
       minYear !== '' ||
@@ -421,6 +431,7 @@ const Gallery: React.FC = () => {
     let count = 0;
     if (selectedCategory !== 'All') count++;
     if (selectedSubcategory !== '') count++;
+    if (selectedArtist !== '') count++;
     if (minPrice !== '') count++;
     if (maxPrice !== '') count++;
     if (minYear !== '') count++;
@@ -435,6 +446,7 @@ const Gallery: React.FC = () => {
     
     let newCategory = selectedCategory;
     let newSubcategory = selectedSubcategory;
+    let newArtist = selectedArtist;
     let newMinPrice = minPrice;
     let newMaxPrice = maxPrice;
     let newMinYear = minYear;
@@ -452,6 +464,14 @@ const Gallery: React.FC = () => {
       case 'subcategory':
         newSubcategory = '';
         setSelectedSubcategory('');
+        break;
+      case 'artist':
+        newArtist = '';
+        setSelectedArtist('');
+        const artistParams = new URLSearchParams(searchParams);
+        artistParams.delete('artist');
+        artistParams.set('page', '1');
+        setSearchParams(artistParams);
         break;
       case 'minPrice':
         newMinPrice = '';
@@ -486,6 +506,7 @@ const Gallery: React.FC = () => {
     await fetchListingsWithFilters({
       category: newCategory,
       subcategory: newSubcategory,
+      cognitoUsername: newArtist,
       minPrice: newMinPrice,
       maxPrice: newMaxPrice,
       minYear: newMinYear,
@@ -632,6 +653,14 @@ const Gallery: React.FC = () => {
                     size="small"
                   />
                 )}
+                {selectedArtist && (
+                  <Chip
+                    label={`Artist: ${selectedArtist}`}
+                    onDelete={() => handleRemoveFilter('artist')}
+                    color="primary"
+                    size="small"
+                  />
+                )}
                 {minPrice && (
                   <Chip
                     label={`Min Price: $${minPrice}`}
@@ -731,6 +760,7 @@ const Gallery: React.FC = () => {
               <>
                 Showing {((page - 1) * itemsPerPage) + 1} - {Math.min(page * itemsPerPage, pagination.total)} of {pagination.total} pieces
                 {selectedCategory !== 'All' && ` in ${selectedCategory}${selectedSubcategory ? ` > ${selectedSubcategory}` : ''}`}
+                {selectedArtist && ` by artist ${selectedArtist}`}
                 {searchTerm && ` matching "${searchTerm}"`}
               </>
             ) : (

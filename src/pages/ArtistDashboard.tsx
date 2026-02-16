@@ -260,6 +260,7 @@ const ArtistDashboard: React.FC = () => {
     try {
       const filters: any = {
         cognitoUsername: user.id,
+        requestingUser: user.id,
         page: listingsPage,
         limit: 12,
         sortBy: 'created_at',

@@ -15,6 +15,7 @@ export interface Artwork {
   inStock: boolean;
   likeCount?: number;
   isLiked?: boolean;
+  imageCount?: number;
 }
 
 export interface Painting extends Artwork {

@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
       }
     }
     
-    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC', cognitoUsername, minPrice, maxPrice, minYear, maxYear, medium, inStock } = req.query;
+    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC', cognitoUsername, requestingUser, minPrice, maxPrice, minYear, maxYear, medium, inStock } = req.query;
     
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 12;
@@ -301,11 +301,13 @@ router.get('/', async (req, res) => {
     
     const [rows] = await pool.execute(finalQuery, queryParams);
     
+    // Use requestingUser (viewer) for is_liked - NOT cognitoUsername (artist filter)
     let userLikedListings = [];
-    if (cognitoUsername) {
+    const viewerForLikes = requestingUser || (isFetchingOwnListings ? cognitoUsername : null);
+    if (viewerForLikes) {
       const [users] = await pool.execute(
         'SELECT id FROM users WHERE cognito_username = ?',
-        [cognitoUsername]
+        [viewerForLikes]
       );
       if (users.length > 0) {
         const userId = users[0].id;

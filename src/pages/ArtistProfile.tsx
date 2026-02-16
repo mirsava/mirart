@@ -56,7 +56,9 @@ const ArtistProfile: React.FC = () => {
         setArtist(artistData);
         
         if (artistData?.id) {
-          const listingsResponse = await apiService.getListings({ userId: artistData.id, status: 'active' }).catch(() => ({ listings: [] }));
+          const filters: { userId: number; status: string; requestingUser?: string } = { userId: artistData.id, status: 'active' };
+          if (user?.id) filters.requestingUser = user.id;
+          const listingsResponse = await apiService.getListings(filters).catch(() => ({ listings: [] }));
           setListings(listingsResponse.listings || []);
         }
       } catch (err: any) {
@@ -67,7 +69,7 @@ const ArtistProfile: React.FC = () => {
     };
 
     fetchArtistProfile();
-  }, [username]);
+  }, [username, user?.id]);
 
   const handleStartChat = async (): Promise<void> => {
     if (!isAuthenticated || !user?.id) {
