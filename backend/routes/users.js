@@ -68,7 +68,7 @@ router.get('/artists/list', async (req, res) => {
         ) as artist_name
       FROM users u
       INNER JOIN listings l ON u.id = l.user_id
-      WHERE l.status = 'active'
+      WHERE l.status = 'active' AND (COALESCE(u.blocked, 0) = 0)
       ORDER BY artist_name ASC`
     );
     

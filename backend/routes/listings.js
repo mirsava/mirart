@@ -84,7 +84,7 @@ router.get('/', async (req, res) => {
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count
       FROM listings l
       JOIN users u ON l.user_id = u.id
-      WHERE 1=1
+      WHERE 1=1 AND (COALESCE(u.blocked, 0) = 0)
     `;
     const params = [];
     
@@ -185,7 +185,7 @@ router.get('/', async (req, res) => {
       SELECT COUNT(*) as total
       FROM listings l
       JOIN users u ON l.user_id = u.id
-      WHERE 1=1
+      WHERE 1=1 AND (COALESCE(u.blocked, 0) = 0)
     `;
     const countParams = [];
     
@@ -420,7 +420,7 @@ router.get('/:id', async (req, res) => {
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count
       FROM listings l
       JOIN users u ON l.user_id = u.id
-       WHERE l.id = ?`,
+      WHERE l.id = ? AND (COALESCE(u.blocked, 0) = 0)`,
       [id]
     );
     
@@ -1060,10 +1060,10 @@ router.get('/user/:cognitoUsername', async (req, res) => {
     const { cognitoUsername } = req.params;
     
     const [listings] = await pool.execute(
-      `SELECT l.*       FROM listings l
+      `SELECT l.* FROM listings l
       JOIN users u ON l.user_id = u.id
-       WHERE u.cognito_username = ?
-       ORDER BY l.created_at DESC`,
+      WHERE u.cognito_username = ? AND (COALESCE(u.blocked, 0) = 0)
+      ORDER BY l.created_at DESC`,
       [cognitoUsername]
     );
     
