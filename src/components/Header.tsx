@@ -68,6 +68,7 @@ const Header: React.FC = () => {
   const gallerySubcategories = {
     'Painting': ['Abstract', 'Figurative', 'Impressionism', 'Realism', 'Pop Art'],
     'Woodworking': ['Furniture', 'Decorative Items', 'Kitchenware', 'Outdoor', 'Storage', 'Lighting', 'Toys & Games'],
+    'Prints': ['Giclée', 'Screen Print', 'Lithograph', 'Offset', 'Digital Print', 'Fine Art Print'],
   };
 
   useEffect(() => {

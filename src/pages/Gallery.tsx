@@ -102,12 +102,13 @@ const Gallery: React.FC = () => {
       price: listing.price,
       image: getImageUrl(listing.primary_image_url) || '',
       description: listing.description || '',
-      category: (listing.category === 'Painting' || listing.category === 'Woodworking') ? listing.category : 'Painting',
+      category: (listing.category === 'Painting' || listing.category === 'Woodworking' || listing.category === 'Prints') ? listing.category : 'Painting',
       subcategory: listing.subcategory || '',
       dimensions: listing.dimensions || '',
       medium: listing.medium || '',
       year: listing.year || new Date().getFullYear(),
       inStock: listing.in_stock,
+      quantityAvailable: listing.quantity_available ?? 1,
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
       imageCount: getListingImageCount(listing),
@@ -335,6 +336,7 @@ const Gallery: React.FC = () => {
     'All': [],
     'Painting': ['Abstract', 'Figurative', 'Impressionism', 'Realism', 'Pop Art'],
     'Woodworking': ['Furniture', 'Decorative Items', 'Kitchenware', 'Outdoor', 'Storage', 'Lighting', 'Toys & Games'],
+    'Prints': ['Giclée', 'Screen Print', 'Lithograph', 'Offset', 'Digital Print', 'Fine Art Print'],
     'Other': []
   };
 

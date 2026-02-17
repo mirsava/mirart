@@ -234,7 +234,9 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
               ${painting.price ?? 'N/A'}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {painting.inStock ? '1 available' : '0 available'}
+              {painting.inStock
+                ? `${painting.quantityAvailable ?? 1} available`
+                : '0 available'}
             </Typography>
           </Box>
           {isAuthenticated && (

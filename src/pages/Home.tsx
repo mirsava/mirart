@@ -73,6 +73,7 @@ const Home: React.FC = () => {
       medium: listing.medium || '',
       year: listing.year || new Date().getFullYear(),
       inStock: listing.in_stock,
+      quantityAvailable: listing.quantity_available ?? 1,
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
       artistEmail: (listing as any).artist_email,

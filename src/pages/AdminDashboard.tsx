@@ -936,6 +936,7 @@ const AdminDashboard: React.FC = () => {
                   <MenuItem value="">All</MenuItem>
                   <MenuItem value="Painting">Painting</MenuItem>
                   <MenuItem value="Woodworking">Woodworking</MenuItem>
+                  <MenuItem value="Prints">Prints</MenuItem>
                   <MenuItem value="Other">Other</MenuItem>
                 </Select>
               </FormControl>

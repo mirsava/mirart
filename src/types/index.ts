@@ -7,12 +7,13 @@ export interface Artwork {
   price: number | null;
   image: string;
   description: string;
-  category: 'Painting' | 'Woodworking';
+  category: 'Painting' | 'Woodworking' | 'Prints';
   subcategory: string;
   dimensions: string;
   medium: string;
   year: number;
   inStock: boolean;
+  quantityAvailable?: number;
   likeCount?: number;
   isLiked?: boolean;
   imageCount?: number;

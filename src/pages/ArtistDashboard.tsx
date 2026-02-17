@@ -1932,7 +1932,7 @@ const ArtistDashboard: React.FC = () => {
                           Specialties
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-                          {['Painting', 'Woodworking', 'Other'].map((specialty) => (
+                          {['Painting', 'Woodworking', 'Prints', 'Other'].map((specialty) => (
                             <Chip
                               key={specialty}
                               label={specialty}

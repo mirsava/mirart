@@ -519,6 +519,7 @@ router.post('/', async (req, res) => {
       medium,
       year,
       in_stock,
+      quantity_available,
       status,
       allow_comments
     } = req.body;
@@ -597,12 +598,17 @@ router.post('/', async (req, res) => {
     
     const { shipping_info, returns_info, special_instructions } = req.body;
     
+    const qty = quantity_available !== undefined && quantity_available !== null && quantity_available !== ''
+      ? Math.max(0, parseInt(quantity_available))
+      : 1;
+    const stock = in_stock !== undefined ? Boolean(in_stock) : (qty > 0);
+
     const [result] = await pool.execute(
       `INSERT INTO listings (
         user_id, title, description, category, subcategory,
         price, primary_image_url, image_urls, dimensions, medium, year,
-        in_stock, status, shipping_info, returns_info, special_instructions, allow_comments
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user_id,
         title,
@@ -615,7 +621,8 @@ router.post('/', async (req, res) => {
         dimensions || null,
         medium || null,
         year && year.toString().trim() !== '' ? parseInt(year) : null,
-        in_stock !== undefined ? Boolean(in_stock) : true,
+        stock,
+        qty,
         listingStatus,
         (shipping_info && shipping_info.trim()) || null,
         (returns_info && returns_info.trim()) || null,
@@ -813,6 +820,7 @@ router.put('/:id', async (req, res) => {
       medium,
       year,
       in_stock,
+      quantity_available,
       status,
       allow_comments
     } = req.body;
@@ -857,6 +865,11 @@ router.put('/:id', async (req, res) => {
     if (medium !== undefined) { updateFields.push('medium = ?'); updateValues.push(medium); }
     if (year !== undefined) { updateFields.push('year = ?'); updateValues.push(year); }
     if (in_stock !== undefined) { updateFields.push('in_stock = ?'); updateValues.push(in_stock); }
+    if (quantity_available !== undefined) {
+      const qty = Math.max(0, parseInt(quantity_available));
+      updateFields.push('quantity_available = ?');
+      updateValues.push(qty);
+    }
     if (status !== undefined) {
       updateFields.push('status = ?');
       updateValues.push(status);

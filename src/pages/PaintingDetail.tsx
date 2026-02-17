@@ -95,13 +95,14 @@ const PaintingDetail: React.FC = () => {
       price: listing.price,
       image: getImageUrl(listing.primary_image_url) || '',
       description: listing.description || '',
-      category: listing.category as 'Painting' | 'Woodworking',
+      category: listing.category as 'Painting' | 'Woodworking' | 'Prints',
       userId: listing.user_id,
       subcategory: listing.subcategory || '',
       dimensions: listing.dimensions || '',
       medium: listing.medium || '',
       year: listing.year || new Date().getFullYear(),
       inStock: listing.in_stock,
+      quantityAvailable: listing.quantity_available ?? 1,
       shipping_info: listing.shipping_info,
       returns_info: listing.returns_info,
       special_instructions: listing.special_instructions,
@@ -809,6 +810,11 @@ const PaintingDetail: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
                   <Typography variant="h4" color="primary">
                     ${painting.price ?? 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {painting.inStock
+                      ? `${painting.quantityAvailable ?? 1} available`
+                      : '0 available'}
                   </Typography>
                   {!painting.inStock && (
                     <Chip label="Sold" color="default" sx={{ fontWeight: 600 }} />

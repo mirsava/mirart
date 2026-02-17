@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS listings (
   user_id INT NOT NULL,
   title VARCHAR(255) NOT NULL,
   description TEXT,
-  category ENUM('Painting', 'Woodworking', 'Sculpture', 'Photography', 'Digital Art', 'Ceramics', 'Textiles', 'Jewelry', 'Mixed Media', 'Other') NOT NULL,
+  category ENUM('Painting', 'Woodworking', 'Prints', 'Sculpture', 'Photography', 'Digital Art', 'Ceramics', 'Textiles', 'Jewelry', 'Mixed Media', 'Other') NOT NULL,
   subcategory VARCHAR(100),
   price DECIMAL(10, 2) NOT NULL,
   primary_image_url VARCHAR(500),

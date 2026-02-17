@@ -53,6 +53,7 @@ const CreateListing: React.FC = () => {
     medium: '',
     year: '',
     in_stock: true,
+    quantity_available: '1',
     status: 'draft' as 'draft',
     shipping_info: '',
     returns_info: '',
@@ -93,6 +94,7 @@ const CreateListing: React.FC = () => {
   const categories = [
     'Painting',
     'Woodworking',
+    'Prints',
     'Other',
   ];
 
@@ -112,6 +114,14 @@ const CreateListing: React.FC = () => {
       'Storage',
       'Lighting',
       'Toys & Games',
+    ],
+    Prints: [
+      'Giclée',
+      'Screen Print',
+      'Lithograph',
+      'Offset',
+      'Digital Print',
+      'Fine Art Print',
     ],
     Other: [],
   };
@@ -162,6 +172,7 @@ const CreateListing: React.FC = () => {
       medium: pick(mediums),
       year: String(2020 + Math.floor(Math.random() * 5)),
       in_stock: Math.random() > 0.2,
+      quantity_available: String(Math.floor(Math.random() * 5) + 1),
       status: 'draft',
       shipping_info: pick(shippingOptions),
       returns_info: pick(returnPolicies),
@@ -181,6 +192,10 @@ const CreateListing: React.FC = () => {
       // Reset subcategory when category changes
       if (name === 'category') {
         updated.subcategory = '';
+      }
+      // Sync in_stock with quantity_available
+      if (name === 'quantity_available') {
+        updated.in_stock = (parseInt(value) || 0) > 0;
       }
       return updated;
     });
@@ -350,7 +365,8 @@ const CreateListing: React.FC = () => {
         dimensions: formData.dimensions || undefined,
         medium: formData.medium || undefined,
         year: formData.year ? parseInt(formData.year) : undefined,
-        in_stock: formData.in_stock,
+        in_stock: (parseInt(formData.quantity_available || '1') || 1) > 0,
+        quantity_available: parseInt(formData.quantity_available || '1') || 1,
         status: 'draft',
         shipping_info: formData.shipping_info && formData.shipping_info.trim() ? formData.shipping_info.trim() : undefined,
         returns_info: formData.returns_info && formData.returns_info.trim() ? formData.returns_info.trim() : undefined,
@@ -809,6 +825,20 @@ const CreateListing: React.FC = () => {
                         value={formData.price}
                         onChange={handleChange}
                         inputProps={{ min: 0, step: 0.01 }}
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Number Available"
+                        name="quantity_available"
+                        value={formData.quantity_available}
+                        onChange={handleChange}
+                        inputProps={{ min: 0, step: 1 }}
+                        helperText="How many of this artwork are available for sale"
                         sx={{ bgcolor: 'background.default' }}
                       />
                     </Grid>

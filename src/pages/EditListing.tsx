@@ -43,6 +43,7 @@ const EditListing: React.FC = () => {
     medium: '',
     year: '',
     in_stock: true,
+    quantity_available: '1',
     status: 'draft' as 'draft',
     shipping_info: '',
     returns_info: '',
@@ -59,6 +60,7 @@ const EditListing: React.FC = () => {
   const categories = [
     'Painting',
     'Woodworking',
+    'Prints',
     'Other',
   ];
 
@@ -78,6 +80,14 @@ const EditListing: React.FC = () => {
       'Storage',
       'Lighting',
       'Toys & Games',
+    ],
+    Prints: [
+      'Giclée',
+      'Screen Print',
+      'Lithograph',
+      'Offset',
+      'Digital Print',
+      'Fine Art Print',
     ],
     Other: [],
   };
@@ -118,6 +128,7 @@ const EditListing: React.FC = () => {
         dimensions: listing.dimensions || '',
         medium: listing.medium || '',
         year: listing.year?.toString() || '',
+        quantity_available: (listing as any).quantity_available?.toString() || '1',
         in_stock: listing.in_stock !== undefined ? Boolean(listing.in_stock) : true,
         status: listing.status || 'draft',
         shipping_info: listing.shipping_info || '',
@@ -176,6 +187,10 @@ const EditListing: React.FC = () => {
       // Reset subcategory when category changes
       if (name === 'category') {
         updated.subcategory = '';
+      }
+      // Sync in_stock with quantity_available
+      if (name === 'quantity_available') {
+        updated.in_stock = (parseInt(value) || 0) > 0;
       }
       return updated;
     });
@@ -385,7 +400,8 @@ const EditListing: React.FC = () => {
         dimensions: formData.dimensions || undefined,
         medium: formData.medium || undefined,
         year: formData.year ? parseInt(formData.year) : undefined,
-        in_stock: formData.in_stock,
+        in_stock: (parseInt(formData.quantity_available || '1') || 1) > 0,
+        quantity_available: parseInt(formData.quantity_available || '1') || 1,
         status: formData.status,
         shipping_info: formData.shipping_info && formData.shipping_info.trim() ? formData.shipping_info.trim() : undefined,
         returns_info: formData.returns_info && formData.returns_info.trim() ? formData.returns_info.trim() : undefined,
@@ -524,6 +540,19 @@ const EditListing: React.FC = () => {
                   value={formData.year}
                   onChange={handleChange}
                   placeholder="e.g., 2024"
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Number Available"
+                  name="quantity_available"
+                  value={formData.quantity_available}
+                  onChange={handleChange}
+                  inputProps={{ min: 0, step: 1 }}
+                  helperText="How many of this artwork are available for sale"
                 />
               </Grid>
 

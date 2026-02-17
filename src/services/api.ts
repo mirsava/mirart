@@ -34,6 +34,7 @@ export interface Listing {
   medium?: string;
   year?: number;
   in_stock: boolean;
+  quantity_available?: number;
   status: 'draft' | 'active' | 'inactive' | 'sold' | 'archived';
   views: number;
   created_at: string;
