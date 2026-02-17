@@ -33,6 +33,10 @@ import {
   Avatar,
   Switch,
   FormControlLabel,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -42,10 +46,14 @@ import {
   MoreVert as MoreVertIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
+  OpenInNew as OpenInNewIcon,
   Block as BlockIcon,
+  Lock as LockIcon,
+  LockOpen as LockOpenIcon,
   CheckCircle as CheckCircleIcon,
   CreditCard as CreditCardIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService, { SubscriptionPlan } from '../services/api';
 import { useSnackbar } from 'notistack';
@@ -74,6 +82,7 @@ function TabPanel(props: TabPanelProps) {
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -109,8 +118,16 @@ const AdminDashboard: React.FC = () => {
   const [deletingUser, setDeletingUser] = useState<number | null>(null);
   const [deactivateUserConfirmOpen, setDeactivateUserConfirmOpen] = useState(false);
   const [deleteUserConfirmOpen, setDeleteUserConfirmOpen] = useState(false);
+  const [blockUserConfirmOpen, setBlockUserConfirmOpen] = useState(false);
   const [userToDeactivate, setUserToDeactivate] = useState<number | null>(null);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [userToBlock, setUserToBlock] = useState<number | null>(null);
+  const [blockingUser, setBlockingUser] = useState<number | null>(null);
+  const [unblockingUser, setUnblockingUser] = useState<number | null>(null);
+  const [subscriptionUsersDialogOpen, setSubscriptionUsersDialogOpen] = useState(false);
+  const [subscriptionUsersFilter, setSubscriptionUsersFilter] = useState<{ filter?: string; plan?: string; billing?: string; title: string } | null>(null);
+  const [subscriptionUsers, setSubscriptionUsers] = useState<any[]>([]);
+  const [loadingSubscriptionUsers, setLoadingSubscriptionUsers] = useState(false);
   const [newStatus, setNewStatus] = useState<'draft' | 'active' | 'inactive' | 'sold' | 'archived'>('active');
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
@@ -397,6 +414,50 @@ const AdminDashboard: React.FC = () => {
     setUserToDeactivate(null);
   };
 
+  const handleBlockUserClick = (userId: number): void => {
+    setUserToBlock(userId);
+    setBlockUserConfirmOpen(true);
+    handleUserMenuClose();
+  };
+
+  const handleBlockUserConfirm = async (): Promise<void> => {
+    if (!user?.id || !userToBlock) return;
+
+    setBlockingUser(userToBlock);
+    try {
+      await apiService.blockUser(user.id, userToBlock, user.groups);
+      enqueueSnackbar('User blocked successfully. They cannot sign in with the same credentials.', { variant: 'success' });
+      setBlockUserConfirmOpen(false);
+      setUserToBlock(null);
+      fetchUsers();
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to block user', { variant: 'error' });
+    } finally {
+      setBlockingUser(null);
+    }
+  };
+
+  const handleBlockUserCancel = (): void => {
+    setBlockUserConfirmOpen(false);
+    setUserToBlock(null);
+  };
+
+  const handleUnblockUser = async (userId: number): Promise<void> => {
+    if (!user?.id) return;
+
+    setUnblockingUser(userId);
+    try {
+      await apiService.unblockUser(user.id, userId, user.groups);
+      enqueueSnackbar('User unblocked successfully', { variant: 'success' });
+      handleUserMenuClose();
+      fetchUsers();
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to unblock user', { variant: 'error' });
+    } finally {
+      setUnblockingUser(null);
+    }
+  };
+
   const handleDeleteUserClick = (userId: number): void => {
     setUserToDelete(userId);
     setDeleteUserConfirmOpen(true);
@@ -509,6 +570,40 @@ const AdminDashboard: React.FC = () => {
     setListingToChangeStatus(null);
   };
 
+  const handleSubscriptionStatClick = async (filter: string, title: string, plan?: string, billing?: string): Promise<void> => {
+    if (!user?.id) return;
+    const count = plan
+      ? (stats.subscriptions?.byPlan?.[plan] ?? 0)
+      : billing
+        ? (stats.subscriptions?.byBilling?.[billing as 'monthly' | 'yearly'] ?? 0)
+        : filter === 'active'
+          ? (stats.subscriptions?.active ?? 0)
+          : filter === 'expired'
+            ? (stats.subscriptions?.expired ?? 0)
+            : filter === 'this_month'
+              ? (stats.subscriptions?.thisMonth ?? 0)
+              : (stats.subscriptions?.ytd ?? 0);
+    if (count === 0) return;
+    setSubscriptionUsersFilter({ filter, plan, billing, title });
+    setSubscriptionUsersDialogOpen(true);
+    setLoadingSubscriptionUsers(true);
+    try {
+      const response = await apiService.getAdminUsers(user.id, {
+        page: 1,
+        limit: 100,
+        subscriptionFilter: filter,
+        subscriptionPlan: plan,
+        subscriptionBilling: billing,
+      }, user.groups);
+      setSubscriptionUsers(response.users || []);
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to load users', { variant: 'error' });
+      setSubscriptionUsers([]);
+    } finally {
+      setLoadingSubscriptionUsers(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -593,6 +688,89 @@ const AdminDashboard: React.FC = () => {
                 </CardContent>
               </Card>
             </Grid>
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <CreditCardIcon color="primary" sx={{ fontSize: 40 }} />
+                    <Typography variant="h6">Subscriptions</Typography>
+                  </Box>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6} sm={4}>
+                      <Box
+                        onClick={() => handleSubscriptionStatClick('active', 'Active Subscriptions')}
+                        sx={{ cursor: (stats.subscriptions?.active ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.active ?? 0) > 0 ? { opacity: 0.8 } : {} }}
+                      >
+                        <Typography variant="h5" color="primary">{stats.subscriptions?.active ?? 0}</Typography>
+                        <Typography variant="caption" color="text.secondary">Active</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Box
+                        onClick={() => handleSubscriptionStatClick('expired', 'Expired Subscriptions')}
+                        sx={{ cursor: (stats.subscriptions?.expired ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.expired ?? 0) > 0 ? { opacity: 0.8 } : {} }}
+                      >
+                        <Typography variant="h5">{stats.subscriptions?.expired ?? 0}</Typography>
+                        <Typography variant="caption" color="text.secondary">Expired</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Box
+                        onClick={() => handleSubscriptionStatClick('this_month', 'Subscriptions This Month')}
+                        sx={{ cursor: (stats.subscriptions?.thisMonth ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.thisMonth ?? 0) > 0 ? { opacity: 0.8 } : {} }}
+                      >
+                        <Typography variant="h5">{stats.subscriptions?.thisMonth ?? 0}</Typography>
+                        <Typography variant="caption" color="text.secondary">This Month</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Box
+                        onClick={() => handleSubscriptionStatClick('ytd', 'Subscriptions YTD')}
+                        sx={{ cursor: (stats.subscriptions?.ytd ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.ytd ?? 0) > 0 ? { opacity: 0.8 } : {} }}
+                      >
+                        <Typography variant="h5">{stats.subscriptions?.ytd ?? 0}</Typography>
+                        <Typography variant="caption" color="text.secondary">YTD</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary" display="block">Billing</Typography>
+                      <Box
+                        onClick={() => handleSubscriptionStatClick('active', 'Active Monthly', undefined, 'monthly')}
+                        sx={{ cursor: (stats.subscriptions?.byBilling?.monthly ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.byBilling?.monthly ?? 0) > 0 ? { opacity: 0.8 } : {} }}
+                      >
+                        <Typography variant="body2">Monthly: {stats.subscriptions?.byBilling?.monthly ?? 0}</Typography>
+                      </Box>
+                      <Box
+                        onClick={() => handleSubscriptionStatClick('active', 'Active Yearly', undefined, 'yearly')}
+                        sx={{ cursor: (stats.subscriptions?.byBilling?.yearly ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.byBilling?.yearly ?? 0) > 0 ? { opacity: 0.8 } : {} }}
+                      >
+                        <Typography variant="body2">Yearly: {stats.subscriptions?.byBilling?.yearly ?? 0}</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="caption" color="text.secondary" display="block">By Plan (active)</Typography>
+                      {stats.subscriptions?.byPlan && Object.keys(stats.subscriptions.byPlan).length > 0 ? (
+                        <Box>
+                          {Object.entries(stats.subscriptions.byPlan).map(([plan, count]) => (
+                            <Box
+                              key={plan}
+                              onClick={() => handleSubscriptionStatClick('active', `${plan} Plan`, plan)}
+                              sx={{ cursor: (count as number) > 0 ? 'pointer' : 'default', '&:hover': (count as number) > 0 ? { opacity: 0.8 } : {} }}
+                            >
+                              <Typography variant="body2">
+                                {plan}: {count as number}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">—</Typography>
+                      )}
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
         )}
 
@@ -601,7 +779,7 @@ const AdminDashboard: React.FC = () => {
             <Tab icon={<PeopleIcon />} iconPosition="start" label="Users" />
             <Tab icon={<InventoryIcon />} iconPosition="start" label="Listings" />
             <Tab icon={<EmailIcon />} iconPosition="start" label="Messages" />
-            <Tab icon={<CreditCardIcon />} iconPosition="start" label="Subscriptions" />
+            <Tab icon={<CreditCardIcon />} iconPosition="start" label="Subscription Plans" />
           </Tabs>
 
           <TabPanel value={tabValue} index={0}>
@@ -661,9 +839,15 @@ const AdminDashboard: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Chip 
-                          label={!userData.active || userData.active === 0 || userData.active === false ? 'Inactive' : 'Active'} 
+                          label={
+                            (userData.blocked === 1 || userData.blocked === true || userData.blocked === '1') ? 'Blocked' :
+                            !userData.active || userData.active === 0 || userData.active === false ? 'Inactive' : 'Active'
+                          } 
                           size="small"
-                          color={!userData.active || userData.active === 0 || userData.active === false ? 'error' : 'success'}
+                          color={
+                            (userData.blocked === 1 || userData.blocked === true || userData.blocked === '1') ? 'error' :
+                            !userData.active || userData.active === 0 || userData.active === false ? 'warning' : 'success'
+                          }
                         />
                       </TableCell>
                       <TableCell>
@@ -787,6 +971,12 @@ const AdminDashboard: React.FC = () => {
                             listing.status === 'archived' ? 'info' : 
                             'default'
                           }
+                          onClick={() => handleStatusChangeClick(listing.id, listing.status)}
+                          sx={{ 
+                            cursor: 'pointer',
+                            '&:hover': { opacity: 0.9 },
+                          }}
+                          disabled={statusChanging === listing.id}
                         />
                       </TableCell>
                       <TableCell>
@@ -796,12 +986,11 @@ const AdminDashboard: React.FC = () => {
                         <IconButton
                           size="small"
                           color="primary"
-                          onClick={() => handleStatusChangeClick(listing.id, listing.status)}
-                          title="Change status"
-                          disabled={statusChanging === listing.id}
+                          onClick={() => navigate(`/edit-listing/${listing.id}`)}
+                          title="Edit listing"
                           sx={{ mr: 1 }}
                         >
-                          <EditIcon />
+                          <OpenInNewIcon />
                         </IconButton>
                         <IconButton
                           size="small"
@@ -1066,7 +1255,7 @@ const AdminDashboard: React.FC = () => {
             <EditIcon sx={{ mr: 1 }} />
             Change User Type
           </MenuItem>
-          {selectedUser && (selectedUser.active !== false && selectedUser.active !== 0 && selectedUser.active) && (
+          {selectedUser && (selectedUser.active !== false && selectedUser.active !== 0 && selectedUser.active) && !(selectedUser.blocked === 1 || selectedUser.blocked === true) && (
             <MenuItem
               onClick={() => {
                 if (selectedUser) {
@@ -1079,7 +1268,21 @@ const AdminDashboard: React.FC = () => {
               Deactivate User
             </MenuItem>
           )}
-          {selectedUser && (!selectedUser.active || selectedUser.active === 0 || selectedUser.active === false) && (
+          {selectedUser && selectedUser.cognito_username !== user?.id && !(selectedUser.blocked === 1 || selectedUser.blocked === true) && (
+            <MenuItem
+              onClick={() => {
+                if (selectedUser) {
+                  handleBlockUserClick(selectedUser.id);
+                }
+              }}
+              disabled={blockingUser === selectedUser?.id}
+              sx={{ color: 'error.main' }}
+            >
+              <LockIcon sx={{ mr: 1 }} />
+              {blockingUser === selectedUser?.id ? 'Blocking...' : 'Block User'}
+            </MenuItem>
+          )}
+          {selectedUser && (!selectedUser.active || selectedUser.active === 0 || selectedUser.active === false) && !(selectedUser.blocked === 1 || selectedUser.blocked === true) && (
             <MenuItem
               onClick={() => {
                 if (selectedUser) {
@@ -1090,6 +1293,19 @@ const AdminDashboard: React.FC = () => {
             >
               <CheckCircleIcon sx={{ mr: 1 }} />
               {activatingUser === selectedUser?.id ? 'Activating...' : 'Activate User'}
+            </MenuItem>
+          )}
+          {selectedUser && selectedUser.cognito_username !== user?.id && (selectedUser.blocked === 1 || selectedUser.blocked === true) && (
+            <MenuItem
+              onClick={() => {
+                if (selectedUser) {
+                  handleUnblockUser(selectedUser.id);
+                }
+              }}
+              disabled={unblockingUser === selectedUser?.id}
+            >
+              <LockOpenIcon sx={{ mr: 1 }} />
+              {unblockingUser === selectedUser?.id ? 'Unblocking...' : 'Unblock User'}
             </MenuItem>
           )}
           <MenuItem
@@ -1219,6 +1435,63 @@ const AdminDashboard: React.FC = () => {
               disabled={deactivatingUser !== null}
             >
               {deactivatingUser ? 'Deactivating...' : 'Deactivate'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={subscriptionUsersDialogOpen}
+          onClose={() => setSubscriptionUsersDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>{subscriptionUsersFilter?.title ?? 'Users'}</DialogTitle>
+          <DialogContent>
+            {loadingSubscriptionUsers ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : subscriptionUsers.length === 0 ? (
+              <Typography color="text.secondary">No users found</Typography>
+            ) : (
+              <List dense>
+                {subscriptionUsers.map((u) => (
+                  <ListItem key={u.id}>
+                    <ListItemAvatar>
+                      <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>
+                        {u.first_name?.charAt(0) || u.email?.charAt(0) || 'U'}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={u.business_name || (u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.cognito_username)}
+                      secondary={`${u.email} • @${u.cognito_username}`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSubscriptionUsersDialogOpen(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={blockUserConfirmOpen} onClose={handleBlockUserCancel}>
+          <DialogTitle>Block User</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Blocking this user will prevent them from signing in. They cannot create a new account with the same email or credentials. Only an admin can unblock them.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleBlockUserCancel}>Cancel</Button>
+            <Button
+              onClick={handleBlockUserConfirm}
+              color="error"
+              variant="contained"
+              disabled={blockingUser !== null}
+            >
+              {blockingUser ? 'Blocking...' : 'Block'}
             </Button>
           </DialogActions>
         </Dialog>

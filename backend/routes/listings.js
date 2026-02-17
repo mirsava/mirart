@@ -3,8 +3,31 @@ import pool from '../config/database.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import UserRole from '../constants/userRoles.js';
 
 const router = express.Router();
+
+// Check if requester can modify listing (owner or admin)
+const canModifyListing = async (listingId, cognitoUsername, groups) => {
+  if (!cognitoUsername) return { allowed: false, reason: 'Authentication required' };
+  const [listing] = await pool.execute('SELECT user_id FROM listings WHERE id = ?', [listingId]);
+  if (listing.length === 0) return { allowed: false, reason: 'Listing not found' };
+  const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
+  if (users.length === 0) return { allowed: false, reason: 'User not found' };
+  const userId = users[0].id;
+  if (listing[0].user_id === userId) return { allowed: true };
+  let userGroups = [];
+  if (groups) {
+    try {
+      userGroups = typeof groups === 'string' ? JSON.parse(groups) : (Array.isArray(groups) ? groups : [groups]);
+    } catch {
+      userGroups = Array.isArray(groups) ? groups : [groups];
+    }
+  }
+  const isAdmin = userGroups.includes(UserRole.SITE_ADMIN) || userGroups.includes('site_admin') || userGroups.includes('admin');
+  if (isAdmin) return { allowed: true };
+  return { allowed: false, reason: 'You do not have permission to modify this listing' };
+};
 
 // Get all listings (with optional filters and pagination)
 router.get('/', async (req, res) => {
@@ -773,6 +796,11 @@ router.post('/:id/activate', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const { cognito_username, groups } = req.body;
+    const check = await canModifyListing(id, cognito_username, groups);
+    if (!check.allowed) {
+      return res.status(check.reason === 'Listing not found' ? 404 : 403).json({ error: check.reason });
+    }
     const {
       title,
       description,
@@ -910,6 +938,11 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const { cognitoUsername, groups } = req.query;
+    const check = await canModifyListing(id, cognitoUsername, groups);
+    if (!check.allowed) {
+      return res.status(check.reason === 'Listing not found' ? 404 : 403).json({ error: check.reason });
+    }
     
     // Get listing info including image URLs before deletion
     const [listing] = await pool.execute(

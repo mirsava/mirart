@@ -15,6 +15,7 @@ import {
 import { Favorite, FavoriteBorder, Email as EmailIcon, Edit as EditIcon, PhotoLibrary as PhotoLibraryIcon, ShoppingCart as ShoppingCartIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { UserRole } from '../types/userRoles';
 import { useCart } from '../contexts/CartContext';
 import { useSnackbar } from 'notistack';
 import apiService from '../services/api';
@@ -47,6 +48,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
   };
 
   const isOwnListing = Boolean(isAuthenticated && user?.id && painting.artistUsername && user.id === painting.artistUsername);
+  const canEditListing = isOwnListing || user?.userRole === UserRole.SITE_ADMIN;
 
   const handleEdit = (e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -116,15 +118,32 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
       onClick={contactDialogOpen ? undefined : handleViewDetails}
     >
       <Box sx={{ position: 'relative' }}>
-        <CardMedia
-          component="img"
-          height="300"
-          image={painting.image}
-          alt={painting.title}
-          sx={{
-            objectFit: 'cover',
-          }}
-        />
+        {painting.image ? (
+          <CardMedia
+            component="img"
+            height="300"
+            image={painting.image}
+            alt={painting.title}
+            sx={{
+              objectFit: 'cover',
+            }}
+          />
+        ) : (
+          <Box
+            sx={{
+              height: 300,
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'grey.200',
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              No Image
+            </Typography>
+          </Box>
+        )}
         {!painting.inStock && (
           <Box
             sx={{
@@ -142,15 +161,11 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
             <Typography
               sx={{
                 transform: 'rotate(-25deg)',
-                fontSize: '2.5rem',
+                fontSize: '4rem',
                 fontWeight: 700,
-                color: 'secondary.main',
-                textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                color: 'rgba(180, 50, 50, 0.25)',
                 letterSpacing: '0.2em',
-                px: 3,
-                py: 1.5,
-                bgcolor: 'rgba(74, 58, 154, 0.15)',
-                borderRadius: '9999px',
+                textShadow: '0 1px 2px rgba(0,0,0,0.3)',
               }}
             >
               SOLD
@@ -255,7 +270,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
         >
           View Details
         </Button>
-        {isOwnListing ? (
+        {canEditListing ? (
           <Tooltip title="Edit listing">
             <IconButton size="small" onClick={handleEdit} color="primary" aria-label="Edit listing">
               <EditIcon />

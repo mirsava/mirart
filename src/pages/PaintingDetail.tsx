@@ -36,6 +36,7 @@ import {
   Delete as DeleteIcon,
   Reply as ReplyIcon,
   InfoOutlined as InfoIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
@@ -44,6 +45,7 @@ import { useChat } from '../contexts/ChatContext';
 import { useSnackbar } from 'notistack';
 import apiService, { Listing, Comment } from '../services/api';
 import ContactSellerDialog from '../components/ContactSellerDialog';
+import { UserRole } from '../types/userRoles';
 import PageHeader from '../components/PageHeader';
 import { Painting } from '../types';
 
@@ -541,33 +543,46 @@ const PaintingDetail: React.FC = () => {
                     <Typography
                       sx={{
                         transform: 'rotate(-25deg)',
-                        fontSize: { xs: '3rem', md: '4.5rem' },
+                        fontSize: { xs: '4.5rem', md: '6rem' },
                         fontWeight: 700,
-                        color: 'secondary.main',
-                        textShadow: '0 2px 12px rgba(0,0,0,0.5)',
+                        color: 'rgba(180, 50, 50, 0.25)',
                         letterSpacing: '0.2em',
-                        px: 4,
-                        py: 2,
-                        bgcolor: 'rgba(74, 58, 154, 0.15)',
-                        borderRadius: '9999px',
+                        textShadow: '0 1px 2px rgba(0,0,0,0.3)',
                       }}
                     >
                       SOLD
                     </Typography>
                   </Box>
                 )}
-                <Box
-                  component="img"
-                  src={allImages[currentImageIndex] || painting.image}
-                  alt={`${painting.title} - Image ${currentImageIndex + 1}`}
-                  sx={{
-                    width: '100%',
-                    height: { xs: 400, md: 600 },
-                    objectFit: 'contain',
-                    display: 'block',
-                    bgcolor: 'background.paper',
-                  }}
-                />
+                {(allImages[currentImageIndex] || painting.image) ? (
+                  <Box
+                    component="img"
+                    src={allImages[currentImageIndex] || painting.image}
+                    alt={`${painting.title} - Image ${currentImageIndex + 1}`}
+                    sx={{
+                      width: '100%',
+                      height: { xs: 400, md: 600 },
+                      objectFit: 'contain',
+                      display: 'block',
+                      bgcolor: 'background.paper',
+                    }}
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: { xs: 400, md: 600 },
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'grey.200',
+                    }}
+                  >
+                    <Typography variant="body1" color="text.secondary">
+                      No Image
+                    </Typography>
+                  </Box>
+                )}
                 
                 {allImages.length > 1 && (
                   <>
@@ -991,6 +1006,17 @@ const PaintingDetail: React.FC = () => {
                 >
                   Back to Gallery
                 </Button>
+                {(painting.artistUsername === user?.id || user?.userRole === UserRole.SITE_ADMIN) && (
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    startIcon={<EditIcon />}
+                    onClick={() => navigate(`/edit-listing/${painting.id}`)}
+                    sx={{ flexGrow: { xs: 1, sm: 0 } }}
+                  >
+                    Edit Listing
+                  </Button>
+                )}
                 <Button
                   variant="outlined"
                   size="large"

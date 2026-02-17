@@ -488,7 +488,7 @@ const ArtistDashboard: React.FC = () => {
 
     setDeleting(true);
     try {
-      await apiService.deleteListing(listingToDelete.id);
+      await apiService.deleteListing(listingToDelete.id, user.id, user.groups);
       setDeleteDialogOpen(false);
       setListingToDelete(null);
       enqueueSnackbar('Listing deleted successfully!', { variant: 'success' });
@@ -684,6 +684,31 @@ const ArtistDashboard: React.FC = () => {
           </Box>
         ) : (
           <>
+            {/* Listing limit reached banner */}
+            {subscription && subscription.status === 'active' && (subscription.current_listings ?? artistStats.activeListings) >= (subscription.max_listings ?? 0) && (
+              <Alert
+                severity="warning"
+                sx={{ mb: 3 }}
+                action={
+                  <Button
+                    color="inherit"
+                    size="small"
+                    variant="outlined"
+                    onClick={() => navigate('/subscription-plans')}
+                  >
+                    Upgrade plan
+                  </Button>
+                }
+              >
+                <Typography variant="subtitle1" fontWeight={600}>
+                  Listing limit reached ({subscription.current_listings ?? artistStats.activeListings} / {subscription.max_listings} active)
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                  You cannot activate more listings until you free up slots. Deactivate an existing listing to make room, or upgrade your plan for more active listings.
+                </Typography>
+              </Alert>
+            )}
+
             {/* Stats Overview */}
             <Grid container spacing={2} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={4}>

@@ -416,6 +416,23 @@ router.put('/:cognitoUsername/reactivate', async (req, res) => {
       return res.status(403).json({ error: 'You can only reactivate your own account' });
     }
     
+    // Check if user is blocked - blocked users cannot self-reactivate
+    try {
+      const [existing] = await pool.execute(
+        'SELECT id, blocked FROM users WHERE cognito_username = ?',
+        [cognitoUsername]
+      );
+      if (existing.length > 0 && (existing[0].blocked === 1 || existing[0].blocked === true)) {
+        return res.status(403).json({ error: 'Your account has been blocked. Please contact support.' });
+      }
+    } catch (colErr) {
+      if (colErr.code === 'ER_BAD_FIELD_ERROR' && colErr.message?.includes('blocked')) {
+        // blocked column not yet migrated, proceed
+      } else {
+        throw colErr;
+      }
+    }
+    
     // Check if active column exists
     try {
       await pool.execute('UPDATE users SET active = 1 WHERE cognito_username = ?', [cognitoUsername]);

@@ -391,6 +391,8 @@ const EditListing: React.FC = () => {
         returns_info: formData.returns_info && formData.returns_info.trim() ? formData.returns_info.trim() : undefined,
         special_instructions: formData.special_instructions && formData.special_instructions.trim() ? formData.special_instructions.trim() : undefined,
         allow_comments: Boolean(formData.allow_comments),
+        cognito_username: user.id,
+        groups: user.groups || [],
       };
 
       listingData.price = parseFloat(formData.price);

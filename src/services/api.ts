@@ -253,15 +253,20 @@ class ApiService {
     });
   }
 
-  async updateListing(id: number, listingData: Partial<Listing>): Promise<Listing> {
+  async updateListing(id: number, listingData: Partial<Listing> & { cognito_username: string; groups?: string[] }): Promise<Listing> {
     return this.request<Listing>(`/listings/${id}`, {
       method: 'PUT',
       body: JSON.stringify(listingData),
     });
   }
 
-  async deleteListing(id: number): Promise<{ message: string }> {
-    return this.request<{ message: string }>(`/listings/${id}`, {
+  async deleteListing(id: number, cognitoUsername: string, groups?: string[]): Promise<{ message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<{ message: string }>(`/listings/${id}?${params.toString()}`, {
       method: 'DELETE',
     });
   }
@@ -477,7 +482,7 @@ class ApiService {
     return this.request<any>(`/admin/stats?${params.toString()}`);
   }
 
-  async getAdminUsers(cognitoUsername: string, filters?: { page?: number; limit?: number; search?: string }, groups?: string[]): Promise<any> {
+  async getAdminUsers(cognitoUsername: string, filters?: { page?: number; limit?: number; search?: string; subscriptionFilter?: string; subscriptionPlan?: string; subscriptionBilling?: string }, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);
     if (groups && groups.length > 0) {
@@ -545,6 +550,28 @@ class ApiService {
       params.append('groups', JSON.stringify(groups));
     }
     return this.request<{ success: boolean; message: string }>(`/admin/users/${userId}/deactivate?${params.toString()}`, {
+      method: 'PUT',
+    });
+  }
+
+  async blockUser(cognitoUsername: string, userId: number, groups?: string[]): Promise<{ success: boolean; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<{ success: boolean; message: string }>(`/admin/users/${userId}/block?${params.toString()}`, {
+      method: 'PUT',
+    });
+  }
+
+  async unblockUser(cognitoUsername: string, userId: number, groups?: string[]): Promise<{ success: boolean; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    return this.request<{ success: boolean; message: string }>(`/admin/users/${userId}/unblock?${params.toString()}`, {
       method: 'PUT',
     });
   }

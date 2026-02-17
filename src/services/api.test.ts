@@ -108,12 +108,12 @@ describe('ApiService', () => {
     });
 
     const { default: apiService } = await import('./api');
-    await apiService.deleteListing(42);
+    await apiService.deleteListing(42, 'user1');
 
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/listings/42'),
-      expect.objectContaining({ method: 'DELETE' })
-    );
+    const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(fetchCall[0]).toContain('/listings/42');
+    expect(fetchCall[0]).toContain('cognitoUsername=user1');
+    expect(fetchCall[1]).toMatchObject({ method: 'DELETE' });
   });
 
   it('throws on HTTP error with message from response', async () => {

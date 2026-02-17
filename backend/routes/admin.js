@@ -1,7 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import UserRole from '../constants/userRoles.js';
-import { CognitoIdentityProviderClient, AdminDeleteUserCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { CognitoIdentityProviderClient, AdminDeleteUserCommand, AdminDisableUserCommand, AdminEnableUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || 'us-east-1_c9TqRAcz9';
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
@@ -60,6 +60,61 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
       console.warn('Orders table may not exist:', orderError.message);
     }
 
+    let subscriptionStats = {
+      total: 0,
+      thisMonth: 0,
+      ytd: 0,
+      active: 0,
+      expired: 0,
+      cancelled: 0,
+      byPlan: {},
+      byBilling: { monthly: 0, yearly: 0 },
+    };
+    try {
+      const [subActive] = await pool.execute(
+        "SELECT COUNT(*) as total FROM user_subscriptions WHERE status = 'active' AND end_date >= CURDATE()"
+      );
+      const [subExpired] = await pool.execute(
+        "SELECT COUNT(*) as total FROM user_subscriptions WHERE status = 'expired'"
+      );
+      const [subCancelled] = await pool.execute(
+        "SELECT COUNT(*) as total FROM user_subscriptions WHERE status = 'cancelled'"
+      );
+      const [subThisMonth] = await pool.execute(
+        "SELECT COUNT(*) as total FROM user_subscriptions WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())"
+      );
+      const [subYtd] = await pool.execute(
+        "SELECT COUNT(*) as total FROM user_subscriptions WHERE YEAR(created_at) = YEAR(CURDATE())"
+      );
+      const [subByPlan] = await pool.execute(
+        `SELECT sp.name, COUNT(*) as total FROM user_subscriptions us
+         JOIN subscription_plans sp ON us.plan_id = sp.id
+         WHERE us.status = 'active' AND us.end_date >= CURDATE()
+         GROUP BY sp.id, sp.name`
+      );
+      const [subByBilling] = await pool.execute(
+        `SELECT billing_period, COUNT(*) as total FROM user_subscriptions
+         WHERE status = 'active' AND end_date >= CURDATE()
+         GROUP BY billing_period`
+      );
+      const byPlan = {};
+      subByPlan.forEach(p => { byPlan[p.name] = p.total; });
+      const byBilling = { monthly: 0, yearly: 0 };
+      subByBilling.forEach(b => { byBilling[b.billing_period] = b.total; });
+      subscriptionStats = {
+        total: (subActive[0]?.total || 0) + (subExpired[0]?.total || 0) + (subCancelled[0]?.total || 0),
+        thisMonth: subThisMonth[0]?.total || 0,
+        ytd: subYtd[0]?.total || 0,
+        active: subActive[0]?.total || 0,
+        expired: subExpired[0]?.total || 0,
+        cancelled: subCancelled[0]?.total || 0,
+        byPlan,
+        byBilling,
+      };
+    } catch (subError) {
+      console.warn('user_subscriptions table may not exist:', subError.message);
+    }
+
     const listingsByStatus = {};
     listingStats.forEach(stat => {
       listingsByStatus[stat.status] = stat.total;
@@ -85,6 +140,7 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
         total: Object.values(ordersByStatus).reduce((a, b) => a + b, 0),
         byStatus: ordersByStatus,
       },
+      subscriptions: subscriptionStats,
     });
   } catch (error) {
     console.error('Error fetching admin stats:', error);
@@ -94,36 +150,101 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
 
 router.get('/users', checkAdminAccess, async (req, res) => {
   try {
-    const { page = 1, limit = 20, search } = req.query;
+    // Ensure blocked column exists (auto-migrate if missing)
+    try {
+      await pool.execute('SELECT blocked FROM users LIMIT 1');
+    } catch (colError) {
+      if (colError.code === 'ER_BAD_FIELD_ERROR' && colError.message?.includes('blocked')) {
+        try {
+          await pool.execute('ALTER TABLE users ADD COLUMN blocked TINYINT(1) DEFAULT 0');
+        } catch (alterError) {
+          if (alterError.code !== 'ER_DUP_FIELDNAME') {
+            console.warn('Could not add blocked column:', alterError.message);
+          }
+        }
+      }
+    }
+
+    const { page = 1, limit = 20, search, subscriptionFilter, subscriptionPlan, subscriptionBilling } = req.query;
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 20;
     const offset = (pageNum - 1) * limitNum;
 
-    let query = 'SELECT * FROM users WHERE 1=1';
+    let query, countQuery;
     const params = [];
+    const countParams = [];
 
-    if (search) {
-      query += ' AND (email LIKE ? OR cognito_username LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR business_name LIKE ?)';
-      const searchTerm = `%${search}%`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    if (subscriptionFilter || subscriptionPlan || subscriptionBilling) {
+      query = `SELECT DISTINCT u.* FROM users u
+        JOIN user_subscriptions us ON u.id = us.user_id
+        JOIN subscription_plans sp ON us.plan_id = sp.id
+        WHERE 1=1`;
+      countQuery = `SELECT COUNT(DISTINCT u.id) as total FROM users u
+        JOIN user_subscriptions us ON u.id = us.user_id
+        JOIN subscription_plans sp ON us.plan_id = sp.id
+        WHERE 1=1`;
+      if (subscriptionFilter === 'active') {
+        query += " AND us.status = 'active' AND us.end_date >= CURDATE()";
+        countQuery += " AND us.status = 'active' AND us.end_date >= CURDATE()";
+      } else if (subscriptionFilter === 'expired') {
+        query += " AND us.status = 'expired'";
+        countQuery += " AND us.status = 'expired'";
+      } else if (subscriptionFilter === 'this_month') {
+        query += ' AND YEAR(us.created_at) = YEAR(CURDATE()) AND MONTH(us.created_at) = MONTH(CURDATE())';
+        countQuery += ' AND YEAR(us.created_at) = YEAR(CURDATE()) AND MONTH(us.created_at) = MONTH(CURDATE())';
+      } else if (subscriptionFilter === 'ytd') {
+        query += ' AND YEAR(us.created_at) = YEAR(CURDATE())';
+        countQuery += ' AND YEAR(us.created_at) = YEAR(CURDATE())';
+      }
+      if (subscriptionPlan) {
+        query += ' AND sp.name = ?';
+        countQuery += ' AND sp.name = ?';
+        params.push(subscriptionPlan);
+        countParams.push(subscriptionPlan);
+      }
+      if (subscriptionBilling) {
+        query += ' AND us.billing_period = ?';
+        countQuery += ' AND us.billing_period = ?';
+        params.push(subscriptionBilling);
+        countParams.push(subscriptionBilling);
+      }
+    } else {
+      query = 'SELECT * FROM users WHERE 1=1';
+      countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
     }
 
-    query += ` ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`;
+    const hasSubscriptionFilter = subscriptionFilter || subscriptionPlan || subscriptionBilling;
+    if (search) {
+      const searchTerm = `%${search}%`;
+      if (hasSubscriptionFilter) {
+        query += ' AND (u.email LIKE ? OR u.cognito_username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.business_name LIKE ?)';
+        countQuery += ' AND (u.email LIKE ? OR u.cognito_username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.business_name LIKE ?)';
+      } else {
+        query += ' AND (email LIKE ? OR cognito_username LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR business_name LIKE ?)';
+        countQuery += ' AND (email LIKE ? OR cognito_username LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR business_name LIKE ?)';
+      }
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      countParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    if (hasSubscriptionFilter) {
+      query += ' ORDER BY u.created_at DESC';
+    } else {
+      query += ' ORDER BY created_at DESC';
+    }
+    query += ` LIMIT ${limitNum} OFFSET ${offset}`;
 
     const [users] = await pool.execute(query, params);
     
-    // Add active field if column doesn't exist (default to true)
-    // Convert MySQL TINYINT (0/1) to boolean
+    // Add active and blocked fields, convert MySQL TINYINT to boolean
     const usersWithActive = users.map(user => ({
       ...user,
-      active: user.active !== undefined ? Boolean(user.active) : true
+      active: user.active !== undefined ? Boolean(user.active) : true,
+      blocked: user.blocked === 1 || user.blocked === true || user.blocked === '1'
     }));
-    const [countResult] = await pool.execute(
-      search 
-        ? 'SELECT COUNT(*) as total FROM users WHERE (email LIKE ? OR cognito_username LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR business_name LIKE ?)'
-        : 'SELECT COUNT(*) as total FROM users',
-      search ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`] : []
-    );
+
+    const countParamsToUse = hasSubscriptionFilter ? countParams : (search ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`] : []);
+    const [countResult] = await pool.execute(countQuery, countParamsToUse);
 
     const total = countResult[0].total;
     const totalPages = Math.ceil(total / limitNum);
@@ -490,6 +611,119 @@ router.put('/users/:userId/deactivate', checkAdminAccess, async (req, res) => {
     }
   } catch (error) {
     console.error('Error deactivating user:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// Block user: disables in Cognito so they cannot sign in. Prevents creating account with same credential.
+router.put('/users/:userId/block', checkAdminAccess, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const [users] = await pool.execute(
+      'SELECT cognito_username, email FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const cognitoUsername = users[0].cognito_username || users[0].email;
+    if (!cognitoUsername) {
+      return res.status(400).json({ error: 'User does not have Cognito username or email' });
+    }
+
+    // Disable user in Cognito (prevents sign-in)
+    try {
+      await cognitoClient.send(new AdminDisableUserCommand({
+        UserPoolId: USER_POOL_ID,
+        Username: cognitoUsername,
+      }));
+    } catch (cognitoError) {
+      if (cognitoError.name === 'UserNotFoundException') {
+        console.warn(`User ${cognitoUsername} not found in Cognito, proceeding with DB update`);
+      } else if (cognitoError.name === 'CredentialsProviderError' || cognitoError.message?.includes('credentials')) {
+        console.warn('AWS credentials not configured. Updating database only.');
+      } else {
+        console.error('Cognito disable error:', cognitoError);
+        return res.status(502).json({
+          error: 'Failed to block user in Cognito',
+          details: cognitoError.message || 'Cognito API error',
+        });
+      }
+    }
+
+    // Ensure blocked column exists, then update
+    try {
+      await pool.execute('SELECT blocked FROM users LIMIT 1');
+    } catch (colErr) {
+      if (colErr.code === 'ER_BAD_FIELD_ERROR' && colErr.message?.includes('blocked')) {
+        await pool.execute('ALTER TABLE users ADD COLUMN blocked TINYINT(1) DEFAULT 0');
+      }
+    }
+    await pool.execute('UPDATE users SET active = 0, blocked = 1 WHERE id = ?', [userId]);
+
+    res.json({ success: true, message: 'User blocked successfully. They cannot sign in or create an account with the same credentials.' });
+  } catch (error) {
+    console.error('Error blocking user:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// Unblock user: re-enables in Cognito
+router.put('/users/:userId/unblock', checkAdminAccess, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const [users] = await pool.execute(
+      'SELECT cognito_username, email FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const cognitoUsername = users[0].cognito_username || users[0].email;
+    if (!cognitoUsername) {
+      return res.status(400).json({ error: 'User does not have Cognito username or email' });
+    }
+
+    // Enable user in Cognito
+    try {
+      await cognitoClient.send(new AdminEnableUserCommand({
+        UserPoolId: USER_POOL_ID,
+        Username: cognitoUsername,
+      }));
+    } catch (cognitoError) {
+      if (cognitoError.name === 'UserNotFoundException') {
+        console.warn(`User ${cognitoUsername} not found in Cognito, proceeding with DB update`);
+      } else if (cognitoError.name === 'CredentialsProviderError' || cognitoError.message?.includes('credentials')) {
+        console.warn('AWS credentials not configured. Updating database only.');
+      } else {
+        console.error('Cognito enable error:', cognitoError);
+        return res.status(502).json({
+          error: 'Failed to unblock user in Cognito',
+          details: cognitoError.message || 'Cognito API error',
+        });
+      }
+    }
+
+    // Update DB: set active=1, blocked=0
+    try {
+      await pool.execute('UPDATE users SET active = 1, blocked = 0 WHERE id = ?', [userId]);
+    } catch (dbError) {
+      if (dbError.code === 'ER_BAD_FIELD_ERROR' && dbError.message?.includes('blocked')) {
+        await pool.execute('UPDATE users SET active = 1 WHERE id = ?', [userId]);
+      } else {
+        throw dbError;
+      }
+    }
+
+    res.json({ success: true, message: 'User unblocked successfully' });
+  } catch (error) {
+    console.error('Error unblocking user:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
