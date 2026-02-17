@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CartProvider, useCart } from './CartContext';
+import { AuthProvider } from './AuthContext';
+
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <AuthProvider>
+    <CartProvider>{children}</CartProvider>
+  </AuthProvider>
+);
 
 const TestConsumer: React.FC = () => {
   const { cartItems, addToCart, removeFromCart, updateQuantity, clearCart, getTotalPrice, getTotalItems } = useCart();
@@ -40,9 +47,9 @@ describe('CartContext', () => {
 
   it('provides cart context to children', () => {
     render(
-      <CartProvider>
+      <TestWrapper>
         <TestConsumer />
-      </CartProvider>
+      </TestWrapper>
     );
     expect(screen.getByTestId('count')).toHaveTextContent('0');
     expect(screen.getByTestId('total')).toHaveTextContent('0');
@@ -51,9 +58,9 @@ describe('CartContext', () => {
   it('addToCart adds item', async () => {
     const user = userEvent.setup();
     render(
-      <CartProvider>
+      <TestWrapper>
         <TestConsumer />
-      </CartProvider>
+      </TestWrapper>
     );
     await user.click(screen.getByText('Add'));
     expect(screen.getByTestId('count')).toHaveTextContent('1');
@@ -64,9 +71,9 @@ describe('CartContext', () => {
   it('addToCart increments quantity for existing item', async () => {
     const user = userEvent.setup();
     render(
-      <CartProvider>
+      <TestWrapper>
         <TestConsumer />
-      </CartProvider>
+      </TestWrapper>
     );
     await user.click(screen.getByText('Add'));
     await user.click(screen.getByText('Add'));
@@ -78,9 +85,9 @@ describe('CartContext', () => {
   it('removeFromCart removes item', async () => {
     const user = userEvent.setup();
     render(
-      <CartProvider>
+      <TestWrapper>
         <TestConsumer />
-      </CartProvider>
+      </TestWrapper>
     );
     await user.click(screen.getByText('Add'));
     await user.click(screen.getByText('Remove'));
@@ -91,9 +98,9 @@ describe('CartContext', () => {
   it('updateQuantity updates item quantity', async () => {
     const user = userEvent.setup();
     render(
-      <CartProvider>
+      <TestWrapper>
         <TestConsumer />
-      </CartProvider>
+      </TestWrapper>
     );
     await user.click(screen.getByText('Add'));
     await user.click(screen.getByText('Update Qty'));
@@ -104,9 +111,9 @@ describe('CartContext', () => {
   it('clearCart removes all items', async () => {
     const user = userEvent.setup();
     render(
-      <CartProvider>
+      <TestWrapper>
         <TestConsumer />
-      </CartProvider>
+      </TestWrapper>
     );
     await user.click(screen.getByText('Add'));
     await user.click(screen.getByText('Add Activation'));
@@ -118,12 +125,12 @@ describe('CartContext', () => {
   it('persists cart to localStorage', async () => {
     const user = userEvent.setup();
     render(
-      <CartProvider>
+      <TestWrapper>
         <TestConsumer />
-      </CartProvider>
+      </TestWrapper>
     );
     await user.click(screen.getByText('Add'));
-    const saved = localStorage.getItem('cart');
+    const saved = localStorage.getItem('cart_guest');
     expect(saved).toBeTruthy();
     const parsed = JSON.parse(saved!);
     expect(parsed).toHaveLength(1);

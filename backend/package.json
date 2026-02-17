@@ -25,6 +25,7 @@
     "migrate-subscriptions": "node database/run-subscription-migration.js",
     "migrate-stripe-product": "node database/run-stripe-product-migration.js",
     "migrate-payment-intent-id": "node database/run-payment-intent-migration.js",
+    "migrate-stripe-connect": "node database/run-stripe-connect-migration.js",
     "rename-column": "node rename-column.js",
     "reset-db": "node scripts/reset-database.js",
     "set-admin": "node scripts/set-admin.js",

@@ -1,5 +1,6 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { stripe } from '../config/stripe.js';
 
 const router = express.Router();
 
@@ -196,6 +197,104 @@ router.get('/user/:cognitoUsername', async (req, res) => {
   } catch (error) {
     console.error('Error fetching orders:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Mark order as shipped (seller)
+router.put('/:orderId/mark-shipped', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { cognito_username } = req.body;
+    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+
+    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
+    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+    const seller_id = users[0].id;
+
+    const [orders] = await pool.execute(
+      'SELECT id, seller_id, status FROM orders WHERE id = ? AND seller_id = ?',
+      [orderId, seller_id]
+    );
+    if (orders.length === 0) return res.status(404).json({ error: 'Order not found' });
+    if (orders[0].status !== 'paid') {
+      return res.status(400).json({ error: 'Only paid orders can be marked as shipped' });
+    }
+
+    await pool.execute("UPDATE orders SET status = 'shipped' WHERE id = ?", [orderId]);
+    res.json({ success: true, status: 'shipped' });
+  } catch (error) {
+    console.error('Error marking order shipped:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Confirm delivery (buyer) - captures payment and transfers funds to artist via Stripe Connect
+router.put('/:orderId/confirm-delivery', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { cognito_username } = req.body;
+    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+
+    if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+
+    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
+    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+    const buyer_id = users[0].id;
+
+    const [orders] = await pool.execute(
+      `SELECT o.*, u.stripe_account_id as seller_stripe_account_id
+       FROM orders o JOIN users u ON o.seller_id = u.id
+       WHERE o.id = ? AND o.buyer_id = ?`,
+      [orderId, buyer_id]
+    );
+    if (orders.length === 0) return res.status(404).json({ error: 'Order not found' });
+    const order = orders[0];
+    if (order.status === 'delivered') return res.json({ success: true, status: 'delivered', alreadyDone: true });
+    if (!['paid', 'shipped'].includes(order.status)) {
+      return res.status(400).json({ error: 'Order cannot be confirmed' });
+    }
+
+    const payment_intent_id = order.payment_intent_id;
+    if (!payment_intent_id) return res.status(400).json({ error: 'Order has no payment intent' });
+
+    let pi = await stripe.paymentIntents.retrieve(payment_intent_id);
+    if (pi.status === 'requires_capture') {
+      await stripe.paymentIntents.capture(payment_intent_id);
+      pi = await stripe.paymentIntents.retrieve(payment_intent_id);
+    }
+
+    const artist_earnings_cents = Math.round(parseFloat(order.artist_earnings) * 100);
+    if (artist_earnings_cents > 0 && order.seller_stripe_account_id && !order.stripe_transfer_id) {
+      const chargeId = pi.latest_charge;
+      const sourceTransaction = typeof chargeId === 'string' ? chargeId : chargeId?.id;
+      const transfer = await stripe.transfers.create({
+        amount: artist_earnings_cents,
+        currency: 'usd',
+        destination: order.seller_stripe_account_id,
+        transfer_group: `order-${order.order_number}`,
+        ...(sourceTransaction && { source_transaction: sourceTransaction }),
+      });
+      await pool.execute('UPDATE orders SET stripe_transfer_id = ? WHERE id = ?', [transfer.id, orderId]);
+    }
+
+    await pool.execute("UPDATE orders SET status = 'delivered' WHERE id = ?", [orderId]);
+
+    try {
+      await pool.execute(
+        `UPDATE dashboard_stats SET total_revenue = total_revenue + ? WHERE user_id = ?`,
+        [order.artist_earnings, order.seller_id]
+      );
+    } catch (e) {
+      console.error('Dashboard stats update:', e);
+    }
+
+    res.json({ success: true, status: 'delivered' });
+  } catch (error) {
+    console.error('Error confirming delivery:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to confirm delivery',
+      details: error.type === 'StripeError' ? error.message : undefined,
+    });
   }
 });
 

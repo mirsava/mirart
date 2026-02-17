@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Artwork, CartItem, CartContextType } from '../types';
+import { useAuth } from './AuthContext';
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -11,19 +12,40 @@ export const useCart = (): CartContextType => {
   return context;
 };
 
+const getStorageKey = (userId: string | null) => `cart_${userId || 'guest'}`;
+
 interface CartProviderProps {
   children: ReactNode;
 }
 
 export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem('cart');
+    const key = getStorageKey(userId);
+    const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : [];
   });
+  const prevUserIdRef = useRef<string | null>(userId);
 
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cartItems));
-  }, [cartItems]);
+    if (prevUserIdRef.current !== userId) {
+      const prevUserId = prevUserIdRef.current;
+      prevUserIdRef.current = userId;
+      if (userId === null) {
+        setCartItems([]);
+      } else {
+        const key = getStorageKey(userId);
+        const saved = localStorage.getItem(key);
+        setCartItems(saved ? JSON.parse(saved) : []);
+      }
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    const key = getStorageKey(userId);
+    localStorage.setItem(key, JSON.stringify(cartItems));
+  }, [cartItems, userId]);
 
   const addToCart = (painting: Artwork, type: 'artwork' | 'activation' = 'artwork', listingId?: number): void => {
     if (type === 'artwork') {

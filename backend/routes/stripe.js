@@ -5,6 +5,77 @@ import { stripe } from '../config/stripe.js';
 const router = express.Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
+// --- Stripe Connect onboarding (artists receive payouts when buyer confirms delivery) ---
+router.post('/connect/create-account', async (req, res) => {
+  try {
+    if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+    const { cognito_username, email, business_name } = req.body;
+    if (!cognito_username || !email) {
+      return res.status(400).json({ error: 'cognito_username and email are required' });
+    }
+    const [users] = await pool.execute('SELECT id, stripe_account_id FROM users WHERE cognito_username = ?', [cognito_username]);
+    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+    const user = users[0];
+    if (user.stripe_account_id) {
+      return res.json({ accountId: user.stripe_account_id, existing: true });
+    }
+    const account = await stripe.accounts.create({
+      type: 'express',
+      country: 'US',
+      email,
+      capabilities: { card_payments: { requested: true } },
+    });
+    await pool.execute('UPDATE users SET stripe_account_id = ? WHERE id = ?', [account.id, user.id]);
+    res.json({ accountId: account.id });
+  } catch (error) {
+    console.error('Stripe Connect create account error:', error);
+    res.status(500).json({ error: error.message || 'Failed to create Connect account' });
+  }
+});
+
+router.post('/connect/create-account-link', async (req, res) => {
+  try {
+    if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+    const { cognito_username } = req.body;
+    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+    const [users] = await pool.execute('SELECT id, stripe_account_id FROM users WHERE cognito_username = ?', [cognito_username]);
+    if (users.length === 0 || !users[0].stripe_account_id) {
+      return res.status(400).json({ error: 'Connect account not created. Call create-account first.' });
+    }
+    const link = await stripe.accountLinks.create({
+      account: users[0].stripe_account_id,
+      refresh_url: `${FRONTEND_URL}/artist-dashboard?stripe_refresh=1`,
+      return_url: `${FRONTEND_URL}/artist-dashboard?stripe_return=1`,
+      type: 'account_onboarding',
+    });
+    res.json({ url: link.url });
+  } catch (error) {
+    console.error('Stripe Connect account link error:', error);
+    res.status(500).json({ error: error.message || 'Failed to create account link' });
+  }
+});
+
+router.get('/connect/status', async (req, res) => {
+  try {
+    if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+    const { cognito_username } = req.query;
+    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+    const [users] = await pool.execute('SELECT stripe_account_id FROM users WHERE cognito_username = ?', [cognito_username]);
+    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+    const accountId = users[0].stripe_account_id;
+    if (!accountId) return res.json({ connected: false, chargesEnabled: false });
+    const account = await stripe.accounts.retrieve(accountId);
+    res.json({
+      connected: true,
+      chargesEnabled: account.charges_enabled || false,
+      detailsSubmitted: account.details_submitted || false,
+    });
+  } catch (error) {
+    console.error('Stripe Connect status error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get Connect status' });
+  }
+});
+
 router.post('/create-checkout-session', async (req, res) => {
   try {
     if (!stripe) {
@@ -57,7 +128,26 @@ router.post('/create-checkout-session', async (req, res) => {
         quantity: 1,
       }];
     } else {
-      // One-time payment (artwork)
+      // One-time payment (artwork) - Stripe Connect: manual capture, funds held until delivery
+      const orderDataJson = metadata?.order_data;
+      if (orderDataJson) {
+        const orderData = typeof orderDataJson === 'string' ? JSON.parse(orderDataJson) : orderDataJson;
+        const orderItems = orderData?.items || [];
+        for (const item of orderItems) {
+          const [listings] = await pool.execute(
+            `SELECT l.user_id, u.stripe_account_id FROM listings l JOIN users u ON l.user_id = u.id WHERE l.id = ?`,
+            [item.listing_id]
+          );
+          if (listings.length > 0 && !listings[0].stripe_account_id) {
+            const [seller] = await pool.execute('SELECT email, first_name, last_name FROM users WHERE id = ?', [listings[0].user_id]);
+            const name = seller[0]?.business_name || [seller[0]?.first_name, seller[0]?.last_name].filter(Boolean).join(' ') || 'Artist';
+            return res.status(400).json({
+              error: 'Artist has not set up payouts',
+              details: `${name} must complete Stripe Connect onboarding before they can receive payments. Please ask them to set up their payout account in their dashboard.`,
+            });
+          }
+        }
+      }
       const totalAmountCents = Math.round(
         items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity * 100, 0)
       );
@@ -101,6 +191,18 @@ router.post('/create-checkout-session', async (req, res) => {
       metadata: sessionMetadata,
     };
 
+    // Artwork: manual capture + transfer_group (funds held until buyer confirms delivery)
+    if (mode === 'payment' && !isSubscription) {
+      const transferGroup = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      sessionConfig.payment_intent_data = {
+        capture_method: 'manual',
+        transfer_group: transferGroup,
+      };
+      if (sessionMetadata.order_data) {
+        sessionMetadata.transfer_group = transferGroup;
+      }
+    }
+
     if (mode === 'payment' && shipping_address && Object.keys(shipping_address).length > 0) {
       sessionConfig.shipping_address_collection = {
         allowed_countries: ['US', 'CA', 'GB', 'AU'],
@@ -129,16 +231,29 @@ router.get('/confirm-session', async (req, res) => {
     }
 
     const session = await stripe.checkout.sessions.retrieve(session_id, {
-      expand: ['line_items', 'subscription'],
+      expand: ['line_items', 'subscription', 'payment_intent'],
     });
 
     const metadata = session.metadata || {};
     const isSubscription = metadata.is_subscription === 'true' || metadata.is_subscription === true;
+    const isArtwork = Boolean(metadata.order_data);
 
-    // For subscriptions: accept 'paid' or 'complete' session (redirect only happens on success)
-    // For one-time payments: require 'paid'
-    const paymentOk = session.payment_status === 'paid' ||
+    // For subscriptions: accept 'paid' or 'complete' session
+    // For artwork (manual capture): accept 'unpaid' when payment_intent status is 'requires_capture'
+    // For other one-time: require 'paid'
+    let paymentOk = session.payment_status === 'paid' ||
       (isSubscription && session.status === 'complete' && session.subscription);
+
+    if (!paymentOk && isArtwork && session.payment_status === 'unpaid') {
+      const pi = session.payment_intent;
+      const piId = typeof pi === 'string' ? pi : pi?.id;
+      if (piId) {
+        const piObj = typeof pi === 'object' ? pi : await stripe.paymentIntents.retrieve(piId);
+        if (piObj?.status === 'requires_capture') {
+          paymentOk = true; // Authorized, funds held until delivery
+        }
+      }
+    }
 
     if (!paymentOk) {
       console.warn('Stripe confirm-session: payment not ready', {
@@ -146,6 +261,7 @@ router.get('/confirm-session', async (req, res) => {
         payment_status: session.payment_status,
         status: session.status,
         isSubscription,
+        isArtwork,
       });
       return res.status(400).json({
         error: 'Payment not completed. Your payment may still be processing—please wait a moment and refresh the page, or check your email for confirmation.',

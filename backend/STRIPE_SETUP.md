@@ -1,6 +1,6 @@
 # Stripe Payment Setup
 
-ArtZyla uses Stripe for payment processing (artwork purchases and subscription plans).
+ArtZyla uses Stripe for payment processing (artwork purchases and subscription plans). Artwork purchases use **Stripe Connect** with **manual capture**—funds are held until the buyer confirms delivery, then transferred to the artist.
 
 ## Required Credentials
 
@@ -64,6 +64,15 @@ VITE_STRIPE_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxx
 ```
 
 The current implementation uses Stripe Checkout (redirect flow), which does not require the publishable key on the frontend.
+
+## Stripe Connect (Artwork Payouts)
+
+Artwork purchases use Stripe Connect so artists receive payouts when buyers confirm delivery:
+
+1. **Enable Connect** in Stripe Dashboard → **Settings** → **Connect**
+2. Run the migration: `npm run migrate-stripe-connect`
+3. Artists set up payouts in **Dashboard** → **Settings** → **Payouts**
+4. Flow: Buyer pays (auth only) → Seller ships → Buyer confirms delivery → Funds captured and transferred to artist
 
 ## Webhooks (Optional)
 

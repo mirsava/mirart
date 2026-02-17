@@ -303,6 +303,38 @@ class ApiService {
     return this.request<Order[]>(`/orders/user/${cognitoUsername}${params}`);
   }
 
+  async markOrderShipped(orderId: number, cognitoUsername: string): Promise<{ success: boolean; status: string }> {
+    return this.request(`/orders/${orderId}/mark-shipped`, {
+      method: 'PUT',
+      body: JSON.stringify({ cognito_username: cognitoUsername }),
+    });
+  }
+
+  async confirmOrderDelivery(orderId: number, cognitoUsername: string): Promise<{ success: boolean; status: string }> {
+    return this.request(`/orders/${orderId}/confirm-delivery`, {
+      method: 'PUT',
+      body: JSON.stringify({ cognito_username: cognitoUsername }),
+    });
+  }
+
+  async createStripeConnectAccount(cognitoUsername: string, email: string, businessName?: string): Promise<{ accountId: string; existing?: boolean }> {
+    return this.request('/stripe/connect/create-account', {
+      method: 'POST',
+      body: JSON.stringify({ cognito_username: cognitoUsername, email, business_name: businessName }),
+    });
+  }
+
+  async createStripeConnectAccountLink(cognitoUsername: string): Promise<{ url: string }> {
+    return this.request('/stripe/connect/create-account-link', {
+      method: 'POST',
+      body: JSON.stringify({ cognito_username: cognitoUsername }),
+    });
+  }
+
+  async getStripeConnectStatus(cognitoUsername: string): Promise<{ connected: boolean; chargesEnabled?: boolean; detailsSubmitted?: boolean }> {
+    return this.request(`/stripe/connect/status?cognito_username=${encodeURIComponent(cognitoUsername)}`);
+  }
+
   async createStripeCheckoutSession(
     items: Array<{ name: string; price: number; quantity: number; image_url?: string }>,
     options?: {

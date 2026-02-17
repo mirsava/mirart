@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
   Typography,
   TextField,
   Button,
@@ -16,13 +15,13 @@ import {
   Alert,
   CircularProgress,
   IconButton,
-  Chip,
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
+import PageHeader from '../components/PageHeader';
 
 const EditListing: React.FC = () => {
   const { user } = useAuth();
@@ -419,15 +418,14 @@ const EditListing: React.FC = () => {
   }
 
   return (
-    <Box sx={{ py: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
-      <Container maxWidth="md">
-        <Paper sx={{ p: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Edit Listing
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-            Update your artwork listing
-          </Typography>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
+      <PageHeader
+        title="Edit Listing"
+        subtitle="Update your artwork listing"
+        align="left"
+      />
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: { xs: 4, sm: 5, md: 6 } }}>
+        <Paper sx={{ p: { xs: 2, sm: 3, md: 4 }, width: '100%' }}>
 
           {error && (
             <Alert severity="error" sx={{ mb: 3 }}>
@@ -786,7 +784,7 @@ const EditListing: React.FC = () => {
             </Grid>
           </form>
         </Paper>
-      </Container>
+      </Box>
     </Box>
   );
 };

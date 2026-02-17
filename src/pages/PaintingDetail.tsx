@@ -523,6 +523,39 @@ const PaintingDetail: React.FC = () => {
                   position: 'relative',
                 }}
               >
+                {!painting.inStock && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      pointerEvents: 'none',
+                      zIndex: 1,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        transform: 'rotate(-25deg)',
+                        fontSize: { xs: '3rem', md: '4.5rem' },
+                        fontWeight: 700,
+                        color: 'secondary.main',
+                        textShadow: '0 2px 12px rgba(0,0,0,0.5)',
+                        letterSpacing: '0.2em',
+                        px: 4,
+                        py: 2,
+                        bgcolor: 'rgba(74, 58, 154, 0.15)',
+                        borderRadius: '9999px',
+                      }}
+                    >
+                      SOLD
+                    </Typography>
+                  </Box>
+                )}
                 <Box
                   component="img"
                   src={allImages[currentImageIndex] || painting.image}
@@ -758,9 +791,14 @@ const PaintingDetail: React.FC = () => {
                   )}
                 </Typography>
 
-                <Typography variant="h4" color="primary" sx={{ mb: 3 }}>
-                  ${painting.price ?? 'N/A'}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+                  <Typography variant="h4" color="primary">
+                    ${painting.price ?? 'N/A'}
+                  </Typography>
+                  {!painting.inStock && (
+                    <Chip label="Sold" color="default" sx={{ fontWeight: 600 }} />
+                  )}
+                </Box>
 
                 <Typography variant="body1" paragraph>
                   {painting.description}
@@ -797,6 +835,16 @@ const PaintingDetail: React.FC = () => {
                         {painting.category}
                       </Typography>
                     </Box>
+                    {painting.subcategory && (
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Subcategory
+                        </Typography>
+                        <Typography variant="body1">
+                          {painting.subcategory}
+                        </Typography>
+                      </Box>
+                    )}
                     <Box>
                       <Typography variant="body2" color="text.secondary">
                         Year

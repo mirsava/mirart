@@ -125,6 +125,38 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
             objectFit: 'cover',
           }}
         />
+        {!painting.inStock && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            <Typography
+              sx={{
+                transform: 'rotate(-25deg)',
+                fontSize: '2.5rem',
+                fontWeight: 700,
+                color: 'secondary.main',
+                textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                letterSpacing: '0.2em',
+                px: 3,
+                py: 1.5,
+                bgcolor: 'rgba(74, 58, 154, 0.15)',
+                borderRadius: '9999px',
+              }}
+            >
+              SOLD
+            </Typography>
+          </Box>
+        )}
         {painting.imageCount != null && painting.imageCount > 0 && (
           <Chip
             icon={<PhotoLibraryIcon sx={{ fontSize: 16 }} />}
@@ -182,9 +214,14 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
           {painting.dimensions} • {painting.medium}
         </Typography>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" color="primary" fontWeight="bold">
-            ${painting.price ?? 'N/A'}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+            <Typography variant="h6" color="primary" fontWeight="bold">
+              ${painting.price ?? 'N/A'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {painting.inStock ? '1 available' : '0 available'}
+            </Typography>
+          </Box>
           {isAuthenticated && (
             <Tooltip title={isLiked ? 'Unlike' : 'Like'}>
               <IconButton
@@ -226,7 +263,9 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
           </Tooltip>
         ) : (
           <>
-            {painting.inStock && (
+            {!painting.inStock ? (
+              <Chip label="Sold" color="default" size="small" sx={{ fontWeight: 600 }} />
+            ) : (
               <Button
                 size="small"
                 variant="contained"

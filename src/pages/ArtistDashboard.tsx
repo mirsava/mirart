@@ -162,19 +162,49 @@ const ArtistDashboard: React.FC = () => {
   const [salesOrders, setSalesOrders] = useState<Order[]>([]);
   const [ordersSubTab, setOrdersSubTab] = useState(0);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [connectStatus, setConnectStatus] = useState<{ connected: boolean; chargesEnabled?: boolean } | null>(null);
+  const [connectLoading, setConnectLoading] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
       fetchSubscription();
-      if (tabValue === 4) {
+      if (tabValue === 4 || tabValue === 5) {
         fetchProfile();
       }
       if (tabValue === 5) {
         fetchSettings();
+        fetchConnectStatus();
       }
     }
   }, [user?.id, tabValue]);
+
+  const fetchConnectStatus = async () => {
+    if (!user?.id) return;
+    try {
+      const status = await apiService.getStripeConnectStatus(user.id);
+      setConnectStatus(status);
+    } catch {
+      setConnectStatus({ connected: false });
+    }
+  };
+
+  const handleConnectOnboarding = async () => {
+    if (!user?.id || !profileData?.email) {
+      enqueueSnackbar('Please save your profile with an email first', { variant: 'warning' });
+      return;
+    }
+    setConnectLoading(true);
+    try {
+      await apiService.createStripeConnectAccount(user.id, profileData.email, profileData.business_name || undefined);
+      const { url } = await apiService.createStripeConnectAccountLink(user.id);
+      window.location.href = url;
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to start payout setup', { variant: 'error' });
+    } finally {
+      setConnectLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (user?.id && tabValue === 0) {
@@ -2018,6 +2048,33 @@ const ArtistDashboard: React.FC = () => {
               </Box>
             ) : (
               <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                      Payouts (Stripe Connect)
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Set up your payout account to receive payments when buyers confirm delivery. Funds are held securely until the buyer receives their artwork.
+                    </Typography>
+                    {connectStatus?.chargesEnabled ? (
+                      <Chip icon={<CheckCircleIcon />} label="Payout account connected" color="success" />
+                    ) : (
+                      <Button
+                        variant="outlined"
+                        startIcon={<CreditCardIcon />}
+                        onClick={handleConnectOnboarding}
+                        disabled={connectLoading || !profileData?.email}
+                      >
+                        {connectLoading ? 'Redirecting...' : connectStatus?.connected ? 'Complete setup' : 'Set up payouts'}
+                      </Button>
+                    )}
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 2 }} />
+                  </Grid>
+
+                  <Grid item xs={12}>
                 <form onSubmit={handleSettingsSubmit}>
                   <Grid container spacing={2}>
                     <Grid item xs={12}>
@@ -2131,6 +2188,8 @@ const ArtistDashboard: React.FC = () => {
                     </Grid>
                   </Grid>
                 </form>
+                  </Grid>
+                </Grid>
               </Paper>
             )}
           </TabPanel>

@@ -11,10 +11,18 @@ import {
   Chip,
   CircularProgress,
   Alert,
+  Button,
 } from '@mui/material';
-import { Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Store as StoreIcon } from '@mui/icons-material';
+import {
+  Receipt as ReceiptIcon,
+  ShoppingBag as ShoppingBagIcon,
+  Store as StoreIcon,
+  LocalShipping as ShippingIcon,
+  CheckCircle as CheckCircleIcon,
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from 'notistack';
 import apiService, { Order } from '../services/api';
 import PageHeader from '../components/PageHeader';
 
@@ -39,11 +47,13 @@ const statusColor: Record<string, 'default' | 'primary' | 'success' | 'warning' 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
   const [tabValue, setTabValue] = useState(0);
   const [purchases, setPurchases] = useState<Order[]>([]);
   const [sales, setSales] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) {
@@ -75,6 +85,54 @@ const Orders: React.FC = () => {
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const refreshOrders = async () => {
+    if (!user?.id) return;
+    try {
+      const [purchasesData, salesData] = await Promise.all([
+        apiService.getUserOrders(user.id, 'buyer'),
+        apiService.getUserOrders(user.id, 'seller'),
+      ]);
+      setPurchases(purchasesData || []);
+      setSales(salesData || []);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleMarkShipped = async (orderId: number) => {
+    if (!user?.id) return;
+    setActionLoading(orderId);
+    setError(null);
+    try {
+      await apiService.markOrderShipped(orderId, user.id);
+      await refreshOrders();
+      enqueueSnackbar('Order marked as shipped', { variant: 'success' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to mark as shipped';
+      setError(msg);
+      enqueueSnackbar(msg, { variant: 'error' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleConfirmDelivery = async (orderId: number) => {
+    if (!user?.id) return;
+    setActionLoading(orderId);
+    setError(null);
+    try {
+      await apiService.confirmOrderDelivery(orderId, user.id);
+      await refreshOrders();
+      enqueueSnackbar('Delivery confirmed. Funds have been released to the artist.', { variant: 'success' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to confirm delivery';
+      setError(msg);
+      enqueueSnackbar(msg, { variant: 'error' });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   if (!isAuthenticated || !user?.id) {
@@ -140,6 +198,31 @@ const Orders: React.FC = () => {
               Qty: {order.quantity}
             </Typography>
           </Box>
+          {type === 'sale' && order.status === 'paid' && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<ShippingIcon />}
+              onClick={(e) => { e.stopPropagation(); handleMarkShipped(order.id); }}
+              disabled={actionLoading === order.id}
+              sx={{ mt: 1 }}
+            >
+              {actionLoading === order.id ? '...' : 'Mark as shipped'}
+            </Button>
+          )}
+          {type === 'purchase' && (order.status === 'shipped' || order.status === 'paid') && order.status !== 'delivered' && (
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              startIcon={<CheckCircleIcon />}
+              onClick={(e) => { e.stopPropagation(); handleConfirmDelivery(order.id); }}
+              disabled={actionLoading === order.id}
+              sx={{ mt: 1 }}
+            >
+              {actionLoading === order.id ? '...' : 'Confirm delivery'}
+            </Button>
+          )}
         </Box>
         <Typography variant="caption" color="text.secondary">
           {new Date(order.created_at).toLocaleDateString()}
