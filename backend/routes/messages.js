@@ -1,5 +1,6 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { createNotification } from '../services/notificationService.js';
 
 const router = express.Router();
 
@@ -392,7 +393,20 @@ router.post('/:messageId/reply', async (req, res) => {
         newRecipientEmail,
         rootMessageId,
       ];
-      await pool.execute(insertQuery, insertParams);
+      const [insertResult] = await pool.execute(insertQuery, insertParams);
+      const newMessageId = insertResult.insertId;
+      try {
+        await createNotification({
+          userId: newRecipientId,
+          type: 'message',
+          title: 'New message',
+          body: `${newSenderName || newSenderEmail}: ${replySubject.slice(0, 80)}`,
+          link: '/messages',
+          referenceId: newMessageId,
+        });
+      } catch (nErr) {
+        console.warn('Could not create notification:', nErr.message);
+      }
     } catch (error) {
       // If column doesn't exist, insert without parent_message_id
       if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('parent_message_id')) {
@@ -410,7 +424,19 @@ router.post('/:messageId/reply', async (req, res) => {
           newSenderName,
           newRecipientEmail,
         ];
-        await pool.execute(insertQuery, insertParams);
+        const [fallbackResult] = await pool.execute(insertQuery, insertParams);
+        try {
+          await createNotification({
+            userId: newRecipientId,
+            type: 'message',
+            title: 'New message',
+            body: `${newSenderName || newSenderEmail}: ${replySubject.slice(0, 80)}`,
+            link: '/messages',
+            referenceId: fallbackResult.insertId,
+          });
+        } catch (nErr) {
+          console.warn('Could not create notification:', nErr.message);
+        }
       } else {
         throw error;
       }

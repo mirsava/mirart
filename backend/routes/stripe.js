@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
+import { createNotification } from '../services/notificationService.js';
 
 const router = express.Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -468,6 +469,28 @@ router.get('/confirm-session', async (req, res) => {
           [result.insertId]
         );
         createdOrders.push(newOrder[0]);
+
+        try {
+          const listingTitle = listing.title || 'Artwork';
+          await createNotification({
+            userId: listing.user_id,
+            type: 'order',
+            title: 'New sale',
+            body: `Order ${order_number} for ${listingTitle}`,
+            link: '/orders',
+            referenceId: result.insertId,
+          });
+          await createNotification({
+            userId: buyer_id,
+            type: 'order',
+            title: 'Order confirmed',
+            body: `Order ${order_number} for ${listingTitle}`,
+            link: '/orders',
+            referenceId: result.insertId,
+          });
+        } catch (nErr) {
+          console.warn('Could not create notification:', nErr.message);
+        }
       }
 
       return res.json({

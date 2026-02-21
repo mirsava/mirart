@@ -19,6 +19,7 @@ import subscriptionsRouter from './routes/subscriptions.js';
 import stripeRouter from './routes/stripe.js';
 import shippingRouter from './routes/shipping.js';
 import announcementsRouter from './routes/announcements.js';
+import notificationsRouter from './routes/notifications.js';
 
 dotenv.config();
 
@@ -113,6 +114,7 @@ app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/stripe', stripeRouter);
 app.use('/api/shipping', shippingRouter);
 app.use('/api/announcements', announcementsRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // 404 handler - must be after all routes
 app.use((req, res, next) => {
@@ -236,6 +238,34 @@ app.listen(PORT, async () => {
     }
   } catch (err) {
     console.warn('[Startup] Announcements migration:', err?.message || err);
+  }
+
+  try {
+    const [tables] = await pool.execute(
+      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'notifications'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (tables.length === 0) {
+      await pool.execute(`
+        CREATE TABLE notifications (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          type VARCHAR(50) NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          body TEXT,
+          link VARCHAR(500),
+          reference_id INT,
+          read_at TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          INDEX idx_user_read (user_id, read_at),
+          INDEX idx_created (created_at)
+        )
+      `);
+      console.log('[Startup] Created notifications table');
+    }
+  } catch (err) {
+    console.warn('[Startup] Notifications migration:', err?.message || err);
   }
 
   try {

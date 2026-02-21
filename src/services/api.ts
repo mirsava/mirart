@@ -132,6 +132,7 @@ class ApiService {
       console.log('API Request:', url, options.method || 'GET');
       const response = await fetch(url, {
         ...options,
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
@@ -631,6 +632,24 @@ class ApiService {
     params.append('cognitoUsername', cognitoUsername);
     if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
     return this.request<{ success: boolean }>(`/announcements/admin/${id}?${params.toString()}`, { method: 'DELETE' });
+  }
+
+  async getNotifications(cognitoUsername: string): Promise<{ notifications: Array<{ id: number; type: string; title: string; body?: string; link?: string; reference_id?: number; read_at: string | null; created_at: string }>; unreadCount: number }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    return this.request<{ notifications: any[]; unreadCount: number }>(`/notifications?${params.toString()}`);
+  }
+
+  async markNotificationRead(cognitoUsername: string, id: number): Promise<{ success: boolean }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    return this.request<{ success: boolean }>(`/notifications/${id}/read?${params.toString()}`, { method: 'PUT' });
+  }
+
+  async markAllNotificationsRead(cognitoUsername: string): Promise<{ success: boolean }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    return this.request<{ success: boolean }>(`/notifications/read-all?${params.toString()}`, { method: 'PUT' });
   }
 
   async getAdminMessages(cognitoUsername: string, filters?: { page?: number; limit?: number }, groups?: string[]): Promise<any> {

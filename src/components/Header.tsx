@@ -20,6 +20,8 @@ import {
   Avatar,
   Divider,
   Popover,
+  Card,
+  CardActionArea,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -31,6 +33,7 @@ import {
   Logout as LogoutIcon,
   Add as AddIcon,
   Email as EmailIcon,
+  Notifications as NotificationsIcon,
   AdminPanelSettings as AdminIcon,
   Chat as ChatIcon,
   ShoppingCart as ShoppingCartIcon,
@@ -41,6 +44,7 @@ import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { useCart } from '../contexts/CartContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import apiService from '../services/api';
 import { UserRole } from '../types/userRoles';
 import logo from '../assets/images/logo.png';
@@ -53,11 +57,12 @@ const Header: React.FC = () => {
   const { user, signOut, isAuthenticated, refreshUser } = useAuth();
   const { openChat } = useChat();
   const { getTotalItems } = useCart();
+  const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
-  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [galleryMenuAnchor, setGalleryMenuAnchor] = useState<null | HTMLElement>(null);
   const galleryCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [artists, setArtists] = useState<Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }>>([]);
@@ -171,54 +176,6 @@ const Header: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  useEffect(() => {
-    const fetchUnreadCount = async (): Promise<void> => {
-      if (!isAuthenticated || !user?.id) {
-        setUnreadCount(0);
-        return;
-      }
-
-      try {
-        const response = await apiService.getMessages(user.id, 'received');
-        const unreadMessages = response.messages.filter(m => m.status === 'sent');
-        setUnreadCount(unreadMessages.length);
-      } catch (error) {
-        console.error('Error fetching unread messages:', error);
-      }
-    };
-
-    // Initial fetch
-    fetchUnreadCount();
-    
-    // Poll for new messages more frequently (every 10 seconds)
-    const interval = setInterval(fetchUnreadCount, 10000);
-    
-    // Listen for messages being marked as read
-    const handleMessagesRead = () => {
-      // Small delay to ensure backend has processed the update
-      setTimeout(() => {
-        fetchUnreadCount();
-      }, 500);
-    };
-    window.addEventListener('messagesRead', handleMessagesRead);
-    
-    // Also refresh more frequently when on messages page
-    let messagesPageInterval: ReturnType<typeof setInterval> | null = null;
-    if (location.pathname === '/messages') {
-      messagesPageInterval = setInterval(() => {
-        fetchUnreadCount();
-      }, 2000);
-    }
-    
-    return () => {
-      clearInterval(interval);
-      if (messagesPageInterval) {
-        clearInterval(messagesPageInterval);
-      }
-      window.removeEventListener('messagesRead', handleMessagesRead);
-    };
-  }, [isAuthenticated, user?.id, location.pathname]);
 
   const handleDrawerToggle = (): void => {
     if (!drawerOpen && isAuthenticated) {
@@ -433,6 +390,35 @@ const Header: React.FC = () => {
                 primary="Messages"
                 primaryTypographyProps={{
                   fontWeight: location.pathname === '/messages' ? 600 : 400,
+                }}
+              />
+            </ListItem>
+            <ListItem 
+              onClick={() => {
+                handleDrawerToggle();
+                setNotificationDrawerOpen(true);
+                fetchNotifications();
+              }}
+              sx={{
+                borderRadius: 2,
+                mb: 1,
+                cursor: 'pointer',
+                bgcolor: 'transparent',
+                color: 'inherit',
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+              }}
+            >
+              <ListItemIcon>
+                <Badge badgeContent={unreadCount} color="error">
+                  <NotificationsIcon fontSize="small" />
+                </Badge>
+              </ListItemIcon>
+              <ListItemText 
+                primary="Notifications"
+                primaryTypographyProps={{
+                  fontWeight: 400,
                 }}
               />
             </ListItem>
@@ -995,46 +981,130 @@ const Header: React.FC = () => {
                 </Badge>
               </IconButton>
               {isAuthenticated && (
-                <IconButton
-                  onClick={() => {
-                    const fetchUnreadCount = async (): Promise<void> => {
-                      if (!isAuthenticated || !user?.id) {
-                        setUnreadCount(0);
-                        return;
-                      }
-                      try {
-                        const response = await apiService.getMessages(user.id, 'received');
-                        const unreadMessages = response.messages.filter(m => m.status === 'sent');
-                        setUnreadCount(unreadMessages.length);
-                      } catch (error) {
-                        console.error('Error fetching unread messages:', error);
-                      }
-                    };
-                    fetchUnreadCount();
-                    navigate('/messages');
-                  }}
-                  sx={{ 
-                    color: isDarkMode ? 'white' : 'text.primary',
-                    bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
-                    '&:hover': {
-                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
-                    },
-                  }}
-                >
-                  <Badge 
-                    badgeContent={unreadCount} 
-                    color="error"
-                    sx={{
-                      '& .MuiBadge-badge': {
-                        bgcolor: 'error.main',
-                        color: 'white',
-                        fontWeight: 600,
+                <>
+                  <IconButton
+                    onClick={() => {
+                      setNotificationDrawerOpen(true);
+                      fetchNotifications();
+                    }}
+                    aria-label="Notifications"
+                    sx={{ 
+                      color: isDarkMode ? 'white' : 'text.primary',
+                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
+                      '&:hover': {
+                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
                       },
                     }}
                   >
-                    <EmailIcon />
-                  </Badge>
-                </IconButton>
+                    <Badge 
+                      badgeContent={unreadCount} 
+                      color="error"
+                      sx={{
+                        '& .MuiBadge-badge': {
+                          bgcolor: 'error.main',
+                          color: 'white',
+                          fontWeight: 600,
+                        },
+                      }}
+                    >
+                      <NotificationsIcon />
+                    </Badge>
+                  </IconButton>
+                  <Drawer
+                    anchor="right"
+                    open={notificationDrawerOpen}
+                    onClose={() => setNotificationDrawerOpen(false)}
+                    PaperProps={{
+                      sx: {
+                        width: { xs: '100%', sm: 380 },
+                        top: { xs: 100, sm: 120 },
+                        height: { xs: 'calc(100vh - 100px)', sm: 'calc(100vh - 120px)' },
+                        maxHeight: '100vh',
+                        overflow: 'hidden',
+                        zIndex: 1400,
+                      },
+                    }}
+                  >
+                    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                      <Box sx={{ px: 2, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: 1, borderColor: 'divider' }}>
+                        <Typography variant="h6" fontWeight={600}>Notifications</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {unreadCount > 0 && (
+                            <Button size="small" onClick={() => { markAllAsRead(); setNotificationDrawerOpen(false); }}>
+                              Mark all read
+                            </Button>
+                          )}
+                          <IconButton size="small" onClick={() => setNotificationDrawerOpen(false)}>
+                            <CloseIcon />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                      <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', pt: 3, pb: 3, px: 2 }}>
+                        {notifications.length === 0 ? (
+                          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: 'text.secondary' }}>
+                            <NotificationsIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                            <Typography variant="body2">No notifications</Typography>
+                          </Box>
+                        ) : (
+                          notifications.map((n) => {
+                            const typeIcon = n.type === 'message' ? <EmailIcon fontSize="small" /> : n.type === 'order' ? <ReceiptIcon fontSize="small" /> : <NotificationsIcon fontSize="small" />;
+                            const timeAgo = n.created_at ? (() => {
+                              const d = new Date(n.created_at);
+                              const now = new Date();
+                              const mins = Math.floor((now.getTime() - d.getTime()) / 60000);
+                              if (mins < 1) return 'Just now';
+                              if (mins < 60) return `${mins}m ago`;
+                              const hrs = Math.floor(mins / 60);
+                              if (hrs < 24) return `${hrs}h ago`;
+                              const days = Math.floor(hrs / 24);
+                              return `${days}d ago`;
+                            })() : null;
+                            return (
+                              <Card
+                                key={n.id}
+                                sx={{
+                                  mb: 1.5,
+                                  overflow: 'hidden',
+                                  borderLeft: 3,
+                                  borderLeftColor: n.read_at ? 'transparent' : 'primary.main',
+                                  boxShadow: 1,
+                                }}
+                              >
+                                <CardActionArea
+                                  onClick={async () => {
+                                    if (!n.read_at) await markAsRead(n.id);
+                                    setNotificationDrawerOpen(false);
+                                    if (n.link) navigate(n.link);
+                                  }}
+                                  sx={{ p: 2, alignItems: 'flex-start', display: 'block' }}
+                                >
+                                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                                    <Box sx={{ color: 'primary.main', mt: 0.25 }}>{typeIcon}</Box>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                      <Typography variant="subtitle2" fontWeight={n.read_at ? 500 : 700} color="text.primary">
+                                        {n.title}
+                                      </Typography>
+                                      {n.body && (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }} display="block">
+                                          {n.body}
+                                        </Typography>
+                                      )}
+                                      {timeAgo && (
+                                        <Typography variant="caption" color="text.disabled" sx={{ mt: 1, display: 'block' }}>
+                                          {timeAgo}
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  </Box>
+                                </CardActionArea>
+                              </Card>
+                            );
+                          })
+                        )}
+                      </Box>
+                    </Box>
+                  </Drawer>
+                </>
               )}
               <IconButton 
                 onClick={toggleTheme}

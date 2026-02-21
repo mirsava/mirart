@@ -7,6 +7,7 @@ import { ThemeProvider as CustomThemeProvider, useTheme } from './contexts/Theme
 import { CartProvider } from './contexts/CartContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import './aws-config';
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -41,7 +42,9 @@ function App(): JSX.Element {
         <AuthProvider>
           <CartProvider>
             <ChatProvider>
-              <AppContent />
+              <NotificationProvider>
+                <AppContent />
+              </NotificationProvider>
             </ChatProvider>
           </CartProvider>
         </AuthProvider>

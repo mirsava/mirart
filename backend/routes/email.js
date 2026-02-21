@@ -1,5 +1,6 @@
 import express from 'express';
 import { sendContactEmail, verifySMTPConnection } from '../services/emailService.js';
+import { createNotification } from '../services/notificationService.js';
 import pool from '../config/database.js';
 
 const router = express.Router();
@@ -73,7 +74,7 @@ router.post('/contact-seller', async (req, res) => {
       }
     }
 
-    await pool.execute(
+    const [msgResult] = await pool.execute(
       `INSERT INTO messages (
         listing_id, sender_id, recipient_id, subject, message,
         sender_email, sender_name, recipient_email, status
@@ -89,6 +90,20 @@ router.post('/contact-seller', async (req, res) => {
         listing.seller_email,
       ]
     );
+    const messageId = msgResult.insertId;
+
+    try {
+      await createNotification({
+        userId: listing.user_id,
+        type: 'message',
+        title: 'New message',
+        body: `${buyerName || buyerEmail}: ${(subject || '').slice(0, 80)}`,
+        link: '/messages',
+        referenceId: messageId,
+      });
+    } catch (nErr) {
+      console.warn('Could not create notification:', nErr.message);
+    }
 
     res.json({
       success: true,

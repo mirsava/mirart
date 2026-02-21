@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
+import { createNotification } from '../services/notificationService.js';
 
 const router = express.Router();
 
@@ -121,6 +122,29 @@ router.post('/', async (req, res) => {
       console.error('Error updating dashboard stats:', statsError);
     }
 
+    try {
+      const [listingRow] = await pool.execute('SELECT title FROM listings WHERE id = ?', [listing_id]);
+      const listingTitle = listingRow[0]?.title || 'Artwork';
+      await createNotification({
+        userId: listing.user_id,
+        type: 'order',
+        title: 'New sale',
+        body: `Order ${order_number} for ${listingTitle}`,
+        link: '/orders',
+        referenceId: result.insertId,
+      });
+      await createNotification({
+        userId: buyer_id,
+        type: 'order',
+        title: 'Order confirmed',
+        body: `Order ${order_number} for ${listingTitle}`,
+        link: '/orders',
+        referenceId: result.insertId,
+      });
+    } catch (nErr) {
+      console.warn('Could not create notification:', nErr.message);
+    }
+
     // Get created order
     const [newOrder] = await pool.execute(
       `SELECT o.*, 
@@ -212,15 +236,32 @@ router.put('/:orderId/mark-shipped', async (req, res) => {
     const seller_id = users[0].id;
 
     const [orders] = await pool.execute(
-      'SELECT id, seller_id, status FROM orders WHERE id = ? AND seller_id = ?',
+      'SELECT id, seller_id, buyer_id, order_number, status FROM orders WHERE id = ? AND seller_id = ?',
       [orderId, seller_id]
     );
     if (orders.length === 0) return res.status(404).json({ error: 'Order not found' });
     if (orders[0].status !== 'paid') {
       return res.status(400).json({ error: 'Only paid orders can be marked as shipped' });
     }
+    const order = orders[0];
 
     await pool.execute("UPDATE orders SET status = 'shipped' WHERE id = ?", [orderId]);
+
+    if (order.buyer_id) {
+      try {
+        await createNotification({
+          userId: order.buyer_id,
+          type: 'order',
+          title: 'Order shipped',
+          body: `Order ${order.order_number} has been shipped.`,
+          link: '/orders',
+          referenceId: parseInt(orderId, 10),
+        });
+      } catch (nErr) {
+        console.warn('Could not create notification:', nErr.message);
+      }
+    }
+
     res.json({ success: true, status: 'shipped' });
   } catch (error) {
     console.error('Error marking order shipped:', error);

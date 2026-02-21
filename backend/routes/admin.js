@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import UserRole from '../constants/userRoles.js';
+import { createNotification } from '../services/notificationService.js';
 import { CognitoIdentityProviderClient, AdminDeleteUserCommand, AdminDisableUserCommand, AdminEnableUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || 'us-east-1_c9TqRAcz9';
@@ -543,10 +544,11 @@ router.put('/orders/:orderId/shipping', checkAdminAccess, async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const [orders] = await pool.execute('SELECT id, status FROM orders WHERE id = ?', [orderId]);
+    const [orders] = await pool.execute('SELECT id, status, buyer_id, order_number FROM orders WHERE id = ?', [orderId]);
     if (orders.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
+    const order = orders[0];
 
     const updates = [];
     const params = [];
@@ -573,6 +575,21 @@ router.put('/orders/:orderId/shipping', checkAdminAccess, async (req, res) => {
       `UPDATE orders SET ${updates.join(', ')} WHERE id = ?`,
       params
     );
+
+    if (status && ['shipped', 'delivered'].includes(status) && order.buyer_id) {
+      try {
+        await createNotification({
+          userId: order.buyer_id,
+          type: 'order',
+          title: status === 'shipped' ? 'Order shipped' : 'Order delivered',
+          body: `Order ${order.order_number} has been ${status}.`,
+          link: '/orders',
+          referenceId: orderId,
+        });
+      } catch (nErr) {
+        console.warn('Could not create notification:', nErr.message);
+      }
+    }
 
     res.json({ success: true, message: 'Shipping updated' });
   } catch (error) {
