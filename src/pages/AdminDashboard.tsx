@@ -53,6 +53,10 @@ import {
   CreditCard as CreditCardIcon,
   ShoppingCart as ShoppingCartIcon,
   Receipt as ReceiptIcon,
+  CardMembership as CardMembershipIcon,
+  Cancel as CancelIcon,
+  PlayArrow as PlayArrowIcon,
+  Event as EventIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -141,6 +145,19 @@ const AdminDashboard: React.FC = () => {
   const [ordersSearch, setOrdersSearch] = useState('');
   const [ordersStatusFilter, setOrdersStatusFilter] = useState('all');
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [subscriptionsPage, setSubscriptionsPage] = useState(1);
+  const [subscriptionsPagination, setSubscriptionsPagination] = useState<any>(null);
+  const [subscriptionsStatusFilter, setSubscriptionsStatusFilter] = useState('all');
+  const [subscriptionsPlanFilter, setSubscriptionsPlanFilter] = useState('');
+  const [subscriptionsSearch, setSubscriptionsSearch] = useState('');
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
+  const [subscriptionActionLoading, setSubscriptionActionLoading] = useState<number | null>(null);
+  const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+  const [extendUserId, setExtendUserId] = useState<number | null>(null);
+  const [extendDays, setExtendDays] = useState(30);
+  const [expireConfirmOpen, setExpireConfirmOpen] = useState(false);
+  const [expireUserId, setExpireUserId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -164,9 +181,19 @@ const AdminDashboard: React.FC = () => {
   }, [user?.id, messagesPage]);
 
   useEffect(() => {
-    if (!user?.id || tabValue !== 4) return;
+    if (!user?.id || (tabValue !== 4 && tabValue !== 5)) return;
     fetchSubscriptionPlans();
   }, [user?.id, tabValue]);
+
+  useEffect(() => {
+    if (!user?.id || tabValue !== 4) return;
+    setSubscriptionsPage(1);
+  }, [subscriptionsStatusFilter, subscriptionsPlanFilter, subscriptionsSearch]);
+
+  useEffect(() => {
+    if (!user?.id || tabValue !== 4) return;
+    fetchSubscriptions();
+  }, [user?.id, tabValue, subscriptionsPage, subscriptionsStatusFilter, subscriptionsPlanFilter, subscriptionsSearch]);
 
   useEffect(() => {
     if (!user?.id || tabValue !== 3) return;
@@ -287,6 +314,28 @@ const AdminDashboard: React.FC = () => {
       setOrdersPagination(null);
     } finally {
       setLoadingOrders(false);
+    }
+  };
+
+  const fetchSubscriptions = async (): Promise<void> => {
+    if (!user?.id) return;
+    setLoadingSubscriptions(true);
+    try {
+      const response = await apiService.getAdminSubscriptions(user.id, {
+        page: subscriptionsPage,
+        limit: 20,
+        status: subscriptionsStatusFilter !== 'all' ? subscriptionsStatusFilter : undefined,
+        plan: subscriptionsPlanFilter || undefined,
+        search: subscriptionsSearch.trim() || undefined,
+      }, user.groups);
+      setSubscriptions(response.subscriptions || []);
+      setSubscriptionsPagination(response.pagination);
+    } catch (error: any) {
+      enqueueSnackbar(error.message || error.error || 'Failed to fetch subscriptions', { variant: 'error' });
+      setSubscriptions([]);
+      setSubscriptionsPagination(null);
+    } finally {
+      setLoadingSubscriptions(false);
     }
   };
 
@@ -642,6 +691,73 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleSubscriptionCancel = async (userId: number): Promise<void> => {
+    if (!user?.id) return;
+    setSubscriptionActionLoading(userId);
+    try {
+      await apiService.cancelUserSubscriptionAsAdmin(user.id, userId, user.groups);
+      enqueueSnackbar('Subscription cancelled', { variant: 'success' });
+      fetchSubscriptions();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to cancel', { variant: 'error' });
+    } finally {
+      setSubscriptionActionLoading(null);
+    }
+  };
+
+  const handleSubscriptionResume = async (userId: number): Promise<void> => {
+    if (!user?.id) return;
+    setSubscriptionActionLoading(userId);
+    try {
+      await apiService.resumeUserSubscriptionAsAdmin(user.id, userId, user.groups);
+      enqueueSnackbar('Subscription resumed', { variant: 'success' });
+      fetchSubscriptions();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to resume', { variant: 'error' });
+    } finally {
+      setSubscriptionActionLoading(null);
+    }
+  };
+
+  const handleSubscriptionExpire = async (): Promise<void> => {
+    const uid = expireUserId;
+    if (!user?.id || !uid) return;
+    setSubscriptionActionLoading(uid);
+    setExpireConfirmOpen(false);
+    setExpireUserId(null);
+    try {
+      await apiService.expireUserSubscriptionAsAdmin(user.id, uid, user.groups);
+      enqueueSnackbar('Subscription expired', { variant: 'success' });
+      fetchSubscriptions();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to expire', { variant: 'error' });
+    } finally {
+      setSubscriptionActionLoading(null);
+    }
+  };
+
+  const handleExtendClick = (userId: number): void => {
+    setExtendUserId(userId);
+    setExtendDays(30);
+    setExtendDialogOpen(true);
+  };
+
+  const handleExtendConfirm = async (): Promise<void> => {
+    if (!user?.id || !extendUserId) return;
+    setSubscriptionActionLoading(extendUserId);
+    try {
+      await apiService.extendUserSubscriptionAsAdmin(user.id, extendUserId, extendDays, user.groups);
+      enqueueSnackbar(`Subscription extended by ${extendDays} days`, { variant: 'success' });
+      setExtendDialogOpen(false);
+      setExtendUserId(null);
+      fetchSubscriptions();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to extend', { variant: 'error' });
+    } finally {
+      setSubscriptionActionLoading(null);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -859,6 +975,7 @@ const AdminDashboard: React.FC = () => {
             <Tab icon={<InventoryIcon />} iconPosition="start" label="Listings" />
             <Tab icon={<EmailIcon />} iconPosition="start" label="Messages" />
             <Tab icon={<ReceiptIcon />} iconPosition="start" label="Orders" />
+            <Tab icon={<CardMembershipIcon />} iconPosition="start" label="Subscriptions" />
             <Tab icon={<CreditCardIcon />} iconPosition="start" label="Subscription Plans" />
           </Tabs>
 
@@ -1259,6 +1376,160 @@ const AdminDashboard: React.FC = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={4}>
+            <Box sx={{ mb: 2, px: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+              <TextField
+                size="small"
+                placeholder="Search by email, name, username..."
+                value={subscriptionsSearch}
+                onChange={(e) => setSubscriptionsSearch(e.target.value)}
+                sx={{ minWidth: 260 }}
+              />
+              <FormControl size="small" sx={{ minWidth: 130 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={subscriptionsStatusFilter}
+                  label="Status"
+                  onChange={(e) => setSubscriptionsStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="expired">Expired</MenuItem>
+                  <MenuItem value="cancelled">Cancelled</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Plan</InputLabel>
+                <Select
+                  value={subscriptionsPlanFilter}
+                  label="Plan"
+                  onChange={(e) => setSubscriptionsPlanFilter(e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {subscriptionPlans.map((p) => (
+                    <MenuItem key={p.id} value={p.name}>{p.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+            {loadingSubscriptions ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <TableContainer sx={{ px: 3 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>User</TableCell>
+                      <TableCell>Plan</TableCell>
+                      <TableCell>Billing</TableCell>
+                      <TableCell>Start</TableCell>
+                      <TableCell>End</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Auto-renew</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {subscriptions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                          <Typography color="text.secondary">No subscriptions found</Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      subscriptions.map((sub) => (
+                        <TableRow key={sub.id}>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="body2">{sub.user_name || sub.email}</Typography>
+                              <Typography variant="caption" color="text.secondary">{sub.email}</Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>{sub.plan_name}</TableCell>
+                          <TableCell>{sub.billing_period === 'monthly' ? 'Monthly' : 'Yearly'}</TableCell>
+                          <TableCell>{new Date(sub.start_date).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(sub.end_date).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={sub.status}
+                              size="small"
+                              color={sub.status === 'active' ? 'success' : sub.status === 'expired' ? 'default' : 'warning'}
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>{sub.auto_renew ? 'Yes' : 'No'}</TableCell>
+                          <TableCell align="right">
+                            {sub.status === 'active' && (
+                              <>
+                                {sub.auto_renew ? (
+                                  <IconButton
+                                    size="small"
+                                    title="Cancel auto-renew"
+                                    onClick={() => handleSubscriptionCancel(sub.user_id)}
+                                    disabled={subscriptionActionLoading === sub.user_id}
+                                  >
+                                    <CancelIcon fontSize="small" />
+                                  </IconButton>
+                                ) : (
+                                  <IconButton
+                                    size="small"
+                                    title="Resume auto-renew"
+                                    onClick={() => handleSubscriptionResume(sub.user_id)}
+                                    disabled={subscriptionActionLoading === sub.user_id}
+                                  >
+                                    <PlayArrowIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                                <IconButton
+                                  size="small"
+                                  title="Extend subscription"
+                                  onClick={() => handleExtendClick(sub.user_id)}
+                                  disabled={subscriptionActionLoading === sub.user_id}
+                                >
+                                  <EventIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  title="Expire immediately"
+                                  onClick={() => { setExpireUserId(sub.user_id); setExpireConfirmOpen(true); }}
+                                  disabled={subscriptionActionLoading === sub.user_id}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+            {subscriptionsPagination && subscriptionsPagination.total > 0 && (
+              <Box sx={{ px: 3, pb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Showing {((subscriptionsPagination.page - 1) * subscriptionsPagination.limit) + 1} - {Math.min(subscriptionsPagination.page * subscriptionsPagination.limit, subscriptionsPagination.total)} of {subscriptionsPagination.total}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <Pagination
+                    count={subscriptionsPagination.totalPages}
+                    page={subscriptionsPagination.page}
+                    onChange={(_e, value) => setSubscriptionsPage(value)}
+                    color="primary"
+                    showFirstButton
+                    showLastButton
+                  />
+                </Box>
+              </Box>
+            )}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={5}>
             <Box sx={{ px: 3, pb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6">Subscription Plans</Typography>
@@ -1674,6 +1945,44 @@ const AdminDashboard: React.FC = () => {
               disabled={blockingUser !== null}
             >
               {blockingUser ? 'Blocking...' : 'Block'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={expireConfirmOpen} onClose={() => { setExpireConfirmOpen(false); setExpireUserId(null); }}>
+          <DialogTitle>Expire Subscription</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              This will immediately expire the subscription. The user will lose access to their listing limits. This cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { setExpireConfirmOpen(false); setExpireUserId(null); }}>Cancel</Button>
+            <Button onClick={handleSubscriptionExpire} color="error" variant="contained">
+              Expire Now
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={extendDialogOpen} onClose={() => { setExtendDialogOpen(false); setExtendUserId(null); }}>
+          <DialogTitle>Extend Subscription</DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              Extend the subscription end date by the number of days specified.
+            </DialogContentText>
+            <TextField
+              label="Days to add"
+              type="number"
+              fullWidth
+              value={extendDays}
+              onChange={(e) => setExtendDays(Math.min(365, Math.max(1, parseInt(e.target.value) || 30)))}
+              inputProps={{ min: 1, max: 365 }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { setExtendDialogOpen(false); setExtendUserId(null); }}>Cancel</Button>
+            <Button onClick={handleExtendConfirm} variant="contained" disabled={!extendUserId}>
+              Extend
             </Button>
           </DialogActions>
         </Dialog>

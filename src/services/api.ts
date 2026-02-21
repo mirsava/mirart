@@ -749,6 +749,49 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  async getAdminSubscriptions(cognitoUsername: string, filters?: { page?: number; limit?: number; status?: string; plan?: string; search?: string }, groups?: string[]): Promise<{ subscriptions: any[]; pagination: any }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') params.append(key, value.toString());
+      });
+    }
+    return this.request<{ subscriptions: any[]; pagination: any }>(`/subscriptions/admin/subscriptions?${params.toString()}`);
+  }
+
+  async cancelUserSubscriptionAsAdmin(cognitoUsername: string, userId: number, groups?: string[]): Promise<{ message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ message: string }>(`/subscriptions/admin/subscriptions/${userId}/cancel?${params.toString()}`, { method: 'PUT' });
+  }
+
+  async resumeUserSubscriptionAsAdmin(cognitoUsername: string, userId: number, groups?: string[]): Promise<{ message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ message: string }>(`/subscriptions/admin/subscriptions/${userId}/resume?${params.toString()}`, { method: 'PUT' });
+  }
+
+  async expireUserSubscriptionAsAdmin(cognitoUsername: string, userId: number, groups?: string[]): Promise<{ message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ message: string }>(`/subscriptions/admin/subscriptions/${userId}/expire?${params.toString()}`, { method: 'PUT' });
+  }
+
+  async extendUserSubscriptionAsAdmin(cognitoUsername: string, userId: number, days: number, groups?: string[]): Promise<{ message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ message: string }>(`/subscriptions/admin/subscriptions/${userId}/extend?${params.toString()}`, {
+      method: 'PUT',
+      body: JSON.stringify({ days }),
+    });
+  }
 }
 
 export interface Comment {

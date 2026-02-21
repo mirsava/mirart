@@ -10,6 +10,305 @@ router.get('/test', (req, res) => {
 });
 
 // Admin routes must come BEFORE public routes to avoid route matching conflicts
+router.get('/admin/subscriptions', async (req, res) => {
+  try {
+    const { cognitoUsername, groups } = req.query;
+    const { page = 1, limit = 20, status, plan, search } = req.query;
+
+    if (!cognitoUsername) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    let userGroups = [];
+    if (groups) {
+      try {
+        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
+      } catch {
+        userGroups = Array.isArray(groups) ? groups : [groups];
+      }
+    }
+
+    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const offset = (pageNum - 1) * limitNum;
+
+    let baseQuery = `
+      SELECT us.*, sp.name as plan_name, sp.tier, sp.max_listings,
+        u.email, u.cognito_username,
+        COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.cognito_username) as user_name
+      FROM user_subscriptions us
+      JOIN subscription_plans sp ON us.plan_id = sp.id
+      JOIN users u ON us.user_id = u.id
+      WHERE 1=1
+    `;
+    const params = [];
+    const countParams = [];
+
+    if (status && status !== 'all') {
+      baseQuery += ' AND us.status = ?';
+      params.push(status);
+      countParams.push(status);
+    }
+
+    if (plan) {
+      baseQuery += ' AND sp.name = ?';
+      params.push(plan);
+      countParams.push(plan);
+    }
+
+    if (search && String(search).trim()) {
+      const term = `%${String(search).trim()}%`;
+      baseQuery += ' AND (u.email LIKE ? OR u.cognito_username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.business_name LIKE ?)';
+      params.push(term, term, term, term, term);
+      countParams.push(term, term, term, term, term);
+    }
+
+    let countQuery = `
+      SELECT COUNT(*) as total FROM user_subscriptions us
+      JOIN subscription_plans sp ON us.plan_id = sp.id
+      JOIN users u ON us.user_id = u.id
+      WHERE 1=1
+    `;
+    if (status && status !== 'all') countQuery += ' AND us.status = ?';
+    if (plan) countQuery += ' AND sp.name = ?';
+    if (search && String(search).trim()) countQuery += ' AND (u.email LIKE ? OR u.cognito_username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.business_name LIKE ?)';
+
+    const [countResult] = await pool.execute(countQuery, countParams);
+
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limitNum);
+
+    baseQuery += ' ORDER BY us.created_at DESC';
+    baseQuery += ` LIMIT ${limitNum} OFFSET ${offset}`;
+
+    const [subscriptions] = await pool.execute(baseQuery, params);
+
+    const formatted = subscriptions.map(s => ({
+      ...s,
+      auto_renew: Boolean(s.auto_renew),
+      max_listings: parseInt(s.max_listings),
+    }));
+
+    res.json({
+      subscriptions: formatted,
+      pagination: { page: pageNum, limit: limitNum, total, totalPages },
+    });
+  } catch (error) {
+    console.error('Error fetching admin subscriptions:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+router.put('/admin/subscriptions/:userId/cancel', async (req, res) => {
+  try {
+    const { cognitoUsername, groups } = req.query;
+    const { userId } = req.params;
+
+    if (!cognitoUsername) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    let userGroups = [];
+    if (groups) {
+      try {
+        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
+      } catch {
+        userGroups = Array.isArray(groups) ? groups : [groups];
+      }
+    }
+
+    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const [users] = await pool.execute('SELECT cognito_username FROM users WHERE id = ?', [userId]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const [subs] = await pool.execute(
+      `SELECT id, payment_intent_id FROM user_subscriptions
+       WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    if (subs.length === 0) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+
+    const stripeSubId = subs[0].payment_intent_id ? String(subs[0].payment_intent_id).trim() : null;
+    if (stripe && stripeSubId && stripeSubId.startsWith('sub_')) {
+      try {
+        await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: true });
+      } catch (stripeErr) {
+        console.error('Stripe cancel failed:', stripeErr.message);
+      }
+    }
+
+    await pool.execute(
+      `UPDATE user_subscriptions SET auto_renew = FALSE WHERE user_id = ? AND status = 'active'`,
+      [userId]
+    );
+
+    res.json({ message: 'Subscription cancelled. User retains access until end of billing period.' });
+  } catch (error) {
+    console.error('Error cancelling subscription:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+router.put('/admin/subscriptions/:userId/resume', async (req, res) => {
+  try {
+    const { cognitoUsername, groups } = req.query;
+    const { userId } = req.params;
+
+    if (!cognitoUsername) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    let userGroups = [];
+    if (groups) {
+      try {
+        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
+      } catch {
+        userGroups = Array.isArray(groups) ? groups : [groups];
+      }
+    }
+
+    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const [subs] = await pool.execute(
+      `SELECT id, payment_intent_id FROM user_subscriptions
+       WHERE user_id = ? AND status = 'active' AND end_date >= CURDATE() ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    if (subs.length === 0) {
+      return res.status(404).json({ error: 'No active subscription found to resume' });
+    }
+
+    const stripeSubId = subs[0].payment_intent_id ? String(subs[0].payment_intent_id).trim() : null;
+    if (stripe && stripeSubId && stripeSubId.startsWith('sub_')) {
+      try {
+        await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: false });
+      } catch (stripeErr) {
+        console.error('Stripe resume failed:', stripeErr.message);
+      }
+    }
+
+    await pool.execute(
+      `UPDATE user_subscriptions SET auto_renew = TRUE WHERE user_id = ? AND status = 'active'`,
+      [userId]
+    );
+
+    res.json({ message: 'Subscription resumed. Auto-renewal enabled.' });
+  } catch (error) {
+    console.error('Error resuming subscription:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+router.put('/admin/subscriptions/:userId/expire', async (req, res) => {
+  try {
+    const { cognitoUsername, groups } = req.query;
+    const { userId } = req.params;
+
+    if (!cognitoUsername) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    let userGroups = [];
+    if (groups) {
+      try {
+        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
+      } catch {
+        userGroups = Array.isArray(groups) ? groups : [groups];
+      }
+    }
+
+    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const [result] = await pool.execute(
+      `UPDATE user_subscriptions SET status = 'expired'
+       WHERE user_id = ? AND status = 'active'`,
+      [userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+
+    res.json({ message: 'Subscription expired immediately.' });
+  } catch (error) {
+    console.error('Error expiring subscription:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+router.put('/admin/subscriptions/:userId/extend', async (req, res) => {
+  try {
+    const { cognitoUsername, groups } = req.query;
+    const { userId } = req.params;
+    const { days } = req.body;
+
+    if (!cognitoUsername) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    let userGroups = [];
+    if (groups) {
+      try {
+        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
+      } catch {
+        userGroups = Array.isArray(groups) ? groups : [groups];
+      }
+    }
+
+    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const extendDays = Math.min(365, Math.max(1, parseInt(days) || 30));
+
+    const [subs] = await pool.execute(
+      `SELECT id, end_date FROM user_subscriptions
+       WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    if (subs.length === 0) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+
+    const currentEnd = new Date(subs[0].end_date);
+    currentEnd.setDate(currentEnd.getDate() + extendDays);
+    const newEndStr = currentEnd.toISOString().slice(0, 10);
+
+    await pool.execute(
+      `UPDATE user_subscriptions SET end_date = ? WHERE id = ?`,
+      [newEndStr, subs[0].id]
+    );
+
+    res.json({ message: `Subscription extended by ${extendDays} days. New end date: ${newEndStr}` });
+  } catch (error) {
+    console.error('Error extending subscription:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
 // Admin: Get all subscription plans
 router.get('/admin/plans', async (req, res) => {
   console.log('=== ADMIN PLANS ROUTE HIT ===');
