@@ -659,7 +659,7 @@ const AdminDashboard: React.FC = () => {
         sx={{
           '& > div > div': {
             borderLeftColor: 'secondary.main',
-            bgcolor: 'rgba(255, 143, 0, 0.04)',
+            bgcolor: 'rgba(255, 143, 0, 0.18)',
           },
         }}
       />
