@@ -176,6 +176,25 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
   }
 });
 
+router.get('/users/:id', checkAdminAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.execute('SELECT * FROM users WHERE id = ?', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const user = rows[0];
+    res.json({
+      ...user,
+      active: user.active !== undefined ? Boolean(user.active) : true,
+      blocked: user.blocked === 1 || user.blocked === true || user.blocked === '1',
+    });
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/users', checkAdminAccess, async (req, res) => {
   try {
     // Ensure blocked column exists (auto-migrate if missing)

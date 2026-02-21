@@ -532,6 +532,13 @@ class ApiService {
     return this.request<any>(`/admin/stats?${params.toString()}`);
   }
 
+  async getAdminUserById(cognitoUsername: string, userId: number, groups?: string[]): Promise<User> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<User>(`/admin/users/${userId}?${params.toString()}`);
+  }
+
   async getAdminUsers(cognitoUsername: string, filters?: { page?: number; limit?: number; search?: string; subscriptionFilter?: string; subscriptionPlan?: string; subscriptionBilling?: string }, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);
@@ -582,6 +589,48 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  }
+
+  async getAnnouncements(cognitoUsername?: string, groups?: string[]): Promise<{ announcements: Array<{ id: number; message: string; severity: string }> }> {
+    const params = new URLSearchParams();
+    if (cognitoUsername) params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    const qs = params.toString();
+    return this.request<{ announcements: Array<{ id: number; message: string; severity: string }> }>(`/announcements${qs ? `?${qs}` : ''}`);
+  }
+
+  async getAdminAnnouncements(cognitoUsername: string, groups?: string[]): Promise<{ announcements: any[] }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ announcements: any[] }>(`/announcements/admin?${params.toString()}`);
+  }
+
+  async createAnnouncement(cognitoUsername: string, data: { message: string; target_type?: string; target_user_ids?: number[]; severity?: string; is_active?: boolean; start_date?: string; end_date?: string }, groups?: string[]): Promise<{ success: boolean }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ success: boolean }>(`/announcements/admin?${params.toString()}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAnnouncement(cognitoUsername: string, id: number, data: Partial<{ message: string; target_type: string; target_user_ids: number[]; severity: string; is_active: boolean; start_date: string; end_date: string }>, groups?: string[]): Promise<{ success: boolean }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ success: boolean }>(`/announcements/admin/${id}?${params.toString()}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAnnouncement(cognitoUsername: string, id: number, groups?: string[]): Promise<{ success: boolean }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ success: boolean }>(`/announcements/admin/${id}?${params.toString()}`, { method: 'DELETE' });
   }
 
   async getAdminMessages(cognitoUsername: string, filters?: { page?: number; limit?: number }, groups?: string[]): Promise<any> {

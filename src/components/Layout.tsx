@@ -4,6 +4,7 @@ import Header from './Header';
 import Footer from './Footer';
 import ChatWidget from './ChatWidget';
 import DeactivatedUserBanner from './DeactivatedUserBanner';
+import AnnouncementBanner from './AnnouncementBanner';
 import { useChat } from '../contexts/ChatContext';
 
 interface LayoutProps {
@@ -23,14 +24,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       }}
     >
       <Header />
-      <DeactivatedUserBanner />
-      <Box 
-        component="main" 
-        sx={{ 
-          flexGrow: 1,
-          pt: { xs: '80px', sm: '88px' },
-        }}
-      >
+      <Box sx={{ pt: { xs: '100px', sm: '120px' } }}>
+        <AnnouncementBanner />
+        <DeactivatedUserBanner />
+      </Box>
+      <Box component="main" sx={{ flexGrow: 1 }}>
         {children}
       </Box>
       <Footer />

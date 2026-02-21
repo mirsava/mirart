@@ -37,6 +37,7 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
+  Autocomplete,
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -58,6 +59,7 @@ import {
   PlayArrow as PlayArrowIcon,
   Event as EventIcon,
   LocalShipping as LocalShippingIcon,
+  Campaign as CampaignIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -164,6 +166,14 @@ const AdminDashboard: React.FC = () => {
   const [shippingTrackingNumber, setShippingTrackingNumber] = useState('');
   const [shippingTrackingUrl, setShippingTrackingUrl] = useState('');
   const [shippingActionLoading, setShippingActionLoading] = useState(false);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<any>(null);
+  const [announcementForm, setAnnouncementForm] = useState({ message: '', target_type: 'all', target_user_ids: [] as number[], severity: 'info', is_active: true });
+  const [announcementUserOptions, setAnnouncementUserOptions] = useState<any[]>([]);
+  const [announcementUserLoading, setAnnouncementUserLoading] = useState(false);
+  const [announcementSelectedUser, setAnnouncementSelectedUser] = useState<any>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -189,6 +199,11 @@ const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (!user?.id || (tabValue !== 4 && tabValue !== 5)) return;
     fetchSubscriptionPlans();
+  }, [user?.id, tabValue]);
+
+  useEffect(() => {
+    if (!user?.id || tabValue !== 6) return;
+    fetchAnnouncements();
   }, [user?.id, tabValue]);
 
   useEffect(() => {
@@ -320,6 +335,91 @@ const AdminDashboard: React.FC = () => {
       setOrdersPagination(null);
     } finally {
       setLoadingOrders(false);
+    }
+  };
+
+  const fetchAnnouncements = async (): Promise<void> => {
+    if (!user?.id) return;
+    setLoadingAnnouncements(true);
+    try {
+      const res = await apiService.getAdminAnnouncements(user.id, user.groups);
+      setAnnouncements(res.announcements || []);
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to fetch announcements', { variant: 'error' });
+      setAnnouncements([]);
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  };
+
+  const handleAnnouncementCreate = (): void => {
+    setEditingAnnouncement(null);
+    setAnnouncementForm({ message: '', target_type: 'all', target_user_ids: [], severity: 'info', is_active: true });
+    setAnnouncementSelectedUser(null);
+    setAnnouncementDialogOpen(true);
+  };
+
+  const handleAnnouncementEdit = async (a: any): Promise<void> => {
+    setEditingAnnouncement(a);
+    setAnnouncementForm({
+      message: a.message || '',
+      target_type: a.target_type || 'all',
+      target_user_ids: Array.isArray(a.target_user_ids) ? a.target_user_ids : [],
+      severity: a.severity || 'info',
+      is_active: a.is_active !== false,
+    });
+    setAnnouncementSelectedUser(null);
+    if (a.target_type === 'specific' && a.target_user_ids?.length > 0 && user?.id) {
+      try {
+        const u = await apiService.getAdminUserById(user.id, a.target_user_ids[0], user.groups);
+        setAnnouncementSelectedUser(u);
+      } catch {
+        setAnnouncementSelectedUser(null);
+      }
+    }
+    setAnnouncementDialogOpen(true);
+  };
+
+  const handleAnnouncementSave = async (): Promise<void> => {
+    if (!user?.id) return;
+    if (!announcementForm.message.trim()) {
+      enqueueSnackbar('Message is required', { variant: 'error' });
+      return;
+    }
+    const payload = { ...announcementForm };
+    if (payload.target_type === 'specific') {
+      const ids = announcementSelectedUser?.id ? [announcementSelectedUser.id] : payload.target_user_ids;
+      if (!ids?.length) {
+        enqueueSnackbar('Select a user for specific targeting', { variant: 'error' });
+        return;
+      }
+      payload.target_user_ids = ids;
+    } else {
+      payload.target_user_ids = [];
+    }
+    try {
+      if (editingAnnouncement) {
+        await apiService.updateAnnouncement(user.id, editingAnnouncement.id, payload, user.groups);
+        enqueueSnackbar('Announcement updated', { variant: 'success' });
+      } else {
+        await apiService.createAnnouncement(user.id, payload, user.groups);
+        enqueueSnackbar('Announcement created', { variant: 'success' });
+      }
+      setAnnouncementDialogOpen(false);
+      fetchAnnouncements();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to save', { variant: 'error' });
+    }
+  };
+
+  const handleAnnouncementDelete = async (id: number): Promise<void> => {
+    if (!user?.id) return;
+    try {
+      await apiService.deleteAnnouncement(user.id, id, user.groups);
+      enqueueSnackbar('Announcement deleted', { variant: 'success' });
+      fetchAnnouncements();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to delete', { variant: 'error' });
     }
   };
 
@@ -1016,6 +1116,7 @@ const AdminDashboard: React.FC = () => {
             <Tab icon={<ReceiptIcon />} iconPosition="start" label="Orders" />
             <Tab icon={<CardMembershipIcon />} iconPosition="start" label="Subscriptions" />
             <Tab icon={<CreditCardIcon />} iconPosition="start" label="Subscription Plans" />
+            <Tab icon={<CampaignIcon />} iconPosition="start" label="Announcements" />
           </Tabs>
 
           <TabPanel value={tabValue} index={0}>
@@ -1679,7 +1780,166 @@ const AdminDashboard: React.FC = () => {
               </TableContainer>
             </Box>
           </TabPanel>
+
+          <TabPanel value={tabValue} index={6}>
+            <Box sx={{ px: 3, pb: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6">Site Announcements</Typography>
+                <Button variant="contained" onClick={handleAnnouncementCreate} startIcon={<CampaignIcon />}>
+                  Create Announcement
+                </Button>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Announcements appear as banners at the top of the site. Choose who sees each message.
+              </Typography>
+              {loadingAnnouncements ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                  <CircularProgress />
+                </Box>
+              ) : announcements.length === 0 ? (
+                <Paper elevation={0} sx={{ p: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <CampaignIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    No announcements yet. Create one to show a banner to users.
+                  </Typography>
+                </Paper>
+              ) : (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Message</TableCell>
+                        <TableCell>Target</TableCell>
+                        <TableCell>Severity</TableCell>
+                        <TableCell>Active</TableCell>
+                        <TableCell align="right">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {announcements.map((a) => (
+                        <TableRow key={a.id}>
+                          <TableCell sx={{ maxWidth: 400 }}>
+                            <Typography variant="body2" noWrap>{a.message}</Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={a.target_type === 'specific' && a.target_user_ids?.length ? `1 user` : a.target_type}
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip label={a.severity} size="small" color={a.severity === 'error' ? 'error' : a.severity === 'warning' ? 'warning' : a.severity === 'success' ? 'success' : 'default'} />
+                          </TableCell>
+                          <TableCell>{a.is_active ? 'Yes' : 'No'}</TableCell>
+                          <TableCell align="right">
+                            <IconButton size="small" onClick={() => handleAnnouncementEdit(a)}>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" color="error" onClick={() => handleAnnouncementDelete(a.id)}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+          </TabPanel>
         </Paper>
+
+        <Dialog open={announcementDialogOpen} onClose={() => setAnnouncementDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>{editingAnnouncement ? 'Edit Announcement' : 'Create Announcement'}</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <TextField
+                label="Message"
+                multiline
+                rows={3}
+                fullWidth
+                value={announcementForm.message}
+                onChange={(e) => setAnnouncementForm({ ...announcementForm, message: e.target.value })}
+                placeholder="This message will appear as a banner at the top of the site"
+                required
+              />
+              <FormControl fullWidth>
+                <InputLabel>Show to</InputLabel>
+                <Select
+                  value={announcementForm.target_type}
+                  label="Show to"
+                  onChange={(e) => setAnnouncementForm({ ...announcementForm, target_type: e.target.value })}
+                >
+                  <MenuItem value="all">All visitors</MenuItem>
+                  <MenuItem value="authenticated">Logged-in users only</MenuItem>
+                  <MenuItem value="artists">Artists only</MenuItem>
+                  <MenuItem value="buyers">Buyers only</MenuItem>
+                  <MenuItem value="admins">Admins only</MenuItem>
+                  <MenuItem value="specific">Specific user</MenuItem>
+                </Select>
+              </FormControl>
+              {announcementForm.target_type === 'specific' && (
+                <Autocomplete
+                  options={announcementUserOptions}
+                  value={announcementSelectedUser}
+                  onChange={(_, v) => setAnnouncementSelectedUser(v)}
+                  onInputChange={(_, v) => {
+                    if (v.length < 2) {
+                      setAnnouncementUserOptions([]);
+                      return;
+                    }
+                    setAnnouncementUserLoading(true);
+                    apiService.getAdminUsers(user!.id, { search: v, limit: 20 }, user!.groups)
+                      .then((r) => setAnnouncementUserOptions(r.users || []))
+                      .finally(() => setAnnouncementUserLoading(false));
+                  }}
+                  onOpen={() => {
+                    if (announcementUserOptions.length === 0 && !announcementUserLoading) {
+                      setAnnouncementUserLoading(true);
+                      apiService.getAdminUsers(user!.id, { limit: 50 }, user!.groups)
+                        .then((r) => setAnnouncementUserOptions(r.users || []))
+                        .finally(() => setAnnouncementUserLoading(false));
+                    }
+                  }}
+                  getOptionLabel={(o) => o?.email || o?.cognito_username || o?.first_name || o?.last_name || String(o?.id || '')}
+                  loading={announcementUserLoading}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Select user" placeholder="Search by email or name" />
+                  )}
+                />
+              )}
+              <FormControl fullWidth>
+                <InputLabel>Severity</InputLabel>
+                <Select
+                  value={announcementForm.severity}
+                  label="Severity"
+                  onChange={(e) => setAnnouncementForm({ ...announcementForm, severity: e.target.value })}
+                >
+                  <MenuItem value="info">Info</MenuItem>
+                  <MenuItem value="warning">Warning</MenuItem>
+                  <MenuItem value="success">Success</MenuItem>
+                  <MenuItem value="error">Error</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={announcementForm.is_active}
+                    onChange={(e) => setAnnouncementForm({ ...announcementForm, is_active: e.target.checked })}
+                  />
+                }
+                label="Active"
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAnnouncementDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAnnouncementSave} variant="contained">
+              {editingAnnouncement ? 'Update' : 'Create'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Dialog open={planDialogOpen} onClose={() => setPlanDialogOpen(false)} maxWidth="sm" fullWidth>
           <DialogTitle>{editingPlan ? 'Edit Plan' : 'Create Plan'}</DialogTitle>

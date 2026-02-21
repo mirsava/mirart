@@ -18,6 +18,7 @@ import commentsRouter from './routes/comments.js';
 import subscriptionsRouter from './routes/subscriptions.js';
 import stripeRouter from './routes/stripe.js';
 import shippingRouter from './routes/shipping.js';
+import announcementsRouter from './routes/announcements.js';
 
 dotenv.config();
 
@@ -111,6 +112,7 @@ app.use('/api/comments', commentsRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/stripe', stripeRouter);
 app.use('/api/shipping', shippingRouter);
+app.use('/api/announcements', announcementsRouter);
 
 // 404 handler - must be after all routes
 app.use((req, res, next) => {
@@ -207,6 +209,33 @@ app.listen(PORT, async () => {
     }
   } catch (err) {
     console.warn('[Startup] Shipping migration:', err?.message || err);
+  }
+
+  try {
+    const [tables] = await pool.execute(
+      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'admin_announcements'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (tables.length === 0) {
+      await pool.execute(`
+        CREATE TABLE admin_announcements (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          message TEXT NOT NULL,
+          target_type ENUM('all', 'authenticated', 'artists', 'buyers', 'admins', 'specific') NOT NULL DEFAULT 'all',
+          target_user_ids JSON NULL,
+          severity ENUM('info', 'warning', 'success', 'error') DEFAULT 'info',
+          is_active BOOLEAN DEFAULT TRUE,
+          start_date DATETIME NULL,
+          end_date DATETIME NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_active_dates (is_active, start_date, end_date)
+        )
+      `);
+      console.log('[Startup] Created admin_announcements table');
+    }
+  } catch (err) {
+    console.warn('[Startup] Announcements migration:', err?.message || err);
   }
 
   try {
