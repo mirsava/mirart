@@ -568,7 +568,7 @@ class ApiService {
     return this.request<any>(`/admin/listings?${params.toString()}`);
   }
 
-  async getAdminOrders(cognitoUsername: string, filters?: { page?: number; limit?: number; search?: string; status?: string }, groups?: string[]): Promise<{ orders: Order[]; pagination: any }> {
+  async getAdminOrders(cognitoUsername: string, filters?: { page?: number; limit?: number; search?: string; status?: string; buyer_id?: number; seller_id?: number; user_id?: number }, groups?: string[]): Promise<{ orders: Order[]; pagination: any }> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);
     if (groups && groups.length > 0) {

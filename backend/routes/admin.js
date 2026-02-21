@@ -508,7 +508,7 @@ router.get('/messages', checkAdminAccess, async (req, res) => {
 
 router.get('/orders', checkAdminAccess, async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, status } = req.query;
+    const { page = 1, limit = 20, search, status, buyer_id, seller_id, user_id } = req.query;
     const pageNum = parseInt(page) || 1;
     const limitNum = Math.min(parseInt(limit) || 20, 100);
     const offset = (pageNum - 1) * limitNum;
@@ -536,6 +536,23 @@ router.get('/orders', checkAdminAccess, async (req, res) => {
       countParams.push(status);
     }
 
+    if (user_id) {
+      const uid = parseInt(user_id, 10);
+      baseQuery += ' AND (o.buyer_id = ? OR o.seller_id = ?)';
+      params.push(uid, uid);
+      countParams.push(uid, uid);
+    } else {
+      if (buyer_id) {
+        baseQuery += ' AND o.buyer_id = ?';
+        params.push(parseInt(buyer_id, 10));
+        countParams.push(parseInt(buyer_id, 10));
+      }
+      if (seller_id) {
+        baseQuery += ' AND o.seller_id = ?';
+        params.push(parseInt(seller_id, 10));
+        countParams.push(parseInt(seller_id, 10));
+      }
+    }
     if (search && String(search).trim()) {
       const term = `%${String(search).trim()}%`;
       baseQuery += ' AND (o.order_number LIKE ? OR l.title LIKE ? OR u_buyer.email LIKE ? OR u_seller.email LIKE ? OR u_buyer.cognito_username LIKE ? OR u_seller.cognito_username LIKE ?)';
@@ -549,6 +566,11 @@ router.get('/orders', checkAdminAccess, async (req, res) => {
       JOIN users u_seller ON o.seller_id = u_seller.id
       WHERE 1=1`;
     if (status && status !== 'all') countQuery += ' AND o.status = ?';
+    if (user_id) countQuery += ' AND (o.buyer_id = ? OR o.seller_id = ?)';
+    else {
+      if (buyer_id) countQuery += ' AND o.buyer_id = ?';
+      if (seller_id) countQuery += ' AND o.seller_id = ?';
+    }
     if (search && String(search).trim()) countQuery += ' AND (o.order_number LIKE ? OR l.title LIKE ? OR u_buyer.email LIKE ? OR u_seller.email LIKE ? OR u_buyer.cognito_username LIKE ? OR u_seller.cognito_username LIKE ?)';
     const [countResult] = await pool.execute(countQuery, countParams);
     const total = countResult[0].total;

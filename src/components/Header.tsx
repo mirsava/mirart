@@ -1103,8 +1103,13 @@ const Header: React.FC = () => {
                                               {n.body}
                                             </Typography>
                                           )}
+                                          {n.link && (
+                                            <Typography variant="caption" color="primary.main" sx={{ mt: 0.5, display: 'block', textDecoration: 'underline' }}>
+                                              {n.link}
+                                            </Typography>
+                                          )}
                                           {timeAgo && (
-                                            <Typography variant="caption" color="text.disabled" sx={{ mt: 1, display: 'block' }}>
+                                            <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: 'block' }}>
                                               {timeAgo}
                                             </Typography>
                                           )}

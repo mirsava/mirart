@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -36,7 +36,7 @@ import {
   Search as SearchIcon,
   FilterList as FilterListIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
 import apiService, { Order } from '../services/api';
@@ -62,6 +62,7 @@ const statusColor: Record<string, 'default' | 'primary' | 'success' | 'warning' 
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const [tabValue, setTabValue] = useState(0);
@@ -126,6 +127,17 @@ const Orders: React.FC = () => {
   useEffect(() => {
     apiService.isShippingConfigured().then((r) => setShippingConfigured(r.configured)).catch(() => setShippingConfigured(false));
   }, []);
+
+  const orderIdParam = searchParams.get('order');
+  useEffect(() => {
+    if (!orderIdParam || loading) return;
+    const oid = parseInt(orderIdParam, 10);
+    if (isNaN(oid)) return;
+    const inPurchases = purchases.some((o) => o.id === oid);
+    const inSales = sales.some((o) => o.id === oid);
+    if (inPurchases && tabValue !== 0) setTabValue(0);
+    if (inSales && !inPurchases && tabValue !== 1) setTabValue(1);
+  }, [orderIdParam, loading, purchases, sales, tabValue]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -243,14 +255,32 @@ const Orders: React.FC = () => {
     );
   }
 
-  const OrderCard: React.FC<{ order: Order; type: 'purchase' | 'sale' }> = ({ order, type }) => (
+  const highlightedOrderId = orderIdParam ? parseInt(orderIdParam, 10) : null;
+
+  const OrderCard: React.FC<{ order: Order; type: 'purchase' | 'sale' }> = ({ order, type }) => {
+    const cardRef = useRef<HTMLDivElement>(null);
+    const isHighlighted = highlightedOrderId === order.id;
+
+    useEffect(() => {
+      if (isHighlighted && cardRef.current) {
+        cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, [isHighlighted]);
+
+    return (
     <Card
+      ref={cardRef}
       sx={{
         display: 'flex',
         height: '100%',
         cursor: 'pointer',
-        transition: 'box-shadow 0.2s',
+        transition: 'box-shadow 0.3s, border-color 0.3s',
         '&:hover': { boxShadow: 3 },
+        ...(isHighlighted && {
+          border: 2,
+          borderColor: 'primary.main',
+          boxShadow: '0 0 12px rgba(25, 118, 210, 0.3)',
+        }),
       }}
       onClick={() => navigate(`/painting/${order.listing_id}`)}
     >
@@ -357,7 +387,8 @@ const Orders: React.FC = () => {
         </Typography>
       </CardContent>
     </Card>
-  );
+    );
+  };
 
   return (
     <Box sx={{ bgcolor: 'background.default' }}>
