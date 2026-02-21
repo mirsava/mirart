@@ -31,7 +31,6 @@ import {
   Logout as LogoutIcon,
   Add as AddIcon,
   Email as EmailIcon,
-  Notifications as NotificationsIcon,
   AdminPanelSettings as AdminIcon,
   Chat as ChatIcon,
   ShoppingCart as ShoppingCartIcon,
@@ -1033,7 +1032,7 @@ const Header: React.FC = () => {
                       },
                     }}
                   >
-                    <NotificationsIcon />
+                    <EmailIcon />
                   </Badge>
                 </IconButton>
               )}
