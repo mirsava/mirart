@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -38,6 +38,9 @@ import {
   ListItemAvatar,
   ListItemText,
   Autocomplete,
+  Popper,
+  MenuList,
+  ClickAwayListener,
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -178,8 +181,10 @@ const AdminDashboard: React.FC = () => {
   const [notificationForm, setNotificationForm] = useState({ title: '', body: '', link: '', target: 'all' as 'all' | 'specific', user_ids: [] as number[], severity: 'info' as 'info' | 'warning' | 'success' | 'error' });
   const [notificationUserOptions, setNotificationUserOptions] = useState<any[]>([]);
   const [notificationSelectedUser, setNotificationSelectedUser] = useState<any>(null);
-  const [notificationLinkInput, setNotificationLinkInput] = useState('');
-  const [notificationLinkOptions, setNotificationLinkOptions] = useState<Array<{ label: string; value: string }>>([]);
+  const [notificationMentionOptions, setNotificationMentionOptions] = useState<Array<{ label: string; value: string }>>([]);
+  const [notificationMentionOpen, setNotificationMentionOpen] = useState(false);
+  const [notificationMentionQuery, setNotificationMentionQuery] = useState('');
+  const notificationBodyRef = useRef<HTMLTextAreaElement>(null);
   const [sendingNotification, setSendingNotification] = useState(false);
 
   useEffect(() => {
@@ -1873,105 +1878,112 @@ const AdminDashboard: React.FC = () => {
                     placeholder="e.g. New feature available"
                     required
                   />
-                  <TextField
-                    label="Message"
-                    multiline
-                    rows={3}
-                    fullWidth
-                    value={notificationForm.body}
-                    onChange={(e) => setNotificationForm({ ...notificationForm, body: e.target.value })}
-                    placeholder="Notification message"
-                  />
-                  <Autocomplete
-                    freeSolo
-                    options={notificationLinkOptions}
-                    inputValue={notificationLinkInput}
-                    onInputChange={(_, v, reason) => {
-                      setNotificationLinkInput(v);
-                      if (reason === 'reset') return;
-                      const lower = v.toLowerCase().trim();
-                      if (lower.startsWith('@')) {
-                        const keyword = lower.slice(1);
-                        const staticLinks: Array<{ label: string; value: string }> = [
-                          { label: '@orders → /orders', value: '/orders' },
-                          { label: '@gallery → /gallery', value: '/gallery' },
-                          { label: '@messages → /messages', value: '/messages' },
-                          { label: '@dashboard → /artist-dashboard', value: '/artist-dashboard' },
-                          { label: '@cart → /cart', value: '/cart' },
-                          { label: '@subscription → /subscription-plans', value: '/subscription-plans' },
-                          { label: '@home → /', value: '/' },
-                          { label: '@about → /about', value: '/about' },
-                          { label: '@contact → /contact', value: '/contact' },
-                        ];
-                        const filtered = keyword ? staticLinks.filter((l) => l.label.toLowerCase().includes(keyword)) : staticLinks;
-                        if (keyword.startsWith('orders') && keyword.length > 6 && notificationForm.target === 'specific' && notificationSelectedUser?.id) {
-                          apiService.getAdminOrders(user!.id, { user_id: notificationSelectedUser.id, limit: 50 }, user!.groups)
-                            .then((r) => {
-                              const orderOpts = (r.orders || []).map((o: any) => ({
-                                label: `@orders → ${o.order_number} - ${o.listing_title || ''} (${o.status})`,
-                                value: `/orders?order=${o.id}`,
-                              }));
-                              setNotificationLinkOptions([...filtered, ...orderOpts]);
-                            });
-                        } else if (keyword === 'orders' && notificationForm.target === 'specific' && notificationSelectedUser?.id) {
-                          apiService.getAdminOrders(user!.id, { user_id: notificationSelectedUser.id, limit: 50 }, user!.groups)
-                            .then((r) => {
-                              const orderOpts = (r.orders || []).map((o: any) => ({
-                                label: `@orders → ${o.order_number} - ${o.listing_title || ''} (${o.status})`,
-                                value: `/orders?order=${o.id}`,
-                              }));
-                              setNotificationLinkOptions([...filtered, ...orderOpts]);
-                            });
-                        } else if (keyword.startsWith('gallery') && keyword.length > 7) {
-                          const search = keyword.slice(7).trim();
-                          if (search.length >= 1) {
-                            apiService.getListings({ search, limit: 20, status: 'active' }).then((r) => {
+                  <Box sx={{ position: 'relative' }}>
+                    <TextField
+                      label="Message"
+                      multiline
+                      rows={3}
+                      fullWidth
+                      inputRef={notificationBodyRef}
+                      value={notificationForm.body}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNotificationForm({ ...notificationForm, body: val });
+                        const cursorPos = e.target.selectionStart || 0;
+                        const textBefore = val.slice(0, cursorPos);
+                        const mentionMatch = textBefore.match(/@(\w*)$/);
+                        if (mentionMatch) {
+                          const query = mentionMatch[1].toLowerCase();
+                          setNotificationMentionQuery(query);
+                          const staticLinks: Array<{ label: string; value: string }> = [
+                            { label: '@orders', value: '/orders' },
+                            { label: '@gallery', value: '/gallery' },
+                            { label: '@messages', value: '/messages' },
+                            { label: '@cart', value: '/cart' },
+                          ];
+                          const filtered = query ? staticLinks.filter((l) => l.label.slice(1).startsWith(query)) : staticLinks;
+                          if ((query === 'orders' || query.startsWith('orders')) && notificationForm.target === 'specific' && notificationSelectedUser?.id) {
+                            apiService.getAdminOrders(user!.id, { user_id: notificationSelectedUser.id, limit: 50 }, user!.groups)
+                              .then((r) => {
+                                const orderOpts = (r.orders || []).map((o: any) => ({
+                                  label: `Order ${o.order_number} - ${o.listing_title || ''} (${o.status})`,
+                                  value: `/orders?order=${o.id}`,
+                                }));
+                                setNotificationMentionOptions([...filtered, ...orderOpts]);
+                              });
+                          } else if ((query === 'gallery' || query.startsWith('gallery')) && query.length > 7) {
+                            const search = query.slice(7).trim();
+                            if (search.length >= 1) {
+                              apiService.getListings({ search, limit: 20, status: 'active' }).then((r) => {
+                                const listingOpts = (r.listings || []).map((l: any) => ({
+                                  label: `${l.title} (${l.category})`,
+                                  value: `/painting/${l.id}`,
+                                }));
+                                setNotificationMentionOptions([...filtered, ...listingOpts]);
+                              });
+                            } else {
+                              setNotificationMentionOptions(filtered);
+                            }
+                          } else if (query === 'gallery') {
+                            apiService.getListings({ limit: 30, status: 'active' }).then((r) => {
                               const listingOpts = (r.listings || []).map((l: any) => ({
-                                label: `@gallery → ${l.title} (${l.category})`,
+                                label: `${l.title} (${l.category})`,
                                 value: `/painting/${l.id}`,
                               }));
-                              setNotificationLinkOptions([...filtered, ...listingOpts]);
+                              setNotificationMentionOptions([...filtered, ...listingOpts]);
                             });
                           } else {
-                            setNotificationLinkOptions(filtered);
+                            setNotificationMentionOptions(filtered);
                           }
-                        } else if (keyword === 'gallery') {
-                          apiService.getListings({ limit: 30, status: 'active' }).then((r) => {
-                            const listingOpts = (r.listings || []).map((l: any) => ({
-                              label: `@gallery → ${l.title} (${l.category})`,
-                              value: `/painting/${l.id}`,
-                            }));
-                            setNotificationLinkOptions([...filtered, ...listingOpts]);
-                          });
-                        } else if (keyword.startsWith('messages') && keyword.length > 8 && notificationForm.target === 'specific' && notificationSelectedUser?.id) {
-                          setNotificationLinkOptions(filtered);
+                          setNotificationMentionOpen(filtered.length > 0 || query.length > 0);
                         } else {
-                          setNotificationLinkOptions(filtered);
+                          setNotificationMentionOpen(false);
                         }
-                      } else {
-                        setNotificationLinkOptions([]);
-                        setNotificationForm({ ...notificationForm, link: v });
-                      }
-                    }}
-                    onChange={(_, v) => {
-                      if (typeof v === 'string') {
-                        setNotificationForm({ ...notificationForm, link: v });
-                        setNotificationLinkInput(v);
-                      } else if (v && typeof v === 'object' && 'value' in v) {
-                        setNotificationForm({ ...notificationForm, link: v.value });
-                        setNotificationLinkInput(v.label);
-                      }
-                    }}
-                    getOptionLabel={(o) => typeof o === 'string' ? o : o.label}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Link"
-                        placeholder="Type @orders, @gallery, @messages or enter URL"
-                        helperText={notificationForm.link ? `Will link to: ${notificationForm.link}` : 'Type @ to see link shortcuts'}
-                      />
-                    )}
-                  />
+                      }}
+                      placeholder="Type message... use @ for links (@orders, @gallery, @messages, @cart)"
+                      helperText={notificationForm.link ? `Link: ${notificationForm.link}` : 'Type @ to insert a link'}
+                    />
+                    <Popper
+                      open={notificationMentionOpen && notificationMentionOptions.length > 0}
+                      anchorEl={notificationBodyRef.current}
+                      placement="bottom-start"
+                      sx={{ zIndex: 1500, width: notificationBodyRef.current?.offsetWidth || 400, maxHeight: 250, overflow: 'auto' }}
+                    >
+                      <ClickAwayListener onClickAway={() => setNotificationMentionOpen(false)}>
+                        <Paper elevation={8} sx={{ maxHeight: 250, overflow: 'auto' }}>
+                          <MenuList dense>
+                            {notificationMentionOptions.map((opt, idx) => (
+                              <MenuItem
+                                key={`${opt.value}-${idx}`}
+                                onClick={() => {
+                                  const body = notificationForm.body;
+                                  const cursorPos = notificationBodyRef.current?.selectionStart || body.length;
+                                  const textBefore = body.slice(0, cursorPos);
+                                  const textAfter = body.slice(cursorPos);
+                                  const mentionMatch = textBefore.match(/@(\w*)$/);
+                                  if (mentionMatch) {
+                                    const start = textBefore.lastIndexOf('@');
+                                    const newBody = textBefore.slice(0, start) + opt.label + textAfter;
+                                    setNotificationForm({ ...notificationForm, body: newBody, link: opt.value });
+                                  } else {
+                                    setNotificationForm({ ...notificationForm, link: opt.value });
+                                  }
+                                  setNotificationMentionOpen(false);
+                                  notificationBodyRef.current?.focus();
+                                }}
+                                sx={{ whiteSpace: 'normal', py: 1 }}
+                              >
+                                <Box>
+                                  <Typography variant="body2">{opt.label}</Typography>
+                                  <Typography variant="caption" color="text.secondary">{opt.value}</Typography>
+                                </Box>
+                              </MenuItem>
+                            ))}
+                          </MenuList>
+                        </Paper>
+                      </ClickAwayListener>
+                    </Popper>
+                  </Box>
                   <FormControl fullWidth>
                     <InputLabel>Send to</InputLabel>
                     <Select
@@ -2049,8 +2061,8 @@ const AdminDashboard: React.FC = () => {
                         enqueueSnackbar(`Notification sent to ${res.sent} user${res.sent !== 1 ? 's' : ''}`, { variant: 'success' });
                         setNotificationForm({ title: '', body: '', link: '', target: 'all', user_ids: [], severity: 'info' });
                         setNotificationSelectedUser(null);
-                        setNotificationLinkInput('');
-                        setNotificationLinkOptions([]);
+                        setNotificationMentionOptions([]);
+                        setNotificationMentionOpen(false);
                       } catch (err: any) {
                         enqueueSnackbar(err.message || 'Failed to send', { variant: 'error' });
                       } finally {
