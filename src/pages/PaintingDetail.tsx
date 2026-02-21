@@ -724,31 +724,6 @@ const PaintingDetail: React.FC = () => {
                 </Box>
               )}
               
-              {isAuthenticated && (
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  mt: 2,
-                  pt: 2,
-                  borderTop: 1,
-                  borderColor: 'divider',
-                }}>
-                  <IconButton
-                    sx={{
-                      color: isLiked ? 'error.main' : 'text.secondary',
-                    }}
-                    onClick={handleLike}
-                    disabled={liking}
-                  >
-                    {isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-                  </IconButton>
-                  <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 600 }}>
-                    {likeCount} {likeCount === 1 ? 'like' : 'likes'}
-                  </Typography>
-                </Box>
-              )}
-              
               <Box
                 sx={{
                   position: 'absolute',

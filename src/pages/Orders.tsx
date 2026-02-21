@@ -41,7 +41,7 @@ import OrderCardComponent, { getReturnEligibility } from '../components/OrderCar
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const [tabValue, setTabValue] = useState(0);
@@ -65,6 +65,7 @@ const Orders: React.FC = () => {
   const [returnOrder, setReturnOrder] = useState<Order | null>(null);
   const [returnReason, setReturnReason] = useState('');
   const [returnLoading, setReturnLoading] = useState(false);
+  const [highlightedOrderId, setHighlightedOrderId] = useState<number | null>(null);
 
   const filterOrders = (orders: Order[]) => {
     return orders.filter((order) => {
@@ -128,9 +129,15 @@ const Orders: React.FC = () => {
     if (isNaN(oid)) return;
     const inPurchases = purchases.some((o) => o.id === oid);
     const inSales = sales.some((o) => o.id === oid);
-    if (inPurchases && tabValue !== 0) setTabValue(0);
-    if (inSales && !inPurchases && tabValue !== 1) setTabValue(1);
-  }, [orderIdParam, loading, purchases, sales, tabValue]);
+    if (inPurchases) setTabValue(0);
+    else if (inSales) setTabValue(1);
+    setHighlightedOrderId(oid);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('order');
+      return next;
+    }, { replace: true });
+  }, [orderIdParam, loading, purchases, sales, setSearchParams]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -285,8 +292,6 @@ const Orders: React.FC = () => {
       </Box>
     );
   }
-
-  const highlightedOrderId = orderIdParam ? parseInt(orderIdParam, 10) : null;
 
   const orderCardProps = {
     actionLoading,

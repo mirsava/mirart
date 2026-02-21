@@ -225,7 +225,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 </Typography>
               </Box>
             )}
-            {type === 'purchase' && order.return_status && (
+            {order.return_status && (
               <Chip
                 label={`Return ${order.return_status}`}
                 size="small"
