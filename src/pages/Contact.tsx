@@ -16,6 +16,7 @@ import {
   Schedule as ScheduleIcon,
 } from '@mui/icons-material';
 import PageHeader from '../components/PageHeader';
+import SEO from '../components/SEO';
 
 const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -61,6 +62,11 @@ const Contact: React.FC = () => {
 
   return (
     <Box sx={{ bgcolor: 'background.default' }}>
+      <SEO
+        title="Contact Us"
+        description="Get in touch with ArtZyla. Have questions about our art marketplace? We're here to help artists and art lovers connect."
+        url="/contact"
+      />
       <PageHeader
         title="Contact Us"
         subtitle="Have questions about our paintings or need assistance? We're here to help! Reach out to us through any of the channels below."

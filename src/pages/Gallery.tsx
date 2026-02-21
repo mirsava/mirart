@@ -44,6 +44,7 @@ import { getListingImageCount } from '../utils/listingUtils';
 import { Artwork } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/PageHeader';
+import SEO from '../components/SEO';
 
 const Gallery: React.FC = () => {
   const navigate = useNavigate();
@@ -522,6 +523,11 @@ const Gallery: React.FC = () => {
 
   return (
     <Box sx={{ bgcolor: 'background.default' }}>
+      <SEO
+        title="Art Gallery"
+        description="Explore original paintings, woodworking, prints, and handmade art from talented independent artists. Browse and buy unique artwork worldwide."
+        url="/gallery"
+      />
       <PageHeader
         title="Art Gallery"
         subtitle="Explore our curated collection of original paintings and handcrafted woodworking pieces from talented artists around the world."

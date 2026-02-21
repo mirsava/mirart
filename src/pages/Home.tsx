@@ -33,6 +33,7 @@ import { Painting } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import joinCommunityBg from '../assets/images/bg/join_our_community.png';
 import { Check as CheckIcon, Star as StarIcon } from '@mui/icons-material';
+import SEO from '../components/SEO';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -147,8 +148,26 @@ const Home: React.FC = () => {
   }, [user?.id]);
 
 
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'ArtZyla',
+    description: 'Discover unique paintings, woodworking, and handmade art from independent artists.',
+    url: typeof window !== 'undefined' ? window.location.origin : '',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: { '@type': 'EntryPoint', urlTemplate: `${typeof window !== 'undefined' ? window.location.origin : ''}/gallery?search={search_term_string}` },
+      'query-input': 'required name=search_term_string',
+    },
+  };
+
   return (
     <Box>
+      <SEO
+        title="Discover Original Paintings & Handmade Art"
+        description="ArtZyla connects talented artists with art lovers. Browse unique paintings, woodworking, prints, and handmade art from independent creators worldwide."
+        structuredData={structuredData}
+      />
       <Box
         sx={{
           position: 'relative',

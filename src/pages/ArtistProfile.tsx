@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { useSnackbar } from 'notistack';
 import apiService, { User, Listing } from '../services/api';
+import SEO from '../components/SEO';
 
 const ArtistProfile: React.FC = () => {
   const { username } = useParams<{ username: string }>();
@@ -125,8 +126,17 @@ const ArtistProfile: React.FC = () => {
       : artist.specialties
     : [];
 
+  const artistName = artist.business_name || `${artist.first_name || ''} ${artist.last_name || ''}`.trim() || 'Artist';
+  const bioPreview = artist.bio ? artist.bio.slice(0, 155) + (artist.bio.length > 155 ? '...' : '') : `View ${artistName}'s profile and artwork on ArtZyla.`;
+
   return (
     <Box sx={{ py: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
+      <SEO
+        title={`${artistName} - Artist Profile`}
+        description={bioPreview}
+        url={`/artist/${username}`}
+        image={artist.profile_image_url ? getImageUrl(artist.profile_image_url) : undefined}
+      />
       <Container maxWidth="lg">
         <Paper sx={{ p: 4, mb: 4 }}>
           <Grid container spacing={4}>

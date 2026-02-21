@@ -13,6 +13,7 @@ import {
   Star as StarIcon,
 } from '@mui/icons-material';
 import PageHeader from '../components/PageHeader';
+import SEO from '../components/SEO';
 
 const About: React.FC = () => {
 
@@ -36,6 +37,11 @@ const About: React.FC = () => {
 
   return (
     <Box sx={{ bgcolor: 'background.default' }}>
+      <SEO
+        title="About Us"
+        description="ArtZyla is a marketplace connecting talented artists with art lovers worldwide. Learn about our mission to support independent creators and democratize art sales."
+        url="/about"
+      />
       <PageHeader
         title="About Our Marketplace"
         subtitle="ArtZyla is a vibrant marketplace connecting talented artists with art lovers worldwide. We empower artists to sell their work through flexible pricing options while providing buyers with access to authentic, handmade art from independent creators."

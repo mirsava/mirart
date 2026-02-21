@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { SnackbarProvider } from 'notistack';
@@ -35,15 +36,17 @@ import { UserRole } from './types/userRoles';
 
 function App(): JSX.Element {
   return (
-    <CustomThemeProvider>
-      <AuthProvider>
-        <CartProvider>
-          <ChatProvider>
-            <AppContent />
-          </ChatProvider>
-        </CartProvider>
-      </AuthProvider>
-    </CustomThemeProvider>
+    <HelmetProvider>
+      <CustomThemeProvider>
+        <AuthProvider>
+          <CartProvider>
+            <ChatProvider>
+              <AppContent />
+            </ChatProvider>
+          </CartProvider>
+        </AuthProvider>
+      </CustomThemeProvider>
+    </HelmetProvider>
   );
 }
 

@@ -27,6 +27,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import apiService, { SubscriptionPlan, UserSubscription } from '../services/api';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../components/PageHeader';
+import SEO from '../components/SEO';
 
 const SubscriptionPlans: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
@@ -171,6 +172,11 @@ const SubscriptionPlans: React.FC = () => {
 
   return (
     <Box sx={{ width: '100%' }}>
+      <SEO
+        title="Pricing - Artist Subscription Plans"
+        description="ArtZyla subscription plans for artists. List your artwork with flexible pricing. Choose monthly or yearly plans to sell your paintings and handmade art."
+        url="/subscription-plans"
+      />
       <PageHeader
         title="Subscription Plans"
         subtitle="Choose the perfect plan for your art business"

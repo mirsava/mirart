@@ -48,6 +48,7 @@ import ContactSellerDialog from '../components/ContactSellerDialog';
 import { UserRole } from '../types/userRoles';
 import PageHeader from '../components/PageHeader';
 import { Painting } from '../types';
+import SEO from '../components/SEO';
 
 const PaintingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -486,8 +487,31 @@ const PaintingDetail: React.FC = () => {
     setCurrentImageIndex((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
   };
 
+  const imageUrl = painting.image?.startsWith('http') ? painting.image : (typeof window !== 'undefined' ? `${window.location.origin}${painting.image}` : painting.image);
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: painting.title,
+    description: painting.description?.slice(0, 200) || painting.title,
+    image: imageUrl,
+    offers: {
+      '@type': 'Offer',
+      price: painting.price,
+      priceCurrency: 'USD',
+      availability: painting.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+    },
+  };
+
   return (
     <Box sx={{ pb: 4 }}>
+      <SEO
+        title={painting.title}
+        description={painting.description?.slice(0, 160) || `${painting.title} by ${painting.artist} - Original art for sale`}
+        image={imageUrl}
+        url={`/painting/${painting.id}`}
+        type="product"
+        structuredData={structuredData}
+      />
       <PageHeader
         title={painting.title}
         subtitle={`By ${painting.artist}`}

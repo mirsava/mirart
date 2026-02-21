@@ -7,9 +7,16 @@ import {
   Divider,
 } from '@mui/material';
 
+import SEO from '../components/SEO';
+
 const Privacy: React.FC = () => {
   return (
     <Box sx={{ py: 8, bgcolor: 'background.default', minHeight: '100vh' }}>
+      <SEO
+        title="Privacy Policy"
+        description="ArtZyla Privacy Policy. Learn how we collect, use, and protect your personal information when you use our art marketplace."
+        url="/privacy"
+      />
       <Container maxWidth="md">
         <Paper sx={{ p: 4 }}>
           <Typography variant="h3" component="h1" gutterBottom>
