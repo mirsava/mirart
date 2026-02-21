@@ -15,6 +15,7 @@ import {
   Tabs,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   ListItemIcon,
   IconButton,
@@ -177,6 +178,13 @@ const ArtistDashboard: React.FC = () => {
   const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>('all');
   const [ordersSearchTerm, setOrdersSearchTerm] = useState('');
   const [connectStatus, setConnectStatus] = useState<{ connected: boolean; chargesEnabled?: boolean } | null>(null);
+  const [shippingConfigured, setShippingConfigured] = useState(false);
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
+  const [labelOrder, setLabelOrder] = useState<Order | null>(null);
+  const [labelRates, setLabelRates] = useState<Array<{ object_id: string; provider: string; servicelevel: string; amount: string; estimated_days?: number }>>([]);
+  const [labelLoading, setLabelLoading] = useState(false);
+  const [labelPurchasing, setLabelPurchasing] = useState(false);
+  const [orderActionLoading, setOrderActionLoading] = useState<number | null>(null);
 
   const filterDashboardOrders = (orders: Order[]) => {
     return orders.filter((order) => {
@@ -304,6 +312,85 @@ const ArtistDashboard: React.FC = () => {
       fetchOrders();
     }
   }, [user?.id, tabValue]);
+
+  useEffect(() => {
+    if (tabValue === 1) {
+      apiService.isShippingConfigured().then((r) => setShippingConfigured(r.configured)).catch(() => setShippingConfigured(false));
+    }
+  }, [tabValue]);
+
+  const refreshOrders = async () => {
+    if (!user?.id) return;
+    try {
+      const [purchases, sales] = await Promise.all([
+        apiService.getUserOrders(user.id, 'buyer'),
+        apiService.getUserOrders(user.id, 'seller'),
+      ]);
+      setPurchasesOrders(purchases || []);
+      setSalesOrders(sales || []);
+    } catch {}
+  };
+
+  const handleOpenLabelDialog = async (order: Order) => {
+    setLabelOrder(order);
+    setLabelDialogOpen(true);
+    setLabelRates([]);
+    setLabelLoading(true);
+    try {
+      const { rates } = await apiService.getShippingRatesForOrder(order.id, user!.id);
+      setLabelRates(rates || []);
+    } catch {
+      enqueueSnackbar('Failed to get shipping rates', { variant: 'error' });
+    } finally {
+      setLabelLoading(false);
+    }
+  };
+
+  const handlePurchaseLabel = async (rateId: string) => {
+    if (!user?.id || !labelOrder) return;
+    setLabelPurchasing(true);
+    try {
+      const result = await apiService.purchaseShippingLabel(labelOrder.id, rateId, user.id);
+      enqueueSnackbar('Label purchased!', { variant: 'success' });
+      setLabelDialogOpen(false);
+      setLabelOrder(null);
+      setLabelRates([]);
+      if (result.label_url) window.open(result.label_url, '_blank');
+      await refreshOrders();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to purchase label', { variant: 'error' });
+    } finally {
+      setLabelPurchasing(false);
+    }
+  };
+
+  const handleMarkShipped = async (orderId: number) => {
+    if (!user?.id) return;
+    setOrderActionLoading(orderId);
+    try {
+      await apiService.markOrderShipped(orderId, user.id);
+      await refreshOrders();
+      enqueueSnackbar('Order marked as shipped', { variant: 'success' });
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to mark as shipped', { variant: 'error' });
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
+
+  const handleConfirmDelivery = async (orderId: number) => {
+    if (!user?.id) return;
+    setOrderActionLoading(orderId);
+    try {
+      await apiService.confirmOrderDelivery(orderId, user.id);
+      await refreshOrders();
+      enqueueSnackbar('Delivery confirmed', { variant: 'success' });
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to confirm delivery', { variant: 'error' });
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
 
   const fetchDashboardData = async () => {
     if (!user?.id) return;
@@ -1320,6 +1407,21 @@ const ArtistDashboard: React.FC = () => {
                                 ${order.total_price?.toFixed(2)}
                               </Typography>
                             </Box>
+                            {order.shipping_address && (
+                              <Typography variant="caption" display="block" color="text.secondary" noWrap>
+                                Ship to: {order.shipping_address.split('\n')[0]}
+                              </Typography>
+                            )}
+                            {order.status === 'shipped' && order.tracking_url && (
+                              <Button size="small" variant="outlined" href={order.tracking_url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
+                                Track
+                              </Button>
+                            )}
+                            {(order.status === 'shipped' || order.status === 'paid') && order.status !== 'delivered' && (
+                              <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={(e) => { e.stopPropagation(); handleConfirmDelivery(order.id); }} disabled={orderActionLoading === order.id} sx={{ mt: 0.5 }}>
+                                {orderActionLoading === order.id ? '...' : 'Confirm delivery'}
+                              </Button>
+                            )}
                           </CardContent>
                         </Card>
                       </Grid>
@@ -1394,6 +1496,29 @@ const ArtistDashboard: React.FC = () => {
                               ${order.total_price?.toFixed(2)}
                             </Typography>
                           </Box>
+                          {order.shipping_address && (
+                            <Typography variant="caption" display="block" color="text.secondary" noWrap>
+                              Ship to: {order.shipping_address.split('\n')[0]}
+                            </Typography>
+                          )}
+                          {order.status === 'paid' && (
+                            <>
+                              {shippingConfigured ? (
+                                <Button size="small" variant="contained" startIcon={<LocalShippingIcon />} onClick={(e) => { e.stopPropagation(); handleOpenLabelDialog(order); }} sx={{ mt: 0.5 }}>
+                                  Buy label
+                                </Button>
+                              ) : (
+                                <Button size="small" variant="outlined" startIcon={<LocalShippingIcon />} onClick={(e) => { e.stopPropagation(); handleMarkShipped(order.id); }} disabled={orderActionLoading === order.id} sx={{ mt: 0.5 }}>
+                                  {orderActionLoading === order.id ? '...' : 'Mark shipped'}
+                                </Button>
+                              )}
+                            </>
+                          )}
+                          {order.status === 'shipped' && order.tracking_url && (
+                            <Button size="small" variant="outlined" href={order.tracking_url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
+                              Track
+                            </Button>
+                          )}
                         </CardContent>
                       </Card>
                     </Grid>
@@ -1801,6 +1926,44 @@ const ArtistDashboard: React.FC = () => {
                     </Button>
                   )}
                 </Box>
+                <Dialog open={labelDialogOpen} onClose={() => !labelPurchasing && setLabelDialogOpen(false)} maxWidth="sm" fullWidth>
+                  <DialogTitle>Buy shipping label</DialogTitle>
+                  <DialogContent>
+                    {labelOrder && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        {labelOrder.listing_title} → {labelOrder.buyer_email}
+                      </Typography>
+                    )}
+                    {labelLoading ? (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                        <CircularProgress />
+                      </Box>
+                    ) : labelRates.length === 0 ? (
+                      <Alert severity="info">
+                        No shipping rates available. Set your address in Profile Settings and ensure the listing has dimensions.
+                      </Alert>
+                    ) : (
+                      <List>
+                        {labelRates.map((rate) => (
+                          <ListItemButton
+                            key={rate.object_id}
+                            onClick={() => handlePurchaseLabel(rate.object_id)}
+                            disabled={labelPurchasing}
+                          >
+                            <ListItemText
+                              primary={`${rate.provider} - ${rate.servicelevel}`}
+                              secondary={`$${rate.amount}${rate.estimated_days ? ` • ${rate.estimated_days} days` : ''}`}
+                            />
+                          </ListItemButton>
+                        ))}
+                      </List>
+                    )}
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={() => setLabelDialogOpen(false)} disabled={labelPurchasing}>Cancel</Button>
+                  </DialogActions>
+                </Dialog>
+
                 <Dialog open={cancelSubscriptionDialogOpen} onClose={() => !cancellingSubscription && setCancelSubscriptionDialogOpen(false)}>
                   <DialogTitle>Cancel subscription?</DialogTitle>
                   <DialogContent>

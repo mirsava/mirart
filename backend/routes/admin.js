@@ -514,6 +514,54 @@ router.get('/orders', checkAdminAccess, async (req, res) => {
   }
 });
 
+router.put('/orders/:orderId/shipping', checkAdminAccess, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { cognitoUsername } = req.query;
+    const { tracking_number, tracking_url, status } = req.body;
+
+    if (!cognitoUsername) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const [orders] = await pool.execute('SELECT id, status FROM orders WHERE id = ?', [orderId]);
+    if (orders.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const updates = [];
+    const params = [];
+
+    if (tracking_number !== undefined) {
+      updates.push('tracking_number = ?');
+      params.push(tracking_number || null);
+    }
+    if (tracking_url !== undefined) {
+      updates.push('tracking_url = ?');
+      params.push(tracking_url || null);
+    }
+    if (status && ['paid', 'shipped', 'delivered'].includes(status)) {
+      updates.push('status = ?');
+      params.push(status);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No updates provided' });
+    }
+
+    params.push(orderId);
+    await pool.execute(
+      `UPDATE orders SET ${updates.join(', ')} WHERE id = ?`,
+      params
+    );
+
+    res.json({ success: true, message: 'Shipping updated' });
+  } catch (error) {
+    console.error('Error updating order shipping:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
 router.put('/users/:cognitoUsername/user-type', checkAdminAccess, async (req, res) => {
   try {
     const { cognitoUsername } = req.params;

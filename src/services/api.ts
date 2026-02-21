@@ -574,6 +574,16 @@ class ApiService {
     return this.request<{ orders: Order[]; pagination: any }>(`/admin/orders?${params.toString()}`);
   }
 
+  async updateAdminOrderShipping(cognitoUsername: string, orderId: number, data: { tracking_number?: string; tracking_url?: string; status?: string }, groups?: string[]): Promise<{ success: boolean }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ success: boolean }>(`/admin/orders/${orderId}/shipping?${params.toString()}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getAdminMessages(cognitoUsername: string, filters?: { page?: number; limit?: number }, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);

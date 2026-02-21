@@ -286,6 +286,22 @@ const Orders: React.FC = () => {
               Qty: {order.quantity}
             </Typography>
           </Box>
+          {order.shipping_address && (
+            <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+              Ship to: {order.shipping_address.split('\n').slice(0, 2).join(', ')}
+            </Typography>
+          )}
+          {order.tracking_number && (
+            <Typography variant="caption" display="block" color="primary" sx={{ mt: 0.25 }}>
+              {order.tracking_url ? (
+                <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                  Track: {order.tracking_number}
+                </a>
+              ) : (
+                `Track: ${order.tracking_number}`
+              )}
+            </Typography>
+          )}
           {type === 'sale' && order.status === 'paid' && (
             <>
               {shippingConfigured ? (

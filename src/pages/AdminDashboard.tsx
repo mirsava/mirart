@@ -57,6 +57,7 @@ import {
   Cancel as CancelIcon,
   PlayArrow as PlayArrowIcon,
   Event as EventIcon,
+  LocalShipping as LocalShippingIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -158,6 +159,11 @@ const AdminDashboard: React.FC = () => {
   const [extendDays, setExtendDays] = useState(30);
   const [expireConfirmOpen, setExpireConfirmOpen] = useState(false);
   const [expireUserId, setExpireUserId] = useState<number | null>(null);
+  const [shippingDialogOpen, setShippingDialogOpen] = useState(false);
+  const [shippingOrder, setShippingOrder] = useState<any>(null);
+  const [shippingTrackingNumber, setShippingTrackingNumber] = useState('');
+  const [shippingTrackingUrl, setShippingTrackingUrl] = useState('');
+  const [shippingActionLoading, setShippingActionLoading] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -742,6 +748,39 @@ const AdminDashboard: React.FC = () => {
     setExtendDialogOpen(true);
   };
 
+  const handleOpenShippingDialog = (order: any): void => {
+    setShippingOrder(order);
+    setShippingTrackingNumber(order.tracking_number || '');
+    setShippingTrackingUrl(order.tracking_url || '');
+    setShippingDialogOpen(true);
+  };
+
+  const handleSaveShipping = async (): Promise<void> => {
+    if (!user?.id || !shippingOrder) return;
+    setShippingActionLoading(true);
+    try {
+      const updates: { tracking_number?: string; tracking_url?: string; status?: string } = {};
+      if (shippingTrackingNumber.trim()) updates.tracking_number = shippingTrackingNumber.trim();
+      if (shippingTrackingUrl.trim()) updates.tracking_url = shippingTrackingUrl.trim();
+      if (Object.keys(updates).length === 0) {
+        enqueueSnackbar('No changes to save', { variant: 'info' });
+        return;
+      }
+      if (shippingTrackingNumber.trim() && shippingOrder.status === 'paid') {
+        updates.status = 'shipped';
+      }
+      await apiService.updateAdminOrderShipping(user.id, shippingOrder.id, updates, user.groups);
+      enqueueSnackbar('Shipping updated', { variant: 'success' });
+      setShippingDialogOpen(false);
+      setShippingOrder(null);
+      fetchOrders();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to update shipping', { variant: 'error' });
+    } finally {
+      setShippingActionLoading(false);
+    }
+  };
+
   const handleExtendConfirm = async (): Promise<void> => {
     if (!user?.id || !extendUserId) return;
     setSubscriptionActionLoading(extendUserId);
@@ -1314,6 +1353,7 @@ const AdminDashboard: React.FC = () => {
                       <TableCell>Seller</TableCell>
                       <TableCell>Total</TableCell>
                       <TableCell>Status</TableCell>
+                      <TableCell>Shipping</TableCell>
                       <TableCell>Date</TableCell>
                       <TableCell></TableCell>
                     </TableRow>
@@ -1321,7 +1361,7 @@ const AdminDashboard: React.FC = () => {
                   <TableBody>
                     {orders.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">No orders found</Typography>
                         </TableCell>
                       </TableRow>
@@ -1340,6 +1380,31 @@ const AdminDashboard: React.FC = () => {
                               color={order.status === 'delivered' ? 'success' : order.status === 'cancelled' ? 'error' : order.status === 'pending' ? 'warning' : 'primary'}
                               variant="outlined"
                             />
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ maxWidth: 180 }}>
+                              {order.shipping_address && (
+                                <Typography variant="caption" display="block" noWrap title={order.shipping_address}>
+                                  {order.shipping_address.split('\n')[0]}
+                                </Typography>
+                              )}
+                              {order.tracking_number ? (
+                                <Typography variant="caption" display="block" color="primary">
+                                  {order.tracking_url ? (
+                                    <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                      {order.tracking_number}
+                                    </a>
+                                  ) : (
+                                    order.tracking_number
+                                  )}
+                                </Typography>
+                              ) : (
+                                <Typography variant="caption" color="text.secondary">No tracking</Typography>
+                              )}
+                              <IconButton size="small" onClick={() => handleOpenShippingDialog(order)} title="Manage shipping">
+                                <LocalShippingIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
                           </TableCell>
                           <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
                           <TableCell>
@@ -1960,6 +2025,57 @@ const AdminDashboard: React.FC = () => {
             <Button onClick={() => { setExpireConfirmOpen(false); setExpireUserId(null); }}>Cancel</Button>
             <Button onClick={handleSubscriptionExpire} color="error" variant="contained">
               Expire Now
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={shippingDialogOpen} onClose={() => { setShippingDialogOpen(false); setShippingOrder(null); }} maxWidth="sm" fullWidth>
+          <DialogTitle>Shipping Details</DialogTitle>
+          <DialogContent>
+            {shippingOrder && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Order</Typography>
+                  <Typography variant="body2">{shippingOrder.order_number} – {shippingOrder.listing_title}</Typography>
+                </Box>
+                {shippingOrder.shipping_address && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Shipping Address</Typography>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{shippingOrder.shipping_address}</Typography>
+                  </Box>
+                )}
+                {shippingOrder.shipping_cost != null && (
+                  <Typography variant="body2">Shipping cost: ${parseFloat(shippingOrder.shipping_cost).toFixed(2)}</Typography>
+                )}
+                {shippingOrder.label_url && (
+                  <Button size="small" href={shippingOrder.label_url} target="_blank" rel="noopener">View label</Button>
+                )}
+                <TextField
+                  label="Tracking number"
+                  fullWidth
+                  size="small"
+                  value={shippingTrackingNumber}
+                  onChange={(e) => setShippingTrackingNumber(e.target.value)}
+                  placeholder="1Z999AA10123456784"
+                />
+                <TextField
+                  label="Tracking URL"
+                  fullWidth
+                  size="small"
+                  value={shippingTrackingUrl}
+                  onChange={(e) => setShippingTrackingUrl(e.target.value)}
+                  placeholder="https://..."
+                />
+                {shippingOrder.status === 'paid' && shippingTrackingNumber.trim() && (
+                  <Typography variant="caption" color="text.secondary">Saving will mark order as shipped</Typography>
+                )}
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { setShippingDialogOpen(false); setShippingOrder(null); }}>Cancel</Button>
+            <Button onClick={handleSaveShipping} variant="contained" disabled={shippingActionLoading}>
+              {shippingActionLoading ? 'Saving...' : 'Save'}
             </Button>
           </DialogActions>
         </Dialog>
