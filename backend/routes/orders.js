@@ -331,6 +331,22 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
 
     await pool.execute("UPDATE orders SET status = 'delivered' WHERE id = ?", [orderId]);
 
+    if (order.seller_id) {
+      try {
+        await createNotification({
+          userId: order.seller_id,
+          type: 'order',
+          title: 'Order delivered',
+          body: `Order ${order.order_number} has been confirmed delivered.`,
+          link: '/orders',
+          referenceId: parseInt(orderId, 10),
+          severity: 'success',
+        });
+      } catch (nErr) {
+        console.warn('Could not create notification:', nErr.message);
+      }
+    }
+
     try {
       await pool.execute(
         `UPDATE dashboard_stats SET total_revenue = total_revenue + ? WHERE user_id = ?`,

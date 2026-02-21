@@ -44,12 +44,13 @@ router.get('/', async (req, res) => {
     }
     const userId = users[0].id;
 
+    let selectCols = 'id, type, title, body, link, reference_id, read_at, created_at';
+    try {
+      await pool.execute('SELECT severity FROM notifications LIMIT 1');
+      selectCols = 'id, type, severity, title, body, link, reference_id, read_at, created_at';
+    } catch {}
     const [rows] = await pool.execute(
-      `SELECT id, type, title, body, link, reference_id, read_at, created_at
-       FROM notifications
-       WHERE user_id = ?
-       ORDER BY created_at DESC
-       LIMIT 50`,
+      `SELECT ${selectCols} FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
       [userId]
     );
 
@@ -58,6 +59,7 @@ router.get('/', async (req, res) => {
       notifications: rows.map((r) => ({
         id: r.id,
         type: r.type,
+        severity: r.severity || 'info',
         title: r.title,
         body: r.body,
         link: r.link,
@@ -91,6 +93,31 @@ router.put('/read-all', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error marking all read:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    await ensureTable();
+    const cognitoUsername = req.query.cognitoUsername;
+    if (!cognitoUsername) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userId = users[0].id;
+
+    const [result] = await pool.execute('DELETE FROM notifications WHERE id = ? AND user_id = ?', [req.params.id, userId]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error dismissing notification:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

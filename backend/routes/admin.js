@@ -48,6 +48,52 @@ const checkAdminAccess = async (req, res, next) => {
   }
 };
 
+router.post('/notifications/send', checkAdminAccess, async (req, res) => {
+  try {
+    const { cognitoUsername } = req.query;
+    if (!cognitoUsername) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const { title, body, link, target, user_ids, severity } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    let userIds = [];
+    if (target === 'all') {
+      const [rows] = await pool.execute('SELECT id FROM users');
+      userIds = rows.map((r) => r.id);
+    } else if (target === 'specific' && Array.isArray(user_ids) && user_ids.length > 0) {
+      userIds = user_ids.map((id) => parseInt(id, 10)).filter((id) => !isNaN(id));
+    } else {
+      return res.status(400).json({ error: 'Invalid target. Use "all" or "specific" with user_ids array.' });
+    }
+    if (userIds.length === 0) {
+      return res.status(400).json({ error: 'No users to notify' });
+    }
+    let created = 0;
+    for (const userId of userIds) {
+      try {
+        await createNotification({
+          userId,
+          type: 'admin',
+          title: title.trim(),
+          body: body?.trim() || null,
+          link: link?.trim() || null,
+          referenceId: null,
+          severity: ['info', 'warning', 'success', 'error'].includes(severity) ? severity : 'info',
+        });
+        created++;
+      } catch (err) {
+        console.warn('Failed to notify user', userId, err.message);
+      }
+    }
+    res.json({ success: true, sent: created, total: userIds.length });
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/stats', checkAdminAccess, async (req, res) => {
   try {
     const [userStats] = await pool.execute('SELECT COUNT(*) as total FROM users');

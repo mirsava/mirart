@@ -17,13 +17,16 @@ import {
   Lock as LockIcon,
   Person as PersonIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
 import apiService from '../services/api';
 
 const ArtistSignin: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn } = useAuth();
+  const { addToCart } = useCart();
   const [formData, setFormData] = useState({
     usernameOrEmail: '',
     password: '',
@@ -75,14 +78,21 @@ const ArtistSignin: React.FC = () => {
     try {
       const cognitoUser = await signIn(formData.usernameOrEmail, formData.password);
       
-      // After successful Cognito login, check if user exists in database
       if (cognitoUser) {
         try {
           await apiService.getUser(cognitoUser.username);
-          // User exists in database, proceed to dashboard
-          navigate('/artist-dashboard');
+          const state = location.state as { returnTo?: string; pendingAdd?: any; from?: { pathname?: string } } | undefined;
+          if (state?.returnTo === 'checkout' && state?.pendingAdd) {
+            try {
+              addToCart(state.pendingAdd, 'artwork', state.pendingAdd.id);
+            } catch {}
+            navigate('/checkout');
+          } else if (state?.from?.pathname) {
+            navigate(state.from.pathname);
+          } else {
+            navigate('/artist-dashboard');
+          }
         } catch (dbError: any) {
-          // User doesn't exist in database, redirect to signup
           navigate('/artist-signup', {
             state: {
               message: 'Please complete your artist profile to continue.',
@@ -92,8 +102,8 @@ const ArtistSignin: React.FC = () => {
           });
         }
       } else {
-        // Fallback: try to navigate to dashboard
-        navigate('/artist-dashboard');
+        const state = location.state as { from?: { pathname?: string } } | undefined;
+        navigate(state?.from?.pathname || '/artist-dashboard');
       }
     } catch (error: any) {
       setLoginError(error.message || 'Invalid username/email or password. Please try again.');

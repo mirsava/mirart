@@ -5,6 +5,7 @@ import apiService from '../services/api';
 export interface Notification {
   id: number;
   type: string;
+  severity?: 'info' | 'warning' | 'success' | 'error';
   title: string;
   body?: string;
   link?: string;
@@ -19,6 +20,7 @@ interface NotificationContextType {
   fetchNotifications: () => Promise<void>;
   markAsRead: (id: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  dismissNotification: (id: number) => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -71,9 +73,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [user?.id]);
 
+  const dismissNotification = useCallback(async (id: number) => {
+    if (!user?.id) return;
+    try {
+      await apiService.dismissNotification(user.id, id);
+      const removed = notifications.find((n) => n.id === id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      if (removed && !removed.read_at) setUnreadCount((c) => Math.max(0, c - 1));
+    } catch {}
+  }, [user?.id, notifications]);
+
   return (
     <NotificationContext.Provider
-      value={{ notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead }}
+      value={{ notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead, dismissNotification }}
     >
       {children}
     </NotificationContext.Provider>

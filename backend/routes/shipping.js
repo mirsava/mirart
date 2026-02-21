@@ -8,6 +8,7 @@ import express from 'express';
 import pool from '../config/database.js';
 import * as shippoService from '../services/shippoService.js';
 import { shippoConfig } from '../config/shippo.js';
+import { createNotification } from '../services/notificationService.js';
 
 const router = express.Router();
 
@@ -288,6 +289,25 @@ router.post('/label', async (req, res) => {
        WHERE id = ?`,
       [result.trackingNumber, result.trackingUrl, result.labelUrl, result.transactionId, order_id]
     );
+
+    if (order.buyer_id) {
+      try {
+        const body = result.trackingNumber
+          ? `Order ${order.order_number} has been shipped. Track: ${result.trackingNumber}`
+          : `Order ${order.order_number} has been shipped.`;
+        await createNotification({
+          userId: order.buyer_id,
+          type: 'order',
+          title: 'Order shipped',
+          body,
+          link: '/orders',
+          referenceId: parseInt(order_id, 10),
+          severity: 'success',
+        });
+      } catch (nErr) {
+        console.warn('Could not create notification:', nErr.message);
+      }
+    }
 
     res.json({
       label_url: result.labelUrl,

@@ -1,5 +1,5 @@
 import React, { ReactNode, useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { UserRole, UserRoleType } from '../types/userRoles';
@@ -13,6 +13,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children, 
   requiredUserType 
 }) => {
+  const location = useLocation();
   const { user, loading, isAuthenticated, refreshUser } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -48,7 +49,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/artist-signin" replace />;
+    return <Navigate to="/artist-signin" state={{ from: location }} replace />;
   }
 
   if (requiredUserType && user?.userRole !== requiredUserType) {

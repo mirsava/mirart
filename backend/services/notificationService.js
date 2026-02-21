@@ -27,12 +27,20 @@ const ensureTable = async () => {
   }
 };
 
-export async function createNotification({ userId, type, title, body, link, referenceId }) {
+export async function createNotification({ userId, type, title, body, link, referenceId, severity }) {
   await ensureTable();
+  const sev = ['info', 'warning', 'success', 'error'].includes(severity) ? severity : 'info';
+  try {
+    await pool.execute('SELECT severity FROM notifications LIMIT 1');
+  } catch (err) {
+    if (err.code === 'ER_BAD_FIELD_ERROR') {
+      await pool.execute("ALTER TABLE notifications ADD COLUMN severity VARCHAR(20) DEFAULT 'info' AFTER type");
+    }
+  }
   const [result] = await pool.execute(
-    `INSERT INTO notifications (user_id, type, title, body, link, reference_id)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [userId, type, title, body || null, link || null, referenceId || null]
+    `INSERT INTO notifications (user_id, type, severity, title, body, link, reference_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [userId, type, sev, title, body || null, link || null, referenceId || null]
   );
   return result.insertId;
 }

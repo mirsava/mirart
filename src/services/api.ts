@@ -646,10 +646,26 @@ class ApiService {
     return this.request<{ success: boolean }>(`/notifications/${id}/read?${params.toString()}`, { method: 'PUT' });
   }
 
+  async dismissNotification(cognitoUsername: string, id: number): Promise<{ success: boolean }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    return this.request<{ success: boolean }>(`/notifications/${id}?${params.toString()}`, { method: 'DELETE' });
+  }
+
   async markAllNotificationsRead(cognitoUsername: string): Promise<{ success: boolean }> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);
     return this.request<{ success: boolean }>(`/notifications/read-all?${params.toString()}`, { method: 'PUT' });
+  }
+
+  async sendAdminNotification(cognitoUsername: string, data: { title: string; body?: string; link?: string; target: 'all' | 'specific'; user_ids?: number[]; severity?: 'info' | 'warning' | 'success' | 'error' }, groups?: string[]): Promise<{ success: boolean; sent: number; total: number }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) params.append('groups', JSON.stringify(groups));
+    return this.request<{ success: boolean; sent: number; total: number }>(`/admin/notifications/send?${params.toString()}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async getAdminMessages(cognitoUsername: string, filters?: { page?: number; limit?: number }, groups?: string[]): Promise<any> {

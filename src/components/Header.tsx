@@ -38,6 +38,10 @@ import {
   Chat as ChatIcon,
   ShoppingCart as ShoppingCartIcon,
   Receipt as ReceiptIcon,
+  InfoOutlined as InfoIcon,
+  WarningAmber as WarningIcon,
+  CheckCircle as SuccessIcon,
+  ErrorOutline as ErrorIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
@@ -57,7 +61,7 @@ const Header: React.FC = () => {
   const { user, signOut, isAuthenticated, refreshUser } = useAuth();
   const { openChat } = useChat();
   const { getTotalItems } = useCart();
-  const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead, dismissNotification } = useNotifications();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
@@ -1047,7 +1051,15 @@ const Header: React.FC = () => {
                           </Box>
                         ) : (
                           notifications.map((n) => {
-                            const typeIcon = n.type === 'message' ? <EmailIcon fontSize="small" /> : n.type === 'order' ? <ReceiptIcon fontSize="small" /> : <NotificationsIcon fontSize="small" />;
+                            const sev = n.severity || 'info';
+                            const severityColors: Record<string, { border: string; icon: string }> = {
+                              info: { border: '#0d47a1', icon: '#0d47a1' },
+                              warning: { border: '#e65100', icon: '#e65100' },
+                              success: { border: '#1b5e20', icon: '#1b5e20' },
+                              error: { border: '#b71c1c', icon: '#b71c1c' },
+                            };
+                            const colors = severityColors[sev] || severityColors.info;
+                            const severityIcon = sev === 'warning' ? <WarningIcon fontSize="small" /> : sev === 'success' ? <SuccessIcon fontSize="small" /> : sev === 'error' ? <ErrorIcon fontSize="small" /> : n.type === 'message' ? <EmailIcon fontSize="small" /> : n.type === 'order' ? <ReceiptIcon fontSize="small" /> : <InfoIcon fontSize="small" />;
                             const timeAgo = n.created_at ? (() => {
                               const d = new Date(n.created_at);
                               const now = new Date();
@@ -1066,7 +1078,7 @@ const Header: React.FC = () => {
                                   mb: 1.5,
                                   overflow: 'hidden',
                                   borderLeft: 3,
-                                  borderLeftColor: n.read_at ? 'transparent' : 'primary.main',
+                                  borderLeftColor: n.read_at ? 'transparent' : colors.border,
                                   boxShadow: 1,
                                 }}
                               >
@@ -1079,21 +1091,36 @@ const Header: React.FC = () => {
                                   sx={{ p: 2, alignItems: 'flex-start', display: 'block' }}
                                 >
                                   <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                                    <Box sx={{ color: 'primary.main', mt: 0.25 }}>{typeIcon}</Box>
+                                    <Box sx={{ color: colors.icon, mt: 0.25 }}>{severityIcon}</Box>
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
+                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
                                       <Typography variant="subtitle2" fontWeight={n.read_at ? 500 : 700} color="text.primary">
                                         {n.title}
-                                      </Typography>
-                                      {n.body && (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }} display="block">
-                                          {n.body}
-                                        </Typography>
-                                      )}
-                                      {timeAgo && (
-                                        <Typography variant="caption" color="text.disabled" sx={{ mt: 1, display: 'block' }}>
-                                          {timeAgo}
-                                        </Typography>
-                                      )}
+                                          </Typography>
+                                          {n.body && (
+                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }} display="block">
+                                              {n.body}
+                                            </Typography>
+                                          )}
+                                          {timeAgo && (
+                                            <Typography variant="caption" color="text.disabled" sx={{ mt: 1, display: 'block' }}>
+                                              {timeAgo}
+                                            </Typography>
+                                          )}
+                                        </Box>
+                                        <IconButton
+                                          size="small"
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            await dismissNotification(n.id);
+                                          }}
+                                          sx={{ mt: -0.5, mr: -0.5 }}
+                                          aria-label="Dismiss"
+                                        >
+                                          <CloseIcon fontSize="small" />
+                                        </IconButton>
+                                      </Box>
                                     </Box>
                                   </Box>
                                 </CardActionArea>

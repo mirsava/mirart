@@ -59,6 +59,10 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
   const handleBuyNow = (e: React.MouseEvent): void => {
     e.stopPropagation();
     e.preventDefault();
+    if (!isAuthenticated || !user?.id) {
+      navigate('/artist-signin', { state: { returnTo: 'checkout', pendingAdd: painting } });
+      return;
+    }
     try {
       addToCart(painting, 'artwork', painting.id);
       enqueueSnackbar('Added to cart', { variant: 'success' });
