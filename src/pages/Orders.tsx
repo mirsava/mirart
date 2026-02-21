@@ -12,6 +12,20 @@ import {
   CircularProgress,
   Alert,
   Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItemButton,
+  ListItemText,
+  Grid,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  InputAdornment,
 } from '@mui/material';
 import {
   Receipt as ReceiptIcon,
@@ -19,6 +33,8 @@ import {
   Store as StoreIcon,
   LocalShipping as ShippingIcon,
   CheckCircle as CheckCircleIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,6 +70,30 @@ const Orders: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [shippingConfigured, setShippingConfigured] = useState(false);
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
+  const [labelOrder, setLabelOrder] = useState<Order | null>(null);
+  const [labelRates, setLabelRates] = useState<Array<{ object_id: string; provider: string; servicelevel: string; amount: string; estimated_days?: number }>>([]);
+  const [labelLoading, setLabelLoading] = useState(false);
+  const [labelPurchasing, setLabelPurchasing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filterOrders = (orders: Order[]) => {
+    return orders.filter((order) => {
+      const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      const search = searchTerm.trim().toLowerCase();
+      const matchesSearch = !search ||
+        (order.order_number?.toLowerCase().includes(search)) ||
+        (order.listing_title?.toLowerCase().includes(search)) ||
+        (order.buyer_email?.toLowerCase().includes(search)) ||
+        (order.seller_email?.toLowerCase().includes(search));
+      return matchesStatus && matchesSearch;
+    });
+  };
+
+  const filteredPurchases = filterOrders(purchases);
+  const filteredSales = filterOrders(sales);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) {
@@ -82,6 +122,10 @@ const Orders: React.FC = () => {
 
     fetchOrders();
   }, [isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    apiService.isShippingConfigured().then((r) => setShippingConfigured(r.configured)).catch(() => setShippingConfigured(false));
+  }, []);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -115,6 +159,44 @@ const Orders: React.FC = () => {
       enqueueSnackbar(msg, { variant: 'error' });
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleOpenLabelDialog = async (order: Order) => {
+    setLabelOrder(order);
+    setLabelDialogOpen(true);
+    setLabelRates([]);
+    setLabelLoading(true);
+    setError(null);
+    try {
+      const { rates } = await apiService.getShippingRatesForOrder(order.id, user!.id);
+      setLabelRates(rates || []);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to get shipping rates');
+      enqueueSnackbar(err instanceof Error ? err.message : 'Failed to get rates', { variant: 'error' });
+    } finally {
+      setLabelLoading(false);
+    }
+  };
+
+  const handlePurchaseLabel = async (rateId: string) => {
+    if (!user?.id || !labelOrder) return;
+    setLabelPurchasing(true);
+    setError(null);
+    try {
+      const result = await apiService.purchaseShippingLabel(labelOrder.id, rateId, user.id);
+      enqueueSnackbar('Label purchased! Print and attach to package.', { variant: 'success' });
+      setLabelDialogOpen(false);
+      setLabelOrder(null);
+      setLabelRates([]);
+      if (result.label_url) window.open(result.label_url, '_blank');
+      await refreshOrders();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to purchase label';
+      setError(msg);
+      enqueueSnackbar(msg, { variant: 'error' });
+    } finally {
+      setLabelPurchasing(false);
     }
   };
 
@@ -165,25 +247,31 @@ const Orders: React.FC = () => {
     <Card
       sx={{
         display: 'flex',
-        mb: 2,
+        height: '100%',
         cursor: 'pointer',
         transition: 'box-shadow 0.2s',
         '&:hover': { boxShadow: 3 },
       }}
       onClick={() => navigate(`/painting/${order.listing_id}`)}
     >
-      <CardMedia
-        component="img"
-        sx={{ width: 120, objectFit: 'cover' }}
-        image={getImageUrl(order.primary_image_url) || '/placeholder-art.jpg'}
-        alt={order.listing_title}
-      />
-      <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-        <Box>
+      <Box sx={{ width: 160, minWidth: 160, height: 160, flexShrink: 0, bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {getImageUrl(order.primary_image_url) ? (
+          <CardMedia
+            component="img"
+            sx={{ width: '100%', height: 160, objectFit: 'cover' }}
+            image={getImageUrl(order.primary_image_url)!}
+            alt={order.listing_title}
+          />
+        ) : (
+          <Typography variant="body2" color="text.secondary">No Image</Typography>
+        )}
+      </Box>
+      <CardContent sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', p: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
           <Typography variant="subtitle2" color="text.secondary">
             {order.order_number}
           </Typography>
-          <Typography variant="h6" gutterBottom>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
             {order.listing_title}
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -199,15 +287,39 @@ const Orders: React.FC = () => {
             </Typography>
           </Box>
           {type === 'sale' && order.status === 'paid' && (
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<ShippingIcon />}
-              onClick={(e) => { e.stopPropagation(); handleMarkShipped(order.id); }}
-              disabled={actionLoading === order.id}
-              sx={{ mt: 1 }}
-            >
-              {actionLoading === order.id ? '...' : 'Mark as shipped'}
+            <>
+              {shippingConfigured ? (
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={<ShippingIcon />}
+                  onClick={(e) => { e.stopPropagation(); handleOpenLabelDialog(order); }}
+                  sx={{ mt: 1 }}
+                >
+                  Buy shipping label
+                </Button>
+              ) : (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<ShippingIcon />}
+                  onClick={(e) => { e.stopPropagation(); handleMarkShipped(order.id); }}
+                  disabled={actionLoading === order.id}
+                  sx={{ mt: 1 }}
+                >
+                  {actionLoading === order.id ? '...' : 'Mark as shipped'}
+                </Button>
+              )}
+            </>
+          )}
+          {type === 'sale' && order.status === 'shipped' && order.tracking_url && (
+            <Button size="small" variant="outlined" href={order.tracking_url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
+              Track shipment
+            </Button>
+          )}
+          {type === 'purchase' && order.status === 'shipped' && order.tracking_url && (
+            <Button size="small" variant="outlined" href={order.tracking_url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
+              Track shipment
             </Button>
           )}
           {type === 'purchase' && (order.status === 'shipped' || order.status === 'paid') && order.status !== 'delivered' && (
@@ -241,6 +353,59 @@ const Orders: React.FC = () => {
 
         <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: { xs: 4, sm: 5, md: 6 }, minHeight: '60vh' }}>
         <Paper sx={{ mb: 4 }}>
+          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'action.hover' }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5, fontWeight: 600 }}>
+              Filter orders
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                <TextField
+                  size="small"
+                  placeholder="Search by order #, title, or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  sx={{ minWidth: 260 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon color="action" fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={statusFilter}
+                    label="Status"
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="paid">Paid</MenuItem>
+                    <MenuItem value="shipped">Shipped</MenuItem>
+                    <MenuItem value="delivered">Delivered</MenuItem>
+                    <MenuItem value="cancelled">Cancelled</MenuItem>
+                  </Select>
+                </FormControl>
+                {(statusFilter !== 'all' || searchTerm.trim()) && (
+                  <Button
+                    size="small"
+                    onClick={() => { setStatusFilter('all'); setSearchTerm(''); }}
+                    startIcon={<FilterListIcon />}
+                  >
+                    Clear filters
+                  </Button>
+                )}
+                {(statusFilter !== 'all' || searchTerm.trim()) && (
+                  <Typography variant="body2" color="text.secondary">
+                    {tabValue === 0
+                      ? `Showing ${filteredPurchases.length} of ${purchases.length} purchases`
+                      : `Showing ${filteredSales.length} of ${sales.length} sales`}
+                  </Typography>
+                )}
+              </Box>
+          </Box>
+
           <Tabs value={tabValue} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tab
               icon={<ShoppingBagIcon />}
@@ -272,10 +437,27 @@ const Orders: React.FC = () => {
                     Items you buy will appear here.
                   </Typography>
                 </Box>
+              ) : filteredPurchases.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 8 }}>
+                  <FilterListIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary">
+                    No matching purchases
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Try adjusting your filters or search.
+                  </Typography>
+                  <Button variant="outlined" onClick={() => { setStatusFilter('all'); setSearchTerm(''); }} sx={{ mt: 2 }}>
+                    Clear filters
+                  </Button>
+                </Box>
               ) : (
-                purchases.map((order) => (
-                  <OrderCard key={order.id} order={order} type="purchase" />
-                ))
+                <Grid container spacing={2}>
+                  {filteredPurchases.map((order) => (
+                    <Grid item xs={12} md={6} key={order.id}>
+                      <OrderCard order={order} type="purchase" />
+                    </Grid>
+                  ))}
+                </Grid>
               )
             ) : sales.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 8 }}>
@@ -287,13 +469,70 @@ const Orders: React.FC = () => {
                   When buyers purchase your artwork, orders will appear here.
                 </Typography>
               </Box>
+            ) : filteredSales.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <FilterListIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6" color="text.secondary">
+                  No matching sales
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Try adjusting your filters or search.
+                </Typography>
+                <Button variant="outlined" onClick={() => { setStatusFilter('all'); setSearchTerm(''); }} sx={{ mt: 2 }}>
+                  Clear filters
+                </Button>
+              </Box>
             ) : (
-              sales.map((order) => (
-                <OrderCard key={order.id} order={order} type="sale" />
-              ))
+              <Grid container spacing={2}>
+                {filteredSales.map((order) => (
+                  <Grid item xs={12} md={6} key={order.id}>
+                    <OrderCard order={order} type="sale" />
+                  </Grid>
+                ))}
+              </Grid>
             )}
           </Box>
         </Paper>
+
+        <Dialog open={labelDialogOpen} onClose={() => !labelPurchasing && setLabelDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Buy shipping label</DialogTitle>
+          <DialogContent>
+            {labelOrder && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {labelOrder.listing_title} → {labelOrder.buyer_email}
+              </Typography>
+            )}
+            {labelLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : labelRates.length === 0 ? (
+              <Alert severity="info">
+                No shipping rates available. Make sure your shipping address is set in Profile Settings and the listing has dimensions.
+              </Alert>
+            ) : (
+              <List>
+                {labelRates.map((rate) => (
+                  <ListItemButton
+                    key={rate.object_id}
+                    onClick={() => handlePurchaseLabel(rate.object_id)}
+                    disabled={labelPurchasing}
+                  >
+                    <ListItemText
+                      primary={`${rate.provider} - ${rate.servicelevel}`}
+                      secondary={`$${rate.amount}${rate.estimated_days ? ` • ${rate.estimated_days} days` : ''}`}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setLabelDialogOpen(false)} disabled={labelPurchasing}>
+              Cancel
+            </Button>
+          </DialogActions>
+        </Dialog>
         </Box>
     </Box>
   );

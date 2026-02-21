@@ -54,8 +54,35 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
     const [messageStats] = await pool.execute('SELECT COUNT(*) as total FROM messages');
     
     let orderStats = [];
+    let orderRevenue = { total: 0, platformFees: 0, thisMonth: 0, thisMonthFees: 0, ytd: 0, ytdFees: 0 };
     try {
       [orderStats] = await pool.execute('SELECT COUNT(*) as total, status FROM orders GROUP BY status');
+      const [rev] = await pool.execute(
+        `SELECT 
+          COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN total_price ELSE 0 END), 0) as total,
+          COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN platform_fee ELSE 0 END), 0) as fees`
+        + ` FROM orders`
+      );
+      const [monthRev] = await pool.execute(
+        `SELECT 
+          COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN total_price ELSE 0 END), 0) as total,
+          COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN platform_fee ELSE 0 END), 0) as fees`
+        + ` FROM orders WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())`
+      );
+      const [ytdRev] = await pool.execute(
+        `SELECT 
+          COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN total_price ELSE 0 END), 0) as total,
+          COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN platform_fee ELSE 0 END), 0) as fees`
+        + ` FROM orders WHERE YEAR(created_at) = YEAR(CURDATE())`
+      );
+      orderRevenue = {
+        total: parseFloat(rev[0]?.total || 0),
+        platformFees: parseFloat(rev[0]?.fees || 0),
+        thisMonth: parseFloat(monthRev[0]?.total || 0),
+        thisMonthFees: parseFloat(monthRev[0]?.fees || 0),
+        ytd: parseFloat(ytdRev[0]?.total || 0),
+        ytdFees: parseFloat(ytdRev[0]?.fees || 0),
+      };
     } catch (orderError) {
       console.warn('Orders table may not exist:', orderError.message);
     }
@@ -139,6 +166,7 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
       orders: {
         total: Object.values(ordersByStatus).reduce((a, b) => a + b, 0),
         byStatus: ordersByStatus,
+        revenue: orderRevenue,
       },
       subscriptions: subscriptionStats,
     });
@@ -408,6 +436,80 @@ router.get('/messages', checkAdminAccess, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching messages:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+router.get('/orders', checkAdminAccess, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search, status } = req.query;
+    const pageNum = parseInt(page) || 1;
+    const limitNum = Math.min(parseInt(limit) || 20, 100);
+    const offset = (pageNum - 1) * limitNum;
+
+    let baseQuery = `
+      SELECT o.*,
+        l.title as listing_title,
+        l.primary_image_url,
+        u_buyer.email as buyer_email,
+        u_seller.email as seller_email,
+        COALESCE(u_buyer.business_name, CONCAT(COALESCE(u_buyer.first_name, ''), ' ', COALESCE(u_buyer.last_name, '')), u_buyer.cognito_username) as buyer_name,
+        COALESCE(u_seller.business_name, CONCAT(COALESCE(u_seller.first_name, ''), ' ', COALESCE(u_seller.last_name, '')), u_seller.cognito_username) as seller_name
+      FROM orders o
+      JOIN listings l ON o.listing_id = l.id
+      JOIN users u_buyer ON o.buyer_id = u_buyer.id
+      JOIN users u_seller ON o.seller_id = u_seller.id
+      WHERE 1=1
+    `;
+    const params = [];
+    const countParams = [];
+
+    if (status && status !== 'all') {
+      baseQuery += ' AND o.status = ?';
+      params.push(status);
+      countParams.push(status);
+    }
+
+    if (search && String(search).trim()) {
+      const term = `%${String(search).trim()}%`;
+      baseQuery += ' AND (o.order_number LIKE ? OR l.title LIKE ? OR u_buyer.email LIKE ? OR u_seller.email LIKE ? OR u_buyer.cognito_username LIKE ? OR u_seller.cognito_username LIKE ?)';
+      params.push(term, term, term, term, term, term);
+      countParams.push(term, term, term, term, term, term);
+    }
+
+    let countQuery = `SELECT COUNT(*) as total FROM orders o
+      JOIN listings l ON o.listing_id = l.id
+      JOIN users u_buyer ON o.buyer_id = u_buyer.id
+      JOIN users u_seller ON o.seller_id = u_seller.id
+      WHERE 1=1`;
+    if (status && status !== 'all') countQuery += ' AND o.status = ?';
+    if (search && String(search).trim()) countQuery += ' AND (o.order_number LIKE ? OR l.title LIKE ? OR u_buyer.email LIKE ? OR u_seller.email LIKE ? OR u_buyer.cognito_username LIKE ? OR u_seller.cognito_username LIKE ?)';
+    const [countResult] = await pool.execute(countQuery, countParams);
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limitNum);
+
+    baseQuery += ' ORDER BY o.created_at DESC';
+    baseQuery += ` LIMIT ${limitNum} OFFSET ${offset}`;
+
+    const [orders] = await pool.execute(baseQuery, params);
+
+    res.json({
+      orders: orders.map(o => ({
+        ...o,
+        unit_price: parseFloat(o.unit_price),
+        total_price: parseFloat(o.total_price),
+        platform_fee: parseFloat(o.platform_fee),
+        artist_earnings: parseFloat(o.artist_earnings),
+      })),
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching orders:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });

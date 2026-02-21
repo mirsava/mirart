@@ -17,6 +17,7 @@ import chatRouter from './routes/chat.js';
 import commentsRouter from './routes/comments.js';
 import subscriptionsRouter from './routes/subscriptions.js';
 import stripeRouter from './routes/stripe.js';
+import shippingRouter from './routes/shipping.js';
 
 dotenv.config();
 
@@ -109,6 +110,7 @@ app.use('/api/chat', chatRouter);
 app.use('/api/comments', commentsRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/stripe', stripeRouter);
+app.use('/api/shipping', shippingRouter);
 
 // 404 handler - must be after all routes
 app.use((req, res, next) => {
@@ -131,6 +133,81 @@ if (process.env.NODE_ENV !== 'test') {
 app.listen(PORT, async () => {
   console.log(`\n=== SERVER STARTED ===`);
   console.log(`Server is running on port ${PORT}`);
+
+  try {
+    const pool = (await import('./config/database.js')).default;
+    const [cols] = await pool.execute(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'default_shipping_preference'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (cols.length === 0) {
+      await pool.execute("ALTER TABLE users ADD COLUMN default_shipping_preference VARCHAR(20) DEFAULT 'buyer'");
+      console.log('[Startup] Added default_shipping_preference column to users');
+    }
+    const [carrierCols] = await pool.execute(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'default_shipping_carrier'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (carrierCols.length === 0) {
+      await pool.execute("ALTER TABLE users ADD COLUMN default_shipping_carrier VARCHAR(20) DEFAULT 'shippo'");
+      console.log('[Startup] Added default_shipping_carrier column to users');
+    }
+    const [listPrefCols] = await pool.execute(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listings' AND COLUMN_NAME = 'shipping_preference'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (listPrefCols.length === 0) {
+      await pool.execute("ALTER TABLE listings ADD COLUMN shipping_preference VARCHAR(20) DEFAULT NULL");
+      await pool.execute("ALTER TABLE listings ADD COLUMN shipping_carrier VARCHAR(20) DEFAULT NULL");
+      console.log('[Startup] Added shipping_preference and shipping_carrier columns to listings');
+    }
+    const [listReturnCols] = await pool.execute(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listings' AND COLUMN_NAME = 'return_days'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (listReturnCols.length === 0) {
+      await pool.execute("ALTER TABLE listings ADD COLUMN return_days INT DEFAULT NULL");
+      console.log('[Startup] Added return_days column to listings');
+    }
+    const [returnCols] = await pool.execute(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'default_return_days'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (returnCols.length === 0) {
+      await pool.execute("ALTER TABLE users ADD COLUMN default_return_days INT DEFAULT 30");
+      console.log('[Startup] Added default_return_days column to users');
+    }
+    const parcelDefaults = { weight_oz: 24, length_in: 24, width_in: 18, height_in: 3 };
+    for (const col of Object.keys(parcelDefaults)) {
+      const [pc] = await pool.execute(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listings' AND COLUMN_NAME = ?",
+        [process.env.DB_NAME || 'mirart', col]
+      );
+      if (pc.length === 0) {
+        await pool.execute(`ALTER TABLE listings ADD COLUMN ${col} DECIMAL(10, 2) DEFAULT ${parcelDefaults[col]}`);
+        console.log(`[Startup] Added ${col} column to listings`);
+      }
+    }
+    const listingCols = [
+      { name: 'shipping_info', sql: 'ADD COLUMN shipping_info TEXT DEFAULT NULL' },
+      { name: 'returns_info', sql: 'ADD COLUMN returns_info TEXT DEFAULT NULL' },
+      { name: 'special_instructions', sql: 'ADD COLUMN special_instructions TEXT DEFAULT NULL' },
+      { name: 'allow_comments', sql: 'ADD COLUMN allow_comments BOOLEAN DEFAULT TRUE' },
+      { name: 'quantity_available', sql: 'ADD COLUMN quantity_available INT DEFAULT 1' }
+    ];
+    for (const { name, sql } of listingCols) {
+      const [lc] = await pool.execute(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listings' AND COLUMN_NAME = ?",
+        [process.env.DB_NAME || 'mirart', name]
+      );
+      if (lc.length === 0) {
+        await pool.execute(`ALTER TABLE listings ${sql}`);
+        console.log(`[Startup] Added ${name} column to listings`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Startup] Shipping migration:', err?.message || err);
+  }
 
   try {
     const { runSubscriptionExpirationJob } = await import('./services/subscriptionExpiration.js');

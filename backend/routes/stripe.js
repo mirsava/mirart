@@ -19,11 +19,15 @@ router.post('/connect/create-account', async (req, res) => {
     if (user.stripe_account_id) {
       return res.json({ accountId: user.stripe_account_id, existing: true });
     }
+    // card_payments requires transfers - see https://stripe.com/docs/connect/account-capabilities#card-payments
     const account = await stripe.accounts.create({
       type: 'express',
       country: 'US',
       email,
-      capabilities: { card_payments: { requested: true } },
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
     });
     await pool.execute('UPDATE users SET stripe_account_id = ? WHERE id = ?', [account.id, user.id]);
     res.json({ accountId: account.id });
@@ -36,16 +40,20 @@ router.post('/connect/create-account', async (req, res) => {
 router.post('/connect/create-account-link', async (req, res) => {
   try {
     if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
-    const { cognito_username } = req.body;
+    const { cognito_username, return_url, refresh_url } = req.body;
     if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
     const [users] = await pool.execute('SELECT id, stripe_account_id FROM users WHERE cognito_username = ?', [cognito_username]);
     if (users.length === 0 || !users[0].stripe_account_id) {
       return res.status(400).json({ error: 'Connect account not created. Call create-account first.' });
     }
+    const base = (req.body.return_url_base || process.env.FRONTEND_URL || FRONTEND_URL).replace(/\/$/, '');
+    const defaultReturn = `${base}/artist-dashboard?stripe_return=1`;
+    const defaultRefresh = `${base}/artist-dashboard?stripe_refresh=1`;
+    const resolveUrl = (url) => (url && url.startsWith('http') ? url : `${base}${url && url.startsWith('/') ? url : '/' + (url || '')}`);
     const link = await stripe.accountLinks.create({
       account: users[0].stripe_account_id,
-      refresh_url: `${FRONTEND_URL}/artist-dashboard?stripe_refresh=1`,
-      return_url: `${FRONTEND_URL}/artist-dashboard?stripe_return=1`,
+      return_url: return_url ? resolveUrl(return_url) : defaultReturn,
+      refresh_url: refresh_url ? resolveUrl(refresh_url) : defaultRefresh,
       type: 'account_onboarding',
     });
     res.json({ url: link.url });
@@ -93,6 +101,7 @@ router.post('/create-checkout-session', async (req, res) => {
 
     let lineItems;
     let mode = 'payment';
+    let artworkTransferData = null;
 
     if (isSubscription && metadata?.plan_id && metadata?.billing_period) {
       // Stripe subscription mode: use Stripe Products
@@ -128,24 +137,72 @@ router.post('/create-checkout-session', async (req, res) => {
         quantity: 1,
       }];
     } else {
-      // One-time payment (artwork) - Stripe Connect: manual capture, funds held until delivery
-      const orderDataJson = metadata?.order_data;
-      if (orderDataJson) {
+      // One-time payment (artwork) - Stripe Connect: use destination charge with manual capture
+      // (Stripe requires transfer_data for Connect - "card-payments without transfer" not supported)
+      const orderDataJson = metadata?.order_data ?? metadata?.orderData;
+      if (!orderDataJson) {
+        return res.status(400).json({
+          error: 'Checkout configuration error',
+          details: 'Order data is required. Please go back to the cart and try checkout again.',
+        });
+      }
+      {
         const orderData = typeof orderDataJson === 'string' ? JSON.parse(orderDataJson) : orderDataJson;
         const orderItems = orderData?.items || [];
+        const totalAmountCents = Math.round(
+          items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity * 100, 0)
+        );
+        const platformFeeCents = items.length * 1000;
+        const artistTotalCents = totalAmountCents - platformFeeCents;
+        const uniqueSellers = new Map();
         for (const item of orderItems) {
           const [listings] = await pool.execute(
             `SELECT l.user_id, u.stripe_account_id FROM listings l JOIN users u ON l.user_id = u.id WHERE l.id = ?`,
             [item.listing_id]
           );
           if (listings.length > 0 && !listings[0].stripe_account_id) {
-            const [seller] = await pool.execute('SELECT email, first_name, last_name FROM users WHERE id = ?', [listings[0].user_id]);
+            const [seller] = await pool.execute('SELECT cognito_username, email, first_name, last_name, business_name FROM users WHERE id = ?', [listings[0].user_id]);
             const name = seller[0]?.business_name || [seller[0]?.first_name, seller[0]?.last_name].filter(Boolean).join(' ') || 'Artist';
+            const sellerCognito = seller[0]?.cognito_username;
+            const buyerCognito = orderData?.cognito_username;
+            const sellerIsCurrentUser = !!(buyerCognito && sellerCognito && buyerCognito === sellerCognito);
             return res.status(400).json({
               error: 'Artist has not set up payouts',
-              details: `${name} must complete Stripe Connect onboarding before they can receive payments. Please ask them to set up their payout account in their dashboard.`,
+              details: sellerIsCurrentUser
+                ? 'Complete your payout setup to receive this payment. You can set it up now and return to checkout.'
+                : `${name} must complete Stripe Connect onboarding before they can receive payments. Please ask them to set up their payout account in their dashboard.`,
+              seller_is_current_user: sellerIsCurrentUser,
+              seller_cognito_username: sellerCognito || undefined,
+              artist_name: name,
+              artist_email: seller[0]?.email,
             });
           }
+          if (listings.length > 0 && listings[0].stripe_account_id) {
+            const sellerId = listings[0].user_id;
+            const [[row]] = await pool.execute('SELECT price FROM listings WHERE id = ?', [item.listing_id]);
+            const unitPrice = parseFloat(row?.price || 0);
+            const itemTotal = Math.round(unitPrice * (item.quantity || 1) * 100);
+            const itemPlatformFee = 1000;
+            const itemArtist = itemTotal - itemPlatformFee;
+            const existing = uniqueSellers.get(sellerId) || { stripe_account_id: listings[0].stripe_account_id, amount: 0 };
+            uniqueSellers.set(sellerId, { stripe_account_id: existing.stripe_account_id, amount: existing.amount + itemArtist });
+          }
+        }
+        const sellerEntries = Array.from(uniqueSellers.entries());
+        if (sellerEntries.length === 0) {
+          return res.status(400).json({
+            error: 'Invalid order',
+            details: 'Could not resolve sellers for the items. Please try again.',
+          });
+        }
+        if (sellerEntries.length === 1) {
+          const [, sellerInfo] = sellerEntries[0];
+          artworkTransferData = { destination: sellerInfo.stripe_account_id, amount: sellerInfo.amount };
+        } else {
+          return res.status(400).json({
+            error: 'Multi-artist checkout not supported',
+            details: 'Please checkout items from one artist at a time. Stripe Connect requires a single destination for card payments.',
+          });
         }
       }
       const totalAmountCents = Math.round(
@@ -191,12 +248,20 @@ router.post('/create-checkout-session', async (req, res) => {
       metadata: sessionMetadata,
     };
 
-    // Artwork: manual capture + transfer_group (funds held until buyer confirms delivery)
+    // Artwork: destination charge with manual capture (funds held until buyer confirms delivery)
+    // Stripe requires transfer_data for Connect - "card_payments without transfers" not supported
     if (mode === 'payment' && !isSubscription) {
+      if (!artworkTransferData) {
+        return res.status(400).json({
+          error: 'Checkout configuration error',
+          details: 'Order data is required for artwork checkout. Please try again from the cart.',
+        });
+      }
       const transferGroup = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       sessionConfig.payment_intent_data = {
         capture_method: 'manual',
         transfer_group: transferGroup,
+        transfer_data: artworkTransferData,
       };
       if (sessionMetadata.order_data) {
         sessionMetadata.transfer_group = transferGroup;
@@ -215,7 +280,11 @@ router.post('/create-checkout-session', async (req, res) => {
     res.json({ url: session.url, sessionId: session.id });
   } catch (error) {
     console.error('Stripe create session error:', error);
-    res.status(500).json({ error: 'Failed to create checkout session', details: error.message });
+    const message = error?.message || 'Unknown error';
+    res.status(500).json({
+      error: 'Failed to create checkout session',
+      details: message,
+    });
   }
 });
 
@@ -380,9 +449,10 @@ router.get('/confirm-session', async (req, res) => {
         await pool.execute('UPDATE listings SET status = ?, in_stock = ? WHERE id = ?', ['sold', false, item.listing_id]);
 
         try {
+          // total_revenue is updated when buyer confirms delivery (funds released to artist)
           await pool.execute(
-            `UPDATE dashboard_stats SET total_sales = total_sales + 1, total_revenue = total_revenue + ?, active_listings = GREATEST(active_listings - 1, 0) WHERE user_id = ?`,
-            [artist_earnings, listing.user_id]
+            `UPDATE dashboard_stats SET total_sales = total_sales + 1, active_listings = GREATEST(active_listings - 1, 0) WHERE user_id = ?`,
+            [listing.user_id]
           );
           const [buyerStats] = await pool.execute('SELECT id FROM dashboard_stats WHERE user_id = ?', [buyer_id]);
           if (buyerStats.length === 0) {

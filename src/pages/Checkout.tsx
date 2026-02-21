@@ -55,6 +55,7 @@ const Checkout: React.FC = () => {
     cardName: '',
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
+  const [needsPayoutSetup, setNeedsPayoutSetup] = useState(false);
 
   const steps = ['Shipping Information', 'Payment', 'Review & Confirm'];
 
@@ -143,7 +144,36 @@ const Checkout: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Stripe checkout error:', error);
-      enqueueSnackbar(error.message || error.details || 'Failed to start checkout. Please try again.', { variant: 'error' });
+      const isPayoutError = error?.error === 'Artist has not set up payouts';
+      const isArtist = error?.seller_is_current_user || (isPayoutError && user?.id && error?.seller_cognito_username === user.id);
+      if (isPayoutError && isArtist) {
+        setNeedsPayoutSetup(true);
+      } else if (isPayoutError) {
+        enqueueSnackbar(error.details || error.message || 'The artist has not set up payouts yet. Please ask them to complete setup in their dashboard.', { variant: 'error' });
+      } else {
+        enqueueSnackbar(error.details || error.message || 'Failed to start checkout. Please try again.', { variant: 'error' });
+      }
+      setLoading(false);
+    }
+  };
+
+  const handlePayoutSetup = async (): Promise<void> => {
+    if (!user?.id) return;
+    const email = formData.email || user.email;
+    if (!email) {
+      enqueueSnackbar('Please enter your email in the shipping form to complete payout setup', { variant: 'warning' });
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiService.createStripeConnectAccount(user.id, email);
+      const { url } = await apiService.createStripeConnectAccountLink(user.id, {
+        return_url: '/checkout',
+        refresh_url: '/checkout',
+      });
+      window.location.href = url;
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to start payout setup', { variant: 'error' });
       setLoading(false);
     }
   };
@@ -326,6 +356,38 @@ const Checkout: React.FC = () => {
         <Alert severity="info">
           No payment required for listing activations.
         </Alert>
+      );
+    }
+
+    if (needsPayoutSetup) {
+      return (
+        <Box>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Complete your payout setup
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              You need to set up Stripe to receive payments for your artwork. This is a one-time setup that takes about 2 minutes. You&apos;ll return to checkout when done.
+            </Typography>
+            <Button
+              variant="contained"
+              color="warning"
+              onClick={handlePayoutSetup}
+              disabled={loading}
+              startIcon={<CreditCardIcon />}
+            >
+              {loading ? 'Starting...' : 'Set up payouts now'}
+            </Button>
+          </Alert>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => setNeedsPayoutSetup(false)}
+            sx={{ mt: 1 }}
+          >
+            Try payment again
+          </Button>
+        </Box>
       );
     }
 

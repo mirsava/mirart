@@ -518,6 +518,10 @@ router.post('/', async (req, res) => {
       dimensions,
       medium,
       year,
+      weight_oz,
+      length_in,
+      width_in,
+      height_in,
       in_stock,
       quantity_available,
       status,
@@ -539,6 +543,10 @@ router.post('/', async (req, res) => {
     }
     if (price === undefined || price === null) {
       return res.status(400).json({ error: 'price is required' });
+    }
+    const priceNum = parseFloat(price);
+    if (isNaN(priceNum) || priceNum < 0) {
+      return res.status(400).json({ error: 'price must be a valid non-negative number' });
     }
     
     // Validate image_urls (max 10 images)
@@ -596,40 +604,131 @@ router.post('/', async (req, res) => {
       }
     }
     
-    const { shipping_info, returns_info, special_instructions } = req.body;
+    const { shipping_info, returns_info, special_instructions, shipping_preference, shipping_carrier, return_days } = req.body;
     
     const qty = quantity_available !== undefined && quantity_available !== null && quantity_available !== ''
       ? Math.max(0, parseInt(quantity_available))
       : 1;
     const stock = in_stock !== undefined ? Boolean(in_stock) : (qty > 0);
 
-    const [result] = await pool.execute(
-      `INSERT INTO listings (
-        user_id, title, description, category, subcategory,
-        price, primary_image_url, image_urls, dimensions, medium, year,
-        in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        user_id,
-        title,
-        description || null,
-        category,
-        subcategory || null,
-        price !== undefined && price !== null ? parseFloat(price) : null,
-        primary_image_url || null,
-        imageUrlsJson,
-        dimensions || null,
-        medium || null,
-        year && year.toString().trim() !== '' ? parseInt(year) : null,
-        stock,
-        qty,
-        listingStatus,
-        (shipping_info && shipping_info.trim()) || null,
-        (returns_info && returns_info.trim()) || null,
-        (special_instructions && special_instructions.trim()) || null,
-        allow_comments !== undefined ? Boolean(allow_comments) : true
-      ]
-    );
+    const shipPref = (shipping_preference === 'free' || shipping_preference === 'buyer') ? shipping_preference : null;
+    const shipCarrier = (shipping_carrier === 'shippo' || shipping_carrier === 'own') ? shipping_carrier : null;
+    const retDaysNum = return_days != null ? parseInt(String(return_days), 10) : null;
+    const retDays = retDaysNum != null && !isNaN(retDaysNum) && retDaysNum > 0 && retDaysNum <= 365 ? retDaysNum : null;
+
+    let result;
+    try {
+      [result] = await pool.execute(
+        `INSERT INTO listings (
+          user_id, title, description, category, subcategory,
+          price, primary_image_url, image_urls, dimensions, medium, year,
+          weight_oz, length_in, width_in, height_in,
+          in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments,
+          shipping_preference, shipping_carrier, return_days
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          user_id,
+          title,
+          description || null,
+          category,
+          subcategory || null,
+          priceNum,
+          primary_image_url || null,
+          imageUrlsJson,
+          dimensions || null,
+          medium || null,
+          year && year.toString().trim() !== '' ? parseInt(year) : null,
+          weight_oz !== undefined && weight_oz !== null && weight_oz !== '' ? parseFloat(weight_oz) : 24,
+          length_in !== undefined && length_in !== null && length_in !== '' ? parseFloat(length_in) : 24,
+          width_in !== undefined && width_in !== null && width_in !== '' ? parseFloat(width_in) : 18,
+          height_in !== undefined && height_in !== null && height_in !== '' ? parseFloat(height_in) : 3,
+          stock,
+          qty,
+          listingStatus,
+          (shipping_info && shipping_info.trim()) || null,
+          (returns_info && returns_info.trim()) || null,
+          (special_instructions && special_instructions.trim()) || null,
+          allow_comments !== undefined ? Boolean(allow_comments) : true,
+          shipPref,
+          shipCarrier,
+          retDays
+        ]
+      );
+    } catch (insertError) {
+      console.error('Create listing INSERT error:', insertError.code, insertError.sqlMessage || insertError.message);
+      const isBadField = insertError.code === 'ER_BAD_FIELD_ERROR';
+      const msg = insertError.message || '';
+      const missingShipping = isBadField && (msg.includes('return_days') || msg.includes('shipping_preference') || msg.includes('shipping_carrier'));
+      const missingParcel = isBadField && (msg.includes('weight_oz') || msg.includes('length_in') || msg.includes('width_in') || msg.includes('height_in'));
+      if (missingShipping) {
+        [result] = await pool.execute(
+          `INSERT INTO listings (
+            user_id, title, description, category, subcategory,
+            price, primary_image_url, image_urls, dimensions, medium, year,
+            weight_oz, length_in, width_in, height_in,
+            in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            user_id,
+            title,
+            description || null,
+            category,
+            subcategory || null,
+            priceNum,
+            primary_image_url || null,
+            imageUrlsJson,
+            dimensions || null,
+            medium || null,
+            year && year.toString().trim() !== '' ? parseInt(year) : null,
+            weight_oz !== undefined && weight_oz !== null && weight_oz !== '' ? parseFloat(weight_oz) : 24,
+            length_in !== undefined && length_in !== null && length_in !== '' ? parseFloat(length_in) : 24,
+            width_in !== undefined && width_in !== null && width_in !== '' ? parseFloat(width_in) : 18,
+            height_in !== undefined && height_in !== null && height_in !== '' ? parseFloat(height_in) : 3,
+            stock,
+            qty,
+            listingStatus,
+            (shipping_info && shipping_info.trim()) || null,
+            (returns_info && returns_info.trim()) || null,
+            (special_instructions && special_instructions.trim()) || null,
+            allow_comments !== undefined ? Boolean(allow_comments) : true
+          ]
+        );
+      } else if (missingParcel) {
+        [result] = await pool.execute(
+          `INSERT INTO listings (
+            user_id, title, description, category, subcategory,
+            price, primary_image_url, image_urls, dimensions, medium, year,
+            in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments,
+            shipping_preference, shipping_carrier, return_days
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            user_id,
+            title,
+            description || null,
+            category,
+            subcategory || null,
+            priceNum,
+            primary_image_url || null,
+            imageUrlsJson,
+            dimensions || null,
+            medium || null,
+            year && year.toString().trim() !== '' ? parseInt(year) : null,
+            stock,
+            qty,
+            listingStatus,
+            (shipping_info && shipping_info.trim()) || null,
+            (returns_info && returns_info.trim()) || null,
+            (special_instructions && special_instructions.trim()) || null,
+            allow_comments !== undefined ? Boolean(allow_comments) : true,
+            shipPref,
+            shipCarrier,
+            retDays
+          ]
+        );
+      } else {
+        throw insertError;
+      }
+    }
       
       // Update dashboard stats (ensure record exists first)
       try {
@@ -686,20 +785,18 @@ router.post('/', async (req, res) => {
         image_urls: parsedImageUrls
       });
   } catch (error) {
-      
-      // Check for specific database errors
-      if (error.code === 'ER_BAD_NULL_ERROR' || (error.sqlMessage && error.sqlMessage.includes('cannot be null'))) {
-        return res.status(400).json({ 
-          error: 'Database constraint error. Please ensure the price column allows NULL values. Run the migration: npm run migrate-price-nullable',
-          details: process.env.NODE_ENV === 'development' ? error.sqlMessage : undefined
-        });
-      }
-      
-      res.status(500).json({ 
-        error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    console.error('Create listing error:', error.code, error.sqlMessage || error.message);
+    if (error.code === 'ER_BAD_NULL_ERROR' || (error.sqlMessage && error.sqlMessage.includes('cannot be null'))) {
+      return res.status(400).json({
+        error: 'Database constraint error. Please ensure the price column allows NULL values. Run the migration: npm run migrate-price-nullable',
+        details: process.env.NODE_ENV === 'development' ? error.sqlMessage : undefined
       });
     }
+    res.status(500).json({
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? (error.sqlMessage || error.message) : undefined
+    });
+  }
 });
 
 // Activate listing (check subscription limits)
@@ -819,6 +916,10 @@ router.put('/:id', async (req, res) => {
       dimensions,
       medium,
       year,
+      weight_oz,
+      length_in,
+      width_in,
+      height_in,
       in_stock,
       quantity_available,
       status,
@@ -852,7 +953,7 @@ router.put('/:id', async (req, res) => {
     const updateFields = [];
     const updateValues = [];
     
-    const { shipping_info, returns_info, special_instructions } = req.body;
+    const { shipping_info, returns_info, special_instructions, shipping_preference, shipping_carrier, return_days } = req.body;
     
     if (title !== undefined) { updateFields.push('title = ?'); updateValues.push(title); }
     if (description !== undefined) { updateFields.push('description = ?'); updateValues.push(description); }
@@ -864,6 +965,10 @@ router.put('/:id', async (req, res) => {
     if (dimensions !== undefined) { updateFields.push('dimensions = ?'); updateValues.push(dimensions); }
     if (medium !== undefined) { updateFields.push('medium = ?'); updateValues.push(medium); }
     if (year !== undefined) { updateFields.push('year = ?'); updateValues.push(year); }
+    if (weight_oz !== undefined) { updateFields.push('weight_oz = ?'); updateValues.push(parseFloat(weight_oz) || 24); }
+    if (length_in !== undefined) { updateFields.push('length_in = ?'); updateValues.push(parseFloat(length_in) || 24); }
+    if (width_in !== undefined) { updateFields.push('width_in = ?'); updateValues.push(parseFloat(width_in) || 18); }
+    if (height_in !== undefined) { updateFields.push('height_in = ?'); updateValues.push(parseFloat(height_in) || 3); }
     if (in_stock !== undefined) { updateFields.push('in_stock = ?'); updateValues.push(in_stock); }
     if (quantity_available !== undefined) {
       const qty = Math.max(0, parseInt(quantity_available));
@@ -878,6 +983,13 @@ router.put('/:id', async (req, res) => {
     if (returns_info !== undefined) { updateFields.push('returns_info = ?'); updateValues.push((returns_info && returns_info.trim()) || null); }
     if (special_instructions !== undefined) { updateFields.push('special_instructions = ?'); updateValues.push((special_instructions && special_instructions.trim()) || null); }
     if (allow_comments !== undefined) { updateFields.push('allow_comments = ?'); updateValues.push(Boolean(allow_comments)); }
+    if (shipping_preference !== undefined) { updateFields.push('shipping_preference = ?'); updateValues.push((shipping_preference === 'free' || shipping_preference === 'buyer') ? shipping_preference : null); }
+    if (shipping_carrier !== undefined) { updateFields.push('shipping_carrier = ?'); updateValues.push((shipping_carrier === 'shippo' || shipping_carrier === 'own') ? shipping_carrier : null); }
+    if (return_days !== undefined) {
+      const rd = return_days == null || return_days === 'none' ? null : (parseInt(String(return_days), 10) || null);
+      updateFields.push('return_days = ?');
+      updateValues.push(rd != null && rd > 0 && rd <= 365 ? rd : null);
+    }
     
     updateValues.push(id);
     

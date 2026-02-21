@@ -67,12 +67,31 @@ The current implementation uses Stripe Checkout (redirect flow), which does not 
 
 ## Stripe Connect (Artwork Payouts)
 
+See `docs/STRIPE_CONNECT_WORKFLOW.md` for the full end-to-end flow.
+
 Artwork purchases use Stripe Connect so artists receive payouts when buyers confirm delivery:
 
 1. **Enable Connect** in Stripe Dashboard → **Settings** → **Connect**
-2. Run the migration: `npm run migrate-stripe-connect`
-3. Artists set up payouts in **Dashboard** → **Settings** → **Payouts**
-4. Flow: Buyer pays (auth only) → Seller ships → Buyer confirms delivery → Funds captured and transferred to artist
+2. **Enable card payments for connected accounts** (required to fix "accounts do not currently support card payment"):
+   - Go to **Settings** → **Connect** → **Payment Methods**
+   - Find **Cards** and set the dropdown to **On by default**
+   - Click **Review changes** and confirm
+   - This allows your connected accounts (artists) to receive card payments
+3. Run the migration: `npm run migrate-stripe-connect`
+4. Artists set up payouts in **Artist Dashboard** → **Settings** → **Payouts**
+5. Flow: Buyer pays (auth only) → Seller ships → Buyer confirms delivery → Funds captured and transferred to artist
+
+### "Accounts do not support card_payments without transfers"
+
+Stripe requires connected accounts to have **both** `card_payments` and `transfers` capabilities. The platform:
+
+1. **Account creation**: Requests both `card_payments` and `transfers` when creating Express accounts.
+2. **Checkout**: Uses **destination charges** with `transfer_data` so the PaymentIntent specifies the connected account and amount.
+
+**If you have existing accounts created before this fix:** They may need the `transfers` capability. In Stripe Dashboard → Connect → Accounts, open the account and ensure both capabilities are enabled. Or create a new account (delete the old `stripe_account_id` from the user and run setup again).
+
+- **Single-artist checkout only**: Carts must contain items from one artist. Multi-artist carts will show: "Please checkout items from one artist at a time."
+- **Payouts**: Artists must use a **bank account** for payouts, not a debit card. See "Accounts do not support card payouts" in troubleshooting.
 
 ## Webhooks (Optional)
 

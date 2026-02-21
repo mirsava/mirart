@@ -263,18 +263,29 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
       pi = await stripe.paymentIntents.retrieve(payment_intent_id);
     }
 
+    // With destination charges (transfer_data), Stripe creates the transfer on capture.
+    // With separate charges and transfers, we create the transfer ourselves.
     const artist_earnings_cents = Math.round(parseFloat(order.artist_earnings) * 100);
     if (artist_earnings_cents > 0 && order.seller_stripe_account_id && !order.stripe_transfer_id) {
       const chargeId = pi.latest_charge;
-      const sourceTransaction = typeof chargeId === 'string' ? chargeId : chargeId?.id;
-      const transfer = await stripe.transfers.create({
-        amount: artist_earnings_cents,
-        currency: 'usd',
-        destination: order.seller_stripe_account_id,
-        transfer_group: `order-${order.order_number}`,
-        ...(sourceTransaction && { source_transaction: sourceTransaction }),
-      });
-      await pool.execute('UPDATE orders SET stripe_transfer_id = ? WHERE id = ?', [transfer.id, orderId]);
+      const charge = chargeId ? await stripe.charges.retrieve(typeof chargeId === 'string' ? chargeId : chargeId.id) : null;
+      const existingTransferId = charge?.transfer;
+
+      if (existingTransferId) {
+        // Destination charge: transfer already created on capture
+        await pool.execute('UPDATE orders SET stripe_transfer_id = ? WHERE payment_intent_id = ?', [existingTransferId, payment_intent_id]);
+      } else {
+        // Separate charges and transfers: create transfer
+        const sourceTransaction = typeof chargeId === 'string' ? chargeId : chargeId?.id;
+        const transfer = await stripe.transfers.create({
+          amount: artist_earnings_cents,
+          currency: 'usd',
+          destination: order.seller_stripe_account_id,
+          transfer_group: `order-${order.order_number}`,
+          ...(sourceTransaction && { source_transaction: sourceTransaction }),
+        });
+        await pool.execute('UPDATE orders SET stripe_transfer_id = ? WHERE id = ?', [transfer.id, orderId]);
+      }
     }
 
     await pool.execute("UPDATE orders SET status = 'delivered' WHERE id = ?", [orderId]);

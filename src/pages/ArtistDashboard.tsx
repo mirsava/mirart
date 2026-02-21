@@ -46,13 +46,16 @@ import {
   Receipt as ReceiptIcon,
   ShoppingBag as ShoppingBagIcon,
   Store as StoreIcon,
+  LocalShipping as LocalShippingIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User, UserSubscription } from '../services/api';
-import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider } from '@mui/material';
+import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment } from '@mui/material';
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
 
@@ -135,6 +138,12 @@ const ArtistDashboard: React.FC = () => {
     phone: '',
     country: '',
     website: '',
+    addressLine1: '',
+    addressLine2: '',
+    addressCity: '',
+    addressState: '',
+    addressZip: '',
+    addressCountry: 'US',
     specialties: [] as string[],
     experience: '',
     bio: '',
@@ -148,6 +157,9 @@ const ArtistDashboard: React.FC = () => {
     email_notifications: true,
     comment_notifications: true,
     default_special_instructions: '',
+    default_shipping_preference: 'buyer' as 'free' | 'buyer',
+    default_shipping_carrier: 'shippo' as 'shippo' | 'own',
+    default_return_days: 30 as number | null,
   });
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -162,7 +174,24 @@ const ArtistDashboard: React.FC = () => {
   const [salesOrders, setSalesOrders] = useState<Order[]>([]);
   const [ordersSubTab, setOrdersSubTab] = useState(0);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>('all');
+  const [ordersSearchTerm, setOrdersSearchTerm] = useState('');
   const [connectStatus, setConnectStatus] = useState<{ connected: boolean; chargesEnabled?: boolean } | null>(null);
+
+  const filterDashboardOrders = (orders: Order[]) => {
+    return orders.filter((order) => {
+      const matchesStatus = ordersStatusFilter === 'all' || order.status === ordersStatusFilter;
+      const search = ordersSearchTerm.trim().toLowerCase();
+      const matchesSearch = !search ||
+        (order.order_number?.toLowerCase().includes(search)) ||
+        (order.listing_title?.toLowerCase().includes(search)) ||
+        (order.buyer_email?.toLowerCase().includes(search)) ||
+        (order.seller_email?.toLowerCase().includes(search));
+      return matchesStatus && matchesSearch;
+    });
+  };
+  const filteredPurchasesOrders = filterDashboardOrders(purchasesOrders);
+  const filteredSalesOrders = filterDashboardOrders(salesOrders);
   const [connectLoading, setConnectLoading] = useState(false);
 
   useEffect(() => {
@@ -375,6 +404,12 @@ const ArtistDashboard: React.FC = () => {
         phone: data.phone || '',
         country: data.country || '',
         website: data.website || '',
+        addressLine1: (data as any).address_line1 || '',
+        addressLine2: (data as any).address_line2 || '',
+        addressCity: (data as any).address_city || '',
+        addressState: (data as any).address_state || '',
+        addressZip: (data as any).address_zip || '',
+        addressCountry: (data as any).address_country || 'US',
         specialties: data.specialties ? (typeof data.specialties === 'string' ? JSON.parse(data.specialties) : data.specialties) : [],
         experience: data.experience_level || '',
         bio: data.bio || '',
@@ -458,6 +493,12 @@ const ArtistDashboard: React.FC = () => {
         phone: profileFormData.phone || null,
         country: profileFormData.country,
         website: profileFormData.website || null,
+        address_line1: profileFormData.addressLine1 || null,
+        address_line2: profileFormData.addressLine2 || null,
+        address_city: profileFormData.addressCity || null,
+        address_state: profileFormData.addressState || null,
+        address_zip: profileFormData.addressZip || null,
+        address_country: profileFormData.addressCountry || 'US',
         specialties: profileFormData.specialties,
         experience_level: profileFormData.experience,
         bio: profileFormData.bio || null,
@@ -581,6 +622,9 @@ const ArtistDashboard: React.FC = () => {
         default_special_instructions: data.default_special_instructions !== undefined && data.default_special_instructions !== null
           ? String(data.default_special_instructions)
           : '',
+        default_shipping_preference: (data.default_shipping_preference === 'free' || data.default_shipping_preference === 'buyer') ? data.default_shipping_preference : 'buyer',
+        default_shipping_carrier: (data.default_shipping_carrier === 'shippo' || data.default_shipping_carrier === 'own') ? data.default_shipping_carrier : 'shippo',
+        default_return_days: (data.default_return_days != null && Number(data.default_return_days) > 0 && Number(data.default_return_days) <= 365) ? Number(data.default_return_days) : (data.default_return_days === null ? null : 30),
       });
     } catch (err: any) {
       setSettingsError(err.message || 'Failed to load settings');
@@ -599,6 +643,33 @@ const ArtistDashboard: React.FC = () => {
     if (settingsSuccess) setSettingsSuccess(false);
   };
 
+  const handleShippingPreferenceChange = (value: 'free' | 'buyer') => {
+    setSettings(prev => ({ ...prev, default_shipping_preference: value }));
+    if (settingsError) setSettingsError(null);
+    if (settingsSuccess) setSettingsSuccess(false);
+  };
+
+  const handleShippingCarrierChange = (value: 'shippo' | 'own') => {
+    setSettings(prev => ({ ...prev, default_shipping_carrier: value }));
+    if (settingsError) setSettingsError(null);
+    if (settingsSuccess) setSettingsSuccess(false);
+  };
+
+  const handleReturnDaysChange = (value: number | null) => {
+    setSettings(prev => ({ ...prev, default_return_days: value }));
+    if (settingsError) setSettingsError(null);
+    if (settingsSuccess) setSettingsSuccess(false);
+  };
+
+  const handleReturnDaysInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value.trim();
+    if (v === '') return;
+    const n = parseInt(v, 10);
+    if (!isNaN(n) && n > 0 && n <= 365) {
+      handleReturnDaysChange(n);
+    }
+  };
+
   const handleSettingsSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user?.id) return;
@@ -612,6 +683,9 @@ const ArtistDashboard: React.FC = () => {
       email_notifications: settings.email_notifications,
       comment_notifications: settings.comment_notifications,
       default_special_instructions: settings.default_special_instructions || '',
+      default_shipping_preference: settings.default_shipping_preference,
+      default_shipping_carrier: settings.default_shipping_carrier,
+      default_return_days: settings.default_return_days,
     };
     
     try {
@@ -640,11 +714,13 @@ const ArtistDashboard: React.FC = () => {
         default_special_instructions: data.default_special_instructions !== undefined && data.default_special_instructions !== null 
           ? String(data.default_special_instructions) 
           : (settings.default_special_instructions || ''),
+        default_shipping_preference: (data.default_shipping_preference === 'free' || data.default_shipping_preference === 'buyer') ? data.default_shipping_preference : settings.default_shipping_preference,
+        default_shipping_carrier: (data.default_shipping_carrier === 'shippo' || data.default_shipping_carrier === 'own') ? data.default_shipping_carrier : settings.default_shipping_carrier,
+        default_return_days: (data.default_return_days != null && Number(data.default_return_days) > 0 && Number(data.default_return_days) <= 365) ? Number(data.default_return_days) : (data.default_return_days === null ? null : (settings.default_return_days ?? 30)),
       };
       setSettings(newSettings);
       setSettingsSuccess(true);
       enqueueSnackbar('Settings saved successfully!', { variant: 'success' });
-      
       setTimeout(() => {
         setSettingsSuccess(false);
       }, 3000);
@@ -1137,6 +1213,42 @@ const ArtistDashboard: React.FC = () => {
                 </Button>
               </Box>
             </Box>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1, alignItems: 'center' }}>
+              <TextField
+                size="small"
+                placeholder="Search orders..."
+                value={ordersSearchTerm}
+                onChange={(e) => setOrdersSearchTerm(e.target.value)}
+                sx={{ minWidth: 200 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={ordersStatusFilter}
+                  label="Status"
+                  onChange={(e) => setOrdersStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="paid">Paid</MenuItem>
+                  <MenuItem value="shipped">Shipped</MenuItem>
+                  <MenuItem value="delivered">Delivered</MenuItem>
+                  <MenuItem value="cancelled">Cancelled</MenuItem>
+                </Select>
+              </FormControl>
+              {(ordersStatusFilter !== 'all' || ordersSearchTerm.trim()) && (
+                <Button size="small" onClick={() => { setOrdersStatusFilter('all'); setOrdersSearchTerm(''); }} startIcon={<FilterListIcon />}>
+                  Clear
+                </Button>
+              )}
+            </Box>
             <Tabs value={ordersSubTab} onChange={(_, v) => setOrdersSubTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
               <Tab icon={<ShoppingBagIcon />} iconPosition="start" label={`Purchases (${purchasesOrders.length})`} />
               <Tab icon={<StoreIcon />} iconPosition="start" label={`Sales (${salesOrders.length})`} />
@@ -1159,44 +1271,60 @@ const ArtistDashboard: React.FC = () => {
                     Browse Gallery
                   </Button>
                 </Paper>
+              ) : filteredPurchasesOrders.length === 0 ? (
+                <Paper elevation={0} sx={{ p: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <FilterListIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                  <Typography variant="h6" gutterBottom>No matching purchases</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Try adjusting your filters.</Typography>
+                  <Button variant="outlined" size="small" onClick={() => { setOrdersStatusFilter('all'); setOrdersSearchTerm(''); }}>Clear filters</Button>
+                </Paper>
               ) : (
                 <Box>
-                  {purchasesOrders.slice(0, 5).map((order) => (
-                    <Card
-                      key={order.id}
-                      sx={{
-                        display: 'flex',
-                        mb: 2,
-                        cursor: 'pointer',
-                        '&:hover': { boxShadow: 2 },
-                      }}
-                      onClick={() => navigate(`/painting/${order.listing_id}`)}
-                    >
-                      <CardMedia
-                        component="img"
-                        sx={{ width: 80, objectFit: 'cover' }}
-                        image={getImageUrl(order.primary_image_url) || ''}
-                        alt={order.listing_title}
-                      />
-                      <CardContent sx={{ flex: 1, py: 1.5 }}>
-                        <Typography variant="subtitle2" color="text.secondary">
-                          {order.order_number}
-                        </Typography>
-                        <Typography variant="subtitle1" fontWeight={600}>
-                          {order.listing_title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Seller: {order.seller_email}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
-                          <Chip label={order.status} size="small" color="primary" variant="outlined" />
-                          <Typography variant="body2" fontWeight={600}>
-                            ${order.total_price?.toFixed(2)}
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  <Grid container spacing={2}>
+                    {filteredPurchasesOrders.slice(0, 5).map((order) => (
+                      <Grid item xs={12} sm={6} key={order.id}>
+                        <Card
+                          sx={{
+                            display: 'flex',
+                            height: '100%',
+                            cursor: 'pointer',
+                            '&:hover': { boxShadow: 2 },
+                          }}
+                          onClick={() => navigate(`/painting/${order.listing_id}`)}
+                        >
+                          <Box sx={{ width: 140, minWidth: 140, height: 140, flexShrink: 0, bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {getImageUrl(order.primary_image_url) ? (
+                              <CardMedia
+                                component="img"
+                                sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                image={getImageUrl(order.primary_image_url)!}
+                                alt={order.listing_title}
+                              />
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">No Image</Typography>
+                            )}
+                          </Box>
+                          <CardContent sx={{ flex: 1, py: 1.5, minWidth: 0 }}>
+                            <Typography variant="subtitle2" color="text.secondary">
+                              {order.order_number}
+                            </Typography>
+                            <Typography variant="subtitle1" fontWeight={600} noWrap>
+                              {order.listing_title}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" noWrap>
+                              Seller: {order.seller_email}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
+                              <Chip label={order.status} size="small" color="primary" variant="outlined" />
+                              <Typography variant="body2" fontWeight={600}>
+                                ${order.total_price?.toFixed(2)}
+                              </Typography>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
                   {purchasesOrders.length > 5 && (
                     <Button fullWidth variant="outlined" onClick={() => navigate('/orders')} sx={{ mt: 2 }}>
                       View all {purchasesOrders.length} purchases
@@ -1217,44 +1345,60 @@ const ArtistDashboard: React.FC = () => {
                   View Orders Page
                 </Button>
               </Paper>
+            ) : filteredSalesOrders.length === 0 ? (
+              <Paper elevation={0} sx={{ p: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <FilterListIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6" gutterBottom>No matching sales</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Try adjusting your filters.</Typography>
+                <Button variant="outlined" size="small" onClick={() => { setOrdersStatusFilter('all'); setOrdersSearchTerm(''); }}>Clear filters</Button>
+              </Paper>
             ) : (
               <Box>
-                {salesOrders.slice(0, 5).map((order) => (
-                  <Card
-                    key={order.id}
-                    sx={{
-                      display: 'flex',
-                      mb: 2,
-                      cursor: 'pointer',
-                      '&:hover': { boxShadow: 2 },
-                    }}
-                    onClick={() => navigate(`/painting/${order.listing_id}`)}
-                  >
-                    <CardMedia
-                      component="img"
-                      sx={{ width: 80, objectFit: 'cover' }}
-                      image={getImageUrl(order.primary_image_url) || ''}
-                      alt={order.listing_title}
-                    />
-                    <CardContent sx={{ flex: 1, py: 1.5 }}>
-                      <Typography variant="subtitle2" color="text.secondary">
-                        {order.order_number}
-                      </Typography>
-                      <Typography variant="subtitle1" fontWeight={600}>
-                        {order.listing_title}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Buyer: {order.buyer_email}
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
-                        <Chip label={order.status} size="small" color="primary" variant="outlined" />
-                        <Typography variant="body2" fontWeight={600}>
-                          ${order.total_price?.toFixed(2)}
-                        </Typography>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                ))}
+                <Grid container spacing={2}>
+                  {filteredSalesOrders.slice(0, 5).map((order) => (
+                    <Grid item xs={12} sm={6} key={order.id}>
+                      <Card
+                        sx={{
+                          display: 'flex',
+                          height: '100%',
+                          cursor: 'pointer',
+                          '&:hover': { boxShadow: 2 },
+                        }}
+                        onClick={() => navigate(`/painting/${order.listing_id}`)}
+                      >
+                        <Box sx={{ width: 140, minWidth: 140, height: 140, flexShrink: 0, bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {getImageUrl(order.primary_image_url) ? (
+                            <CardMedia
+                              component="img"
+                              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              image={getImageUrl(order.primary_image_url)!}
+                              alt={order.listing_title}
+                            />
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">No Image</Typography>
+                          )}
+                        </Box>
+                        <CardContent sx={{ flex: 1, py: 1.5, minWidth: 0 }}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            {order.order_number}
+                          </Typography>
+                          <Typography variant="subtitle1" fontWeight={600} noWrap>
+                            {order.listing_title}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            Buyer: {order.buyer_email}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
+                            <Chip label={order.status} size="small" color="primary" variant="outlined" />
+                            <Typography variant="body2" fontWeight={600}>
+                              ${order.total_price?.toFixed(2)}
+                            </Typography>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
                 {salesOrders.length > 5 && (
                   <Button fullWidth variant="outlined" onClick={() => navigate('/orders')} sx={{ mt: 2 }}>
                     View all {salesOrders.length} sales
@@ -1862,6 +2006,62 @@ const ArtistDashboard: React.FC = () => {
                       </Grid>
 
                       <Grid item xs={12}>
+                        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600, mt: 2 }}>
+                          Shipping address (origin – where you ship from)
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          Required for Shippo label purchase. Used as the "from" address for shipping rates.
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label="Street address"
+                          value={profileFormData.addressLine1}
+                          onChange={handleProfileInputChange('addressLine1')}
+                          placeholder="123 Main St"
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label="Street address 2 (optional)"
+                          value={profileFormData.addressLine2}
+                          onChange={handleProfileInputChange('addressLine2')}
+                          placeholder="Apt, suite, etc."
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          fullWidth
+                          label="City"
+                          value={profileFormData.addressCity}
+                          onChange={handleProfileInputChange('addressCity')}
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          fullWidth
+                          label="State"
+                          value={profileFormData.addressState}
+                          onChange={handleProfileInputChange('addressState')}
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          fullWidth
+                          label="ZIP code"
+                          value={profileFormData.addressZip}
+                          onChange={handleProfileInputChange('addressZip')}
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+
+                      <Grid item xs={12}>
                         <TextField
                           fullWidth
                           label="Website"
@@ -2102,6 +2302,132 @@ const ArtistDashboard: React.FC = () => {
                   <Grid item xs={12}>
                 <form onSubmit={handleSettingsSubmit}>
                   <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                        <LocalShippingIcon sx={{ color: 'primary.main' }} />
+                        <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+                          Shipping Defaults
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Default shipping option for new listings. You can override this when creating or editing individual listings.
+                      </Typography>
+                      <FormControl component="fieldset" sx={{ display: 'block' }}>
+                        <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
+                          Who pays for shipping?
+                        </FormLabel>
+                        <RadioGroup
+                          row
+                          value={settings.default_shipping_preference}
+                          onChange={(e) => handleShippingPreferenceChange(e.target.value as 'free' | 'buyer')}
+                        >
+                          <FormControlLabel
+                            value="free"
+                            control={<Radio color="primary" />}
+                            label={
+                              <Box>
+                                <Typography variant="body1" fontWeight={500}>
+                                  Free shipping
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  You absorb shipping costs
+                                </Typography>
+                              </Box>
+                            }
+                          />
+                          <FormControlLabel
+                            value="buyer"
+                            control={<Radio color="primary" />}
+                            label={
+                              <Box>
+                                <Typography variant="body1" fontWeight={500}>
+                                  By buyer
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Buyer pays shipping at checkout
+                                </Typography>
+                              </Box>
+                            }
+                          />
+                        </RadioGroup>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <FormControl component="fieldset" sx={{ display: 'block' }}>
+                        <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
+                          How do you ship?
+                        </FormLabel>
+                        <RadioGroup
+                          row
+                          value={settings.default_shipping_carrier}
+                          onChange={(e) => handleShippingCarrierChange(e.target.value as 'shippo' | 'own')}
+                        >
+                          <FormControlLabel
+                            value="shippo"
+                            control={<Radio color="primary" />}
+                            label={
+                              <Box>
+                                <Typography variant="body1" fontWeight={500}>
+                                  Shippo service
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  You package and ship. We provide the label and it is automatically attached to your order.
+                                </Typography>
+                              </Box>
+                            }
+                          />
+                          <FormControlLabel
+                            value="own"
+                            control={<Radio color="primary" />}
+                            label={
+                              <Box>
+                                <Typography variant="body1" fontWeight={500}>
+                                  Your own carrier
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  You ship yourself. Trackable shipping required.
+                                </Typography>
+                              </Box>
+                            }
+                          />
+                        </RadioGroup>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <FormControl component="fieldset" sx={{ display: 'block' }}>
+                        <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
+                          Refund & Return
+                        </FormLabel>
+                        <RadioGroup
+                          row
+                          value={settings.default_return_days === null ? 'none' : 'days'}
+                          onChange={(e) => handleReturnDaysChange(e.target.value === 'none' ? null : 30)}
+                        >
+                          <FormControlLabel value="none" control={<Radio color="primary" />} label="No returns" />
+                          <FormControlLabel value="days" control={<Radio color="primary" />} label="Return within" />
+                        </RadioGroup>
+                        {settings.default_return_days !== null && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, ml: 4 }}>
+                            <TextField
+                              type="number"
+                              size="small"
+                              value={settings.default_return_days}
+                              onChange={handleReturnDaysInputChange}
+                              inputProps={{ min: 1, max: 365 }}
+                              sx={{ width: 80 }}
+                            />
+                            <Typography variant="body2">days</Typography>
+                          </Box>
+                        )}
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Divider sx={{ my: 2 }} />
+                    </Grid>
+
                     <Grid item xs={12}>
                       <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
                         Comment Settings

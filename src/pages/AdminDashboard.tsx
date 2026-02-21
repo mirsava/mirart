@@ -39,7 +39,6 @@ import {
   ListItemText,
 } from '@mui/material';
 import {
-  Dashboard as DashboardIcon,
   People as PeopleIcon,
   Inventory as InventoryIcon,
   Email as EmailIcon,
@@ -52,6 +51,8 @@ import {
   LockOpen as LockOpenIcon,
   CheckCircle as CheckCircleIcon,
   CreditCard as CreditCardIcon,
+  ShoppingCart as ShoppingCartIcon,
+  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -134,6 +135,12 @@ const AdminDashboard: React.FC = () => {
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [planFormData, setPlanFormData] = useState<Partial<SubscriptionPlan>>({});
   const [deletingPlan, setDeletingPlan] = useState<number | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersPagination, setOrdersPagination] = useState<any>(null);
+  const [ordersSearch, setOrdersSearch] = useState('');
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState('all');
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -157,9 +164,19 @@ const AdminDashboard: React.FC = () => {
   }, [user?.id, messagesPage]);
 
   useEffect(() => {
-    if (!user?.id || tabValue !== 3) return;
+    if (!user?.id || tabValue !== 4) return;
     fetchSubscriptionPlans();
   }, [user?.id, tabValue]);
+
+  useEffect(() => {
+    if (!user?.id || tabValue !== 3) return;
+    setOrdersPage(1);
+  }, [ordersSearch, ordersStatusFilter]);
+
+  useEffect(() => {
+    if (!user?.id || tabValue !== 3) return;
+    fetchOrders();
+  }, [user?.id, tabValue, ordersPage, ordersSearch, ordersStatusFilter]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -249,6 +266,27 @@ const AdminDashboard: React.FC = () => {
       const errorMessage = error.message || error.error || 'Failed to fetch messages';
       enqueueSnackbar(errorMessage, { variant: 'error' });
       console.error('Error fetching messages:', error);
+    }
+  };
+
+  const fetchOrders = async (): Promise<void> => {
+    if (!user?.id) return;
+    setLoadingOrders(true);
+    try {
+      const response = await apiService.getAdminOrders(user.id, {
+        page: ordersPage,
+        limit: 20,
+        search: ordersSearch.trim() || undefined,
+        status: ordersStatusFilter !== 'all' ? ordersStatusFilter : undefined,
+      }, user.groups);
+      setOrders(response.orders || []);
+      setOrdersPagination(response.pagination);
+    } catch (error: any) {
+      enqueueSnackbar(error.message || error.error || 'Failed to fetch orders', { variant: 'error' });
+      setOrders([]);
+      setOrdersPagination(null);
+    } finally {
+      setLoadingOrders(false);
     }
   };
 
@@ -625,7 +663,7 @@ const AdminDashboard: React.FC = () => {
           },
         }}
       />
-      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: { xs: 4, sm: 5, md: 6 } }}>
         {stats && (
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12} sm={6} md={3}>
@@ -677,14 +715,55 @@ const AdminDashboard: React.FC = () => {
               <Card>
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <DashboardIcon color="primary" sx={{ fontSize: 40 }} />
+                    <ShoppingCartIcon color="primary" sx={{ fontSize: 40 }} />
                     <Box>
-                      <Typography variant="h4">{stats.orders.total}</Typography>
+                      <Typography variant="h4">{stats.orders?.total ?? 0}</Typography>
                       <Typography variant="body2" color="text.secondary">
                         Total Orders
                       </Typography>
                     </Box>
                   </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <ShoppingCartIcon color="primary" sx={{ fontSize: 40 }} />
+                    <Typography variant="h6">Order Statistics</Typography>
+                  </Box>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary" display="block">By Status</Typography>
+                      {stats.orders?.byStatus && Object.keys(stats.orders.byStatus).length > 0 ? (
+                        <Box>
+                          {Object.entries(stats.orders.byStatus).map(([status, count]) => (
+                            <Typography key={status} variant="body2">
+                              {status}: {count as number}
+                            </Typography>
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">—</Typography>
+                      )}
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary" display="block">Revenue</Typography>
+                      <Typography variant="body2">Total: ${(stats.orders?.revenue?.total ?? 0).toFixed(2)}</Typography>
+                      <Typography variant="body2">Platform fees: ${(stats.orders?.revenue?.platformFees ?? 0).toFixed(2)}</Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary" display="block">This Month</Typography>
+                      <Typography variant="body2">${(stats.orders?.revenue?.thisMonth ?? 0).toFixed(2)}</Typography>
+                      <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.thisMonthFees ?? 0).toFixed(2)}</Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary" display="block">YTD</Typography>
+                      <Typography variant="body2">${(stats.orders?.revenue?.ytd ?? 0).toFixed(2)}</Typography>
+                      <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.ytdFees ?? 0).toFixed(2)}</Typography>
+                    </Grid>
+                  </Grid>
                 </CardContent>
               </Card>
             </Grid>
@@ -779,6 +858,7 @@ const AdminDashboard: React.FC = () => {
             <Tab icon={<PeopleIcon />} iconPosition="start" label="Users" />
             <Tab icon={<InventoryIcon />} iconPosition="start" label="Listings" />
             <Tab icon={<EmailIcon />} iconPosition="start" label="Messages" />
+            <Tab icon={<ReceiptIcon />} iconPosition="start" label="Orders" />
             <Tab icon={<CreditCardIcon />} iconPosition="start" label="Subscription Plans" />
           </Tabs>
 
@@ -1078,6 +1158,107 @@ const AdminDashboard: React.FC = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={3}>
+            <Box sx={{ mb: 2, px: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+              <TextField
+                size="small"
+                placeholder="Search by order #, title, buyer, seller..."
+                value={ordersSearch}
+                onChange={(e) => setOrdersSearch(e.target.value)}
+                sx={{ minWidth: 280 }}
+              />
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={ordersStatusFilter}
+                  label="Status"
+                  onChange={(e) => setOrdersStatusFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="paid">Paid</MenuItem>
+                  <MenuItem value="shipped">Shipped</MenuItem>
+                  <MenuItem value="delivered">Delivered</MenuItem>
+                  <MenuItem value="cancelled">Cancelled</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+            {loadingOrders ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <TableContainer sx={{ px: 3 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Order</TableCell>
+                      <TableCell>Listing</TableCell>
+                      <TableCell>Buyer</TableCell>
+                      <TableCell>Seller</TableCell>
+                      <TableCell>Total</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Date</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {orders.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                          <Typography color="text.secondary">No orders found</Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      orders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell>{order.order_number}</TableCell>
+                          <TableCell>{order.listing_title}</TableCell>
+                          <TableCell>{order.buyer_email}</TableCell>
+                          <TableCell>{order.seller_email}</TableCell>
+                          <TableCell>${order.total_price?.toFixed(2)}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={order.status}
+                              size="small"
+                              color={order.status === 'delivered' ? 'success' : order.status === 'cancelled' ? 'error' : order.status === 'pending' ? 'warning' : 'primary'}
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <IconButton size="small" onClick={() => navigate(`/painting/${order.listing_id}`)}>
+                              <OpenInNewIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+            {ordersPagination && ordersPagination.total > 0 && (
+              <Box sx={{ px: 3, pb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Showing {((ordersPagination.page - 1) * ordersPagination.limit) + 1} - {Math.min(ordersPagination.page * ordersPagination.limit, ordersPagination.total)} of {ordersPagination.total} orders
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <Pagination
+                    count={ordersPagination.totalPages}
+                    page={ordersPagination.page}
+                    onChange={(_e, value) => setOrdersPage(value)}
+                    color="primary"
+                    showFirstButton
+                    showLastButton
+                  />
+                </Box>
+              </Box>
+            )}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={4}>
             <Box sx={{ px: 3, pb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6">Subscription Plans</Typography>

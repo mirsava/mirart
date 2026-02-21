@@ -112,6 +112,7 @@ const Gallery: React.FC = () => {
       likeCount: listing.like_count || 0,
       isLiked: listing.is_liked || false,
       imageCount: getListingImageCount(listing),
+      shippingInfo: listing.shipping_info,
     };
   };
 

@@ -174,7 +174,7 @@ const OrderSuccess: React.FC = () => {
                 </Box>
               </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <ShippingIcon sx={{ mr: 2, color: 'primary.main' }} />
                 <Box>
                   <Typography variant="body2" fontWeight="bold">
@@ -182,6 +182,17 @@ const OrderSuccess: React.FC = () => {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Free shipping with tracking information provided
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <CheckCircleIcon sx={{ mr: 2, color: 'primary.main' }} />
+                <Box>
+                  <Typography variant="body2" fontWeight="bold">
+                    Confirm Delivery
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    When you receive your artwork, confirm delivery in Orders to release payment to the artist
                   </Typography>
                 </Box>
               </Box>
@@ -193,6 +204,13 @@ const OrderSuccess: React.FC = () => {
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Button
               variant="contained"
+              size="large"
+              onClick={() => navigate('/orders')}
+            >
+              View My Orders
+            </Button>
+            <Button
+              variant="outlined"
               size="large"
               onClick={() => navigate('/gallery')}
             >

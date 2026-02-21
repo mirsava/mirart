@@ -15,6 +15,9 @@ import {
   Alert,
   CircularProgress,
   IconButton,
+  RadioGroup,
+  Radio,
+  FormLabel,
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -42,6 +45,10 @@ const EditListing: React.FC = () => {
     dimensions: '',
     medium: '',
     year: '',
+    weight_oz: '24',
+    length_in: '24',
+    width_in: '18',
+    height_in: '3',
     in_stock: true,
     quantity_available: '1',
     status: 'draft' as 'draft',
@@ -49,6 +56,9 @@ const EditListing: React.FC = () => {
     returns_info: '',
     special_instructions: '',
     allow_comments: true,
+    shipping_preference: 'buyer' as 'free' | 'buyer',
+    shipping_carrier: 'shippo' as 'shippo' | 'own',
+    return_days: 30 as number | null,
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -128,6 +138,10 @@ const EditListing: React.FC = () => {
         dimensions: listing.dimensions || '',
         medium: listing.medium || '',
         year: listing.year?.toString() || '',
+        weight_oz: (listing as any).weight_oz?.toString() || '24',
+        length_in: (listing as any).length_in?.toString() || '24',
+        width_in: (listing as any).width_in?.toString() || '18',
+        height_in: (listing as any).height_in?.toString() || '3',
         quantity_available: (listing as any).quantity_available?.toString() || '1',
         in_stock: listing.in_stock !== undefined ? Boolean(listing.in_stock) : true,
         status: listing.status || 'draft',
@@ -135,6 +149,9 @@ const EditListing: React.FC = () => {
         returns_info: listing.returns_info || '',
         special_instructions: listing.special_instructions || '',
         allow_comments: listing.allow_comments === true || listing.allow_comments === 1 || (listing.allow_comments !== false && listing.allow_comments !== 0),
+        shipping_preference: (listing.shipping_preference === 'free' || listing.shipping_preference === 'buyer') ? listing.shipping_preference : 'buyer',
+        shipping_carrier: (listing.shipping_carrier === 'shippo' || listing.shipping_carrier === 'own') ? listing.shipping_carrier : 'shippo',
+        return_days: (listing.return_days != null && Number(listing.return_days) > 0 && Number(listing.return_days) <= 365) ? Number(listing.return_days) : (listing.return_days === null ? null : 30),
       });
 
       const allImages = [];
@@ -400,6 +417,10 @@ const EditListing: React.FC = () => {
         dimensions: formData.dimensions || undefined,
         medium: formData.medium || undefined,
         year: formData.year ? parseInt(formData.year) : undefined,
+        weight_oz: parseFloat(formData.weight_oz) || 24,
+        length_in: parseFloat(formData.length_in) || 24,
+        width_in: parseFloat(formData.width_in) || 18,
+        height_in: parseFloat(formData.height_in) || 3,
         in_stock: (parseInt(formData.quantity_available || '1') || 1) > 0,
         quantity_available: parseInt(formData.quantity_available || '1') || 1,
         status: formData.status,
@@ -407,6 +428,9 @@ const EditListing: React.FC = () => {
         returns_info: formData.returns_info && formData.returns_info.trim() ? formData.returns_info.trim() : undefined,
         special_instructions: formData.special_instructions && formData.special_instructions.trim() ? formData.special_instructions.trim() : undefined,
         allow_comments: Boolean(formData.allow_comments),
+        shipping_preference: formData.shipping_preference,
+        shipping_carrier: formData.shipping_carrier,
+        return_days: formData.return_days,
         cognito_username: user.id,
         groups: user.groups || [],
       };
@@ -554,6 +578,24 @@ const EditListing: React.FC = () => {
                   inputProps={{ min: 0, step: 1 }}
                   helperText="How many of this artwork are available for sale"
                 />
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Shipping dimensions (for rate calculation)
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField fullWidth type="number" label="Weight (oz)" name="weight_oz" value={formData.weight_oz} onChange={handleChange} inputProps={{ min: 1, step: 0.1 }} />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField fullWidth type="number" label="Length (in)" name="length_in" value={formData.length_in} onChange={handleChange} inputProps={{ min: 1, step: 0.1 }} />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField fullWidth type="number" label="Width (in)" name="width_in" value={formData.width_in} onChange={handleChange} inputProps={{ min: 1, step: 0.1 }} />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField fullWidth type="number" label="Height (in)" name="height_in" value={formData.height_in} onChange={handleChange} inputProps={{ min: 1, step: 0.1 }} />
               </Grid>
 
               <Grid item xs={12}>
@@ -711,6 +753,36 @@ const EditListing: React.FC = () => {
               </Grid>
 
               <Grid item xs={12}>
+                <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
+                  <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
+                    Who pays for shipping?
+                  </FormLabel>
+                  <RadioGroup
+                    row
+                    value={formData.shipping_preference}
+                    onChange={(e) => setFormData(prev => ({ ...prev, shipping_preference: e.target.value as 'free' | 'buyer' }))}
+                  >
+                    <FormControlLabel value="free" control={<Radio color="primary" />} label="Free shipping" />
+                    <FormControlLabel value="buyer" control={<Radio color="primary" />} label="Buyer pays" />
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
+                  <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
+                    How do you ship?
+                  </FormLabel>
+                  <RadioGroup
+                    row
+                    value={formData.shipping_carrier}
+                    onChange={(e) => setFormData(prev => ({ ...prev, shipping_carrier: e.target.value as 'shippo' | 'own' }))}
+                  >
+                    <FormControlLabel value="shippo" control={<Radio color="primary" />} label="Shippo service" />
+                    <FormControlLabel value="own" control={<Radio color="primary" />} label="Your own carrier" />
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   multiline
@@ -723,7 +795,39 @@ const EditListing: React.FC = () => {
                   helperText="Provide details about shipping options, costs, and delivery times"
                 />
               </Grid>
-
+              <Grid item xs={12}>
+                <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
+                  <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
+                    Refund & Return
+                  </FormLabel>
+                  <RadioGroup
+                    row
+                    value={formData.return_days === null ? 'none' : 'days'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, return_days: e.target.value === 'none' ? null : 30 }))}
+                  >
+                    <FormControlLabel value="none" control={<Radio color="primary" />} label="No returns" />
+                    <FormControlLabel value="days" control={<Radio color="primary" />} label="Return within" />
+                  </RadioGroup>
+                  {formData.return_days !== null && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, ml: 4 }}>
+                      <TextField
+                        type="number"
+                        size="small"
+                        value={formData.return_days}
+                        onChange={(e) => {
+                          const v = e.target.value.trim();
+                          if (v === '') return;
+                          const n = parseInt(v, 10);
+                          if (!isNaN(n) && n > 0 && n <= 365) setFormData(prev => ({ ...prev, return_days: n }));
+                        }}
+                        inputProps={{ min: 1, max: 365 }}
+                        sx={{ width: 80 }}
+                      />
+                      <Typography variant="body2">days</Typography>
+                    </Box>
+                  )}
+                </FormControl>
+              </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth

@@ -17,6 +17,7 @@ export interface Artwork {
   likeCount?: number;
   isLiked?: boolean;
   imageCount?: number;
+  shippingInfo?: string;
 }
 
 export interface Painting extends Artwork {

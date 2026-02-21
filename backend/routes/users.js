@@ -126,7 +126,13 @@ router.post('/', async (req, res) => {
       experience_level,
       bio,
       profile_image_url,
-      signature_url
+      signature_url,
+      address_line1,
+      address_line2,
+      address_city,
+      address_state,
+      address_zip,
+      address_country
     } = req.body;
     
     // Check if user exists
@@ -141,7 +147,8 @@ router.post('/', async (req, res) => {
         `UPDATE users SET 
           email = ?, first_name = ?, last_name = ?, business_name = ?, 
           phone = ?, country = ?, website = ?, specialties = ?, 
-          experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?
+          experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?,
+          address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?
         WHERE cognito_username = ?`,
         [
           (email && email.trim()) || null, 
@@ -156,6 +163,12 @@ router.post('/', async (req, res) => {
           (bio && bio.trim()) || null, 
           (profile_image_url && profile_image_url.trim()) || null,
           (signature_url && signature_url.trim()) || null,
+          (address_line1 && address_line1.trim()) || null,
+          (address_line2 && address_line2.trim()) || null,
+          (address_city && address_city.trim()) || null,
+          (address_state && address_state.trim()) || null,
+          (address_zip && address_zip.trim()) || null,
+          (address_country && address_country.trim()) || 'US',
           cognito_username
         ]
       );
@@ -213,11 +226,22 @@ router.post('/', async (req, res) => {
 router.get('/:cognitoUsername/settings', async (req, res) => {
   try {
     const { cognitoUsername } = req.params;
-    
-    const [rows] = await pool.execute(
-      'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
+    let rows;
+    try {
+      [rows] = await pool.execute(
+        'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions, default_shipping_preference, default_shipping_carrier, default_return_days FROM users WHERE cognito_username = ?',
+        [cognitoUsername]
+      );
+    } catch (selectError) {
+      if (selectError.code === 'ER_BAD_FIELD_ERROR' && (selectError.message?.includes('default_shipping_preference') || selectError.message?.includes('default_shipping_carrier') || selectError.message?.includes('default_return_days'))) {
+        [rows] = await pool.execute(
+          'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions, default_shipping_preference, default_shipping_carrier FROM users WHERE cognito_username = ?',
+          [cognitoUsername]
+        );
+      } else {
+        throw selectError;
+      }
+    }
     
     if (rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -226,12 +250,22 @@ router.get('/:cognitoUsername/settings', async (req, res) => {
     const specialInstructions = rows[0].default_special_instructions !== null && rows[0].default_special_instructions !== undefined
       ? String(rows[0].default_special_instructions)
       : '';
-    
+    const rawPref = rows[0].default_shipping_preference;
+    const prefStr = rawPref != null ? String(rawPref).trim().toLowerCase() : '';
+    const shippingPref = prefStr === 'free' ? 'free' : 'buyer';
+    const rawCarrier = rows[0].default_shipping_carrier;
+    const carrierStr = rawCarrier != null ? String(rawCarrier).trim().toLowerCase() : '';
+    const shippingCarrier = carrierStr === 'own' ? 'own' : 'shippo';
+    const returnDays = rows[0].default_return_days != null ? (parseInt(String(rows[0].default_return_days), 10) || null) : null;
+
     const responseData = {
       default_allow_comments: rows[0].default_allow_comments !== 0,
       email_notifications: rows[0].email_notifications !== 0,
       comment_notifications: rows[0].comment_notifications !== 0,
       default_special_instructions: specialInstructions,
+      default_shipping_preference: shippingPref,
+      default_shipping_carrier: shippingCarrier,
+      default_return_days: returnDays,
     };
     
     res.json(responseData);
@@ -245,7 +279,7 @@ router.get('/:cognitoUsername/settings', async (req, res) => {
 router.put('/:cognitoUsername/settings', async (req, res) => {
   try {
     const { cognitoUsername } = req.params;
-    const { default_allow_comments, email_notifications, comment_notifications, default_special_instructions } = req.body;
+    const { default_allow_comments, email_notifications, comment_notifications, default_special_instructions, default_shipping_preference, default_shipping_carrier, default_return_days } = req.body;
     
     let specialInstructionsValue = null;
     if (default_special_instructions !== undefined && default_special_instructions !== null) {
@@ -257,14 +291,21 @@ router.put('/:cognitoUsername/settings', async (req, res) => {
       }
     }
     
+    const shippingPrefValue = (default_shipping_preference === 'free' || default_shipping_preference === 'buyer') ? default_shipping_preference : 'buyer';
+    const shippingCarrierValue = (default_shipping_carrier === 'own' || default_shipping_carrier === 'shippo') ? default_shipping_carrier : 'shippo';
+    const returnDaysNum = default_return_days === null || default_return_days === 'none' || default_return_days === undefined ? null : (parseInt(String(default_return_days), 10) || null);
+    const returnDaysValue = returnDaysNum != null && returnDaysNum > 0 && returnDaysNum <= 365 ? returnDaysNum : null;
     const updateParams = [
       default_allow_comments !== undefined ? (default_allow_comments ? 1 : 0) : null,
       email_notifications !== undefined ? (email_notifications ? 1 : 0) : null,
       comment_notifications !== undefined ? (comment_notifications ? 1 : 0) : null,
       specialInstructionsValue,
+      shippingPrefValue,
+      shippingCarrierValue,
+      returnDaysValue,
       cognitoUsername
     ];
-    
+
     let updateResult;
     try {
       updateResult = await pool.execute(
@@ -272,12 +313,15 @@ router.put('/:cognitoUsername/settings', async (req, res) => {
           default_allow_comments = ?,
           email_notifications = ?,
           comment_notifications = ?,
-          default_special_instructions = ?
+          default_special_instructions = ?,
+          default_shipping_preference = ?,
+          default_shipping_carrier = ?,
+          default_return_days = ?
         WHERE cognito_username = ?`,
         updateParams
       );
     } catch (updateError) {
-      if (updateError.code === 'ER_BAD_FIELD_ERROR' && updateError.message?.includes('default_special_instructions')) {
+      if (updateError.code === 'ER_BAD_FIELD_ERROR' && (updateError.message?.includes('default_special_instructions') || updateError.message?.includes('default_shipping_preference') || updateError.message?.includes('default_shipping_carrier') || updateError.message?.includes('default_return_days'))) {
         updateResult = await pool.execute(
           `UPDATE users SET 
             default_allow_comments = ?,
@@ -298,19 +342,28 @@ router.put('/:cognitoUsername/settings', async (req, res) => {
     
     let updated;
     let hasSpecialInstructionsColumn = false;
+    let hasShippingPrefColumn = false;
+    let hasShippingCarrierColumn = false;
+    let hasReturnDaysColumn = false;
     try {
       [updated] = await pool.execute(
-        'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions FROM users WHERE cognito_username = ?',
+        'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions, default_shipping_preference, default_shipping_carrier FROM users WHERE cognito_username = ?',
         [cognitoUsername]
       );
       hasSpecialInstructionsColumn = updated.length > 0 && 'default_special_instructions' in updated[0];
+      hasShippingPrefColumn = updated.length > 0 && 'default_shipping_preference' in updated[0];
+      hasShippingCarrierColumn = updated.length > 0 && 'default_shipping_carrier' in updated[0];
+      hasReturnDaysColumn = updated.length > 0 && 'default_return_days' in updated[0];
     } catch (selectError) {
-      if (selectError.code === 'ER_BAD_FIELD_ERROR' && selectError.message?.includes('default_special_instructions')) {
+      if (selectError.code === 'ER_BAD_FIELD_ERROR' && (selectError.message?.includes('default_special_instructions') || selectError.message?.includes('default_shipping_preference') || selectError.message?.includes('default_shipping_carrier') || selectError.message?.includes('default_return_days'))) {
         [updated] = await pool.execute(
           'SELECT default_allow_comments, email_notifications, comment_notifications FROM users WHERE cognito_username = ?',
           [cognitoUsername]
         );
         hasSpecialInstructionsColumn = false;
+        hasShippingPrefColumn = false;
+        hasShippingCarrierColumn = false;
+        hasReturnDaysColumn = false;
       } else {
         throw selectError;
       }
@@ -334,13 +387,34 @@ router.put('/:cognitoUsername/settings', async (req, res) => {
         ? String(dbValue) 
         : '';
     } else {
-      // Column not in SELECT result - use value from request if available
       const requestValue = (default_special_instructions && typeof default_special_instructions === 'string') 
         ? default_special_instructions.trim() 
         : '';
       responseData.default_special_instructions = requestValue;
     }
-    
+    if (hasShippingPrefColumn && 'default_shipping_preference' in updated[0]) {
+      const rawPref = updated[0].default_shipping_preference;
+      const prefStr = rawPref != null ? String(rawPref).trim().toLowerCase() : '';
+      responseData.default_shipping_preference = prefStr === 'free' ? 'free' : 'buyer';
+    } else {
+      responseData.default_shipping_preference = (default_shipping_preference === 'free' || default_shipping_preference === 'buyer') ? default_shipping_preference : 'buyer';
+    }
+    if (hasShippingCarrierColumn && 'default_shipping_carrier' in updated[0]) {
+      const rawCarrier = updated[0].default_shipping_carrier;
+      const carrierStr = rawCarrier != null ? String(rawCarrier).trim().toLowerCase() : '';
+      responseData.default_shipping_carrier = carrierStr === 'own' ? 'own' : 'shippo';
+    } else {
+      responseData.default_shipping_carrier = (default_shipping_carrier === 'own' || default_shipping_carrier === 'shippo') ? default_shipping_carrier : 'shippo';
+    }
+    if (hasReturnDaysColumn && 'default_return_days' in updated[0]) {
+      const rd = updated[0].default_return_days;
+      const n = rd != null ? parseInt(String(rd), 10) : null;
+      responseData.default_return_days = (n != null && n > 0 && n <= 365) ? n : null;
+    } else {
+      const n = (default_return_days === null || default_return_days === 'none' || default_return_days === undefined) ? null : (parseInt(String(default_return_days), 10) || null);
+      responseData.default_return_days = (n != null && n > 0 && n <= 365) ? n : null;
+    }
+
     res.json(responseData);
   } catch (error) {
     console.error('Error updating user settings:', error);
@@ -368,14 +442,21 @@ router.put('/:cognitoUsername', async (req, res) => {
       experience_level,
       bio,
       profile_image_url,
-      signature_url
+      signature_url,
+      address_line1,
+      address_line2,
+      address_city,
+      address_state,
+      address_zip,
+      address_country
     } = req.body;
     
     await pool.execute(
       `UPDATE users SET 
         first_name = ?, last_name = ?, business_name = ?, 
         phone = ?, country = ?, website = ?, specialties = ?, 
-        experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?
+        experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?,
+        address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?
       WHERE cognito_username = ?`,
       [
         (first_name && first_name.trim()) || null, 
@@ -389,6 +470,12 @@ router.put('/:cognitoUsername', async (req, res) => {
         (bio && bio.trim()) || null, 
         (profile_image_url && profile_image_url.trim()) || null,
         (signature_url && signature_url.trim()) || null,
+        (address_line1 && address_line1.trim()) || null,
+        (address_line2 && address_line2.trim()) || null,
+        (address_city && address_city.trim()) || null,
+        (address_state && address_state.trim()) || null,
+        (address_zip && address_zip.trim()) || null,
+        (address_country && address_country.trim()) || 'US',
         cognitoUsername
       ]
     );

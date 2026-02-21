@@ -187,6 +187,18 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
             }}
           />
         )}
+        {painting.shippingInfo && /free\s+shipping/i.test(painting.shippingInfo) && (
+          <Chip
+            label="Free shipping"
+            size="small"
+            color="success"
+            sx={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+            }}
+          />
+        )}
       </Box>
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>

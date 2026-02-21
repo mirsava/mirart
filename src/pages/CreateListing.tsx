@@ -20,6 +20,9 @@ import {
   Stepper,
   Step,
   StepLabel,
+  RadioGroup,
+  Radio,
+  FormLabel,
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -52,6 +55,10 @@ const CreateListing: React.FC = () => {
     dimensions: '',
     medium: '',
     year: '',
+    weight_oz: '24',
+    length_in: '24',
+    width_in: '18',
+    height_in: '3',
     in_stock: true,
     quantity_available: '1',
     status: 'draft' as 'draft',
@@ -59,6 +66,9 @@ const CreateListing: React.FC = () => {
     returns_info: '',
     special_instructions: '',
     allow_comments: true,
+    shipping_preference: 'buyer' as 'free' | 'buyer',
+    shipping_carrier: 'shippo' as 'shippo' | 'own',
+    return_days: 30 as number | null,
   });
 
   useEffect(() => {
@@ -74,6 +84,9 @@ const CreateListing: React.FC = () => {
             ...prev,
             allow_comments: data.default_allow_comments !== false,
             special_instructions: data.default_special_instructions || '',
+            shipping_preference: (data.default_shipping_preference === 'free' || data.default_shipping_preference === 'buyer') ? data.default_shipping_preference : 'buyer',
+            shipping_carrier: (data.default_shipping_carrier === 'shippo' || data.default_shipping_carrier === 'own') ? data.default_shipping_carrier : 'shippo',
+            return_days: (data.default_return_days != null && Number(data.default_return_days) > 0 && Number(data.default_return_days) <= 365) ? Number(data.default_return_days) : (data.default_return_days === null ? null : 30),
           }));
         }
       } catch (error) {
@@ -171,6 +184,10 @@ const CreateListing: React.FC = () => {
       dimensions: pick(dimensions),
       medium: pick(mediums),
       year: String(2020 + Math.floor(Math.random() * 5)),
+      weight_oz: '24',
+      length_in: '24',
+      width_in: '18',
+      height_in: '3',
       in_stock: Math.random() > 0.2,
       quantity_available: String(Math.floor(Math.random() * 5) + 1),
       status: 'draft',
@@ -365,6 +382,10 @@ const CreateListing: React.FC = () => {
         dimensions: formData.dimensions || undefined,
         medium: formData.medium || undefined,
         year: formData.year ? parseInt(formData.year) : undefined,
+        weight_oz: parseFloat(formData.weight_oz) || 24,
+        length_in: parseFloat(formData.length_in) || 24,
+        width_in: parseFloat(formData.width_in) || 18,
+        height_in: parseFloat(formData.height_in) || 3,
         in_stock: (parseInt(formData.quantity_available || '1') || 1) > 0,
         quantity_available: parseInt(formData.quantity_available || '1') || 1,
         status: 'draft',
@@ -372,6 +393,9 @@ const CreateListing: React.FC = () => {
         returns_info: formData.returns_info && formData.returns_info.trim() ? formData.returns_info.trim() : undefined,
         special_instructions: formData.special_instructions && formData.special_instructions.trim() ? formData.special_instructions.trim() : undefined,
         allow_comments: formData.allow_comments,
+        shipping_preference: formData.shipping_preference,
+        shipping_carrier: formData.shipping_carrier,
+        return_days: formData.return_days,
       };
 
       listingData.price = parseFloat(formData.price);
@@ -579,6 +603,59 @@ const CreateListing: React.FC = () => {
                         sx={{ bgcolor: 'background.default' }}
                       />
                     </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        Shipping dimensions (for rate calculation)
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Weight (oz)"
+                        name="weight_oz"
+                        value={formData.weight_oz}
+                        onChange={handleChange}
+                        inputProps={{ min: 1, step: 0.1 }}
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Length (in)"
+                        name="length_in"
+                        value={formData.length_in}
+                        onChange={handleChange}
+                        inputProps={{ min: 1, step: 0.1 }}
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Width (in)"
+                        name="width_in"
+                        value={formData.width_in}
+                        onChange={handleChange}
+                        inputProps={{ min: 1, step: 0.1 }}
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Height (in)"
+                        name="height_in"
+                        value={formData.height_in}
+                        onChange={handleChange}
+                        inputProps={{ min: 1, step: 0.1 }}
+                        sx={{ bgcolor: 'background.default' }}
+                      />
+                    </Grid>
                   </Grid>
                 </Paper>
               </Grid>
@@ -744,13 +821,43 @@ const CreateListing: React.FC = () => {
                   }}
                 >
                   <Typography variant="h6" fontWeight={600} gutterBottom>
-                    Shipping & Returns
+                    Shipping
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Optional information to help buyers understand shipping and return policies
+                    Override your default settings for this listing, or leave as is.
                   </Typography>
-                  
+
                   <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                      <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
+                        <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
+                          Who pays for shipping?
+                        </FormLabel>
+                        <RadioGroup
+                          row
+                          value={formData.shipping_preference}
+                          onChange={(e) => setFormData(prev => ({ ...prev, shipping_preference: e.target.value as 'free' | 'buyer' }))}
+                        >
+                          <FormControlLabel value="free" control={<Radio color="primary" />} label="Free shipping" />
+                          <FormControlLabel value="buyer" control={<Radio color="primary" />} label="Buyer pays" />
+                        </RadioGroup>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
+                        <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
+                          How do you ship?
+                        </FormLabel>
+                        <RadioGroup
+                          row
+                          value={formData.shipping_carrier}
+                          onChange={(e) => setFormData(prev => ({ ...prev, shipping_carrier: e.target.value as 'shippo' | 'own' }))}
+                        >
+                          <FormControlLabel value="shippo" control={<Radio color="primary" />} label="Shippo service" />
+                          <FormControlLabel value="own" control={<Radio color="primary" />} label="Your own carrier" />
+                        </RadioGroup>
+                      </FormControl>
+                    </Grid>
                     <Grid item xs={12}>
                       <TextField
                         fullWidth
@@ -765,7 +872,39 @@ const CreateListing: React.FC = () => {
                         sx={{ bgcolor: 'background.default' }}
                       />
                     </Grid>
-
+                    <Grid item xs={12}>
+                      <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
+                        <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
+                          Refund & Return
+                        </FormLabel>
+                        <RadioGroup
+                          row
+                          value={formData.return_days === null ? 'none' : 'days'}
+                          onChange={(e) => setFormData(prev => ({ ...prev, return_days: e.target.value === 'none' ? null : 30 }))}
+                        >
+                          <FormControlLabel value="none" control={<Radio color="primary" />} label="No returns" />
+                          <FormControlLabel value="days" control={<Radio color="primary" />} label="Return within" />
+                        </RadioGroup>
+                        {formData.return_days !== null && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, ml: 4 }}>
+                            <TextField
+                              type="number"
+                              size="small"
+                              value={formData.return_days}
+                              onChange={(e) => {
+                                const v = e.target.value.trim();
+                                if (v === '') return;
+                                const n = parseInt(v, 10);
+                                if (!isNaN(n) && n > 0 && n <= 365) setFormData(prev => ({ ...prev, return_days: n }));
+                              }}
+                              inputProps={{ min: 1, max: 365 }}
+                              sx={{ width: 80 }}
+                            />
+                            <Typography variant="body2">days</Typography>
+                          </Box>
+                        )}
+                      </FormControl>
+                    </Grid>
                     <Grid item xs={12}>
                       <TextField
                         fullWidth

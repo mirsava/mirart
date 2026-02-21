@@ -48,6 +48,9 @@ export interface Listing {
   like_count?: number;
   is_liked?: boolean;
   allow_comments?: boolean;
+  shipping_preference?: 'free' | 'buyer';
+  shipping_carrier?: 'shippo' | 'own';
+  return_days?: number | null;
 }
 
 export interface Order {
@@ -63,6 +66,10 @@ export interface Order {
   artist_earnings: number;
   status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
   shipping_address?: string;
+  shipping_cost?: number;
+  tracking_number?: string;
+  tracking_url?: string;
+  label_url?: string;
   payment_intent_id?: string;
   created_at: string;
   updated_at: string;
@@ -147,6 +154,10 @@ class ApiService {
         error.status = response.status;
         error.error = errorData.error || errorMessage;
         error.details = errorData.details || errorData;
+        if (errorData.seller_is_current_user !== undefined) error.seller_is_current_user = errorData.seller_is_current_user;
+        if (errorData.seller_cognito_username !== undefined) error.seller_cognito_username = errorData.seller_cognito_username;
+        if (errorData.artist_email !== undefined) error.artist_email = errorData.artist_email;
+        if (errorData.artist_name !== undefined) error.artist_name = errorData.artist_name;
         console.error('API Error:', error);
         throw error;
       }
@@ -323,6 +334,37 @@ class ApiService {
     });
   }
 
+  // Shippo shipping
+  async getShippingRates(address: { street1: string; city: string; state: string; zip: string; country?: string; name?: string }, items: Array<{ listing_id: number; quantity: number }>): Promise<{ rates: Array<{ object_id: string; provider: string; servicelevel: string; amount: string; estimated_days?: number }> }> {
+    return this.request('/shipping/rates', {
+      method: 'POST',
+      body: JSON.stringify({ address, items }),
+    });
+  }
+
+  async getShippingRatesForOrder(orderId: number, cognitoUsername: string): Promise<{ rates: Array<{ object_id: string; provider: string; servicelevel: string; amount: string; estimated_days?: number }> }> {
+    return this.request('/shipping/rates-for-order', {
+      method: 'POST',
+      body: JSON.stringify({ order_id: orderId, cognito_username: cognitoUsername }),
+    });
+  }
+
+  async purchaseShippingLabel(orderId: number, rateId: string, cognitoUsername: string): Promise<{ label_url: string; tracking_number: string; tracking_url: string }> {
+    return this.request('/shipping/label', {
+      method: 'POST',
+      body: JSON.stringify({ order_id: orderId, rate_id: rateId, cognito_username: cognitoUsername }),
+    });
+  }
+
+  async getShippingTracking(trackingNumber: string, carrier?: string): Promise<{ status: string; url?: string }> {
+    const params = carrier ? `?carrier=${encodeURIComponent(carrier)}` : '';
+    return this.request(`/shipping/track/${encodeURIComponent(trackingNumber)}${params}`);
+  }
+
+  async isShippingConfigured(): Promise<{ configured: boolean }> {
+    return this.request('/shipping/configured');
+  }
+
   async createStripeConnectAccount(cognitoUsername: string, email: string, businessName?: string): Promise<{ accountId: string; existing?: boolean }> {
     return this.request('/stripe/connect/create-account', {
       method: 'POST',
@@ -330,10 +372,17 @@ class ApiService {
     });
   }
 
-  async createStripeConnectAccountLink(cognitoUsername: string): Promise<{ url: string }> {
+  async createStripeConnectAccountLink(
+    cognitoUsername: string,
+    options?: { return_url?: string; refresh_url?: string }
+  ): Promise<{ url: string }> {
+    const body: Record<string, string> = { cognito_username: cognitoUsername };
+    if (options?.return_url) body.return_url = options.return_url;
+    if (options?.refresh_url) body.refresh_url = options.refresh_url;
+    if (typeof window !== 'undefined') body.return_url_base = window.location.origin;
     return this.request('/stripe/connect/create-account-link', {
       method: 'POST',
-      body: JSON.stringify({ cognito_username: cognitoUsername }),
+      body: JSON.stringify(body),
     });
   }
 
@@ -509,6 +558,20 @@ class ApiService {
       });
     }
     return this.request<any>(`/admin/listings?${params.toString()}`);
+  }
+
+  async getAdminOrders(cognitoUsername: string, filters?: { page?: number; limit?: number; search?: string; status?: string }, groups?: string[]): Promise<{ orders: Order[]; pagination: any }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups && groups.length > 0) {
+      params.append('groups', JSON.stringify(groups));
+    }
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') params.append(key, value.toString());
+      });
+    }
+    return this.request<{ orders: Order[]; pagination: any }>(`/admin/orders?${params.toString()}`);
   }
 
   async getAdminMessages(cognitoUsername: string, filters?: { page?: number; limit?: number }, groups?: string[]): Promise<any> {

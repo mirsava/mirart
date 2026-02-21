@@ -882,9 +882,14 @@ const PaintingDetail: React.FC = () => {
                     Shipping & Returns
                   </Typography>
                   <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Shipping
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Typography variant="subtitle2" gutterBottom sx={{ mb: 0 }}>
+                        Shipping
+                      </Typography>
+                      {painting.shipping_info && /free\s+shipping/i.test(painting.shipping_info) && (
+                        <Chip label="Free shipping" size="small" color="success" />
+                      )}
+                    </Box>
                     {painting.shipping_info && painting.shipping_info.trim() ? (
                       <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
                         {painting.shipping_info}
