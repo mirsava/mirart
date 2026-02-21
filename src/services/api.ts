@@ -65,12 +65,17 @@ export interface Order {
   platform_fee: number;
   artist_earnings: number;
   status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+  return_status?: 'requested' | 'approved' | 'denied' | null;
+  return_reason?: string;
+  return_requested_at?: string;
   shipping_address?: string;
   shipping_cost?: number;
   tracking_number?: string;
   tracking_url?: string;
   label_url?: string;
   payment_intent_id?: string;
+  return_days?: number | null;
+  returns_info?: string | null;
   created_at: string;
   updated_at: string;
   listing_title?: string;
@@ -332,6 +337,20 @@ class ApiService {
     return this.request(`/orders/${orderId}/confirm-delivery`, {
       method: 'PUT',
       body: JSON.stringify({ cognito_username: cognitoUsername }),
+    });
+  }
+
+  async requestReturn(orderId: number, cognitoUsername: string, reason?: string): Promise<{ success: boolean; return_status: string }> {
+    return this.request(`/orders/${orderId}/return-request`, {
+      method: 'POST',
+      body: JSON.stringify({ cognito_username: cognitoUsername, reason }),
+    });
+  }
+
+  async respondToReturn(orderId: number, cognitoUsername: string, action: 'approved' | 'denied'): Promise<{ success: boolean; return_status: string }> {
+    return this.request(`/orders/${orderId}/return-respond`, {
+      method: 'PUT',
+      body: JSON.stringify({ cognito_username: cognitoUsername, action }),
     });
   }
 

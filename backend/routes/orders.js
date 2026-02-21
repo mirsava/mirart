@@ -130,7 +130,7 @@ router.post('/', async (req, res) => {
         type: 'order',
         title: 'New sale',
         body: `Order ${order_number} for ${listingTitle}`,
-        link: '/orders',
+        link: `/orders?order=${result.insertId}`,
         referenceId: result.insertId,
       });
       await createNotification({
@@ -138,7 +138,7 @@ router.post('/', async (req, res) => {
         type: 'order',
         title: 'Order confirmed',
         body: `Order ${order_number} for ${listingTitle}`,
-        link: '/orders',
+        link: `/orders?order=${result.insertId}`,
         referenceId: result.insertId,
       });
     } catch (nErr) {
@@ -191,6 +191,8 @@ router.get('/user/:cognitoUsername', async (req, res) => {
       query = `SELECT o.*, 
         l.title as listing_title,
         l.primary_image_url,
+        l.return_days,
+        l.returns_info,
         u.email as buyer_email
        FROM orders o
        JOIN listings l ON o.listing_id = l.id
@@ -201,6 +203,8 @@ router.get('/user/:cognitoUsername', async (req, res) => {
       query = `SELECT o.*, 
         l.title as listing_title,
         l.primary_image_url,
+        l.return_days,
+        l.returns_info,
         u.email as seller_email
        FROM orders o
        JOIN listings l ON o.listing_id = l.id
@@ -254,7 +258,7 @@ router.put('/:orderId/mark-shipped', async (req, res) => {
           type: 'order',
           title: 'Order shipped',
           body: `Order ${order.order_number} has been shipped.`,
-          link: '/orders',
+          link: `/orders?order=${orderId}`,
           referenceId: parseInt(orderId, 10),
         });
       } catch (nErr) {
@@ -338,7 +342,7 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
           type: 'order',
           title: 'Order delivered',
           body: `Order ${order.order_number} has been confirmed delivered.`,
-          link: '/orders',
+          link: `/orders?order=${orderId}`,
           referenceId: parseInt(orderId, 10),
           severity: 'success',
         });
@@ -363,6 +367,114 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
       error: error.message || 'Failed to confirm delivery',
       details: error.type === 'StripeError' ? error.message : undefined,
     });
+  }
+});
+
+router.post('/:orderId/return-request', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { cognito_username, reason } = req.body;
+    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+
+    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
+    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+    const buyer_id = users[0].id;
+
+    const [orders] = await pool.execute(
+      `SELECT o.*, l.return_days, l.returns_info
+       FROM orders o JOIN listings l ON o.listing_id = l.id
+       WHERE o.id = ? AND o.buyer_id = ?`,
+      [orderId, buyer_id]
+    );
+    if (orders.length === 0) return res.status(404).json({ error: 'Order not found' });
+    const order = orders[0];
+
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ error: 'Only delivered orders can be returned' });
+    }
+    if (order.return_status) {
+      return res.status(400).json({ error: `Return already ${order.return_status}` });
+    }
+
+    const returnDays = order.return_days;
+    if (!returnDays || returnDays <= 0) {
+      return res.status(400).json({ error: 'This item does not accept returns' });
+    }
+
+    const deliveredDate = order.updated_at || order.created_at;
+    const daysSinceDelivery = Math.floor((Date.now() - new Date(deliveredDate).getTime()) / 86400000);
+    if (daysSinceDelivery > returnDays) {
+      return res.status(400).json({ error: `Return window of ${returnDays} days has expired` });
+    }
+
+    await pool.execute(
+      "UPDATE orders SET return_status = 'requested', return_reason = ?, return_requested_at = NOW() WHERE id = ?",
+      [reason || null, orderId]
+    );
+
+    if (order.seller_id) {
+      try {
+        await createNotification({
+          userId: order.seller_id,
+          type: 'order',
+          title: 'Return requested',
+          body: `Buyer requested a return for order ${order.order_number}.${reason ? ' Reason: ' + reason : ''}`,
+          link: `/orders?order=${order.id}`,
+          referenceId: parseInt(orderId, 10),
+          severity: 'warning',
+        });
+      } catch {}
+    }
+
+    res.json({ success: true, return_status: 'requested' });
+  } catch (error) {
+    console.error('Error requesting return:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/:orderId/return-respond', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { cognito_username, action } = req.body;
+    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+    if (!['approved', 'denied'].includes(action)) return res.status(400).json({ error: 'action must be approved or denied' });
+
+    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
+    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+    const seller_id = users[0].id;
+
+    const [orders] = await pool.execute(
+      'SELECT id, seller_id, buyer_id, order_number, return_status FROM orders WHERE id = ? AND seller_id = ?',
+      [orderId, seller_id]
+    );
+    if (orders.length === 0) return res.status(404).json({ error: 'Order not found' });
+    const order = orders[0];
+
+    if (order.return_status !== 'requested') {
+      return res.status(400).json({ error: 'No pending return request' });
+    }
+
+    await pool.execute('UPDATE orders SET return_status = ? WHERE id = ?', [action, orderId]);
+
+    if (order.buyer_id) {
+      try {
+        await createNotification({
+          userId: order.buyer_id,
+          type: 'order',
+          title: action === 'approved' ? 'Return approved' : 'Return denied',
+          body: `Your return request for order ${order.order_number} has been ${action}.`,
+          link: `/orders?order=${order.id}`,
+          referenceId: parseInt(orderId, 10),
+          severity: action === 'approved' ? 'success' : 'error',
+        });
+      } catch {}
+    }
+
+    res.json({ success: true, return_status: action });
+  } catch (error) {
+    console.error('Error responding to return:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

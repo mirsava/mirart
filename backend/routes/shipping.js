@@ -300,7 +300,7 @@ router.post('/label', async (req, res) => {
           type: 'order',
           title: 'Order shipped',
           body,
-          link: '/orders',
+          link: `/orders?order=${order_id}`,
           referenceId: parseInt(order_id, 10),
           severity: 'success',
         });

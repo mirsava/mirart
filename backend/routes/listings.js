@@ -625,7 +625,7 @@ router.post('/', async (req, res) => {
           weight_oz, length_in, width_in, height_in,
           in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments,
           shipping_preference, shipping_carrier, return_days
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           user_id,
           title,

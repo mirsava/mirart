@@ -1043,7 +1043,7 @@ const Header: React.FC = () => {
                           </IconButton>
                         </Box>
                       </Box>
-                      <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', pt: 3, pb: 3, px: 2 }}>
+                      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pt: 3, pb: 3, px: 2 }}>
                         {notifications.length === 0 ? (
                           <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: 'text.secondary' }}>
                             <NotificationsIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />

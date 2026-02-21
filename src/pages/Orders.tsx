@@ -1,20 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
   Paper,
   Tabs,
   Tab,
-  Card,
-  CardContent,
-  CardMedia,
-  Chip,
   CircularProgress,
   Alert,
   Button,
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions,
   List,
   ListItemButton,
@@ -26,13 +23,12 @@ import {
   Select,
   MenuItem,
   InputAdornment,
+  Pagination,
 } from '@mui/material';
 import {
   Receipt as ReceiptIcon,
   ShoppingBag as ShoppingBagIcon,
   Store as StoreIcon,
-  LocalShipping as ShippingIcon,
-  CheckCircle as CheckCircleIcon,
   Search as SearchIcon,
   FilterList as FilterListIcon,
 } from '@mui/icons-material';
@@ -41,24 +37,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
 import apiService, { Order } from '../services/api';
 import PageHeader from '../components/PageHeader';
-
-const getImageUrl = (url?: string): string => {
-  if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-  const baseUrl = API_BASE_URL.replace('/api', '');
-  return baseUrl + url;
-};
-
-const statusColor: Record<string, 'default' | 'primary' | 'success' | 'warning' | 'error'> = {
-  pending: 'warning',
-  paid: 'primary',
-  shipped: 'primary',
-  delivered: 'success',
-  cancelled: 'error',
-};
+import OrderCardComponent, { getReturnEligibility } from '../components/OrderCard';
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
@@ -79,6 +58,13 @@ const Orders: React.FC = () => {
   const [labelPurchasing, setLabelPurchasing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [purchasePage, setPurchasePage] = useState(1);
+  const [salesPage, setSalesPage] = useState(1);
+  const ordersPerPage = 6;
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [returnOrder, setReturnOrder] = useState<Order | null>(null);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnLoading, setReturnLoading] = useState(false);
 
   const filterOrders = (orders: Order[]) => {
     return orders.filter((order) => {
@@ -95,6 +81,13 @@ const Orders: React.FC = () => {
 
   const filteredPurchases = filterOrders(purchases);
   const filteredSales = filterOrders(sales);
+
+  const purchaseTotalPages = Math.ceil(filteredPurchases.length / ordersPerPage);
+  const salesTotalPages = Math.ceil(filteredSales.length / ordersPerPage);
+  const safePurchasePage = Math.min(purchasePage, purchaseTotalPages || 1);
+  const safeSalesPage = Math.min(salesPage, salesTotalPages || 1);
+  const paginatedPurchases = filteredPurchases.slice((safePurchasePage - 1) * ordersPerPage, safePurchasePage * ordersPerPage);
+  const paginatedSales = filteredSales.slice((safeSalesPage - 1) * ordersPerPage, safeSalesPage * ordersPerPage);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) {
@@ -229,6 +222,44 @@ const Orders: React.FC = () => {
     }
   };
 
+  const handleOpenReturnDialog = (order: Order) => {
+    setReturnOrder(order);
+    setReturnReason('');
+    setReturnDialogOpen(true);
+  };
+
+  const handleSubmitReturn = async () => {
+    if (!user?.id || !returnOrder) return;
+    setReturnLoading(true);
+    try {
+      await apiService.requestReturn(returnOrder.id, user.id, returnReason);
+      enqueueSnackbar('Return request submitted', { variant: 'success' });
+      setReturnDialogOpen(false);
+      setReturnOrder(null);
+      await refreshOrders();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to submit return request';
+      enqueueSnackbar(msg, { variant: 'error' });
+    } finally {
+      setReturnLoading(false);
+    }
+  };
+
+  const handleRespondReturn = async (orderId: number, action: 'approved' | 'denied') => {
+    if (!user?.id) return;
+    setActionLoading(orderId);
+    try {
+      await apiService.respondToReturn(orderId, user.id, action);
+      enqueueSnackbar(`Return ${action}`, { variant: action === 'approved' ? 'success' : 'info' });
+      await refreshOrders();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to respond to return';
+      enqueueSnackbar(msg, { variant: 'error' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   if (!isAuthenticated || !user?.id) {
     return (
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8 }}>
@@ -257,137 +288,14 @@ const Orders: React.FC = () => {
 
   const highlightedOrderId = orderIdParam ? parseInt(orderIdParam, 10) : null;
 
-  const OrderCard: React.FC<{ order: Order; type: 'purchase' | 'sale' }> = ({ order, type }) => {
-    const cardRef = useRef<HTMLDivElement>(null);
-    const isHighlighted = highlightedOrderId === order.id;
-
-    useEffect(() => {
-      if (isHighlighted && cardRef.current) {
-        cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, [isHighlighted]);
-
-    return (
-    <Card
-      ref={cardRef}
-      sx={{
-        display: 'flex',
-        height: '100%',
-        cursor: 'pointer',
-        transition: 'box-shadow 0.3s, border-color 0.3s',
-        '&:hover': { boxShadow: 3 },
-        ...(isHighlighted && {
-          border: 2,
-          borderColor: 'primary.main',
-          boxShadow: '0 0 12px rgba(25, 118, 210, 0.3)',
-        }),
-      }}
-      onClick={() => navigate(`/painting/${order.listing_id}`)}
-    >
-      <Box sx={{ width: 160, minWidth: 160, height: 160, flexShrink: 0, bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {getImageUrl(order.primary_image_url) ? (
-          <CardMedia
-            component="img"
-            sx={{ width: '100%', height: 160, objectFit: 'cover' }}
-            image={getImageUrl(order.primary_image_url)!}
-            alt={order.listing_title}
-          />
-        ) : (
-          <Typography variant="body2" color="text.secondary">No Image</Typography>
-        )}
-      </Box>
-      <CardContent sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', p: 2 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            {order.order_number}
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            {order.listing_title}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {type === 'purchase' ? 'Seller' : 'Buyer'}: {type === 'purchase' ? order.seller_email : order.buyer_email}
-          </Typography>
-          <Box sx={{ mt: 1, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-            <Chip label={order.status} size="small" color={statusColor[order.status] || 'default'} />
-            <Typography variant="body2" fontWeight={600}>
-              ${order.total_price?.toFixed(2)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Qty: {order.quantity}
-            </Typography>
-          </Box>
-          {order.shipping_address && (
-            <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
-              Ship to: {order.shipping_address.split('\n').slice(0, 2).join(', ')}
-            </Typography>
-          )}
-          {order.tracking_number && (
-            <Typography variant="caption" display="block" color="primary" sx={{ mt: 0.25 }}>
-              {order.tracking_url ? (
-                <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                  Track: {order.tracking_number}
-                </a>
-              ) : (
-                `Track: ${order.tracking_number}`
-              )}
-            </Typography>
-          )}
-          {type === 'sale' && order.status === 'paid' && (
-            <>
-              {shippingConfigured ? (
-                <Button
-                  size="small"
-                  variant="contained"
-                  startIcon={<ShippingIcon />}
-                  onClick={(e) => { e.stopPropagation(); handleOpenLabelDialog(order); }}
-                  sx={{ mt: 1 }}
-                >
-                  Buy shipping label
-                </Button>
-              ) : (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<ShippingIcon />}
-                  onClick={(e) => { e.stopPropagation(); handleMarkShipped(order.id); }}
-                  disabled={actionLoading === order.id}
-                  sx={{ mt: 1 }}
-                >
-                  {actionLoading === order.id ? '...' : 'Mark as shipped'}
-                </Button>
-              )}
-            </>
-          )}
-          {type === 'sale' && order.status === 'shipped' && order.tracking_url && (
-            <Button size="small" variant="outlined" href={order.tracking_url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
-              Track shipment
-            </Button>
-          )}
-          {type === 'purchase' && order.status === 'shipped' && order.tracking_url && (
-            <Button size="small" variant="outlined" href={order.tracking_url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
-              Track shipment
-            </Button>
-          )}
-          {type === 'purchase' && (order.status === 'shipped' || order.status === 'paid') && order.status !== 'delivered' && (
-            <Button
-              size="small"
-              variant="contained"
-              color="success"
-              startIcon={<CheckCircleIcon />}
-              onClick={(e) => { e.stopPropagation(); handleConfirmDelivery(order.id); }}
-              disabled={actionLoading === order.id}
-              sx={{ mt: 1 }}
-            >
-              {actionLoading === order.id ? '...' : 'Confirm delivery'}
-            </Button>
-          )}
-        </Box>
-        <Typography variant="caption" color="text.secondary">
-          {new Date(order.created_at).toLocaleDateString()}
-        </Typography>
-      </CardContent>
-    </Card>
-    );
+  const orderCardProps = {
+    actionLoading,
+    shippingConfigured,
+    onMarkShipped: handleMarkShipped,
+    onOpenLabelDialog: handleOpenLabelDialog,
+    onConfirmDelivery: handleConfirmDelivery,
+    onOpenReturnDialog: handleOpenReturnDialog,
+    onRespondReturn: handleRespondReturn,
   };
 
   return (
@@ -409,7 +317,7 @@ const Orders: React.FC = () => {
                   size="small"
                   placeholder="Search by order #, title, or email..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setPurchasePage(1); setSalesPage(1); }}
                   sx={{ minWidth: 260 }}
                   InputProps={{
                     startAdornment: (
@@ -424,7 +332,7 @@ const Orders: React.FC = () => {
                   <Select
                     value={statusFilter}
                     label="Status"
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    onChange={(e) => { setStatusFilter(e.target.value); setPurchasePage(1); setSalesPage(1); }}
                   >
                     <MenuItem value="all">All</MenuItem>
                     <MenuItem value="pending">Pending</MenuItem>
@@ -437,7 +345,7 @@ const Orders: React.FC = () => {
                 {(statusFilter !== 'all' || searchTerm.trim()) && (
                   <Button
                     size="small"
-                    onClick={() => { setStatusFilter('all'); setSearchTerm(''); }}
+                    onClick={() => { setStatusFilter('all'); setSearchTerm(''); setPurchasePage(1); setSalesPage(1); }}
                     startIcon={<FilterListIcon />}
                   >
                     Clear filters
@@ -493,18 +401,30 @@ const Orders: React.FC = () => {
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                     Try adjusting your filters or search.
                   </Typography>
-                  <Button variant="outlined" onClick={() => { setStatusFilter('all'); setSearchTerm(''); }} sx={{ mt: 2 }}>
+                  <Button variant="outlined" onClick={() => { setStatusFilter('all'); setSearchTerm(''); setPurchasePage(1); setSalesPage(1); }} sx={{ mt: 2 }}>
                     Clear filters
                   </Button>
                 </Box>
               ) : (
-                <Grid container spacing={2}>
-                  {filteredPurchases.map((order) => (
-                    <Grid item xs={12} md={6} key={order.id}>
-                      <OrderCard order={order} type="purchase" />
-                    </Grid>
-                  ))}
-                </Grid>
+                <>
+                  <Grid container spacing={2} alignItems="stretch">
+                    {paginatedPurchases.map((order) => (
+                      <Grid item xs={12} key={order.id} sx={{ display: 'flex' }}>
+                        <OrderCardComponent order={order} type="purchase" highlighted={highlightedOrderId === order.id} {...orderCardProps} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                  {purchaseTotalPages > 1 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                      <Pagination
+                        count={purchaseTotalPages}
+                        page={safePurchasePage}
+                        onChange={(_e, p) => { setPurchasePage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                        color="primary"
+                      />
+                    </Box>
+                  )}
+                </>
               )
             ) : sales.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 8 }}>
@@ -525,18 +445,30 @@ const Orders: React.FC = () => {
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                   Try adjusting your filters or search.
                 </Typography>
-                <Button variant="outlined" onClick={() => { setStatusFilter('all'); setSearchTerm(''); }} sx={{ mt: 2 }}>
+                <Button variant="outlined" onClick={() => { setStatusFilter('all'); setSearchTerm(''); setPurchasePage(1); setSalesPage(1); }} sx={{ mt: 2 }}>
                   Clear filters
                 </Button>
               </Box>
             ) : (
-              <Grid container spacing={2}>
-                {filteredSales.map((order) => (
-                  <Grid item xs={12} md={6} key={order.id}>
-                    <OrderCard order={order} type="sale" />
-                  </Grid>
-                ))}
-              </Grid>
+              <>
+                <Grid container spacing={2} alignItems="stretch">
+                  {paginatedSales.map((order) => (
+                    <Grid item xs={12} key={order.id} sx={{ display: 'flex' }}>
+                      <OrderCardComponent order={order} type="sale" highlighted={highlightedOrderId === order.id} {...orderCardProps} />
+                    </Grid>
+                  ))}
+                </Grid>
+                {salesTotalPages > 1 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                    <Pagination
+                      count={salesTotalPages}
+                      page={safeSalesPage}
+                      onChange={(_e, p) => { setSalesPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      color="primary"
+                    />
+                  </Box>
+                )}
+              </>
             )}
           </Box>
         </Paper>
@@ -577,6 +509,47 @@ const Orders: React.FC = () => {
           <DialogActions>
             <Button onClick={() => setLabelDialogOpen(false)} disabled={labelPurchasing}>
               Cancel
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={returnDialogOpen} onClose={() => !returnLoading && setReturnDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Request return</DialogTitle>
+          <DialogContent>
+            {returnOrder && (
+              <>
+                <DialogContentText sx={{ mb: 2 }}>
+                  {returnOrder.listing_title} — Order {returnOrder.order_number}
+                </DialogContentText>
+                {returnOrder.returns_info && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>Seller's return policy</Typography>
+                    {returnOrder.returns_info}
+                  </Alert>
+                )}
+                {returnOrder.return_days && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Return window: {returnOrder.return_days} days from delivery
+                  </Typography>
+                )}
+              </>
+            )}
+            <TextField
+              fullWidth
+              multiline
+              minRows={3}
+              label="Reason for return"
+              value={returnReason}
+              onChange={(e) => setReturnReason(e.target.value)}
+              placeholder="Please describe why you'd like to return this item..."
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setReturnDialogOpen(false)} disabled={returnLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitReturn} variant="contained" color="warning" disabled={returnLoading}>
+              {returnLoading ? 'Submitting...' : 'Submit return request'}
             </Button>
           </DialogActions>
         </Dialog>

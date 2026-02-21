@@ -138,8 +138,8 @@ app.listen(PORT, async () => {
   console.log(`\n=== SERVER STARTED ===`);
   console.log(`Server is running on port ${PORT}`);
 
+  const pool = (await import('./config/database.js')).default;
   try {
-    const pool = (await import('./config/database.js')).default;
     const [cols] = await pool.execute(
       "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'default_shipping_preference'",
       [process.env.DB_NAME || 'mirart']
@@ -211,6 +211,26 @@ app.listen(PORT, async () => {
     }
   } catch (err) {
     console.warn('[Startup] Shipping migration:', err?.message || err);
+  }
+
+  try {
+    const orderReturnCols = [
+      { name: 'return_status', sql: "ADD COLUMN return_status VARCHAR(30) DEFAULT NULL AFTER status" },
+      { name: 'return_reason', sql: "ADD COLUMN return_reason TEXT DEFAULT NULL AFTER return_status" },
+      { name: 'return_requested_at', sql: "ADD COLUMN return_requested_at TIMESTAMP NULL DEFAULT NULL AFTER return_reason" },
+    ];
+    for (const { name, sql } of orderReturnCols) {
+      const [oc] = await pool.execute(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'orders' AND COLUMN_NAME = ?",
+        [process.env.DB_NAME || 'mirart', name]
+      );
+      if (oc.length === 0) {
+        await pool.execute(`ALTER TABLE orders ${sql}`);
+        console.log(`[Startup] Added ${name} column to orders`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Startup] Order return columns migration:', err?.message || err);
   }
 
   try {

@@ -56,6 +56,7 @@ import { useCart } from '../contexts/CartContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User, UserSubscription } from '../services/api';
+import OrderCardComponent from '../components/OrderCard';
 import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment } from '@mui/material';
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
@@ -200,6 +201,19 @@ const ArtistDashboard: React.FC = () => {
   };
   const filteredPurchasesOrders = filterDashboardOrders(purchasesOrders);
   const filteredSalesOrders = filterDashboardOrders(salesOrders);
+  const [ordersPurchasePage, setOrdersPurchasePage] = useState(1);
+  const [ordersSalesPage, setOrdersSalesPage] = useState(1);
+  const ordersPerPage = 6;
+  const purchasesTotalPages = Math.ceil(filteredPurchasesOrders.length / ordersPerPage);
+  const salesTotalPages = Math.ceil(filteredSalesOrders.length / ordersPerPage);
+  const safePurchasePage = Math.min(ordersPurchasePage, purchasesTotalPages || 1);
+  const safeSalesPage = Math.min(ordersSalesPage, salesTotalPages || 1);
+  const paginatedPurchases = filteredPurchasesOrders.slice((safePurchasePage - 1) * ordersPerPage, safePurchasePage * ordersPerPage);
+  const paginatedSales = filteredSalesOrders.slice((safeSalesPage - 1) * ordersPerPage, safeSalesPage * ordersPerPage);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [returnOrder, setReturnOrder] = useState<Order | null>(null);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnLoading, setReturnLoading] = useState(false);
   const [connectLoading, setConnectLoading] = useState(false);
 
   useEffect(() => {
@@ -387,6 +401,42 @@ const ArtistDashboard: React.FC = () => {
       enqueueSnackbar('Delivery confirmed', { variant: 'success' });
     } catch (err: any) {
       enqueueSnackbar(err.message || 'Failed to confirm delivery', { variant: 'error' });
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
+
+  const handleOpenReturnDialog = (order: Order) => {
+    setReturnOrder(order);
+    setReturnReason('');
+    setReturnDialogOpen(true);
+  };
+
+  const handleSubmitReturn = async () => {
+    if (!user?.id || !returnOrder) return;
+    setReturnLoading(true);
+    try {
+      await apiService.requestReturn(returnOrder.id, user.id, returnReason);
+      enqueueSnackbar('Return request submitted', { variant: 'success' });
+      setReturnDialogOpen(false);
+      setReturnOrder(null);
+      await refreshOrders();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to submit return request', { variant: 'error' });
+    } finally {
+      setReturnLoading(false);
+    }
+  };
+
+  const handleRespondReturn = async (orderId: number, action: 'approved' | 'denied') => {
+    if (!user?.id) return;
+    setOrderActionLoading(orderId);
+    try {
+      await apiService.respondToReturn(orderId, user.id, action);
+      enqueueSnackbar(`Return ${action}`, { variant: action === 'approved' ? 'success' : 'info' });
+      await refreshOrders();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Failed to respond to return', { variant: 'error' });
     } finally {
       setOrderActionLoading(null);
     }
@@ -1291,13 +1341,6 @@ const ArtistDashboard: React.FC = () => {
                     </Typography>
                   </Box>
                 </Box>
-                <Button
-                  variant="outlined"
-                  onClick={() => navigate('/orders')}
-                  sx={{ textTransform: 'none' }}
-                >
-                  View All Orders
-                </Button>
               </Box>
             </Box>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1, alignItems: 'center' }}>
@@ -1305,7 +1348,7 @@ const ArtistDashboard: React.FC = () => {
                 size="small"
                 placeholder="Search orders..."
                 value={ordersSearchTerm}
-                onChange={(e) => setOrdersSearchTerm(e.target.value)}
+                onChange={(e) => { setOrdersSearchTerm(e.target.value); setOrdersPurchasePage(1); setOrdersSalesPage(1); }}
                 sx={{ minWidth: 200 }}
                 InputProps={{
                   startAdornment: (
@@ -1320,7 +1363,7 @@ const ArtistDashboard: React.FC = () => {
                 <Select
                   value={ordersStatusFilter}
                   label="Status"
-                  onChange={(e) => setOrdersStatusFilter(e.target.value)}
+                  onChange={(e) => { setOrdersStatusFilter(e.target.value); setOrdersPurchasePage(1); setOrdersSalesPage(1); }}
                 >
                   <MenuItem value="all">All</MenuItem>
                   <MenuItem value="pending">Pending</MenuItem>
@@ -1331,7 +1374,7 @@ const ArtistDashboard: React.FC = () => {
                 </Select>
               </FormControl>
               {(ordersStatusFilter !== 'all' || ordersSearchTerm.trim()) && (
-                <Button size="small" onClick={() => { setOrdersStatusFilter('all'); setOrdersSearchTerm(''); }} startIcon={<FilterListIcon />}>
+                <Button size="small" onClick={() => { setOrdersStatusFilter('all'); setOrdersSearchTerm(''); setOrdersPurchasePage(1); setOrdersSalesPage(1); }} startIcon={<FilterListIcon />}>
                   Clear
                 </Button>
               )}
@@ -1363,74 +1406,36 @@ const ArtistDashboard: React.FC = () => {
                   <FilterListIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
                   <Typography variant="h6" gutterBottom>No matching purchases</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Try adjusting your filters.</Typography>
-                  <Button variant="outlined" size="small" onClick={() => { setOrdersStatusFilter('all'); setOrdersSearchTerm(''); }}>Clear filters</Button>
+                  <Button variant="outlined" size="small" onClick={() => { setOrdersStatusFilter('all'); setOrdersSearchTerm(''); setOrdersPurchasePage(1); setOrdersSalesPage(1); }}>Clear filters</Button>
                 </Paper>
               ) : (
                 <Box>
-                  <Grid container spacing={2}>
-                    {filteredPurchasesOrders.slice(0, 5).map((order) => (
-                      <Grid item xs={12} sm={6} key={order.id}>
-                        <Card
-                          sx={{
-                            display: 'flex',
-                            height: '100%',
-                            cursor: 'pointer',
-                            '&:hover': { boxShadow: 2 },
-                          }}
-                          onClick={() => navigate(`/painting/${order.listing_id}`)}
-                        >
-                          <Box sx={{ width: 140, minWidth: 140, height: 140, flexShrink: 0, bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {getImageUrl(order.primary_image_url) ? (
-                              <CardMedia
-                                component="img"
-                                sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                image={getImageUrl(order.primary_image_url)!}
-                                alt={order.listing_title}
-                              />
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">No Image</Typography>
-                            )}
-                          </Box>
-                          <CardContent sx={{ flex: 1, py: 1.5, minWidth: 0 }}>
-                            <Typography variant="subtitle2" color="text.secondary">
-                              {order.order_number}
-                            </Typography>
-                            <Typography variant="subtitle1" fontWeight={600} noWrap>
-                              {order.listing_title}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" noWrap>
-                              Seller: {order.seller_email}
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
-                              <Chip label={order.status} size="small" color="primary" variant="outlined" />
-                              <Typography variant="body2" fontWeight={600}>
-                                ${order.total_price?.toFixed(2)}
-                              </Typography>
-                            </Box>
-                            {order.shipping_address && (
-                              <Typography variant="caption" display="block" color="text.secondary" noWrap>
-                                Ship to: {order.shipping_address.split('\n')[0]}
-                              </Typography>
-                            )}
-                            {order.status === 'shipped' && order.tracking_url && (
-                              <Button size="small" variant="outlined" href={order.tracking_url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
-                                Track
-                              </Button>
-                            )}
-                            {(order.status === 'shipped' || order.status === 'paid') && order.status !== 'delivered' && (
-                              <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={(e) => { e.stopPropagation(); handleConfirmDelivery(order.id); }} disabled={orderActionLoading === order.id} sx={{ mt: 0.5 }}>
-                                {orderActionLoading === order.id ? '...' : 'Confirm delivery'}
-                              </Button>
-                            )}
-                          </CardContent>
-                        </Card>
+                  <Grid container spacing={2} alignItems="stretch">
+                    {paginatedPurchases.map((order) => (
+                      <Grid item xs={12} key={order.id} sx={{ display: 'flex' }}>
+                        <OrderCardComponent
+                          order={order}
+                          type="purchase"
+                          actionLoading={orderActionLoading}
+                          shippingConfigured={shippingConfigured}
+                          onConfirmDelivery={handleConfirmDelivery}
+                          onOpenLabelDialog={handleOpenLabelDialog}
+                          onMarkShipped={handleMarkShipped}
+                          onOpenReturnDialog={handleOpenReturnDialog}
+                          onRespondReturn={handleRespondReturn}
+                        />
                       </Grid>
                     ))}
                   </Grid>
-                  {purchasesOrders.length > 5 && (
-                    <Button fullWidth variant="outlined" onClick={() => navigate('/orders')} sx={{ mt: 2 }}>
-                      View all {purchasesOrders.length} purchases
-                    </Button>
+                  {purchasesTotalPages > 1 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                      <Pagination
+                        count={purchasesTotalPages}
+                        page={safePurchasePage}
+                        onChange={(_e, p) => setOrdersPurchasePage(p)}
+                        color="primary"
+                      />
+                    </Box>
                   )}
                 </Box>
               )
@@ -1452,82 +1457,34 @@ const ArtistDashboard: React.FC = () => {
                 <FilterListIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
                 <Typography variant="h6" gutterBottom>No matching sales</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Try adjusting your filters.</Typography>
-                <Button variant="outlined" size="small" onClick={() => { setOrdersStatusFilter('all'); setOrdersSearchTerm(''); }}>Clear filters</Button>
+                <Button variant="outlined" size="small" onClick={() => { setOrdersStatusFilter('all'); setOrdersSearchTerm(''); setOrdersPurchasePage(1); setOrdersSalesPage(1); }}>Clear filters</Button>
               </Paper>
             ) : (
               <Box>
-                <Grid container spacing={2}>
-                  {filteredSalesOrders.slice(0, 5).map((order) => (
-                    <Grid item xs={12} sm={6} key={order.id}>
-                      <Card
-                        sx={{
-                          display: 'flex',
-                          height: '100%',
-                          cursor: 'pointer',
-                          '&:hover': { boxShadow: 2 },
-                        }}
-                        onClick={() => navigate(`/painting/${order.listing_id}`)}
-                      >
-                        <Box sx={{ width: 140, minWidth: 140, height: 140, flexShrink: 0, bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {getImageUrl(order.primary_image_url) ? (
-                            <CardMedia
-                              component="img"
-                              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              image={getImageUrl(order.primary_image_url)!}
-                              alt={order.listing_title}
-                            />
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">No Image</Typography>
-                          )}
-                        </Box>
-                        <CardContent sx={{ flex: 1, py: 1.5, minWidth: 0 }}>
-                          <Typography variant="subtitle2" color="text.secondary">
-                            {order.order_number}
-                          </Typography>
-                          <Typography variant="subtitle1" fontWeight={600} noWrap>
-                            {order.listing_title}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap>
-                            Buyer: {order.buyer_email}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
-                            <Chip label={order.status} size="small" color="primary" variant="outlined" />
-                            <Typography variant="body2" fontWeight={600}>
-                              ${order.total_price?.toFixed(2)}
-                            </Typography>
-                          </Box>
-                          {order.shipping_address && (
-                            <Typography variant="caption" display="block" color="text.secondary" noWrap>
-                              Ship to: {order.shipping_address.split('\n')[0]}
-                            </Typography>
-                          )}
-                          {order.status === 'paid' && (
-                            <>
-                              {shippingConfigured ? (
-                                <Button size="small" variant="contained" startIcon={<LocalShippingIcon />} onClick={(e) => { e.stopPropagation(); handleOpenLabelDialog(order); }} sx={{ mt: 0.5 }}>
-                                  Buy label
-                                </Button>
-                              ) : (
-                                <Button size="small" variant="outlined" startIcon={<LocalShippingIcon />} onClick={(e) => { e.stopPropagation(); handleMarkShipped(order.id); }} disabled={orderActionLoading === order.id} sx={{ mt: 0.5 }}>
-                                  {orderActionLoading === order.id ? '...' : 'Mark shipped'}
-                                </Button>
-                              )}
-                            </>
-                          )}
-                          {order.status === 'shipped' && order.tracking_url && (
-                            <Button size="small" variant="outlined" href={order.tracking_url} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
-                              Track
-                            </Button>
-                          )}
-                        </CardContent>
-                      </Card>
+                <Grid container spacing={2} alignItems="stretch">
+                  {paginatedSales.map((order) => (
+                    <Grid item xs={12} key={order.id} sx={{ display: 'flex' }}>
+                      <OrderCardComponent
+                        order={order}
+                        type="sale"
+                        actionLoading={orderActionLoading}
+                        shippingConfigured={shippingConfigured}
+                        onMarkShipped={handleMarkShipped}
+                        onOpenLabelDialog={handleOpenLabelDialog}
+                        onRespondReturn={handleRespondReturn}
+                      />
                     </Grid>
                   ))}
                 </Grid>
-                {salesOrders.length > 5 && (
-                  <Button fullWidth variant="outlined" onClick={() => navigate('/orders')} sx={{ mt: 2 }}>
-                    View all {salesOrders.length} sales
-                  </Button>
+                {salesTotalPages > 1 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                    <Pagination
+                      count={salesTotalPages}
+                      page={safeSalesPage}
+                      onChange={(_e, p) => setOrdersSalesPage(p)}
+                      color="primary"
+                    />
+                  </Box>
                 )}
               </Box>
             )}
@@ -1961,6 +1918,45 @@ const ArtistDashboard: React.FC = () => {
                   </DialogContent>
                   <DialogActions>
                     <Button onClick={() => setLabelDialogOpen(false)} disabled={labelPurchasing}>Cancel</Button>
+                  </DialogActions>
+                </Dialog>
+
+                <Dialog open={returnDialogOpen} onClose={() => !returnLoading && setReturnDialogOpen(false)} maxWidth="sm" fullWidth>
+                  <DialogTitle>Request return</DialogTitle>
+                  <DialogContent>
+                    {returnOrder && (
+                      <>
+                        <DialogContentText sx={{ mb: 2 }}>
+                          {returnOrder.listing_title} — Order {returnOrder.order_number}
+                        </DialogContentText>
+                        {returnOrder.returns_info && (
+                          <Alert severity="info" sx={{ mb: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>Seller's return policy</Typography>
+                            {returnOrder.returns_info}
+                          </Alert>
+                        )}
+                        {returnOrder.return_days && (
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Return window: {returnOrder.return_days} days from delivery
+                          </Typography>
+                        )}
+                      </>
+                    )}
+                    <TextField
+                      fullWidth
+                      multiline
+                      minRows={3}
+                      label="Reason for return"
+                      value={returnReason}
+                      onChange={(e) => setReturnReason(e.target.value)}
+                      placeholder="Please describe why you'd like to return this item..."
+                    />
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={() => setReturnDialogOpen(false)} disabled={returnLoading}>Cancel</Button>
+                    <Button onClick={handleSubmitReturn} variant="contained" color="warning" disabled={returnLoading}>
+                      {returnLoading ? 'Submitting...' : 'Submit return request'}
+                    </Button>
                   </DialogActions>
                 </Dialog>
 

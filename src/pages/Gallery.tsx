@@ -131,11 +131,11 @@ const Gallery: React.FC = () => {
     }
     
     const searchFromUrl = searchParams.get('search') || '';
-    if (searchFromUrl !== searchInput) {
+    if (searchFromUrl !== searchTerm) {
       setSearchInput(searchFromUrl);
       setSearchTerm(searchFromUrl);
     }
-  }, [searchParams, selectedCategory, selectedArtist, searchInput]);
+  }, [searchParams, selectedCategory, selectedArtist, searchTerm]);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
