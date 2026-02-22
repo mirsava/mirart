@@ -32,18 +32,20 @@ import {
   ChevronRight as ChevronRightIcon,
   Email as EmailIcon,
   Chat as ChatIcon,
-  Comment as CommentIcon,
   Delete as DeleteIcon,
-  Reply as ReplyIcon,
   InfoOutlined as InfoIcon,
   Edit as EditIcon,
+  Star as StarIcon,
+  StarBorder as StarBorderIcon,
+  StarHalf as StarHalfIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { useSnackbar } from 'notistack';
-import apiService, { Listing, Comment } from '../services/api';
+import apiService, { Listing, Review } from '../services/api';
+import { Rating } from '@mui/material';
 import ContactSellerDialog from '../components/ContactSellerDialog';
 import { UserRole } from '../types/userRoles';
 import { useFavorites } from '../contexts/FavoritesContext';
@@ -68,15 +70,16 @@ const PaintingDetail: React.FC = () => {
   const [likeCount, setLikeCount] = useState(0);
   const [liking, setLiking] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
-  const [newComment, setNewComment] = useState('');
-  const [replyingTo, setReplyingTo] = useState<number | null>(null);
-  const [replyText, setReplyText] = useState<{ [key: number]: string }>({});
-  const [submittingComment, setSubmittingComment] = useState(false);
-  const [submittingReply, setSubmittingReply] = useState<number | null>(null);
-  const [loadingComments, setLoadingComments] = useState(false);
+  const [reviewToDelete, setReviewToDelete] = useState<number | null>(null);
+  const [newReviewRating, setNewReviewRating] = useState<number | null>(0);
+  const [newReviewComment, setNewReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [userHasReviewed, setUserHasReviewed] = useState(false);
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -115,39 +118,19 @@ const PaintingDetail: React.FC = () => {
     };
   };
 
-  const organizeComments = (comments: Comment[]): Comment[] => {
-    const commentMap = new Map<number, Comment>();
-    const rootComments: Comment[] = [];
-
-    comments.forEach(comment => {
-      comment.replies = [];
-      commentMap.set(comment.id, comment);
-    });
-
-    comments.forEach(comment => {
-      if (comment.parent_comment_id) {
-        const parent = commentMap.get(comment.parent_comment_id);
-        if (parent) {
-          if (!parent.replies) parent.replies = [];
-          parent.replies.push(comment);
-        }
-      } else {
-        rootComments.push(comment);
-      }
-    });
-
-    return rootComments;
-  };
-
-  const fetchComments = async (listingId: number) => {
-    setLoadingComments(true);
+  const fetchReviews = async (listingId: number) => {
+    setLoadingReviews(true);
     try {
-      const response = await apiService.getListingComments(listingId);
-      const organized = organizeComments(response.comments);
-      setComments(organized);
-    } catch (error: any) {
+      const response = await apiService.getListingReviews(listingId);
+      setReviews(response.reviews || []);
+      setAverageRating(response.averageRating || 0);
+      setReviewCount(response.reviewCount || 0);
+      if (user?.id) {
+        setUserHasReviewed(response.reviews.some(r => r.cognito_username === user.id));
+      }
+    } catch {
     } finally {
-      setLoadingComments(false);
+      setLoadingReviews(false);
     }
   };
 
@@ -285,7 +268,7 @@ const PaintingDetail: React.FC = () => {
             setLoading(false);
             
             if (listing.allow_comments !== false && listing.allow_comments !== 0) {
-              fetchComments(listingId);
+              fetchReviews(listingId);
             }
             return;
           } catch (apiError: any) {
@@ -406,73 +389,62 @@ const PaintingDetail: React.FC = () => {
     }
   };
 
-  const handleSubmitComment = async (parentCommentId?: number) => {
+  const handleSubmitReview = async () => {
     if (!isAuthenticated || !user?.id) {
-      enqueueSnackbar('Please sign in to comment', { variant: 'info' });
+      enqueueSnackbar('Please sign in to leave a review', { variant: 'info' });
       return;
     }
+    if (!newReviewRating || !painting) return;
 
-    const commentText = parentCommentId ? replyText[parentCommentId] : newComment;
-    if (!commentText?.trim() || !painting) return;
-
-    if (parentCommentId) {
-      setSubmittingReply(parentCommentId);
-    } else {
-      setSubmittingComment(true);
-    }
-
+    setSubmittingReview(true);
     try {
-      const response = await apiService.createComment(painting.id, user.id, commentText.trim(), parentCommentId);
-      
-      if (parentCommentId) {
-        const updatedComments = comments.map(comment => {
-          if (comment.id === parentCommentId) {
-            return {
-              ...comment,
-              replies: [...(comment.replies || []), response.comment],
-            };
-          }
-          return comment;
-        });
-        setComments(updatedComments);
-        setReplyText({ ...replyText, [parentCommentId]: '' });
-        setReplyingTo(null);
-        enqueueSnackbar('Reply posted successfully', { variant: 'success' });
+      const response = await apiService.createReview(painting.id, user.id, newReviewRating, newReviewComment.trim() || undefined);
+      if (response.updated) {
+        setReviews(prev => prev.map(r => r.id === response.review.id ? response.review : r));
+        enqueueSnackbar('Review updated', { variant: 'success' });
       } else {
-        setComments([...comments, response.comment]);
-        setNewComment('');
-        enqueueSnackbar('Comment posted successfully', { variant: 'success' });
+        setReviews(prev => [response.review, ...prev]);
+        enqueueSnackbar('Review posted', { variant: 'success' });
       }
+      setNewReviewRating(0);
+      setNewReviewComment('');
+      setUserHasReviewed(true);
+      fetchReviews(painting.id);
     } catch (error: any) {
-      console.error('Error posting comment:', error);
-      let errorMessage = 'Failed to post comment';
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
-      enqueueSnackbar(errorMessage, { variant: 'error' });
+      enqueueSnackbar(error?.message || 'Failed to post review', { variant: 'error' });
     } finally {
-      if (parentCommentId) {
-        setSubmittingReply(null);
-      } else {
-        setSubmittingComment(false);
-      }
+      setSubmittingReview(false);
     }
   };
 
-  const handleDeleteComment = async (commentId: number) => {
-    if (!user?.id) return;
-
+  const handleDeleteReview = async (reviewId: number) => {
+    if (!user?.id || !painting) return;
     try {
-      await apiService.deleteComment(commentId, user.id);
-      setComments(comments.filter(c => c.id !== commentId));
-      enqueueSnackbar('Comment deleted', { variant: 'success' });
+      await apiService.deleteReview(reviewId, user.id);
+      setReviews(prev => prev.filter(r => r.id !== reviewId));
       setDeleteDialogOpen(false);
-      setCommentToDelete(null);
+      setReviewToDelete(null);
+      setUserHasReviewed(false);
+      enqueueSnackbar('Review deleted', { variant: 'success' });
+      fetchReviews(painting.id);
     } catch (error: any) {
-      enqueueSnackbar(error.message || 'Failed to delete comment', { variant: 'error' });
+      enqueueSnackbar(error?.message || 'Failed to delete review', { variant: 'error' });
     }
+  };
+
+  const renderStars = (value: number, size: 'small' | 'medium' = 'small') => {
+    const stars = [];
+    const fontSize = size === 'small' ? '1rem' : '1.25rem';
+    for (let i = 1; i <= 5; i++) {
+      if (i <= Math.floor(value)) {
+        stars.push(<StarIcon key={i} sx={{ color: '#faaf00', fontSize }} />);
+      } else if (i - 0.5 <= value) {
+        stars.push(<StarHalfIcon key={i} sx={{ color: '#faaf00', fontSize }} />);
+      } else {
+        stars.push(<StarBorderIcon key={i} sx={{ color: '#faaf00', fontSize }} />);
+      }
+    }
+    return stars;
   };
 
   const handlePreviousImage = (): void => {
@@ -1055,211 +1027,128 @@ const PaintingDetail: React.FC = () => {
 
         <Box sx={{ mt: 6 }}>
           <Divider sx={{ mb: 4 }} />
-          <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 600 }}>
-            Comments
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+            <Typography variant="h5" fontWeight={600}>Reviews</Typography>
+            {reviewCount > 0 && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {renderStars(averageRating, 'medium')}
+                <Typography variant="body1" fontWeight={600} sx={{ ml: 0.5 }}>{averageRating}</Typography>
+                <Typography variant="body2" color="text.secondary">({reviewCount})</Typography>
+              </Box>
+            )}
+          </Box>
 
           {painting.allow_comments === true ? (
             <>
-              <Alert severity="info" sx={{ mb: 3 }}>
-                <Typography variant="body2">
-                  <strong>Please be courteous:</strong> Comments are monitored and inappropriate content will be deleted.
-                </Typography>
-              </Alert>
-
-              {isAuthenticated && (
-                <Paper sx={{ p: 2, mb: 3 }}>
+              {isAuthenticated && !userHasReviewed && painting.userId !== user?.id && (
+                <Paper sx={{ p: 3, mb: 3 }}>
+                  <Typography variant="subtitle1" fontWeight={600} gutterBottom>Write a Review</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary">Your rating:</Typography>
+                    <Rating
+                      value={newReviewRating}
+                      onChange={(_, val) => setNewReviewRating(val)}
+                      size="large"
+                    />
+                  </Box>
                   <TextField
                     fullWidth
                     multiline
                     rows={3}
-                    placeholder="Write a comment..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Share your experience (optional)"
+                    value={newReviewComment}
+                    onChange={(e) => setNewReviewComment(e.target.value)}
                     sx={{ mb: 2 }}
                   />
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
                       variant="contained"
-                      onClick={() => handleSubmitComment()}
-                      disabled={!newComment.trim() || submittingComment}
-                      startIcon={<CommentIcon />}
+                      onClick={handleSubmitReview}
+                      disabled={!newReviewRating || submittingReview}
+                      startIcon={<StarIcon />}
                     >
-                      {submittingComment ? 'Posting...' : 'Post Comment'}
+                      {submittingReview ? 'Submitting...' : 'Submit Review'}
                     </Button>
                   </Box>
                 </Paper>
               )}
 
-              {!isAuthenticated && (
-                <Alert severity="info" sx={{ mb: 3 }}>
-                  Please sign in to leave a comment.
-                </Alert>
+              {isAuthenticated && userHasReviewed && (
+                <Alert severity="success" sx={{ mb: 3 }}>You have already reviewed this listing.</Alert>
               )}
 
-              {loadingComments ? (
+              {!isAuthenticated && (
+                <Alert severity="info" sx={{ mb: 3 }}>Please sign in to leave a review.</Alert>
+              )}
+
+              {loadingReviews ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                   <CircularProgress />
                 </Box>
-              ) : comments.length === 0 ? (
+              ) : reviews.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                  No comments yet. Be the first to comment!
+                  No reviews yet. Be the first to review!
                 </Typography>
               ) : (
-                <List>
-                  {comments.map((comment) => (
-                    <Box key={comment.id}>
-                      <ListItem
-                        sx={{
-                          bgcolor: 'background.paper',
-                          mb: 1,
-                          borderRadius: 1,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          flexDirection: 'column',
-                          alignItems: 'flex-start',
-                          px: 2,
-                          py: 2,
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', width: '100%', alignItems: 'flex-start', gap: 2 }}>
-                          <ListItemAvatar>
-                            <Avatar src={comment.profile_image_url}>
-                              {comment.user_name.charAt(0).toUpperCase()}
-                            </Avatar>
-                          </ListItemAvatar>
-                          <Box sx={{ flex: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                {comment.user_name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {new Date(comment.created_at).toLocaleDateString()}
-                              </Typography>
-                            </Box>
-                            <Typography variant="body2" sx={{ mb: 1, whiteSpace: 'pre-wrap' }}>
-                              {comment.comment}
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                              {isAuthenticated && (
-                                <Button
-                                  size="small"
-                                  startIcon={<ReplyIcon />}
-                                  onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                                  sx={{ textTransform: 'none' }}
-                                >
-                                  Reply
-                                </Button>
-                              )}
-                              {(user?.id === comment.cognito_username || painting.userId === user?.id) && (
-                                <IconButton
-                                  size="small"
-                                  onClick={() => {
-                                    setCommentToDelete(comment.id);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              )}
-                            </Box>
-                            {replyingTo === comment.id && isAuthenticated && (
-                              <Box sx={{ mt: 2, ml: 4, pl: 2, borderLeft: '2px solid', borderColor: 'divider' }}>
-                                <TextField
-                                  fullWidth
-                                  multiline
-                                  rows={2}
-                                  placeholder={`Reply to ${comment.user_name}...`}
-                                  value={replyText[comment.id] || ''}
-                                  onChange={(e) => setReplyText({ ...replyText, [comment.id]: e.target.value })}
-                                  sx={{ mb: 1 }}
-                                />
-                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    onClick={() => handleSubmitComment(comment.id)}
-                                    disabled={!replyText[comment.id]?.trim() || submittingReply === comment.id}
-                                  >
-                                    {submittingReply === comment.id ? 'Posting...' : 'Post Reply'}
-                                  </Button>
-                                  <Button
-                                    size="small"
-                                    onClick={() => {
-                                      setReplyingTo(null);
-                                      setReplyText({ ...replyText, [comment.id]: '' });
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </Box>
-                              </Box>
-                            )}
-                          </Box>
+                <List disablePadding>
+                  {reviews.map((review) => (
+                    <ListItem
+                      key={review.id}
+                      sx={{
+                        bgcolor: 'background.paper',
+                        mb: 1.5,
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        px: 2,
+                        py: 2,
+                        alignItems: 'flex-start',
+                      }}
+                    >
+                      <ListItemAvatar>
+                        <Avatar src={review.profile_image_url}>
+                          {review.user_name.charAt(0).toUpperCase()}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                          <Typography variant="subtitle2" fontWeight={600}>{review.user_name}</Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>{renderStars(review.rating)}</Box>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(review.created_at).toLocaleDateString()}
+                          </Typography>
                         </Box>
-                        {comment.replies && comment.replies.length > 0 && (
-                          <Box sx={{ width: '100%', mt: 2, ml: 6, pl: 2, borderLeft: '2px solid', borderColor: 'divider' }}>
-                            {comment.replies.map((reply) => (
-                              <Box key={reply.id} sx={{ mb: 2 }}>
-                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                                  <Avatar sx={{ width: 32, height: 32 }} src={reply.profile_image_url}>
-                                    {reply.user_name.charAt(0).toUpperCase()}
-                                  </Avatar>
-                                  <Box sx={{ flex: 1 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                      <Typography variant="subtitle2" fontWeight={600} fontSize="0.875rem">
-                                        {reply.user_name}
-                                      </Typography>
-                                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                                        {new Date(reply.created_at).toLocaleDateString()}
-                                      </Typography>
-                                    </Box>
-                                    <Typography variant="body2" sx={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
-                                      {reply.comment}
-                                    </Typography>
-                                    {(user?.id === reply.cognito_username || painting.userId === user?.id) && (
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => {
-                                          setCommentToDelete(reply.id);
-                                          setDeleteDialogOpen(true);
-                                        }}
-                                        sx={{ mt: 0.5 }}
-                                      >
-                                        <DeleteIcon fontSize="small" />
-                                      </IconButton>
-                                    )}
-                                  </Box>
-                                </Box>
-                              </Box>
-                            ))}
-                          </Box>
+                        {review.comment && (
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 0.5 }}>{review.comment}</Typography>
                         )}
-                      </ListItem>
-                    </Box>
+                      </Box>
+                      {(user?.id === review.cognito_username || painting.userId === user?.id) && (
+                        <IconButton
+                          size="small"
+                          onClick={() => { setReviewToDelete(review.id); setDeleteDialogOpen(true); }}
+                          sx={{ ml: 1 }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </ListItem>
                   ))}
                 </List>
               )}
             </>
           ) : (
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Comments are disabled for this listing.
-            </Alert>
+            <Alert severity="info" sx={{ mb: 3 }}>Reviews are disabled for this listing.</Alert>
           )}
         </Box>
 
         <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-          <DialogTitle>Delete Comment</DialogTitle>
+          <DialogTitle>Delete Review</DialogTitle>
           <DialogContent>
-            <Typography>Are you sure you want to delete this comment? This action cannot be undone.</Typography>
+            <Typography>Are you sure you want to delete this review? This action cannot be undone.</Typography>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button
-              onClick={() => commentToDelete && handleDeleteComment(commentToDelete)}
-              color="error"
-              variant="contained"
-            >
+            <Button onClick={() => reviewToDelete && handleDeleteReview(reviewToDelete)} color="error" variant="contained">
               Delete
             </Button>
           </DialogActions>

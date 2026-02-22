@@ -234,6 +234,19 @@ app.listen(PORT, async () => {
   }
 
   try {
+    const [ratingCol] = await pool.execute(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listing_comments' AND COLUMN_NAME = 'rating'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (ratingCol.length === 0) {
+      await pool.execute("ALTER TABLE listing_comments ADD COLUMN rating TINYINT NULL AFTER comment");
+      console.log('[Startup] Added rating column to listing_comments');
+    }
+  } catch (err) {
+    console.warn('[Startup] Rating column migration:', err?.message || err);
+  }
+
+  try {
     const [tables] = await pool.execute(
       "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'admin_announcements'",
       [process.env.DB_NAME || 'mirart']

@@ -79,6 +79,8 @@ const Home: React.FC = () => {
       isLiked: listing.is_liked || false,
       artistEmail: (listing as any).artist_email,
       imageCount: getListingImageCount(listing),
+      avgRating: listing.avg_rating ? parseFloat(Number(listing.avg_rating).toFixed(1)) : null,
+      reviewCount: listing.review_count || 0,
     };
   };
 

@@ -1034,10 +1034,10 @@ const CreateListing: React.FC = () => {
                         label={
                           <Box>
                             <Typography variant="body1" fontWeight={500}>
-                              Allow Comments
+                              Allow Reviews
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              Enable comments on this listing
+                              Enable reviews on this listing
                             </Typography>
                           </Box>
                         }

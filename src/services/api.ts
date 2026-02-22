@@ -48,6 +48,8 @@ export interface Listing {
   like_count?: number;
   is_liked?: boolean;
   allow_comments?: boolean;
+  avg_rating?: number | null;
+  review_count?: number;
   shipping_preference?: 'free' | 'buyer';
   shipping_carrier?: 'shippo' | 'own';
   return_days?: number | null;
@@ -530,19 +532,19 @@ class ApiService {
     return this.request<{ users: User[] }>(`/users/search?${params.toString()}`);
   }
 
-  async getListingComments(listingId: number): Promise<{ comments: Comment[] }> {
-    return this.request<{ comments: Comment[] }>(`/comments/listing/${listingId}`);
+  async getListingReviews(listingId: number): Promise<{ reviews: Review[]; averageRating: number; reviewCount: number }> {
+    return this.request(`/comments/listing/${listingId}`);
   }
 
-  async createComment(listingId: number, cognitoUsername: string, comment: string, parentCommentId?: number): Promise<{ comment: Comment }> {
-    return this.request<{ comment: Comment }>(`/comments`, {
+  async createReview(listingId: number, cognitoUsername: string, rating: number, comment?: string): Promise<{ review: Review; updated?: boolean }> {
+    return this.request(`/comments`, {
       method: 'POST',
-      body: JSON.stringify({ listingId, cognitoUsername, comment, parentCommentId }),
+      body: JSON.stringify({ listingId, cognitoUsername, rating, comment }),
     });
   }
 
-  async deleteComment(commentId: number, cognitoUsername: string): Promise<{ success: boolean }> {
-    return this.request<{ success: boolean }>(`/comments/${commentId}?cognitoUsername=${encodeURIComponent(cognitoUsername)}`, {
+  async deleteReview(reviewId: number, cognitoUsername: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/comments/${reviewId}?cognitoUsername=${encodeURIComponent(cognitoUsername)}`, {
       method: 'DELETE',
     });
   }
@@ -911,18 +913,17 @@ class ApiService {
   }
 }
 
-export interface Comment {
+export interface Review {
   id: number;
   listing_id: number;
   user_id: number;
-  comment: string;
-  parent_comment_id?: number | null;
+  comment: string | null;
+  rating: number;
   created_at: string;
   updated_at: string;
   cognito_username: string;
   user_name: string;
   profile_image_url?: string;
-  replies?: Comment[];
 }
 
 export interface Message {

@@ -126,6 +126,8 @@ const Gallery: React.FC = () => {
       isLiked: listing.is_liked || false,
       imageCount: getListingImageCount(listing),
       shippingInfo: listing.shipping_info,
+      avgRating: listing.avg_rating ? parseFloat(Number(listing.avg_rating).toFixed(1)) : null,
+      reviewCount: listing.review_count || 0,
     };
   };
 

@@ -12,7 +12,7 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import { Favorite, FavoriteBorder, Email as EmailIcon, Edit as EditIcon, PhotoLibrary as PhotoLibraryIcon, ShoppingCart as ShoppingCartIcon } from '@mui/icons-material';
+import { Favorite, FavoriteBorder, Email as EmailIcon, Edit as EditIcon, PhotoLibrary as PhotoLibraryIcon, ShoppingCart as ShoppingCartIcon, Star as StarIcon, StarBorder as StarBorderIcon, StarHalf as StarHalfIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/userRoles';
@@ -236,9 +236,23 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
             painting.artist
           )}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           {painting.dimensions} • {painting.medium}
         </Typography>
+        {painting.avgRating != null && painting.avgRating > 0 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+            {[1, 2, 3, 4, 5].map(i => {
+              const val = painting.avgRating!;
+              return i <= Math.floor(val)
+                ? <StarIcon key={i} sx={{ color: '#faaf00', fontSize: '1rem' }} />
+                : i - 0.5 <= val
+                  ? <StarHalfIcon key={i} sx={{ color: '#faaf00', fontSize: '1rem' }} />
+                  : <StarBorderIcon key={i} sx={{ color: '#faaf00', fontSize: '1rem' }} />;
+            })}
+            <Typography variant="body2" fontWeight={600} sx={{ ml: 0.25 }}>{painting.avgRating}</Typography>
+            <Typography variant="caption" color="text.secondary">({painting.reviewCount})</Typography>
+          </Box>
+        )}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
             <Typography variant="h6" color="primary" fontWeight="bold">

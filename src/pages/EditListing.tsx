@@ -893,7 +893,7 @@ const EditListing: React.FC = () => {
                       name="allow_comments"
                     />
                   }
-                  label="Allow Comments"
+                  label="Allow Reviews"
                 />
               </Grid>
 

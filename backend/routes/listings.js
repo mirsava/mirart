@@ -81,7 +81,9 @@ router.get('/', async (req, res) => {
         ) as artist_name,
         u.cognito_username,
         u.signature_url,
-        (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count
+        (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count,
+        (SELECT AVG(rating) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as avg_rating,
+        (SELECT COUNT(*) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as review_count
       FROM listings l
       JOIN users u ON l.user_id = u.id
       WHERE 1=1 AND (COALESCE(u.blocked, 0) = 0)
@@ -441,7 +443,9 @@ router.get('/:id', async (req, res) => {
         ) as artist_name,
         u.cognito_username,
         u.signature_url,
-        (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count
+        (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count,
+        (SELECT AVG(rating) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as avg_rating,
+        (SELECT COUNT(*) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as review_count
       FROM listings l
       JOIN users u ON l.user_id = u.id
       WHERE l.id = ? AND (COALESCE(u.blocked, 0) = 0)`,

@@ -18,6 +18,8 @@ export interface Artwork {
   isLiked?: boolean;
   imageCount?: number;
   shippingInfo?: string;
+  avgRating?: number | null;
+  reviewCount?: number;
 }
 
 export interface Painting extends Artwork {
