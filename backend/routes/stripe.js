@@ -477,7 +477,7 @@ router.get('/confirm-session', async (req, res) => {
             type: 'order',
             title: 'New sale',
             body: `Order ${order_number} for ${listingTitle}`,
-            link: '/orders',
+            link: `/orders?order=${result.insertId}`,
             referenceId: result.insertId,
           });
           await createNotification({
@@ -485,7 +485,7 @@ router.get('/confirm-session', async (req, res) => {
             type: 'order',
             title: 'Order confirmed',
             body: `Order ${order_number} for ${listingTitle}`,
-            link: '/orders',
+            link: `/orders?order=${result.insertId}`,
             referenceId: result.insertId,
           });
         } catch (nErr) {

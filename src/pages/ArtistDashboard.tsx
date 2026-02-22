@@ -146,6 +146,13 @@ const ArtistDashboard: React.FC = () => {
     addressState: '',
     addressZip: '',
     addressCountry: 'US',
+    billingLine1: '',
+    billingLine2: '',
+    billingCity: '',
+    billingState: '',
+    billingZip: '',
+    billingCountry: 'US',
+    billingSameAsShipping: false,
     specialties: [] as string[],
     experience: '',
     bio: '',
@@ -547,6 +554,20 @@ const ArtistDashboard: React.FC = () => {
         addressState: (data as any).address_state || '',
         addressZip: (data as any).address_zip || '',
         addressCountry: (data as any).address_country || 'US',
+        billingLine1: (data as any).billing_line1 || '',
+        billingLine2: (data as any).billing_line2 || '',
+        billingCity: (data as any).billing_city || '',
+        billingState: (data as any).billing_state || '',
+        billingZip: (data as any).billing_zip || '',
+        billingCountry: (data as any).billing_country || 'US',
+        billingSameAsShipping:
+          ((data as any).address_line1 || '') === ((data as any).billing_line1 || '') &&
+          ((data as any).address_line2 || '') === ((data as any).billing_line2 || '') &&
+          ((data as any).address_city || '') === ((data as any).billing_city || '') &&
+          ((data as any).address_state || '') === ((data as any).billing_state || '') &&
+          ((data as any).address_zip || '') === ((data as any).billing_zip || '') &&
+          ((data as any).address_country || 'US') === ((data as any).billing_country || 'US') &&
+          !!((data as any).address_line1 || (data as any).billing_line1),
         specialties: data.specialties ? (typeof data.specialties === 'string' ? JSON.parse(data.specialties) : data.specialties) : [],
         experience: data.experience_level || '',
         bio: data.bio || '',
@@ -636,6 +657,12 @@ const ArtistDashboard: React.FC = () => {
         address_state: profileFormData.addressState || null,
         address_zip: profileFormData.addressZip || null,
         address_country: profileFormData.addressCountry || 'US',
+        billing_line1: (profileFormData.billingSameAsShipping ? profileFormData.addressLine1 : profileFormData.billingLine1) || null,
+        billing_line2: (profileFormData.billingSameAsShipping ? profileFormData.addressLine2 : profileFormData.billingLine2) || null,
+        billing_city: (profileFormData.billingSameAsShipping ? profileFormData.addressCity : profileFormData.billingCity) || null,
+        billing_state: (profileFormData.billingSameAsShipping ? profileFormData.addressState : profileFormData.billingState) || null,
+        billing_zip: (profileFormData.billingSameAsShipping ? profileFormData.addressZip : profileFormData.billingZip) || null,
+        billing_country: (profileFormData.billingSameAsShipping ? profileFormData.addressCountry : profileFormData.billingCountry) || 'US',
         specialties: profileFormData.specialties,
         experience_level: profileFormData.experience,
         bio: profileFormData.bio || null,
@@ -2143,36 +2170,105 @@ const ArtistDashboard: React.FC = () => {
                     <Divider sx={{ mb: 3 }} />
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Phone"
-                          value={profileFormData.phone}
-                          onChange={handleProfileInputChange('phone')}
-                          placeholder="+1234567890"
-                          sx={{ bgcolor: 'background.paper' }}
-                        />
+                        <FormControl fullWidth required sx={{ bgcolor: 'background.paper' }}>
+                          <InputLabel>Country</InputLabel>
+                          <Select
+                            value={profileFormData.country}
+                            label="Country"
+                            onChange={(e) => {
+                              setProfileFormData(prev => ({ ...prev, country: e.target.value as string, phone: '' }));
+                            }}
+                          >
+                            {[
+                              { code: 'US', name: 'United States', dial: '+1' },
+                              { code: 'CA', name: 'Canada', dial: '+1' },
+                              { code: 'GB', name: 'United Kingdom', dial: '+44' },
+                              { code: 'AU', name: 'Australia', dial: '+61' },
+                              { code: 'DE', name: 'Germany', dial: '+49' },
+                              { code: 'FR', name: 'France', dial: '+33' },
+                              { code: 'IT', name: 'Italy', dial: '+39' },
+                              { code: 'ES', name: 'Spain', dial: '+34' },
+                              { code: 'NL', name: 'Netherlands', dial: '+31' },
+                              { code: 'BE', name: 'Belgium', dial: '+32' },
+                              { code: 'CH', name: 'Switzerland', dial: '+41' },
+                              { code: 'AT', name: 'Austria', dial: '+43' },
+                              { code: 'SE', name: 'Sweden', dial: '+46' },
+                              { code: 'NO', name: 'Norway', dial: '+47' },
+                              { code: 'DK', name: 'Denmark', dial: '+45' },
+                              { code: 'FI', name: 'Finland', dial: '+358' },
+                              { code: 'IE', name: 'Ireland', dial: '+353' },
+                              { code: 'NZ', name: 'New Zealand', dial: '+64' },
+                              { code: 'JP', name: 'Japan', dial: '+81' },
+                              { code: 'KR', name: 'South Korea', dial: '+82' },
+                              { code: 'IN', name: 'India', dial: '+91' },
+                              { code: 'BR', name: 'Brazil', dial: '+55' },
+                              { code: 'MX', name: 'Mexico', dial: '+52' },
+                              { code: 'AR', name: 'Argentina', dial: '+54' },
+                              { code: 'ZA', name: 'South Africa', dial: '+27' },
+                              { code: 'IL', name: 'Israel', dial: '+972' },
+                              { code: 'AE', name: 'United Arab Emirates', dial: '+971' },
+                              { code: 'SG', name: 'Singapore', dial: '+65' },
+                              { code: 'PT', name: 'Portugal', dial: '+351' },
+                              { code: 'PL', name: 'Poland', dial: '+48' },
+                            ].map(c => (
+                              <MenuItem key={c.code} value={c.code}>{c.name} ({c.dial})</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
                       </Grid>
 
                       <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
-                          label="Country"
-                          value={profileFormData.country}
-                          onChange={handleProfileInputChange('country')}
-                          required
+                          label="Phone"
+                          value={profileFormData.phone}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '');
+                            const phoneMasks: Record<string, (d: string) => string> = {
+                              US: (d) => d.length <= 3 ? d : d.length <= 6 ? `(${d.slice(0,3)}) ${d.slice(3)}` : `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6,10)}`,
+                              CA: (d) => d.length <= 3 ? d : d.length <= 6 ? `(${d.slice(0,3)}) ${d.slice(3)}` : `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6,10)}`,
+                              GB: (d) => d.length <= 4 ? d : d.length <= 7 ? `${d.slice(0,4)} ${d.slice(4)}` : `${d.slice(0,4)} ${d.slice(4,7)} ${d.slice(7,11)}`,
+                              AU: (d) => d.length <= 4 ? d : d.length <= 7 ? `${d.slice(0,4)} ${d.slice(4)}` : `${d.slice(0,4)} ${d.slice(4,7)} ${d.slice(7,10)}`,
+                              DE: (d) => d.length <= 4 ? d : `${d.slice(0,4)} ${d.slice(4,12)}`,
+                              FR: (d) => d.replace(/(\d{2})(?=\d)/g, '$1 ').trim().slice(0,14),
+                              IN: (d) => d.length <= 5 ? d : `${d.slice(0,5)} ${d.slice(5,10)}`,
+                            };
+                            const maxLen: Record<string, number> = { US: 10, CA: 10, GB: 11, AU: 10, DE: 12, FR: 10, IN: 10 };
+                            const country = profileFormData.country;
+                            const max = maxLen[country] || 15;
+                            const trimmed = digits.slice(0, max);
+                            const formatter = phoneMasks[country];
+                            const formatted = formatter ? formatter(trimmed) : trimmed;
+                            setProfileFormData(prev => ({ ...prev, phone: formatted }));
+                          }}
+                          InputProps={{
+                            startAdornment: profileFormData.country ? (
+                              <InputAdornment position="start">
+                                {{
+                                  US: '+1', CA: '+1', GB: '+44', AU: '+61', DE: '+49', FR: '+33', IT: '+39', ES: '+34',
+                                  NL: '+31', BE: '+32', CH: '+41', AT: '+43', SE: '+46', NO: '+47', DK: '+45', FI: '+358',
+                                  IE: '+353', NZ: '+64', JP: '+81', KR: '+82', IN: '+91', BR: '+55', MX: '+52', AR: '+54',
+                                  ZA: '+27', IL: '+972', AE: '+971', SG: '+65', PT: '+351', PL: '+48',
+                                }[profileFormData.country] || ''}
+                              </InputAdornment>
+                            ) : undefined,
+                          }}
+                          placeholder={
+                            { US: '(555) 123-4567', CA: '(555) 123-4567', GB: '7911 123 456', AU: '0412 345 678', DE: '0151 12345678', FR: '06 12 34 56 78', IN: '98765 43210' }[profileFormData.country] || 'Phone number'
+                          }
                           sx={{ bgcolor: 'background.paper' }}
                         />
                       </Grid>
 
                       <Grid item xs={12}>
                         <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600, mt: 2 }}>
-                          Shipping address (origin – where you ship from)
+                          Shipping Address
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          Required for Shippo label purchase. Used as the "from" address for shipping rates.
+                          Used as your origin for shipping labels and for receiving items.
                         </Typography>
                       </Grid>
-                      <Grid item xs={12}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
                           label="Street address"
@@ -2182,7 +2278,7 @@ const ArtistDashboard: React.FC = () => {
                           sx={{ bgcolor: 'background.paper' }}
                         />
                       </Grid>
-                      <Grid item xs={12}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
                           label="Street address 2 (optional)"
@@ -2204,7 +2300,7 @@ const ArtistDashboard: React.FC = () => {
                       <Grid item xs={12} sm={4}>
                         <TextField
                           fullWidth
-                          label="State"
+                          label="State / Province"
                           value={profileFormData.addressState}
                           onChange={handleProfileInputChange('addressState')}
                           sx={{ bgcolor: 'background.paper' }}
@@ -2213,12 +2309,86 @@ const ArtistDashboard: React.FC = () => {
                       <Grid item xs={12} sm={4}>
                         <TextField
                           fullWidth
-                          label="ZIP code"
+                          label="ZIP / Postal code"
                           value={profileFormData.addressZip}
                           onChange={handleProfileInputChange('addressZip')}
                           sx={{ bgcolor: 'background.paper' }}
                         />
                       </Grid>
+
+                      <Grid item xs={12}>
+                        <Divider sx={{ my: 1 }} />
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2 }}>
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                              Billing Address
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Used for invoices and payment processing.
+                            </Typography>
+                          </Box>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={profileFormData.billingSameAsShipping}
+                                onChange={(e) => setProfileFormData(prev => ({ ...prev, billingSameAsShipping: e.target.checked }))}
+                              />
+                            }
+                            label={<Typography variant="body2">Same as shipping</Typography>}
+                          />
+                        </Box>
+                      </Grid>
+                      {!profileFormData.billingSameAsShipping && (
+                        <>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="Street address"
+                              value={profileFormData.billingLine1}
+                              onChange={handleProfileInputChange('billingLine1')}
+                              placeholder="123 Main St"
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="Street address 2 (optional)"
+                              value={profileFormData.billingLine2}
+                              onChange={handleProfileInputChange('billingLine2')}
+                              placeholder="Apt, suite, etc."
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <TextField
+                              fullWidth
+                              label="City"
+                              value={profileFormData.billingCity}
+                              onChange={handleProfileInputChange('billingCity')}
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <TextField
+                              fullWidth
+                              label="State / Province"
+                              value={profileFormData.billingState}
+                              onChange={handleProfileInputChange('billingState')}
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <TextField
+                              fullWidth
+                              label="ZIP / Postal code"
+                              value={profileFormData.billingZip}
+                              onChange={handleProfileInputChange('billingZip')}
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                        </>
+                      )}
 
                       <Grid item xs={12}>
                         <TextField
@@ -2360,7 +2530,10 @@ const ArtistDashboard: React.FC = () => {
                         Digital Signature
                       </Typography>
                     </Box>
-                    <Divider sx={{ mb: 3 }} />
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      Your signature will be displayed on your public profile and artwork pages, helping collectors identify and authenticate your work.
+                    </Typography>
                     <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2 }}>
                       <SignatureInput
                         value={profileFormData.signatureUrl}

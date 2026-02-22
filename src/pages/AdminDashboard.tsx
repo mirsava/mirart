@@ -1870,6 +1870,59 @@ const AdminDashboard: React.FC = () => {
               </Typography>
               <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Send to</InputLabel>
+                    <Select
+                      value={notificationForm.target}
+                      label="Send to"
+                      onChange={(e) => {
+                        const t = e.target.value as 'all' | 'specific';
+                        setNotificationForm({ ...notificationForm, target: t });
+                        if (t === 'all') setNotificationSelectedUser(null);
+                      }}
+                    >
+                      <MenuItem value="all">All users</MenuItem>
+                      <MenuItem value="specific">Specific user</MenuItem>
+                    </Select>
+                  </FormControl>
+                  {notificationForm.target === 'specific' && (
+                    <Autocomplete
+                      options={notificationUserOptions}
+                      value={notificationSelectedUser}
+                      onChange={(_, v) => setNotificationSelectedUser(v)}
+                      onInputChange={(_, v) => {
+                        if (v.length < 2) {
+                          setNotificationUserOptions([]);
+                          return;
+                        }
+                        apiService.getAdminUsers(user!.id, { search: v, limit: 20 }, user!.groups)
+                          .then((r) => setNotificationUserOptions(r.users || []));
+                      }}
+                      onOpen={() => {
+                        if (notificationUserOptions.length === 0) {
+                          apiService.getAdminUsers(user!.id, { limit: 50 }, user!.groups)
+                            .then((r) => setNotificationUserOptions(r.users || []));
+                        }
+                      }}
+                      getOptionLabel={(o) => o?.email || o?.cognito_username || o?.first_name || o?.last_name || String(o?.id || '')}
+                      renderInput={(params) => (
+                        <TextField {...params} label="Select user" placeholder="Search by email or name" />
+                      )}
+                    />
+                  )}
+                  <FormControl fullWidth>
+                    <InputLabel>Severity</InputLabel>
+                    <Select
+                      value={notificationForm.severity}
+                      label="Severity"
+                      onChange={(e) => setNotificationForm({ ...notificationForm, severity: e.target.value as 'info' | 'warning' | 'success' | 'error' })}
+                    >
+                      <MenuItem value="info">Info</MenuItem>
+                      <MenuItem value="warning">Warning</MenuItem>
+                      <MenuItem value="success">Success</MenuItem>
+                      <MenuItem value="error">Error</MenuItem>
+                    </Select>
+                  </FormControl>
                   <TextField
                     label="Title"
                     fullWidth
@@ -1984,59 +2037,6 @@ const AdminDashboard: React.FC = () => {
                       </ClickAwayListener>
                     </Popper>
                   </Box>
-                  <FormControl fullWidth>
-                    <InputLabel>Send to</InputLabel>
-                    <Select
-                      value={notificationForm.target}
-                      label="Send to"
-                      onChange={(e) => {
-                        const t = e.target.value as 'all' | 'specific';
-                        setNotificationForm({ ...notificationForm, target: t });
-                        if (t === 'all') setNotificationSelectedUser(null);
-                      }}
-                    >
-                      <MenuItem value="all">All users</MenuItem>
-                      <MenuItem value="specific">Specific user</MenuItem>
-                    </Select>
-                  </FormControl>
-                  {notificationForm.target === 'specific' && (
-                    <Autocomplete
-                      options={notificationUserOptions}
-                      value={notificationSelectedUser}
-                      onChange={(_, v) => setNotificationSelectedUser(v)}
-                      onInputChange={(_, v) => {
-                        if (v.length < 2) {
-                          setNotificationUserOptions([]);
-                          return;
-                        }
-                        apiService.getAdminUsers(user!.id, { search: v, limit: 20 }, user!.groups)
-                          .then((r) => setNotificationUserOptions(r.users || []));
-                      }}
-                      onOpen={() => {
-                        if (notificationUserOptions.length === 0) {
-                          apiService.getAdminUsers(user!.id, { limit: 50 }, user!.groups)
-                            .then((r) => setNotificationUserOptions(r.users || []));
-                        }
-                      }}
-                      getOptionLabel={(o) => o?.email || o?.cognito_username || o?.first_name || o?.last_name || String(o?.id || '')}
-                      renderInput={(params) => (
-                        <TextField {...params} label="Select user" placeholder="Search by email or name" />
-                      )}
-                    />
-                  )}
-                  <FormControl fullWidth>
-                    <InputLabel>Severity</InputLabel>
-                    <Select
-                      value={notificationForm.severity}
-                      label="Severity"
-                      onChange={(e) => setNotificationForm({ ...notificationForm, severity: e.target.value as 'info' | 'warning' | 'success' | 'error' })}
-                    >
-                      <MenuItem value="info">Info</MenuItem>
-                      <MenuItem value="warning">Warning</MenuItem>
-                      <MenuItem value="success">Success</MenuItem>
-                      <MenuItem value="error">Error</MenuItem>
-                    </Select>
-                  </FormControl>
                   <Button
                     variant="contained"
                     onClick={async () => {

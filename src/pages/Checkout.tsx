@@ -59,6 +59,30 @@ const Checkout: React.FC = () => {
 
   const steps = ['Shipping Information', 'Payment', 'Review & Confirm'];
 
+  const fetchUserProfile = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const profile = await apiService.getUser(user.id);
+      setFormData(prev => ({
+        ...prev,
+        firstName: prev.firstName || profile.first_name || '',
+        lastName: prev.lastName || profile.last_name || '',
+        email: prev.email || profile.email || '',
+        phone: prev.phone || profile.phone || '',
+        address: prev.address || profile.address_line1 || '',
+        city: prev.city || profile.address_city || '',
+        state: prev.state || profile.address_state || '',
+        zipCode: prev.zipCode || profile.address_zip || '',
+        country: profile.address_country || profile.country || prev.country,
+      }));
+    } catch {
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [fetchUserProfile]);
+
   const handleInputChange = (field: keyof FormData) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,

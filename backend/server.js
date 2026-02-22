@@ -192,6 +192,30 @@ app.listen(PORT, async () => {
         console.log(`[Startup] Added ${col} column to listings`);
       }
     }
+    const userAddressCols = [
+      { name: 'address_line1', sql: 'ADD COLUMN address_line1 VARCHAR(255) NULL' },
+      { name: 'address_line2', sql: 'ADD COLUMN address_line2 VARCHAR(255) NULL' },
+      { name: 'address_city', sql: 'ADD COLUMN address_city VARCHAR(100) NULL' },
+      { name: 'address_state', sql: 'ADD COLUMN address_state VARCHAR(100) NULL' },
+      { name: 'address_zip', sql: 'ADD COLUMN address_zip VARCHAR(20) NULL' },
+      { name: 'address_country', sql: "ADD COLUMN address_country VARCHAR(10) DEFAULT 'US'" },
+      { name: 'billing_line1', sql: 'ADD COLUMN billing_line1 VARCHAR(255) NULL' },
+      { name: 'billing_line2', sql: 'ADD COLUMN billing_line2 VARCHAR(255) NULL' },
+      { name: 'billing_city', sql: 'ADD COLUMN billing_city VARCHAR(100) NULL' },
+      { name: 'billing_state', sql: 'ADD COLUMN billing_state VARCHAR(100) NULL' },
+      { name: 'billing_zip', sql: 'ADD COLUMN billing_zip VARCHAR(20) NULL' },
+      { name: 'billing_country', sql: "ADD COLUMN billing_country VARCHAR(10) DEFAULT 'US'" },
+    ];
+    for (const { name, sql } of userAddressCols) {
+      const [ac] = await pool.execute(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = ?",
+        [process.env.DB_NAME || 'mirart', name]
+      );
+      if (ac.length === 0) {
+        await pool.execute(`ALTER TABLE users ${sql}`);
+        console.log(`[Startup] Added ${name} column to users`);
+      }
+    }
     const listingCols = [
       { name: 'shipping_info', sql: 'ADD COLUMN shipping_info TEXT DEFAULT NULL' },
       { name: 'returns_info', sql: 'ADD COLUMN returns_info TEXT DEFAULT NULL' },

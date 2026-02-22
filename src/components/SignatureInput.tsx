@@ -22,6 +22,7 @@ interface SignatureInputProps {
 
 const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabled = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [uploadedImage, setUploadedImage] = useState<string | null>(value || null);
@@ -34,30 +35,65 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
     }
   }, [value]);
 
+  const resizeCanvas = () => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    const w = rect.width;
+    const h = 200;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.scale(dpr, dpr);
+      ctx.strokeStyle = '#1a1a2e';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    }
+  };
+
+  useEffect(() => {
+    if (tabValue === 1) {
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      return () => window.removeEventListener('resize', resizeCanvas);
+    }
+  }, [tabValue]);
+
+  const getPos = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0]?.clientX ?? (e as any).changedTouches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0]?.clientY ?? (e as any).changedTouches[0].clientY : (e as React.MouseEvent).clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (disabled) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
+    const { x, y } = getPos(e);
     setIsDrawing(true);
     ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.moveTo(x, y);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || disabled) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    const { x, y } = getPos(e);
+    ctx.lineTo(x, y);
     ctx.stroke();
   };
 
@@ -114,11 +150,10 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     setDrawnSignature(null);
     onChange(null);
   };
@@ -161,35 +196,33 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
   };
 
   useEffect(() => {
+    if (tabValue !== 1) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
 
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    if (drawnSignature && tabValue === 1 && drawnSignature.startsWith('data:')) {
+    if (drawnSignature && drawnSignature.startsWith('data:')) {
       const img = new Image();
       img.onload = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
       };
       img.src = drawnSignature;
-    } else if (drawnSignature && tabValue === 1 && !drawnSignature.startsWith('data:')) {
+    } else if (drawnSignature && !drawnSignature.startsWith('data:')) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
       };
       const baseUrl = (import.meta as any).env?.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001';
       img.src = baseUrl + drawnSignature;
-    } else if (!drawnSignature && tabValue === 1) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else if (!drawnSignature) {
+      ctx.clearRect(0, 0, w, h);
     }
   }, [tabValue, drawnSignature]);
 
@@ -278,19 +311,46 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
         {tabValue === 1 && (
           <Box>
             <Box
+              ref={containerRef}
               sx={{
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1,
+                border: '2px dashed',
+                borderColor: isDrawing ? 'primary.main' : 'divider',
+                borderRadius: 2,
                 position: 'relative',
-                bgcolor: 'background.paper',
+                bgcolor: '#fafafa',
                 mb: 2,
+                overflow: 'hidden',
+                transition: 'border-color 0.2s',
               }}
             >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  bottom: 40,
+                  left: 24,
+                  right: 24,
+                  height: '1px',
+                  bgcolor: 'grey.300',
+                  pointerEvents: 'none',
+                }}
+              />
+              <Typography
+                variant="caption"
+                sx={{
+                  position: 'absolute',
+                  bottom: 12,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  color: 'grey.400',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  letterSpacing: 1,
+                }}
+              >
+                Sign above the line
+              </Typography>
               <canvas
                 ref={canvasRef}
-                width={600}
-                height={200}
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
@@ -300,24 +360,22 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
                   if (disabled) return;
                   const canvas = canvasRef.current;
                   if (!canvas) return;
-                  const touch = e.touches[0];
-                  const rect = canvas.getBoundingClientRect();
                   const ctx = canvas.getContext('2d');
                   if (!ctx) return;
+                  const { x, y } = getPos(e);
                   setIsDrawing(true);
                   ctx.beginPath();
-                  ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+                  ctx.moveTo(x, y);
                 }}
                 onTouchMove={(e) => {
                   e.preventDefault();
                   if (!isDrawing || disabled) return;
                   const canvas = canvasRef.current;
                   if (!canvas) return;
-                  const touch = e.touches[0];
-                  const rect = canvas.getBoundingClientRect();
                   const ctx = canvas.getContext('2d');
                   if (!ctx) return;
-                  ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+                  const { x, y } = getPos(e);
+                  ctx.lineTo(x, y);
                   ctx.stroke();
                 }}
                 onTouchEnd={(e) => {
@@ -328,11 +386,8 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
                   }
                 }}
                 style={{
-                  width: '100%',
-                  maxWidth: 600,
-                  height: 'auto',
-                  cursor: disabled ? 'not-allowed' : 'crosshair',
                   display: 'block',
+                  cursor: disabled ? 'not-allowed' : 'crosshair',
                   touchAction: 'none',
                 }}
               />

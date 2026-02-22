@@ -15,6 +15,18 @@ export interface User {
   bio?: string;
   profile_image_url?: string;
   signature_url?: string;
+  address_line1?: string;
+  address_line2?: string;
+  address_city?: string;
+  address_state?: string;
+  address_zip?: string;
+  address_country?: string;
+  billing_line1?: string;
+  billing_line2?: string;
+  billing_city?: string;
+  billing_state?: string;
+  billing_zip?: string;
+  billing_country?: string;
   active?: boolean;
   created_at?: string;
   updated_at?: string;

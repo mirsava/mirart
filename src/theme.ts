@@ -151,14 +151,14 @@ export const darkTheme: Theme = createTheme({
       dark: '#ff6f00',
     },
     background: {
-      default: '#121212',
-      paper: '#1e1e1e',
+      default: '#1a1a2e',
+      paper: '#252540',
     },
     text: {
-      primary: '#ffffff',
-      secondary: '#e0e0e0',
+      primary: '#f0f0f5',
+      secondary: '#b0b0c0',
     },
-    divider: 'rgba(255, 255, 255, 0.15)',
+    divider: 'rgba(255, 255, 255, 0.12)',
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',

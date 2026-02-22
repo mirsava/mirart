@@ -132,7 +132,13 @@ router.post('/', async (req, res) => {
       address_city,
       address_state,
       address_zip,
-      address_country
+      address_country,
+      billing_line1,
+      billing_line2,
+      billing_city,
+      billing_state,
+      billing_zip,
+      billing_country
     } = req.body;
     
     // Check if user exists
@@ -148,7 +154,8 @@ router.post('/', async (req, res) => {
           email = ?, first_name = ?, last_name = ?, business_name = ?, 
           phone = ?, country = ?, website = ?, specialties = ?, 
           experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?,
-          address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?
+          address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?,
+          billing_line1 = ?, billing_line2 = ?, billing_city = ?, billing_state = ?, billing_zip = ?, billing_country = ?
         WHERE cognito_username = ?`,
         [
           (email && email.trim()) || null, 
@@ -169,6 +176,12 @@ router.post('/', async (req, res) => {
           (address_state && address_state.trim()) || null,
           (address_zip && address_zip.trim()) || null,
           (address_country && address_country.trim()) || 'US',
+          (billing_line1 && billing_line1.trim()) || null,
+          (billing_line2 && billing_line2.trim()) || null,
+          (billing_city && billing_city.trim()) || null,
+          (billing_state && billing_state.trim()) || null,
+          (billing_zip && billing_zip.trim()) || null,
+          (billing_country && billing_country.trim()) || 'US',
           cognito_username
         ]
       );
@@ -448,7 +461,13 @@ router.put('/:cognitoUsername', async (req, res) => {
       address_city,
       address_state,
       address_zip,
-      address_country
+      address_country,
+      billing_line1,
+      billing_line2,
+      billing_city,
+      billing_state,
+      billing_zip,
+      billing_country
     } = req.body;
     
     await pool.execute(
@@ -456,7 +475,8 @@ router.put('/:cognitoUsername', async (req, res) => {
         first_name = ?, last_name = ?, business_name = ?, 
         phone = ?, country = ?, website = ?, specialties = ?, 
         experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?,
-        address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?
+        address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?,
+        billing_line1 = ?, billing_line2 = ?, billing_city = ?, billing_state = ?, billing_zip = ?, billing_country = ?
       WHERE cognito_username = ?`,
       [
         (first_name && first_name.trim()) || null, 
@@ -476,6 +496,12 @@ router.put('/:cognitoUsername', async (req, res) => {
         (address_state && address_state.trim()) || null,
         (address_zip && address_zip.trim()) || null,
         (address_country && address_country.trim()) || 'US',
+        (billing_line1 && billing_line1.trim()) || null,
+        (billing_line2 && billing_line2.trim()) || null,
+        (billing_city && billing_city.trim()) || null,
+        (billing_state && billing_state.trim()) || null,
+        (billing_zip && billing_zip.trim()) || null,
+        (billing_country && billing_country.trim()) || 'US',
         cognitoUsername
       ]
     );

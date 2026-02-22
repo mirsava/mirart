@@ -68,7 +68,7 @@ const Header: React.FC = () => {
   const { isDarkMode, toggleTheme } = useCustomTheme();
   const { user, signOut, isAuthenticated, refreshUser } = useAuth();
   const { openChat } = useChat();
-  const { getTotalItems } = useCart();
+  const { cartItems, getTotalItems, getTotalPrice, removeFromCart } = useCart();
   const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead, dismissNotification } = useNotifications();
   const { favorites, favoritesLoading, fetchFavorites, removeFavorite } = useFavorites();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
@@ -77,6 +77,7 @@ const Header: React.FC = () => {
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [favoritesDrawerOpen, setFavoritesDrawerOpen] = useState(false);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [galleryMenuAnchor, setGalleryMenuAnchor] = useState<null | HTMLElement>(null);
   const galleryCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [artists, setArtists] = useState<Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }>>([]);
@@ -1010,7 +1011,7 @@ const Header: React.FC = () => {
               ) : null}
               
               <IconButton
-                onClick={() => navigate('/cart')}
+                onClick={() => setCartDrawerOpen(true)}
                 sx={{ 
                   color: isDarkMode ? 'white' : 'text.primary',
                   bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
@@ -1033,6 +1034,109 @@ const Header: React.FC = () => {
                   <ShoppingCartIcon />
                 </Badge>
               </IconButton>
+              <Drawer
+                anchor="right"
+                open={cartDrawerOpen}
+                onClose={() => setCartDrawerOpen(false)}
+                disableScrollLock
+                PaperProps={{
+                  sx: {
+                    width: { xs: '100%', sm: 380 },
+                    top: { xs: 100, sm: 120 },
+                    height: { xs: 'calc(100vh - 100px)', sm: 'calc(100vh - 120px)' },
+                    maxHeight: '100vh',
+                    overflow: 'hidden',
+                    zIndex: 1400,
+                  },
+                }}
+              >
+                <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <Box sx={{ px: 2, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: 1, borderColor: 'divider' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <ShoppingCartIcon fontSize="small" color="primary" />
+                      <Typography variant="h6" fontWeight={600}>Cart</Typography>
+                      {cartItems.length > 0 && (
+                        <Chip label={getTotalItems()} size="small" color="primary" sx={{ fontWeight: 600, height: 22 }} />
+                      )}
+                    </Box>
+                    <IconButton size="small" onClick={() => setCartDrawerOpen(false)}>
+                      <CloseIcon />
+                    </IconButton>
+                  </Box>
+                  <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2 }}>
+                    {cartItems.length === 0 ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6, color: 'text.secondary' }}>
+                        <ShoppingCartIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                        <Typography variant="body1" fontWeight={500}>Your cart is empty</Typography>
+                        <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>
+                          Browse the gallery to find art you love
+                        </Typography>
+                      </Box>
+                    ) : (
+                      cartItems.map((item) => (
+                        <Card key={`${item.id}-${item.type}`} sx={{ mb: 1.5, overflow: 'hidden', boxShadow: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+                            <Box sx={{ width: 80, minWidth: 80, flexShrink: 0, position: 'relative', bgcolor: 'grey.200' }}>
+                              {getImageUrl(item.image) ? (
+                                <CardMedia
+                                  component="img"
+                                  image={getImageUrl(item.image)}
+                                  alt={item.title}
+                                  sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              ) : (
+                                <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <ShoppingCartIcon sx={{ color: 'grey.400' }} />
+                                </Box>
+                              )}
+                            </Box>
+                            <Box sx={{ flex: 1, p: 1.5, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <Typography variant="subtitle2" fontWeight={600} noWrap>{item.title}</Typography>
+                              {item.type === 'activation' ? (
+                                <Typography variant="caption" color="secondary.main">Listing activation</Typography>
+                              ) : (
+                                <Typography variant="caption" color="text.secondary" noWrap>{item.artist}</Typography>
+                              )}
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                <Typography variant="body2" color="primary.main" fontWeight={600}>
+                                  ${item.price}
+                                </Typography>
+                                {item.quantity > 1 && (
+                                  <Typography variant="caption" color="text.secondary">x{item.quantity}</Typography>
+                                )}
+                              </Box>
+                            </Box>
+                            <Tooltip title="Remove">
+                              <IconButton
+                                size="small"
+                                onClick={() => removeFromCart(item.id)}
+                                sx={{ alignSelf: 'center', mr: 1, color: 'error.main', '&:hover': { bgcolor: 'error.light', color: 'white' } }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </Card>
+                      ))
+                    )}
+                  </Box>
+                  {cartItems.length > 0 && (
+                    <Box sx={{ px: 2, py: 1.5, borderTop: 1, borderColor: 'divider' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                        <Typography variant="body1" fontWeight={600}>Total</Typography>
+                        <Typography variant="h6" fontWeight={700} color="primary.main">${getTotalPrice().toFixed(2)}</Typography>
+                      </Box>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        onClick={() => { setCartDrawerOpen(false); navigate('/checkout'); }}
+                      >
+                        Proceed to Checkout
+                      </Button>
+                    </Box>
+                  )}
+                </Box>
+              </Drawer>
               {isAuthenticated && (
                 <>
                   <IconButton
