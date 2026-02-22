@@ -22,6 +22,10 @@ import {
   Popover,
   Card,
   CardActionArea,
+  CardMedia,
+  Chip,
+  Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -42,6 +46,9 @@ import {
   WarningAmber as WarningIcon,
   CheckCircle as SuccessIcon,
   ErrorOutline as ErrorIcon,
+  Favorite as FavoriteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
@@ -49,6 +56,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { useCart } from '../contexts/CartContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useFavorites } from '../contexts/FavoritesContext';
 import apiService from '../services/api';
 import { UserRole } from '../types/userRoles';
 import logo from '../assets/images/logo.png';
@@ -62,11 +70,13 @@ const Header: React.FC = () => {
   const { openChat } = useChat();
   const { getTotalItems } = useCart();
   const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead, dismissNotification } = useNotifications();
+  const { favorites, favoritesLoading, fetchFavorites, removeFavorite } = useFavorites();
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+  const [favoritesDrawerOpen, setFavoritesDrawerOpen] = useState(false);
   const [galleryMenuAnchor, setGalleryMenuAnchor] = useState<null | HTMLElement>(null);
   const galleryCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [artists, setArtists] = useState<Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }>>([]);
@@ -96,6 +106,18 @@ const Header: React.FC = () => {
     };
     fetchArtists();
   }, []);
+
+  const getImageUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    return API_BASE_URL.replace('/api', '') + url;
+  };
+
+  const handleRemoveFavorite = async (e: React.MouseEvent, listingId: number) => {
+    e.stopPropagation();
+    await removeFavorite(listingId);
+  };
 
   const menuItems = [
     { label: 'Home', path: '/' },
@@ -394,6 +416,33 @@ const Header: React.FC = () => {
                 primary="Messages"
                 primaryTypographyProps={{
                   fontWeight: location.pathname === '/messages' ? 600 : 400,
+                }}
+              />
+            </ListItem>
+            <ListItem 
+              onClick={() => {
+                handleDrawerToggle();
+                setFavoritesDrawerOpen(true);
+                fetchFavorites();
+              }}
+              sx={{
+                borderRadius: 2,
+                mb: 1,
+                cursor: 'pointer',
+                bgcolor: 'transparent',
+                color: 'inherit',
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+              }}
+            >
+              <ListItemIcon>
+                <FavoriteIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Favorites"
+                primaryTypographyProps={{
+                  fontWeight: 400,
                 }}
               />
             </ListItem>
@@ -988,6 +1037,34 @@ const Header: React.FC = () => {
                 <>
                   <IconButton
                     onClick={() => {
+                      setFavoritesDrawerOpen(true);
+                      fetchFavorites();
+                    }}
+                    aria-label="Favorites"
+                    sx={{ 
+                      color: isDarkMode ? 'white' : 'text.primary',
+                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
+                      '&:hover': {
+                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
+                      },
+                    }}
+                  >
+                    <Badge 
+                      badgeContent={favorites.length || 0} 
+                      color="error"
+                      sx={{
+                        '& .MuiBadge-badge': {
+                          bgcolor: 'error.main',
+                          color: 'white',
+                          fontWeight: 600,
+                        },
+                      }}
+                    >
+                      <FavoriteIcon />
+                    </Badge>
+                  </IconButton>
+                  <IconButton
+                    onClick={() => {
                       setNotificationDrawerOpen(true);
                       fetchNotifications();
                     }}
@@ -1137,6 +1214,121 @@ const Header: React.FC = () => {
                       </Box>
                     </Box>
                   </Drawer>
+                  <Drawer
+                    anchor="right"
+                    open={favoritesDrawerOpen}
+                    onClose={() => setFavoritesDrawerOpen(false)}
+                    disableScrollLock
+                    PaperProps={{
+                      sx: {
+                        width: { xs: '100%', sm: 380 },
+                        top: { xs: 100, sm: 120 },
+                        height: { xs: 'calc(100vh - 100px)', sm: 'calc(100vh - 120px)' },
+                        maxHeight: '100vh',
+                        overflow: 'hidden',
+                        zIndex: 1400,
+                      },
+                    }}
+                  >
+                    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                      <Box sx={{ px: 2, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: 1, borderColor: 'divider' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <FavoriteIcon color="error" fontSize="small" />
+                          <Typography variant="h6" fontWeight={600}>My Favorites</Typography>
+                          {favorites.length > 0 && (
+                            <Chip label={favorites.length} size="small" color="primary" sx={{ fontWeight: 600, height: 22 }} />
+                          )}
+                        </Box>
+                        <IconButton size="small" onClick={() => setFavoritesDrawerOpen(false)}>
+                          <CloseIcon />
+                        </IconButton>
+                      </Box>
+                      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2 }}>
+                        {favoritesLoading ? (
+                          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                            <CircularProgress size={32} />
+                          </Box>
+                        ) : favorites.length === 0 ? (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6, color: 'text.secondary' }}>
+                            <FavoriteBorderIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                            <Typography variant="body1" fontWeight={500}>No favorites yet</Typography>
+                            <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>
+                              Tap the heart on artwork you love
+                            </Typography>
+                          </Box>
+                        ) : (
+                          favorites.map((item) => (
+                            <Card
+                              key={item.id}
+                              sx={{ mb: 1.5, overflow: 'hidden', boxShadow: 1 }}
+                            >
+                              <CardActionArea
+                                onClick={() => {
+                                  setFavoritesDrawerOpen(false);
+                                  navigate(`/painting/${item.id}`);
+                                }}
+                                sx={{ display: 'flex', alignItems: 'stretch', p: 0 }}
+                              >
+                                <Box sx={{ width: 80, minWidth: 80, flexShrink: 0, position: 'relative', bgcolor: 'grey.200' }}>
+                                  {getImageUrl(item.primary_image_url) ? (
+                                    <CardMedia
+                                      component="img"
+                                      image={getImageUrl(item.primary_image_url)}
+                                      alt={item.title}
+                                      sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                                    />
+                                  ) : (
+                                    <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <FavoriteBorderIcon sx={{ color: 'grey.400' }} />
+                                    </Box>
+                                  )}
+                                </Box>
+                                <Box sx={{ flex: 1, p: 1.5, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                  <Typography variant="subtitle2" fontWeight={600} noWrap>
+                                    {item.title}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" noWrap>
+                                    {item.artist_name}
+                                  </Typography>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    <Typography variant="body2" color="primary.main" fontWeight={600}>
+                                      ${item.price}
+                                    </Typography>
+                                    {!item.in_stock && (
+                                      <Chip label="Sold" size="small" sx={{ height: 18, fontSize: '0.65rem' }} />
+                                    )}
+                                  </Box>
+                                </Box>
+                                <Tooltip title="Remove from favorites">
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleRemoveFavorite(e, item.id)}
+                                    sx={{ alignSelf: 'center', mr: 1, color: 'error.main', '&:hover': { bgcolor: 'error.light', color: 'white' } }}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </CardActionArea>
+                            </Card>
+                          ))
+                        )}
+                      </Box>
+                      {favorites.length > 0 && (
+                        <Box sx={{ px: 2, py: 1.5, borderTop: 1, borderColor: 'divider' }}>
+                          <Button
+                            fullWidth
+                            variant="outlined"
+                            onClick={() => {
+                              setFavoritesDrawerOpen(false);
+                              navigate('/gallery');
+                            }}
+                          >
+                            Browse Gallery
+                          </Button>
+                        </Box>
+                      )}
+                    </Box>
+                  </Drawer>
                 </>
               )}
               <IconButton 
@@ -1262,6 +1454,21 @@ const Header: React.FC = () => {
         >
           <ReceiptIcon sx={{ mr: 2, fontSize: 20 }} />
           Orders
+        </MenuItem>
+        <MenuItem 
+          onClick={() => {
+            handleUserMenuClose();
+            setFavoritesDrawerOpen(true);
+            fetchFavorites();
+          }}
+          sx={{ 
+            py: 1.5,
+            px: 2,
+            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
+          }}
+        >
+          <FavoriteIcon sx={{ mr: 2, fontSize: 20 }} />
+          Favorites
         </MenuItem>
         {user?.userRole === UserRole.SITE_ADMIN && (
           <>

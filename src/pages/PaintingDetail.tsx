@@ -46,6 +46,7 @@ import { useSnackbar } from 'notistack';
 import apiService, { Listing, Comment } from '../services/api';
 import ContactSellerDialog from '../components/ContactSellerDialog';
 import { UserRole } from '../types/userRoles';
+import { useFavorites } from '../contexts/FavoritesContext';
 import PageHeader from '../components/PageHeader';
 import { Painting } from '../types';
 import SEO from '../components/SEO';
@@ -56,13 +57,14 @@ const PaintingDetail: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { openChat } = useChat();
   const { enqueueSnackbar } = useSnackbar();
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; special_instructions?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean }) | null>(null);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [defaultSpecialInstructions, setDefaultSpecialInstructions] = useState<string>('');
-  const [isLiked, setIsLiked] = useState(false);
+  const isLiked = painting ? isFavorite(painting.id) : false;
   const [likeCount, setLikeCount] = useState(0);
   const [liking, setLiking] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
@@ -213,7 +215,6 @@ const PaintingDetail: React.FC = () => {
             }
             
             setPainting(convertedPainting);
-            setIsLiked(convertedPainting.isLiked || false);
             setLikeCount(convertedPainting.likeCount || 0);
             
             const images: string[] = [];
@@ -387,24 +388,19 @@ const PaintingDetail: React.FC = () => {
     if (liking || !painting) return;
 
     setLiking(true);
-    const wasLiked = isLiked;
     const previousCount = likeCount;
 
-    setIsLiked(!wasLiked);
-    setLikeCount(wasLiked ? likeCount - 1 : likeCount + 1);
-
     try {
-      if (wasLiked) {
-        const result = await apiService.unlikeListing(painting.id, user.id);
-        setLikeCount(result.likeCount);
+      if (isLiked) {
+        const result = await removeFavorite(painting.id);
+        if (result) setLikeCount(result.likeCount);
       } else {
-        const result = await apiService.likeListing(painting.id, user.id);
-        setLikeCount(result.likeCount);
+        const result = await addFavorite(painting.id);
+        if (result) setLikeCount(result.likeCount);
       }
-    } catch (error) {
-      setIsLiked(wasLiked);
+    } catch {
       setLikeCount(previousCount);
-      enqueueSnackbar('Failed to update like', { variant: 'error' });
+      enqueueSnackbar('Failed to update favorite', { variant: 'error' });
     } finally {
       setLiking(false);
     }
@@ -772,9 +768,6 @@ const PaintingDetail: React.FC = () => {
                       >
                         {isLiked ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
                       </IconButton>
-                      <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
-                        {likeCount} {likeCount === 1 ? 'like' : 'likes'}
-                      </Typography>
                     </Box>
                   )}
                 </Box>

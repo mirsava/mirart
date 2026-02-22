@@ -8,6 +8,7 @@ import { CartProvider } from './contexts/CartContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { FavoritesProvider } from './contexts/FavoritesContext';
 import './aws-config';
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -43,7 +44,9 @@ function App(): JSX.Element {
           <CartProvider>
             <ChatProvider>
               <NotificationProvider>
-                <AppContent />
+                <FavoritesProvider>
+                  <AppContent />
+                </FavoritesProvider>
               </NotificationProvider>
             </ChatProvider>
           </CartProvider>

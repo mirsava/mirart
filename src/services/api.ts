@@ -260,6 +260,10 @@ class ApiService {
     });
   }
 
+  async getFavoriteListings(cognitoUsername: string): Promise<{ listings: Array<{ id: number; title: string; price: number; primary_image_url?: string; category: string; in_stock: boolean; status: string; cognito_username: string; artist_name: string; like_count: number; favorited_at: string }> }> {
+    return this.request(`/likes/user/${cognitoUsername}/listings`);
+  }
+
   async getListing(id: number): Promise<Listing> {
     return this.request<Listing>(`/listings/${id}`);
   }
