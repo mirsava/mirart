@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -15,17 +15,15 @@ import {
   CardContent,
   Button,
   Pagination,
-  Menu,
-  Drawer,
   IconButton,
   Divider,
-  Checkbox,
-  FormControlLabel,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Badge,
+  Drawer,
   InputAdornment,
+  Badge,
+  alpha,
+  Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { 
   Search as SearchIcon, 
@@ -34,8 +32,15 @@ import {
   Brush as BrushIcon,
   Tune as FilterIcon,
   Close as CloseIcon,
-  ExpandMore as ExpandMoreIcon,
   Clear as ClearIcon,
+  AttachMoney as PriceIcon,
+  CalendarMonth as YearIcon,
+  ColorLens as MediumIcon,
+  Inventory as StockIcon,
+  Category as CategoryIcon,
+  CheckCircleOutline as CheckIcon,
+  PushPin as PinIcon,
+  PushPinOutlined as PinOutlinedIcon,
 } from '@mui/icons-material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PaintingCard from '../components/PaintingCard';
@@ -63,8 +68,9 @@ const Gallery: React.FC = () => {
   const [itemsPerPage, setItemsPerPage] = useState<number>(parseInt(searchParams.get('limit') || '25', 10));
   const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } | null>(null);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState<boolean>(false);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
-  const [yearRange, setYearRange] = useState<[number, number]>([1900, new Date().getFullYear()]);
+  const [filterPinned, setFilterPinned] = useState<boolean>(false);
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
   const isApplyingFiltersRef = useRef(false);
   
   const [pendingSelectedCategory, setPendingSelectedCategory] = useState<string>('All');
@@ -296,7 +302,7 @@ const Gallery: React.FC = () => {
       if (itemsPerPage !== 25) {
         setItemsPerPage(25);
       }
-    } else if (limitNum !== itemsPerPage) {
+    } else if (limitNum !== null && limitNum !== itemsPerPage) {
       setItemsPerPage(limitNum);
     }
   }, []);
@@ -338,36 +344,9 @@ const Gallery: React.FC = () => {
     'All': [],
     'Painting': ['Abstract', 'Figurative', 'Impressionism', 'Realism', 'Pop Art'],
     'Woodworking': ['Furniture', 'Decorative Items', 'Kitchenware', 'Outdoor', 'Storage', 'Lighting', 'Toys & Games'],
-    'Prints': ['Giclée', 'Screen Print', 'Lithograph', 'Offset', 'Digital Print', 'Fine Art Print'],
+    'Prints': ['GiclÃ©e', 'Screen Print', 'Lithograph', 'Offset', 'Digital Print', 'Fine Art Print'],
     'Other': []
   };
-
-  const handleCategoryMenuOpen = (event: React.MouseEvent<HTMLElement>, category: string) => {
-    setCategoryMenuAnchor(prev => ({ ...prev, [category]: event.currentTarget }));
-  };
-
-  const handleCategoryClick = (category: string): void => {
-    if (category === 'All') {
-      setSelectedCategory('All');
-      setSelectedSubcategory('');
-      setPage(1);
-      const newParams = new URLSearchParams(searchParams);
-      newParams.delete('category');
-      newParams.delete('subcategory');
-      newParams.set('page', '1');
-      setSearchParams(newParams);
-    } else {
-      setSelectedCategory(category);
-      setSelectedSubcategory('');
-      setPage(1);
-      const newParams = new URLSearchParams(searchParams);
-      newParams.set('category', category);
-      newParams.delete('subcategory');
-      newParams.set('page', '1');
-      setSearchParams(newParams);
-    }
-  };
-
 
   const handleSearchChange = (value: string): void => {
     setSearchInput(value);
@@ -540,228 +519,140 @@ const Gallery: React.FC = () => {
         disablePattern={true}
       />
 
-      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: { xs: 4, sm: 5, md: 6 } }}>
-        <Box sx={{ mb: 4 }}>
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                <Badge
-                  badgeContent={hasActiveFilters() ? getActiveFilterCount() : 0}
-                  color="primary"
-                  sx={{
-                    '& .MuiBadge-badge': {
-                      right: 4,
-                      top: 4,
-                    },
-                  }}
-                >
-                  <IconButton
-                    onClick={() => {
-                      setPendingSelectedCategory(selectedCategory);
-                      setPendingSelectedSubcategory(selectedSubcategory);
-                      setPendingMinPrice(minPrice);
-                      setPendingMaxPrice(maxPrice);
-                      setPendingMinYear(minYear);
-                      setPendingMaxYear(maxYear);
-                      setPendingSelectedMedium(selectedMedium);
-                      setPendingInStockOnly(inStockOnly);
-                      setFilterDrawerOpen(true);
-                    }}
-                    sx={{
-                      border: '1px solid',
-                      borderColor: hasActiveFilters() ? 'primary.main' : 'divider',
-                      borderRadius: 1,
-                      height: '56px',
-                      width: '56px',
-                    }}
-                  >
-                    <FilterIcon sx={{ color: hasActiveFilters() ? 'primary.main' : 'inherit' }} />
+      <Box sx={{
+        width: '100%',
+        px: { xs: 2, sm: 3, md: 4 },
+        pb: { xs: 4, sm: 5, md: 6 },
+        ml: filterPinned && filterDrawerOpen && !isSmallScreen ? '380px' : 0,
+        transition: 'margin-left 225ms cubic-bezier(0, 0, 0.2, 1)',
+      }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 2 }}>
+          <TextField
+            placeholder="Search artwork..."
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            size="small"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                </InputAdornment>
+              ),
+              endAdornment: searchInput && (
+                <InputAdornment position="end">
+                  <IconButton edge="end" onClick={() => handleSearchChange('')} size="small">
+                    <ClearIcon sx={{ fontSize: 18 }} />
                   </IconButton>
-                </Badge>
-                <TextField
-                  fullWidth
-                  placeholder="Search artwork..."
-                  value={searchInput}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon sx={{ color: 'text.secondary' }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: searchInput && (
-                      <InputAdornment position="end">
-                        <IconButton
-                          edge="end"
-                          onClick={() => handleSearchChange('')}
-                          sx={{ p: 0.5 }}
-                        >
-                          <ClearIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{ maxWidth: 400 }}
-                />
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Items per page</InputLabel>
-                  <Select
-                    value={itemsPerPage}
-                    label="Items per page"
-                    onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-                  >
-                    <MenuItem value={10}>10</MenuItem>
-                    <MenuItem value={25}>25</MenuItem>
-                    <MenuItem value={50}>50</MenuItem>
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Sort by</InputLabel>
-                  <Select
-                    value={sortBy === 'price' && sortOrder === 'ASC' ? 'price-low' : 
-                           sortBy === 'price' && sortOrder === 'DESC' ? 'price-high' :
-                           sortBy === 'title' ? 'title' :
-                           sortBy === 'year' ? 'year' : 'created_at'}
-                    label="Sort by"
-                    onChange={(e) => handleSortChange(e.target.value)}
-                  >
-                    <MenuItem value="created_at">Newest First</MenuItem>
-                    <MenuItem value="title">Title</MenuItem>
-                    <MenuItem value="price-low">Price: Low to High</MenuItem>
-                    <MenuItem value="price-high">Price: High to Low</MenuItem>
-                    <MenuItem value="year">Year (Newest)</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-            </Grid>
-          </Grid>
-
-          {hasActiveFilters() && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom sx={{ mb: 1 }}>
-                Active Filters:
-              </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {selectedCategory !== 'All' && (
-                  <Chip
-                    label={`Category: ${selectedCategory}`}
-                    onDelete={() => handleRemoveFilter('category')}
-                    color="primary"
-                    size="small"
-                  />
-                )}
-                {selectedSubcategory && (
-                  <Chip
-                    label={`Subcategory: ${selectedSubcategory}`}
-                    onDelete={() => handleRemoveFilter('subcategory')}
-                    color="primary"
-                    size="small"
-                  />
-                )}
-                {selectedArtist && (
-                  <Chip
-                    label={`Artist: ${selectedArtist}`}
-                    onDelete={() => handleRemoveFilter('artist')}
-                    color="primary"
-                    size="small"
-                  />
-                )}
-                {minPrice && (
-                  <Chip
-                    label={`Min Price: $${minPrice}`}
-                    onDelete={() => handleRemoveFilter('minPrice')}
-                    color="primary"
-                    size="small"
-                  />
-                )}
-                {maxPrice && (
-                  <Chip
-                    label={`Max Price: $${maxPrice}`}
-                    onDelete={() => handleRemoveFilter('maxPrice')}
-                    color="primary"
-                    size="small"
-                  />
-                )}
-                {minYear && (
-                  <Chip
-                    label={`Min Year: ${minYear}`}
-                    onDelete={() => handleRemoveFilter('minYear')}
-                    color="primary"
-                    size="small"
-                  />
-                )}
-                {maxYear && (
-                  <Chip
-                    label={`Max Year: ${maxYear}`}
-                    onDelete={() => handleRemoveFilter('maxYear')}
-                    color="primary"
-                    size="small"
-                  />
-                )}
-                {selectedMedium.map((medium) => (
-                  <Chip
-                    key={medium}
-                    label={`Medium: ${medium}`}
-                    onDelete={() => handleRemoveFilter('medium', medium)}
-                    color="primary"
-                    size="small"
-                  />
-                ))}
-                {inStockOnly && (
-                  <Chip
-                    label="In Stock Only"
-                    onDelete={() => handleRemoveFilter('inStock')}
-                    color="primary"
-                    size="small"
-                  />
-                )}
-              </Stack>
-            </Box>
-          )}
-
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Categories:
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              {Object.keys(categoryStructure).map((category) => {
-                const isSelected = selectedCategory === category && !selectedSubcategory;
-                
-                return (
-                  <Chip
-                    key={category}
-                    label={category}
-                    onClick={() => handleCategoryClick(category)}
-                    color={isSelected ? 'primary' : 'default'}
-                    variant={isSelected ? 'filled' : 'outlined'}
-                    sx={{ mb: 1 }}
-                  />
-                );
-              })}
-            </Stack>
-            {selectedSubcategory && (
-              <Box sx={{ mt: 2 }}>
-                <Chip
-                  label={`${selectedCategory} > ${selectedSubcategory}`}
-                  onDelete={() => {
-                    setSelectedSubcategory('');
-                    const newParams = new URLSearchParams(searchParams);
-                    newParams.delete('subcategory');
-                    newParams.set('page', '1');
-                    setSearchParams(newParams);
-                  }}
-                  color="primary"
-                  variant="filled"
-                  sx={{ mb: 1 }}
-                />
-              </Box>
-            )}
+                </InputAdornment>
+              ),
+            }}
+            sx={{ flex: 1, minWidth: 200, maxWidth: 360 }}
+          />
+          <Badge badgeContent={hasActiveFilters() ? getActiveFilterCount() : 0} color="primary">
+            <Button
+              variant="outlined"
+              startIcon={<FilterIcon />}
+              onClick={() => {
+                setPendingSelectedCategory(selectedCategory);
+                setPendingSelectedSubcategory(selectedSubcategory);
+                setPendingMinPrice(minPrice);
+                setPendingMaxPrice(maxPrice);
+                setPendingMinYear(minYear);
+                setPendingMaxYear(maxYear);
+                setPendingSelectedMedium(selectedMedium);
+                setPendingInStockOnly(inStockOnly);
+                setFilterDrawerOpen(true);
+              }}
+              size="small"
+              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, px: 2, py: 0.75 }}
+            >
+              Filters
+            </Button>
+          </Badge>
+          <Box sx={{ display: 'flex', gap: 1.5, ml: 'auto' }}>
+            <FormControl size="small" sx={{ minWidth: 110 }}>
+              <InputLabel>Show</InputLabel>
+              <Select value={itemsPerPage} label="Show" onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}>
+                <MenuItem value={10}>10</MenuItem>
+                <MenuItem value={25}>25</MenuItem>
+                <MenuItem value={50}>50</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Sort by</InputLabel>
+              <Select
+                value={sortBy === 'price' && sortOrder === 'ASC' ? 'price-low' :
+                       sortBy === 'price' && sortOrder === 'DESC' ? 'price-high' :
+                       sortBy === 'title' ? 'title' :
+                       sortBy === 'year' ? 'year' : 'created_at'}
+                label="Sort by"
+                onChange={(e) => handleSortChange(e.target.value)}
+              >
+                <MenuItem value="created_at">Newest First</MenuItem>
+                <MenuItem value="title">Title</MenuItem>
+                <MenuItem value="price-low">Price: Low to High</MenuItem>
+                <MenuItem value="price-high">Price: High to Low</MenuItem>
+                <MenuItem value="year">Year (Newest)</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
         </Box>
+
+        {hasActiveFilters() && (
+          <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+            {selectedCategory !== 'All' && (
+              <Chip label={selectedCategory} onDelete={() => handleRemoveFilter('category')} color="primary" variant="outlined" size="small" />
+            )}
+            {selectedSubcategory && (
+              <Chip label={selectedSubcategory} onDelete={() => handleRemoveFilter('subcategory')} color="primary" variant="outlined" size="small" />
+            )}
+            {selectedArtist && (
+              <Chip label={`Artist: ${selectedArtist}`} onDelete={() => handleRemoveFilter('artist')} color="primary" variant="outlined" size="small" />
+            )}
+            {minPrice && (
+              <Chip label={`$${minPrice}+`} onDelete={() => handleRemoveFilter('minPrice')} color="primary" variant="outlined" size="small" />
+            )}
+            {maxPrice && (
+              <Chip label={`Up to $${maxPrice}`} onDelete={() => handleRemoveFilter('maxPrice')} color="primary" variant="outlined" size="small" />
+            )}
+            {minYear && (
+              <Chip label={`From ${minYear}`} onDelete={() => handleRemoveFilter('minYear')} color="primary" variant="outlined" size="small" />
+            )}
+            {maxYear && (
+              <Chip label={`Until ${maxYear}`} onDelete={() => handleRemoveFilter('maxYear')} color="primary" variant="outlined" size="small" />
+            )}
+            {selectedMedium.map((medium) => (
+              <Chip key={medium} label={medium} onDelete={() => handleRemoveFilter('medium', medium)} color="primary" variant="outlined" size="small" />
+            ))}
+            {inStockOnly && (
+              <Chip label="In Stock" onDelete={() => handleRemoveFilter('inStock')} color="success" variant="outlined" size="small" />
+            )}
+            <Chip
+              label="Clear all"
+              onClick={async () => {
+                setSelectedCategory('All');
+                setSelectedSubcategory('');
+                setSelectedArtist('');
+                setMinPrice('');
+                setMaxPrice('');
+                setMinYear('');
+                setMaxYear('');
+                setSelectedMedium([]);
+                setInStockOnly(false);
+                setPage(1);
+                isApplyingFiltersRef.current = true;
+                await fetchListingsWithFilters({
+                  category: 'All', subcategory: '', minPrice: '', maxPrice: '',
+                  minYear: '', maxYear: '', selectedMedium: [], inStockOnly: false, pageNum: 1,
+                });
+              }}
+              size="small"
+              variant="outlined"
+              color="error"
+              icon={<ClearIcon sx={{ fontSize: 14 }} />}
+            />
+          </Stack>
+        )}
 
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary">
@@ -871,580 +762,263 @@ const Gallery: React.FC = () => {
 
       <Drawer
         anchor="left"
+        variant={filterPinned && !isSmallScreen ? 'persistent' : 'temporary'}
         open={filterDrawerOpen}
-        onClose={() => setFilterDrawerOpen(false)}
-        hideBackdrop={false}
-        ModalProps={{
-          sx: {
-            zIndex: 1299,
-          },
-        }}
+        onClose={() => { if (!filterPinned) setFilterDrawerOpen(false); }}
+        disableScrollLock
         PaperProps={{
           sx: {
-            width: { xs: '85%', sm: 400 },
-            height: { xs: 'calc(100% - 114px)', sm: 'calc(100% - 120px)' },
-            position: 'fixed',
-            top: { xs: 114, sm: 120 },
-            left: 0,
-            boxShadow: '4px 0 24px rgba(0,0,0,0.1)',
-            borderRight: '1px solid',
-            borderColor: 'divider',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            bgcolor: 'background.paper',
+            width: { xs: '100%', sm: 380 },
+            bgcolor: 'background.default',
+            ...(filterPinned && !isSmallScreen ? { top: 0, height: '100vh' } : {}),
           },
         }}
       >
-        <Box 
-          sx={{ 
-            px: 2.5, 
-            py: 2, 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
-            borderBottom: '2px solid',
-            borderColor: 'primary.dark',
-            flexShrink: 0,
-            minHeight: 56,
-            width: '100%',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-            <FilterIcon sx={{ fontSize: 22 }} />
-            <Typography variant="subtitle1" fontWeight={700} sx={{ letterSpacing: '0.3px', fontSize: '1rem' }}>
-              Filters
-            </Typography>
-            {hasActiveFilters() && (
-              <Chip 
-                label={getActiveFilterCount()} 
-                size="small" 
-                sx={{ 
-                  bgcolor: 'primary.contrastText',
-                  color: 'primary.main',
-                  fontWeight: 700,
-                  height: 22,
-                  fontSize: '0.75rem',
-                }} 
-              />
-            )}
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Box sx={{ px: 3, py: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <FilterIcon sx={{ color: 'primary.main' }} />
+              <Typography variant="h6" fontWeight={700}>Filters</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              {!isSmallScreen && (
+                <Tooltip title={filterPinned ? 'Unpin sidebar' : 'Pin sidebar'}>
+                  <IconButton
+                    onClick={() => setFilterPinned(!filterPinned)}
+                    size="small"
+                    sx={{
+                      color: filterPinned ? 'primary.main' : 'text.secondary',
+                      transform: filterPinned ? 'rotate(0deg)' : 'rotate(45deg)',
+                      transition: 'transform 0.2s ease, color 0.2s ease',
+                    }}
+                  >
+                    {filterPinned ? <PinIcon fontSize="small" /> : <PinOutlinedIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+              )}
+              <IconButton onClick={() => { setFilterDrawerOpen(false); setFilterPinned(false); }} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Box>
           </Box>
-          <IconButton 
-            onClick={() => setFilterDrawerOpen(false)} 
-            size="medium"
-            sx={{
-              color: 'primary.contrastText',
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-              },
-            }}
-          >
-            <CloseIcon sx={{ fontSize: 22 }} />
-          </IconButton>
-        </Box>
-        
-        <Box sx={{ px: 3, py: 3, overflow: 'auto', maxHeight: { xs: 'calc(100vh - 200px)', sm: 'calc(100vh - 210px)' } }}>
-          <Accordion 
-            defaultExpanded
-            sx={{
-              mb: 2,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:before': { display: 'none' },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              '&.Mui-expanded': {
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              },
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                height: 35,
-                minHeight: 35,
-                borderRadius: 2,
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                },
-                '&.Mui-expanded': {
-                  bgcolor: 'action.selected',
-                  borderBottomLeftRadius: 0,
-                  borderBottomRightRadius: 0,
-                  height: 35,
-                  minHeight: 35,
-                },
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
-                Category
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-                gap: 1,
-                columnGap: 2
-              }}>
+
+          <Box sx={{ flex: 1, overflowY: 'auto', px: 3, py: 3 }}>
+            <Box sx={{ mb: 3.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <CategoryIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <Typography variant="subtitle2" fontWeight={700} textTransform="uppercase" letterSpacing={0.5} fontSize="0.75rem">Category</Typography>
+              </Box>
+              <Stack spacing={0.5}>
                 {Object.keys(categoryStructure).map((category) => {
-                  const subcategories = categoryStructure[category as keyof typeof categoryStructure];
-                  const hasSubcategories = subcategories.length > 0;
                   const isSelected = pendingSelectedCategory === category && !pendingSelectedSubcategory;
-                  
+                  const subcategories = categoryStructure[category as keyof typeof categoryStructure];
                   return (
                     <Box key={category}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={isSelected}
-                            onChange={() => {
-                              if (category === 'All') {
-                                setPendingSelectedCategory('All');
-                                setPendingSelectedSubcategory('');
-                              } else {
-                                setPendingSelectedCategory(category);
-                                setPendingSelectedSubcategory('');
-                              }
-                            }}
-                          />
-                        }
-                        label={category}
-                        sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.875rem' } }}
-                      />
-                      {hasSubcategories && pendingSelectedCategory === category && (
-                        <Box sx={{ pl: 4, pt: 1 }}>
-                          {subcategories.map((subcategory) => (
-                            <FormControlLabel
-                              key={subcategory}
-                              control={
-                                <Checkbox
-                                  checked={pendingSelectedSubcategory === subcategory}
-                                  onChange={() => {
-                                    setPendingSelectedSubcategory(subcategory);
-                                  }}
-                                />
-                              }
-                              label={subcategory}
-                              sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.875rem' } }}
+                      <Box
+                        onClick={() => {
+                          setPendingSelectedCategory(category === 'All' ? 'All' : category);
+                          setPendingSelectedSubcategory('');
+                        }}
+                        sx={{
+                          px: 2, py: 1, borderRadius: 1.5, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          bgcolor: isSelected ? (theme) => alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                          color: isSelected ? 'primary.main' : 'text.primary',
+                          fontWeight: isSelected ? 600 : 400,
+                          transition: 'all 0.15s ease',
+                          '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06) },
+                        }}
+                      >
+                        <Typography variant="body2" fontWeight={isSelected ? 600 : 400}>{category}</Typography>
+                        {isSelected && <CheckIcon sx={{ fontSize: 18, color: 'primary.main' }} />}
+                      </Box>
+                      {subcategories.length > 0 && pendingSelectedCategory === category && (
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ pl: 2, pt: 1, pb: 0.5 }}>
+                          {subcategories.map((sub) => (
+                            <Chip
+                              key={sub}
+                              label={sub}
+                              size="small"
+                              onClick={() => setPendingSelectedSubcategory(pendingSelectedSubcategory === sub ? '' : sub)}
+                              color={pendingSelectedSubcategory === sub ? 'primary' : 'default'}
+                              variant={pendingSelectedSubcategory === sub ? 'filled' : 'outlined'}
+                              sx={{ fontSize: '0.7rem', height: 26 }}
                             />
                           ))}
-                        </Box>
+                        </Stack>
                       )}
                     </Box>
                   );
                 })}
-              </Box>
-            </AccordionDetails>
-          </Accordion>
+              </Stack>
+            </Box>
 
-          <Accordion 
-            defaultExpanded
-            sx={{
-              mb: 2,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:before': { display: 'none' },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              '&.Mui-expanded': {
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              },
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                height: 35,
-                minHeight: 35,
-                borderRadius: 2,
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                },
-                '&.Mui-expanded': {
-                  bgcolor: 'action.selected',
-                  borderBottomLeftRadius: 0,
-                  borderBottomRightRadius: 0,
-                  height: 35,
-                  minHeight: 35,
-                },
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
-                Price Range
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+            <Divider sx={{ mb: 3 }} />
+
+            <Box sx={{ mb: 3.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <PriceIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <Typography variant="subtitle2" fontWeight={700} textTransform="uppercase" letterSpacing={0.5} fontSize="0.75rem">Price Range</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                 <TextField
-                  label="Min Price"
+                  label="Min"
                   type="number"
                   value={pendingMinPrice}
                   onChange={(e) => setPendingMinPrice(e.target.value)}
                   size="small"
                   fullWidth
-                  sx={{
-                    '& .MuiInputLabel-root': { fontSize: '0.875rem' },
-                    '& .MuiInputBase-input': { fontSize: '0.875rem' },
-                  }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
                 />
+                <Typography color="text.disabled" fontWeight={300} fontSize="1.2rem">/</Typography>
                 <TextField
-                  label="Max Price"
+                  label="Max"
                   type="number"
                   value={pendingMaxPrice}
                   onChange={(e) => setPendingMaxPrice(e.target.value)}
                   size="small"
                   fullWidth
-                  sx={{
-                    '& .MuiInputLabel-root': { fontSize: '0.875rem' },
-                    '& .MuiInputBase-input': { fontSize: '0.875rem' },
-                  }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
                 />
               </Box>
-              <Button
-                size="small"
-                startIcon={<ClearIcon />}
-                onClick={() => {
-                  setPendingMinPrice('');
-                  setPendingMaxPrice('');
-                }}
-                sx={{ mt: 1 }}
-              >
-                Clear
-              </Button>
-            </AccordionDetails>
-          </Accordion>
+            </Box>
 
-          <Accordion 
-            defaultExpanded
-            sx={{
-              mb: 2,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:before': { display: 'none' },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              '&.Mui-expanded': {
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              },
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                height: 35,
-                minHeight: 35,
-                borderRadius: 2,
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                },
-                '&.Mui-expanded': {
-                  bgcolor: 'action.selected',
-                  borderBottomLeftRadius: 0,
-                  borderBottomRightRadius: 0,
-                  height: 35,
-                  minHeight: 35,
-                },
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
-                Year Range
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+            <Divider sx={{ mb: 3 }} />
+
+            <Box sx={{ mb: 3.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <YearIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <Typography variant="subtitle2" fontWeight={700} textTransform="uppercase" letterSpacing={0.5} fontSize="0.75rem">Year</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                 <TextField
-                  label="Min Year"
+                  label="From"
                   type="number"
                   value={pendingMinYear}
                   onChange={(e) => setPendingMinYear(e.target.value)}
                   size="small"
                   fullWidth
                   inputProps={{ min: 1900, max: new Date().getFullYear() }}
-                  sx={{
-                    '& .MuiInputLabel-root': { fontSize: '0.875rem' },
-                    '& .MuiInputBase-input': { fontSize: '0.875rem' },
-                  }}
                 />
+                <Typography color="text.disabled" fontWeight={300} fontSize="1.2rem">/</Typography>
                 <TextField
-                  label="Max Year"
+                  label="To"
                   type="number"
                   value={pendingMaxYear}
                   onChange={(e) => setPendingMaxYear(e.target.value)}
                   size="small"
                   fullWidth
                   inputProps={{ min: 1900, max: new Date().getFullYear() }}
-                  sx={{
-                    '& .MuiInputLabel-root': { fontSize: '0.875rem' },
-                    '& .MuiInputBase-input': { fontSize: '0.875rem' },
-                  }}
                 />
               </Box>
-              <Button
-                size="small"
-                startIcon={<ClearIcon />}
-                onClick={() => {
-                  setPendingMinYear('');
-                  setPendingMaxYear('');
-                }}
-                sx={{ mt: 1 }}
-              >
-                Clear
-              </Button>
-            </AccordionDetails>
-          </Accordion>
+            </Box>
 
-          <Accordion
-            sx={{
-              mb: 2,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:before': { display: 'none' },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              '&.Mui-expanded': {
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              },
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                height: 35,
-                minHeight: 35,
-                borderRadius: 2,
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                },
-                '&.Mui-expanded': {
-                  bgcolor: 'action.selected',
-                  borderBottomLeftRadius: 0,
-                  borderBottomRightRadius: 0,
-                  height: 35,
-                  minHeight: 35,
-                },
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
-                Medium
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 2, py: 2 }}>
-              <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-                gap: 1.5,
-                columnGap: 2
-              }}>
+            <Divider sx={{ mb: 3 }} />
+
+            <Box sx={{ mb: 3.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <MediumIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <Typography variant="subtitle2" fontWeight={700} textTransform="uppercase" letterSpacing={0.5} fontSize="0.75rem">Medium</Typography>
+              </Box>
+              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
                 {['Oil', 'Acrylic', 'Watercolor', 'Pastel', 'Charcoal', 'Pencil', 'Mixed Media', 'Wood', 'Metal', 'Other'].map((medium) => (
-                  <FormControlLabel
+                  <Chip
                     key={medium}
-                    control={
-                      <Checkbox
-                        checked={pendingSelectedMedium.includes(medium)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setPendingSelectedMedium([...pendingSelectedMedium, medium]);
-                          } else {
-                            setPendingSelectedMedium(pendingSelectedMedium.filter(m => m !== medium));
-                          }
-                        }}
-                      />
-                    }
                     label={medium}
-                    sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.875rem' } }}
+                    size="small"
+                    onClick={() => setPendingSelectedMedium((prev) => prev.includes(medium) ? prev.filter((m) => m !== medium) : [...prev, medium])}
+                    color={pendingSelectedMedium.includes(medium) ? 'primary' : 'default'}
+                    variant={pendingSelectedMedium.includes(medium) ? 'filled' : 'outlined'}
+                    sx={{ fontWeight: pendingSelectedMedium.includes(medium) ? 600 : 400 }}
                   />
                 ))}
+              </Stack>
+            </Box>
+
+            <Divider sx={{ mb: 3 }} />
+
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <StockIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <Typography variant="subtitle2" fontWeight={700} textTransform="uppercase" letterSpacing={0.5} fontSize="0.75rem">Availability</Typography>
               </Box>
-              {pendingSelectedMedium.length > 0 && (
-                <Button
-                  size="small"
-                  startIcon={<ClearIcon />}
-                  onClick={() => {
-                    setPendingSelectedMedium([]);
-                  }}
-                  sx={{ mt: 2 }}
-                >
-                  Clear
-                </Button>
-              )}
-            </AccordionDetails>
-          </Accordion>
-
-          <Accordion
-            sx={{
-              mb: 2,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:before': { display: 'none' },
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              '&.Mui-expanded': {
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              },
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main', fontSize: 16 }} />}
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                height: 35,
-                minHeight: 35,
-                borderRadius: 2,
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                },
-                '&.Mui-expanded': {
-                  bgcolor: 'action.selected',
-                  borderBottomLeftRadius: 0,
-                  borderBottomRightRadius: 0,
-                  height: 35,
-                  minHeight: 35,
-                },
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'primary.main' }}>
-                Availability
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 2, py: 2 }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={pendingInStockOnly}
-                    onChange={(e) => {
-                      setPendingInStockOnly(e.target.checked);
-                    }}
-                  />
-                }
+              <Chip
                 label="In Stock Only"
-                sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
+                onClick={() => setPendingInStockOnly(!pendingInStockOnly)}
+                color={pendingInStockOnly ? 'success' : 'default'}
+                variant={pendingInStockOnly ? 'filled' : 'outlined'}
+                icon={pendingInStockOnly ? <CheckIcon sx={{ fontSize: 16 }} /> : undefined}
+                sx={{ fontWeight: pendingInStockOnly ? 600 : 400 }}
               />
-            </AccordionDetails>
-          </Accordion>
+            </Box>
+          </Box>
 
-          <Box 
-            sx={{ 
-              mt: 3, 
-              px: 1,
-              pb: 1,
-              position: 'sticky',
-              bottom: 0,
-              bgcolor: 'background.paper',
-              borderTop: '2px solid',
-              borderColor: 'divider',
-              pt: 2.5,
-              boxShadow: '0 -4px 12px rgba(0,0,0,0.05)',
-            }}
-          >
-            <Stack spacing={1.5}>
-              <Button
-                variant="contained"
-                fullWidth
-                onClick={async () => {
-                  isApplyingFiltersRef.current = true;
-                  
-                  const newFilters = {
-                    category: pendingSelectedCategory,
-                    subcategory: pendingSelectedSubcategory,
-                    minPrice: pendingMinPrice || '',
-                    maxPrice: pendingMaxPrice || '',
-                    minYear: pendingMinYear || '',
-                    maxYear: pendingMaxYear || '',
-                    selectedMedium: pendingSelectedMedium,
-                    inStockOnly: pendingInStockOnly,
-                    pageNum: 1
-                  };
-                  
-                  setSelectedCategory(pendingSelectedCategory);
-                  setSelectedSubcategory(pendingSelectedSubcategory);
-                  setMinPrice(newFilters.minPrice);
-                  setMaxPrice(newFilters.maxPrice);
-                  setMinYear(newFilters.minYear);
-                  setMaxYear(newFilters.maxYear);
-                  setSelectedMedium(newFilters.selectedMedium.length > 0 ? [...newFilters.selectedMedium] : []);
-                  setInStockOnly(newFilters.inStockOnly);
-                  setPage(1);
-                  setFilterDrawerOpen(false);
-                  
-                  await fetchListingsWithFilters(newFilters);
-                }}
-                sx={{
-                  py: 1.5,
-                  fontWeight: 600,
-                  fontSize: '0.95rem',
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  '&:hover': {
-                    boxShadow: '0 6px 16px rgba(0,0,0,0.2)',
-                  },
-                }}
-              >
-                Apply Filters
-              </Button>
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={async () => {
-                  setPendingSelectedCategory('All');
-                  setPendingSelectedSubcategory('');
-                  setPendingMinPrice('');
-                  setPendingMaxPrice('');
-                  setPendingMinYear('');
-                  setPendingMaxYear('');
-                  setPendingSelectedMedium([]);
-                  setPendingInStockOnly(false);
-                  setSelectedCategory('All');
-                  setSelectedSubcategory('');
-                  setMinPrice('');
-                  setMaxPrice('');
-                  setMinYear('');
-                  setMaxYear('');
-                  setSelectedMedium([]);
-                  setInStockOnly(false);
-                  setPage(1);
-                  
-                  isApplyingFiltersRef.current = true;
-                  await fetchListingsWithFilters({
-                    category: 'All',
-                    subcategory: '',
-                    minPrice: '',
-                    maxPrice: '',
-                    minYear: '',
-                    maxYear: '',
-                    selectedMedium: [],
-                    inStockOnly: false,
-                    pageNum: 1
-                  });
-                }}
-                sx={{
-                  py: 1.25,
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  borderWidth: 2,
-                  '&:hover': {
-                    borderWidth: 2,
-                    bgcolor: 'action.hover',
-                  },
-                }}
-              >
-                Clear All Filters
-              </Button>
-            </Stack>
+          <Box sx={{ px: 3, py: 2.5, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', display: 'flex', gap: 1.5 }}>
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<ClearIcon />}
+              onClick={async () => {
+                setPendingSelectedCategory('All');
+                setPendingSelectedSubcategory('');
+                setPendingMinPrice('');
+                setPendingMaxPrice('');
+                setPendingMinYear('');
+                setPendingMaxYear('');
+                setPendingSelectedMedium([]);
+                setPendingInStockOnly(false);
+                setSelectedCategory('All');
+                setSelectedSubcategory('');
+                setMinPrice('');
+                setMaxPrice('');
+                setMinYear('');
+                setMaxYear('');
+                setSelectedMedium([]);
+                setInStockOnly(false);
+                setPage(1);
+                setFilterDrawerOpen(false);
+                isApplyingFiltersRef.current = true;
+                await fetchListingsWithFilters({
+                  category: 'All', subcategory: '', minPrice: '', maxPrice: '',
+                  minYear: '', maxYear: '', selectedMedium: [], inStockOnly: false, pageNum: 1,
+                });
+              }}
+              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, py: 1.25 }}
+            >
+              Clear
+            </Button>
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={async () => {
+                isApplyingFiltersRef.current = true;
+                const newFilters = {
+                  category: pendingSelectedCategory,
+                  subcategory: pendingSelectedSubcategory,
+                  minPrice: pendingMinPrice || '',
+                  maxPrice: pendingMaxPrice || '',
+                  minYear: pendingMinYear || '',
+                  maxYear: pendingMaxYear || '',
+                  selectedMedium: pendingSelectedMedium,
+                  inStockOnly: pendingInStockOnly,
+                  pageNum: 1,
+                };
+                setSelectedCategory(pendingSelectedCategory);
+                setSelectedSubcategory(pendingSelectedSubcategory);
+                setMinPrice(newFilters.minPrice);
+                setMaxPrice(newFilters.maxPrice);
+                setMinYear(newFilters.minYear);
+                setMaxYear(newFilters.maxYear);
+                setSelectedMedium(newFilters.selectedMedium.length > 0 ? [...newFilters.selectedMedium] : []);
+                setInStockOnly(newFilters.inStockOnly);
+                setPage(1);
+                setFilterDrawerOpen(false);
+                await fetchListingsWithFilters(newFilters);
+              }}
+              sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, py: 1.25 }}
+            >
+              Apply Filters
+            </Button>
           </Box>
         </Box>
       </Drawer>

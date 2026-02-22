@@ -1018,6 +1018,7 @@ const Header: React.FC = () => {
                     anchor="right"
                     open={notificationDrawerOpen}
                     onClose={() => setNotificationDrawerOpen(false)}
+                    disableScrollLock
                     PaperProps={{
                       sx: {
                         width: { xs: '100%', sm: 380 },
@@ -1299,6 +1300,7 @@ const Header: React.FC = () => {
         anchor="left"
         open={drawerOpen}
         onClose={handleDrawerToggle}
+        disableScrollLock
         ModalProps={{
           keepMounted: true,
         }}
