@@ -57,8 +57,8 @@ const Gallery: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState<string>(searchParams.get('search') || '');
   const [searchTerm, setSearchTerm] = useState<string>(searchParams.get('search') || '');
-  const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || 'All');
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>(searchParams.get('subcategory') || '');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(searchParams.get('category')?.split(',').filter(Boolean) || []);
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>(searchParams.get('subcategory')?.split(',').filter(Boolean) || []);
   const [selectedArtist, setSelectedArtist] = useState<string>(searchParams.get('artist') || '');
   const [sortBy, setSortBy] = useState<string>(searchParams.get('sortBy') || 'created_at');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>(searchParams.get('sortOrder') === 'ASC' ? 'ASC' : 'DESC');
@@ -67,14 +67,20 @@ const Gallery: React.FC = () => {
   const [page, setPage] = useState<number>(parseInt(searchParams.get('page') || '1', 10));
   const [itemsPerPage, setItemsPerPage] = useState<number>(parseInt(searchParams.get('limit') || '25', 10));
   const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } | null>(null);
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState<boolean>(false);
-  const [filterPinned, setFilterPinned] = useState<boolean>(false);
+  const [filterPinned, setFilterPinnedRaw] = useState<boolean>(() => {
+    try { return localStorage.getItem('galleryFilterPinned') === 'true'; } catch { return false; }
+  });
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState<boolean>(filterPinned);
+  const setFilterPinned = (pinned: boolean) => {
+    setFilterPinnedRaw(pinned);
+    try { localStorage.setItem('galleryFilterPinned', String(pinned)); } catch {}
+  };
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
   const isApplyingFiltersRef = useRef(false);
   
-  const [pendingSelectedCategory, setPendingSelectedCategory] = useState<string>('All');
-  const [pendingSelectedSubcategory, setPendingSelectedSubcategory] = useState<string>('');
+  const [pendingSelectedCategories, setPendingSelectedCategories] = useState<string[]>([]);
+  const [pendingSelectedSubcategories, setPendingSelectedSubcategories] = useState<string[]>([]);
   const [pendingSelectedMedium, setPendingSelectedMedium] = useState<string[]>([]);
   const [pendingInStockOnly, setPendingInStockOnly] = useState<boolean>(false);
   const [pendingMinPrice, setPendingMinPrice] = useState<string>('');
@@ -125,9 +131,16 @@ const Gallery: React.FC = () => {
 
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category');
-    if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
-      setSelectedCategory(categoryFromUrl);
+    const catsFromUrl = categoryFromUrl ? categoryFromUrl.split(',').filter(Boolean) : [];
+    if (JSON.stringify(catsFromUrl) !== JSON.stringify(selectedCategories)) {
+      setSelectedCategories(catsFromUrl);
       setPage(1);
+    }
+
+    const subFromUrl = searchParams.get('subcategory');
+    const subsFromUrl = subFromUrl ? subFromUrl.split(',').filter(Boolean) : [];
+    if (JSON.stringify(subsFromUrl) !== JSON.stringify(selectedSubcategories)) {
+      setSelectedSubcategories(subsFromUrl);
     }
     
     const artistFromUrl = searchParams.get('artist') || '';
@@ -141,7 +154,7 @@ const Gallery: React.FC = () => {
       setSearchInput(searchFromUrl);
       setSearchTerm(searchFromUrl);
     }
-  }, [searchParams, selectedCategory, selectedArtist, searchTerm]);
+  }, [searchParams]);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -163,8 +176,8 @@ const Gallery: React.FC = () => {
   }, [searchInput, searchTerm, searchParams, setSearchParams]);
 
   const fetchListingsWithFilters = async (filterValues: {
-    category?: string;
-    subcategory?: string;
+    categories?: string[];
+    subcategories?: string[];
     cognitoUsername?: string;
     minPrice: string;
     maxPrice: string;
@@ -184,15 +197,15 @@ const Gallery: React.FC = () => {
         sortOrder,
       };
       
-      const categoryToUse = filterValues.category !== undefined ? filterValues.category : selectedCategory;
-      const subcategoryToUse = filterValues.subcategory !== undefined ? filterValues.subcategory : selectedSubcategory;
+      const catsToUse = filterValues.categories !== undefined ? filterValues.categories : selectedCategories;
+      const subsToUse = filterValues.subcategories !== undefined ? filterValues.subcategories : selectedSubcategories;
       
-      if (categoryToUse !== 'All') {
-        filters.category = categoryToUse;
+      if (catsToUse.length > 0) {
+        filters.category = catsToUse.join(',');
       }
       
-      if (subcategoryToUse) {
-        filters.subcategory = subcategoryToUse;
+      if (subsToUse.length > 0) {
+        filters.subcategory = subsToUse.join(',');
       }
       
       if (searchTerm) {
@@ -281,7 +294,7 @@ const Gallery: React.FC = () => {
       inStockOnly,
       pageNum: page
     });
-  }, [page, itemsPerPage, selectedCategory, selectedSubcategory, selectedArtist, searchTerm, sortBy, sortOrder, minPrice, maxPrice, minYear, maxYear, selectedMedium, inStockOnly, user?.id]);
+  }, [page, itemsPerPage, selectedCategories, selectedSubcategories, selectedArtist, searchTerm, sortBy, sortOrder, minPrice, maxPrice, minYear, maxYear, selectedMedium, inStockOnly, user?.id]);
 
   useEffect(() => {
     if (!isApplyingFiltersRef.current) {
@@ -309,14 +322,15 @@ const Gallery: React.FC = () => {
 
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category');
-    const subcategoryFromUrl = searchParams.get('subcategory') || '';
-    
-    if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
-      setSelectedCategory(categoryFromUrl);
+    const catsFromUrl = categoryFromUrl ? categoryFromUrl.split(',').filter(Boolean) : [];
+    if (JSON.stringify(catsFromUrl) !== JSON.stringify(selectedCategories)) {
+      setSelectedCategories(catsFromUrl);
     }
-    
-    if (subcategoryFromUrl !== selectedSubcategory) {
-      setSelectedSubcategory(subcategoryFromUrl);
+
+    const subFromUrl = searchParams.get('subcategory');
+    const subsFromUrl = subFromUrl ? subFromUrl.split(',').filter(Boolean) : [];
+    if (JSON.stringify(subsFromUrl) !== JSON.stringify(selectedSubcategories)) {
+      setSelectedSubcategories(subsFromUrl);
     }
     
     const pageParam = searchParams.get('page');
@@ -340,11 +354,11 @@ const Gallery: React.FC = () => {
     }
   }, [searchParams]);
 
-  const categoryStructure = {
+  const categoryStructure: Record<string, string[]> = {
     'All': [],
     'Painting': ['Abstract', 'Figurative', 'Impressionism', 'Realism', 'Pop Art'],
     'Woodworking': ['Furniture', 'Decorative Items', 'Kitchenware', 'Outdoor', 'Storage', 'Lighting', 'Toys & Games'],
-    'Prints': ['GiclÃ©e', 'Screen Print', 'Lithograph', 'Offset', 'Digital Print', 'Fine Art Print'],
+    'Prints': ['Giclée', 'Screen Print', 'Lithograph', 'Offset', 'Digital Print', 'Fine Art Print'],
     'Other': []
   };
 
@@ -398,8 +412,8 @@ const Gallery: React.FC = () => {
 
   const hasActiveFilters = (): boolean => {
     return (
-      (selectedCategory !== 'All') ||
-      selectedSubcategory !== '' ||
+      selectedCategories.length > 0 ||
+      selectedSubcategories.length > 0 ||
       selectedArtist !== '' ||
       minPrice !== '' ||
       maxPrice !== '' ||
@@ -412,8 +426,8 @@ const Gallery: React.FC = () => {
 
   const getActiveFilterCount = (): number => {
     let count = 0;
-    if (selectedCategory !== 'All') count++;
-    if (selectedSubcategory !== '') count++;
+    count += selectedCategories.length;
+    count += selectedSubcategories.length;
     if (selectedArtist !== '') count++;
     if (minPrice !== '') count++;
     if (maxPrice !== '') count++;
@@ -427,8 +441,8 @@ const Gallery: React.FC = () => {
   const handleRemoveFilter = async (filterType: string, value?: string) => {
     isApplyingFiltersRef.current = true;
     
-    let newCategory = selectedCategory;
-    let newSubcategory = selectedSubcategory;
+    let newCategories = [...selectedCategories];
+    let newSubcategories = [...selectedSubcategories];
     let newArtist = selectedArtist;
     let newMinPrice = minPrice;
     let newMaxPrice = maxPrice;
@@ -439,22 +453,30 @@ const Gallery: React.FC = () => {
     
     switch (filterType) {
       case 'category':
-        newCategory = 'All';
-        newSubcategory = '';
-        setSelectedCategory('All');
-        setSelectedSubcategory('');
+        if (value) {
+          newCategories = newCategories.filter(c => c !== value);
+          newSubcategories = newSubcategories.filter(s => {
+            const catSubs = categoryStructure[value as keyof typeof categoryStructure] || [];
+            return !catSubs.includes(s);
+          });
+        } else {
+          newCategories = [];
+          newSubcategories = [];
+        }
+        setSelectedCategories(newCategories);
+        setSelectedSubcategories(newSubcategories);
         break;
       case 'subcategory':
-        newSubcategory = '';
-        setSelectedSubcategory('');
+        if (value) {
+          newSubcategories = newSubcategories.filter(s => s !== value);
+        } else {
+          newSubcategories = [];
+        }
+        setSelectedSubcategories(newSubcategories);
         break;
       case 'artist':
         newArtist = '';
         setSelectedArtist('');
-        const artistParams = new URLSearchParams(searchParams);
-        artistParams.delete('artist');
-        artistParams.set('page', '1');
-        setSearchParams(artistParams);
         break;
       case 'minPrice':
         newMinPrice = '';
@@ -485,10 +507,19 @@ const Gallery: React.FC = () => {
     }
     
     setPage(1);
-    
+
+    const newParams = new URLSearchParams();
+    newParams.set('page', '1');
+    newParams.set('limit', itemsPerPage.toString());
+    if (newCategories.length > 0) newParams.set('category', newCategories.join(','));
+    if (newSubcategories.length > 0) newParams.set('subcategory', newSubcategories.join(','));
+    if (newArtist) newParams.set('artist', newArtist);
+    if (searchTerm) newParams.set('search', searchTerm);
+    setSearchParams(newParams, { replace: true });
+
     await fetchListingsWithFilters({
-      category: newCategory,
-      subcategory: newSubcategory,
+      categories: newCategories,
+      subcategories: newSubcategories,
       cognitoUsername: newArtist,
       minPrice: newMinPrice,
       maxPrice: newMaxPrice,
@@ -500,8 +531,14 @@ const Gallery: React.FC = () => {
     });
   };
 
+  const drawerShift = filterPinned && filterDrawerOpen && !isSmallScreen;
+
   return (
-    <Box sx={{ bgcolor: 'background.default' }}>
+    <Box sx={{
+      bgcolor: 'background.default',
+      ml: drawerShift ? '380px' : 0,
+      transition: 'margin-left 225ms cubic-bezier(0, 0, 0.2, 1)',
+    }}>
       <SEO
         title="Art Gallery"
         description="Explore original paintings, woodworking, prints, and handmade art from talented independent artists. Browse and buy unique artwork worldwide."
@@ -523,8 +560,6 @@ const Gallery: React.FC = () => {
         width: '100%',
         px: { xs: 2, sm: 3, md: 4 },
         pb: { xs: 4, sm: 5, md: 6 },
-        ml: filterPinned && filterDrawerOpen && !isSmallScreen ? '380px' : 0,
-        transition: 'margin-left 225ms cubic-bezier(0, 0, 0.2, 1)',
       }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 2 }}>
           <TextField
@@ -553,8 +588,8 @@ const Gallery: React.FC = () => {
               variant="outlined"
               startIcon={<FilterIcon />}
               onClick={() => {
-                setPendingSelectedCategory(selectedCategory);
-                setPendingSelectedSubcategory(selectedSubcategory);
+                setPendingSelectedCategories([...selectedCategories]);
+                setPendingSelectedSubcategories([...selectedSubcategories]);
                 setPendingMinPrice(minPrice);
                 setPendingMaxPrice(maxPrice);
                 setPendingMinYear(minYear);
@@ -600,12 +635,12 @@ const Gallery: React.FC = () => {
 
         {hasActiveFilters() && (
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-            {selectedCategory !== 'All' && (
-              <Chip label={selectedCategory} onDelete={() => handleRemoveFilter('category')} color="primary" variant="outlined" size="small" />
-            )}
-            {selectedSubcategory && (
-              <Chip label={selectedSubcategory} onDelete={() => handleRemoveFilter('subcategory')} color="primary" variant="outlined" size="small" />
-            )}
+            {selectedCategories.map((cat) => (
+              <Chip key={cat} label={cat} onDelete={() => handleRemoveFilter('category', cat)} color="primary" variant="outlined" size="small" />
+            ))}
+            {selectedSubcategories.map((sub) => (
+              <Chip key={sub} label={sub} onDelete={() => handleRemoveFilter('subcategory', sub)} color="primary" variant="outlined" size="small" />
+            ))}
             {selectedArtist && (
               <Chip label={`Artist: ${selectedArtist}`} onDelete={() => handleRemoveFilter('artist')} color="primary" variant="outlined" size="small" />
             )}
@@ -630,8 +665,8 @@ const Gallery: React.FC = () => {
             <Chip
               label="Clear all"
               onClick={async () => {
-                setSelectedCategory('All');
-                setSelectedSubcategory('');
+                setSelectedCategories([]);
+                setSelectedSubcategories([]);
                 setSelectedArtist('');
                 setMinPrice('');
                 setMaxPrice('');
@@ -640,9 +675,13 @@ const Gallery: React.FC = () => {
                 setSelectedMedium([]);
                 setInStockOnly(false);
                 setPage(1);
+                const cleanParams = new URLSearchParams();
+                cleanParams.set('page', '1');
+                cleanParams.set('limit', itemsPerPage.toString());
+                setSearchParams(cleanParams, { replace: true });
                 isApplyingFiltersRef.current = true;
                 await fetchListingsWithFilters({
-                  category: 'All', subcategory: '', minPrice: '', maxPrice: '',
+                  categories: [], subcategories: [], minPrice: '', maxPrice: '',
                   minYear: '', maxYear: '', selectedMedium: [], inStockOnly: false, pageNum: 1,
                 });
               }}
@@ -659,7 +698,7 @@ const Gallery: React.FC = () => {
             {pagination ? (
               <>
                 Showing {((page - 1) * itemsPerPage) + 1} - {Math.min(page * itemsPerPage, pagination.total)} of {pagination.total} pieces
-                {selectedCategory !== 'All' && ` in ${selectedCategory}${selectedSubcategory ? ` > ${selectedSubcategory}` : ''}`}
+                {selectedCategories.length > 0 && ` in ${selectedCategories.join(', ')}${selectedSubcategories.length > 0 ? ` > ${selectedSubcategories.join(', ')}` : ''}`}
                 {selectedArtist && ` by artist ${selectedArtist}`}
                 {searchTerm && ` matching "${searchTerm}"`}
               </>
@@ -770,7 +809,8 @@ const Gallery: React.FC = () => {
           sx: {
             width: { xs: '100%', sm: 380 },
             bgcolor: 'background.default',
-            ...(filterPinned && !isSmallScreen ? { top: 0, height: '100vh' } : {}),
+            top: { xs: '100px', md: '120px' },
+            height: { xs: 'calc(100vh - 100px)', md: 'calc(100vh - 120px)' },
           },
         }}
       >
@@ -809,39 +849,46 @@ const Gallery: React.FC = () => {
                 <Typography variant="subtitle2" fontWeight={700} textTransform="uppercase" letterSpacing={0.5} fontSize="0.75rem">Category</Typography>
               </Box>
               <Stack spacing={0.5}>
-                {Object.keys(categoryStructure).map((category) => {
-                  const isSelected = pendingSelectedCategory === category && !pendingSelectedSubcategory;
+                {Object.keys(categoryStructure).filter(c => c !== 'All').map((category) => {
+                  const isSelected = pendingSelectedCategories.includes(category);
                   const subcategories = categoryStructure[category as keyof typeof categoryStructure];
                   return (
                     <Box key={category}>
                       <Box
                         onClick={() => {
-                          setPendingSelectedCategory(category === 'All' ? 'All' : category);
-                          setPendingSelectedSubcategory('');
+                          setPendingSelectedCategories((prev) =>
+                            prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]
+                          );
+                          if (isSelected) {
+                            setPendingSelectedSubcategories((prev) =>
+                              prev.filter(s => !subcategories.includes(s))
+                            );
+                          }
                         }}
                         sx={{
                           px: 2, py: 1, borderRadius: 1.5, cursor: 'pointer',
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          bgcolor: isSelected ? (theme) => alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                          bgcolor: isSelected ? (th) => alpha(th.palette.primary.main, 0.1) : 'transparent',
                           color: isSelected ? 'primary.main' : 'text.primary',
-                          fontWeight: isSelected ? 600 : 400,
                           transition: 'all 0.15s ease',
-                          '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06) },
+                          '&:hover': { bgcolor: (th) => alpha(th.palette.primary.main, 0.06) },
                         }}
                       >
                         <Typography variant="body2" fontWeight={isSelected ? 600 : 400}>{category}</Typography>
                         {isSelected && <CheckIcon sx={{ fontSize: 18, color: 'primary.main' }} />}
                       </Box>
-                      {subcategories.length > 0 && pendingSelectedCategory === category && (
+                      {subcategories.length > 0 && isSelected && (
                         <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ pl: 2, pt: 1, pb: 0.5 }}>
                           {subcategories.map((sub) => (
                             <Chip
                               key={sub}
                               label={sub}
                               size="small"
-                              onClick={() => setPendingSelectedSubcategory(pendingSelectedSubcategory === sub ? '' : sub)}
-                              color={pendingSelectedSubcategory === sub ? 'primary' : 'default'}
-                              variant={pendingSelectedSubcategory === sub ? 'filled' : 'outlined'}
+                              onClick={() => setPendingSelectedSubcategories((prev) =>
+                                prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
+                              )}
+                              color={pendingSelectedSubcategories.includes(sub) ? 'primary' : 'default'}
+                              variant={pendingSelectedSubcategories.includes(sub) ? 'filled' : 'outlined'}
                               sx={{ fontSize: '0.7rem', height: 26 }}
                             />
                           ))}
@@ -959,16 +1006,16 @@ const Gallery: React.FC = () => {
               variant="outlined"
               startIcon={<ClearIcon />}
               onClick={async () => {
-                setPendingSelectedCategory('All');
-                setPendingSelectedSubcategory('');
+                setPendingSelectedCategories([]);
+                setPendingSelectedSubcategories([]);
                 setPendingMinPrice('');
                 setPendingMaxPrice('');
                 setPendingMinYear('');
                 setPendingMaxYear('');
                 setPendingSelectedMedium([]);
                 setPendingInStockOnly(false);
-                setSelectedCategory('All');
-                setSelectedSubcategory('');
+                setSelectedCategories([]);
+                setSelectedSubcategories([]);
                 setMinPrice('');
                 setMaxPrice('');
                 setMinYear('');
@@ -976,10 +1023,14 @@ const Gallery: React.FC = () => {
                 setSelectedMedium([]);
                 setInStockOnly(false);
                 setPage(1);
-                setFilterDrawerOpen(false);
+                if (!filterPinned) setFilterDrawerOpen(false);
+                const cleanParams = new URLSearchParams();
+                cleanParams.set('page', '1');
+                cleanParams.set('limit', itemsPerPage.toString());
+                setSearchParams(cleanParams, { replace: true });
                 isApplyingFiltersRef.current = true;
                 await fetchListingsWithFilters({
-                  category: 'All', subcategory: '', minPrice: '', maxPrice: '',
+                  categories: [], subcategories: [], minPrice: '', maxPrice: '',
                   minYear: '', maxYear: '', selectedMedium: [], inStockOnly: false, pageNum: 1,
                 });
               }}
@@ -993,8 +1044,8 @@ const Gallery: React.FC = () => {
               onClick={async () => {
                 isApplyingFiltersRef.current = true;
                 const newFilters = {
-                  category: pendingSelectedCategory,
-                  subcategory: pendingSelectedSubcategory,
+                  categories: pendingSelectedCategories,
+                  subcategories: pendingSelectedSubcategories,
                   minPrice: pendingMinPrice || '',
                   maxPrice: pendingMaxPrice || '',
                   minYear: pendingMinYear || '',
@@ -1003,8 +1054,8 @@ const Gallery: React.FC = () => {
                   inStockOnly: pendingInStockOnly,
                   pageNum: 1,
                 };
-                setSelectedCategory(pendingSelectedCategory);
-                setSelectedSubcategory(pendingSelectedSubcategory);
+                setSelectedCategories([...pendingSelectedCategories]);
+                setSelectedSubcategories([...pendingSelectedSubcategories]);
                 setMinPrice(newFilters.minPrice);
                 setMaxPrice(newFilters.maxPrice);
                 setMinYear(newFilters.minYear);
@@ -1012,7 +1063,15 @@ const Gallery: React.FC = () => {
                 setSelectedMedium(newFilters.selectedMedium.length > 0 ? [...newFilters.selectedMedium] : []);
                 setInStockOnly(newFilters.inStockOnly);
                 setPage(1);
-                setFilterDrawerOpen(false);
+                if (!filterPinned) setFilterDrawerOpen(false);
+                const newParams = new URLSearchParams();
+                newParams.set('page', '1');
+                newParams.set('limit', itemsPerPage.toString());
+                if (pendingSelectedCategories.length > 0) newParams.set('category', pendingSelectedCategories.join(','));
+                if (pendingSelectedSubcategories.length > 0) newParams.set('subcategory', pendingSelectedSubcategories.join(','));
+                if (searchTerm) newParams.set('search', searchTerm);
+                if (selectedArtist) newParams.set('artist', selectedArtist);
+                setSearchParams(newParams, { replace: true });
                 await fetchListingsWithFilters(newFilters);
               }}
               sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, py: 1.25 }}

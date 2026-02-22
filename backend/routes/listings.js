@@ -89,13 +89,25 @@ router.get('/', async (req, res) => {
     const params = [];
     
     if (category) {
-      baseQuery += ' AND l.category = ?';
-      params.push(String(category));
+      const cats = String(category).split(',').map(c => c.trim()).filter(Boolean);
+      if (cats.length === 1) {
+        baseQuery += ' AND l.category = ?';
+        params.push(cats[0]);
+      } else if (cats.length > 1) {
+        baseQuery += ` AND l.category IN (${cats.map(() => '?').join(',')})`;
+        params.push(...cats);
+      }
     }
     
     if (subcategory) {
-      baseQuery += ' AND l.subcategory = ?';
-      params.push(String(subcategory));
+      const subs = String(subcategory).split(',').map(s => s.trim()).filter(Boolean);
+      if (subs.length === 1) {
+        baseQuery += ' AND l.subcategory = ?';
+        params.push(subs[0]);
+      } else if (subs.length > 1) {
+        baseQuery += ` AND l.subcategory IN (${subs.map(() => '?').join(',')})`;
+        params.push(...subs);
+      }
     }
     
     // Only apply default "active" filter if not fetching own listings
@@ -190,13 +202,25 @@ router.get('/', async (req, res) => {
     const countParams = [];
     
     if (category) {
-      countQuery += ' AND l.category = ?';
-      countParams.push(String(category));
+      const cats = String(category).split(',').map(c => c.trim()).filter(Boolean);
+      if (cats.length === 1) {
+        countQuery += ' AND l.category = ?';
+        countParams.push(cats[0]);
+      } else if (cats.length > 1) {
+        countQuery += ` AND l.category IN (${cats.map(() => '?').join(',')})`;
+        countParams.push(...cats);
+      }
     }
     
     if (subcategory) {
-      countQuery += ' AND l.subcategory = ?';
-      countParams.push(String(subcategory));
+      const subs = String(subcategory).split(',').map(s => s.trim()).filter(Boolean);
+      if (subs.length === 1) {
+        countQuery += ' AND l.subcategory = ?';
+        countParams.push(subs[0]);
+      } else if (subs.length > 1) {
+        countQuery += ` AND l.subcategory IN (${subs.map(() => '?').join(',')})`;
+        countParams.push(...subs);
+      }
     }
     
     // Only apply default "active" filter if not fetching own listings
