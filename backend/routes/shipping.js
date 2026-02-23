@@ -250,7 +250,7 @@ router.post('/label', async (req, res) => {
       return res.status(503).json({ error: 'Shipping is not configured' });
     }
 
-    const { order_id, rate_id, cognito_username } = req.body;
+    const { order_id, rate_id, cognito_username, rate_amount, carrier } = req.body;
     if (!order_id || !rate_id || !cognito_username) {
       return res.status(400).json({ error: 'order_id, rate_id, and cognito_username are required' });
     }
@@ -285,9 +285,12 @@ router.post('/label', async (req, res) => {
         tracking_number = ?,
         tracking_url = ?,
         label_url = ?,
-        shippo_transaction_id = ?
+        shippo_transaction_id = ?,
+        shipping_cost = COALESCE(?, shipping_cost),
+        shipping_carrier = ?,
+        shipped_at = NOW()
        WHERE id = ?`,
-      [result.trackingNumber, result.trackingUrl, result.labelUrl, result.transactionId, order_id]
+      [result.trackingNumber, result.trackingUrl, result.labelUrl, result.transactionId, rate_amount || null, carrier || null, order_id]
     );
 
     if (order.buyer_id) {
@@ -344,6 +347,95 @@ router.get('/track/:trackingNumber', async (req, res) => {
       error: 'Failed to get tracking status',
       message: error.message,
     });
+  }
+});
+
+/**
+ * GET /shipping/track-order/:orderId
+ * Detailed tracking for an order — returns full Shippo tracking history
+ */
+router.get('/track-order/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const [orders] = await pool.execute(
+      'SELECT tracking_number, shipping_carrier, tracking_status, tracking_last_updated, shipped_at, delivered_at, status FROM orders WHERE id = ?',
+      [orderId]
+    );
+    if (orders.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    const order = orders[0];
+    if (!order.tracking_number) {
+      return res.json({ tracking: null, message: 'No tracking information available' });
+    }
+
+    const carrier = order.shipping_carrier || 'usps';
+    let trackingData = null;
+
+    if (shippoConfig.isConfigured) {
+      try {
+        const body = { carrier, tracking_number: order.tracking_number };
+        const opts = {
+          method: 'POST',
+          headers: {
+            Authorization: `ShippoToken ${shippoConfig.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        };
+        const response = await fetch('https://api.goshippo.com/tracks', opts);
+        const data = await response.json();
+
+        trackingData = {
+          status: data.tracking_status?.status || order.tracking_status || 'UNKNOWN',
+          statusDetails: data.tracking_status?.status_details || '',
+          statusDate: data.tracking_status?.status_date || null,
+          location: data.tracking_status?.location || null,
+          eta: data.eta || null,
+          trackingUrl: data.tracking_url_provider || order.tracking_url || null,
+          carrier: carrier,
+          trackingNumber: order.tracking_number,
+          history: (data.tracking_history || []).map(event => ({
+            status: event.status,
+            statusDetails: event.status_details || '',
+            statusDate: event.status_date,
+            location: event.location,
+          })),
+        };
+
+        if (trackingData.status !== order.tracking_status) {
+          await pool.execute(
+            'UPDATE orders SET tracking_status = ?, tracking_last_updated = NOW() WHERE id = ?',
+            [trackingData.status, orderId]
+          );
+        }
+      } catch (trackErr) {
+        console.warn('Shippo tracking fetch failed:', trackErr.message);
+      }
+    }
+
+    if (!trackingData) {
+      trackingData = {
+        status: order.tracking_status || 'UNKNOWN',
+        statusDetails: '',
+        statusDate: order.tracking_last_updated || order.shipped_at,
+        location: null,
+        eta: null,
+        trackingUrl: null,
+        carrier: carrier,
+        trackingNumber: order.tracking_number,
+        history: [],
+      };
+    }
+
+    trackingData.shippedAt = order.shipped_at;
+    trackingData.deliveredAt = order.delivered_at;
+    trackingData.orderStatus = order.status;
+
+    res.json({ tracking: trackingData });
+  } catch (error) {
+    console.error('Track order error:', error);
+    res.status(500).json({ error: 'Failed to get tracking', message: error.message });
   }
 });
 

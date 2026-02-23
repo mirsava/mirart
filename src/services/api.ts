@@ -84,9 +84,15 @@ export interface Order {
   return_requested_at?: string;
   shipping_address?: string;
   shipping_cost?: number;
+  shippo_rate_id?: string;
+  shipping_carrier?: string;
   tracking_number?: string;
   tracking_url?: string;
+  tracking_status?: string;
+  tracking_last_updated?: string;
   label_url?: string;
+  shipped_at?: string;
+  delivered_at?: string;
   payment_intent_id?: string;
   return_days?: number | null;
   returns_info?: string | null;
@@ -409,16 +415,20 @@ class ApiService {
     });
   }
 
-  async purchaseShippingLabel(orderId: number, rateId: string, cognitoUsername: string): Promise<{ label_url: string; tracking_number: string; tracking_url: string }> {
+  async purchaseShippingLabel(orderId: number, rateId: string, cognitoUsername: string, rateAmount?: string, carrier?: string): Promise<{ label_url: string; tracking_number: string; tracking_url: string }> {
     return this.request('/shipping/label', {
       method: 'POST',
-      body: JSON.stringify({ order_id: orderId, rate_id: rateId, cognito_username: cognitoUsername }),
+      body: JSON.stringify({ order_id: orderId, rate_id: rateId, cognito_username: cognitoUsername, rate_amount: rateAmount, carrier }),
     });
   }
 
   async getShippingTracking(trackingNumber: string, carrier?: string): Promise<{ status: string; url?: string }> {
     const params = carrier ? `?carrier=${encodeURIComponent(carrier)}` : '';
     return this.request(`/shipping/track/${encodeURIComponent(trackingNumber)}${params}`);
+  }
+
+  async getOrderTracking(orderId: number): Promise<{ tracking: any }> {
+    return this.request(`/shipping/track-order/${orderId}`);
   }
 
   async isShippingConfigured(): Promise<{ configured: boolean }> {

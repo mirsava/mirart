@@ -51,7 +51,7 @@ export async function createShipmentAndGetRates(addressFrom, addressTo, parcels)
   const shipment = await shippoRequest('POST', '/shipments', body);
   return {
     shipmentId: shipment.object_id,
-    rates: shipment.rates?.results || [],
+    rates: shipment.rates || [],
   };
 }
 

@@ -56,6 +56,7 @@ const Orders: React.FC = () => {
   const [labelRates, setLabelRates] = useState<Array<{ object_id: string; provider: string; servicelevel: string; amount: string; estimated_days?: number }>>([]);
   const [labelLoading, setLabelLoading] = useState(false);
   const [labelPurchasing, setLabelPurchasing] = useState(false);
+  const [selectedLabelRate, setSelectedLabelRate] = useState<{ object_id: string; provider: string; servicelevel: string; amount: string; estimated_days?: number } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [purchasePage, setPurchasePage] = useState(1);
@@ -127,17 +128,30 @@ const Orders: React.FC = () => {
     if (!orderIdParam || loading) return;
     const oid = parseInt(orderIdParam, 10);
     if (isNaN(oid)) return;
-    const inPurchases = purchases.some((o) => o.id === oid);
-    const inSales = sales.some((o) => o.id === oid);
-    if (inPurchases) setTabValue(0);
-    else if (inSales) setTabValue(1);
-    setHighlightedOrderId(oid);
+    const purchaseIndex = purchases.findIndex((o) => o.id === oid);
+    const salesIndex = sales.findIndex((o) => o.id === oid);
+
+    setStatusFilter('all');
+    setSearchTerm('');
+
+    if (purchaseIndex >= 0) {
+      setTabValue(0);
+      setPurchasePage(Math.floor(purchaseIndex / ordersPerPage) + 1);
+      setHighlightedOrderId(oid);
+    } else if (salesIndex >= 0) {
+      setTabValue(1);
+      setSalesPage(Math.floor(salesIndex / ordersPerPage) + 1);
+      setHighlightedOrderId(oid);
+    } else {
+      return;
+    }
+
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('order');
       return next;
     }, { replace: true });
-  }, [orderIdParam, loading, purchases, sales, setSearchParams]);
+  }, [orderIdParam, loading, purchases, sales, setSearchParams, ordersPerPage]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -178,6 +192,7 @@ const Orders: React.FC = () => {
     setLabelOrder(order);
     setLabelDialogOpen(true);
     setLabelRates([]);
+    setSelectedLabelRate(null);
     setLabelLoading(true);
     setError(null);
     try {
@@ -193,10 +208,11 @@ const Orders: React.FC = () => {
 
   const handlePurchaseLabel = async (rateId: string) => {
     if (!user?.id || !labelOrder) return;
+    const rate = selectedLabelRate || labelRates.find(r => r.object_id === rateId);
     setLabelPurchasing(true);
     setError(null);
     try {
-      const result = await apiService.purchaseShippingLabel(labelOrder.id, rateId, user.id);
+      const result = await apiService.purchaseShippingLabel(labelOrder.id, rateId, user.id, rate?.amount, rate?.provider?.toLowerCase());
       enqueueSnackbar('Label purchased! Print and attach to package.', { variant: 'success' });
       setLabelDialogOpen(false);
       setLabelOrder(null);
@@ -479,7 +495,7 @@ const Orders: React.FC = () => {
         </Paper>
 
         <Dialog open={labelDialogOpen} onClose={() => !labelPurchasing && setLabelDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Buy shipping label</DialogTitle>
+          <DialogTitle>{selectedLabelRate ? 'Confirm Label Purchase' : 'Select Shipping Rate'}</DialogTitle>
           <DialogContent>
             {labelOrder && (
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -490,6 +506,25 @@ const Orders: React.FC = () => {
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>
+            ) : selectedLabelRate ? (
+              <Box>
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  You are about to purchase a shipping label. This action cannot be undone.
+                </Alert>
+                <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    {selectedLabelRate.provider} — {selectedLabelRate.servicelevel}
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700} color="primary.main" sx={{ my: 1 }}>
+                    ${parseFloat(selectedLabelRate.amount).toFixed(2)}
+                  </Typography>
+                  {selectedLabelRate.estimated_days && (
+                    <Typography variant="body2" color="text.secondary">
+                      Estimated delivery: {selectedLabelRate.estimated_days} business day{selectedLabelRate.estimated_days !== 1 ? 's' : ''}
+                    </Typography>
+                  )}
+                </Paper>
+              </Box>
             ) : labelRates.length === 0 ? (
               <Alert severity="info">
                 No shipping rates available. Make sure your shipping address is set in Profile Settings and the listing has dimensions.
@@ -499,12 +534,12 @@ const Orders: React.FC = () => {
                 {labelRates.map((rate) => (
                   <ListItemButton
                     key={rate.object_id}
-                    onClick={() => handlePurchaseLabel(rate.object_id)}
+                    onClick={() => setSelectedLabelRate(rate)}
                     disabled={labelPurchasing}
                   >
                     <ListItemText
-                      primary={`${rate.provider} - ${rate.servicelevel}`}
-                      secondary={`$${rate.amount}${rate.estimated_days ? ` • ${rate.estimated_days} days` : ''}`}
+                      primary={`${rate.provider} — ${rate.servicelevel}`}
+                      secondary={`$${parseFloat(rate.amount).toFixed(2)}${rate.estimated_days ? ` • ${rate.estimated_days} day${rate.estimated_days !== 1 ? 's' : ''}` : ''}`}
                     />
                   </ListItemButton>
                 ))}
@@ -512,9 +547,24 @@ const Orders: React.FC = () => {
             )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setLabelDialogOpen(false)} disabled={labelPurchasing}>
-              Cancel
-            </Button>
+            {selectedLabelRate ? (
+              <>
+                <Button onClick={() => setSelectedLabelRate(null)} disabled={labelPurchasing}>
+                  Back
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() => handlePurchaseLabel(selectedLabelRate.object_id)}
+                  disabled={labelPurchasing}
+                >
+                  {labelPurchasing ? 'Purchasing...' : 'Confirm Purchase'}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setLabelDialogOpen(false)} disabled={labelPurchasing}>
+                Cancel
+              </Button>
+            )}
           </DialogActions>
         </Dialog>
 

@@ -281,12 +281,12 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
           </Tooltip>
         </Box>
       </CardContent>
-      <CardActions sx={{ p: 2, pt: 0, flexWrap: 'wrap', gap: 0.5 }}>
+      <CardActions sx={{ p: 2, pt: 0, flexWrap: 'nowrap', gap: 0.75, alignItems: 'center' }}>
         <Button
           size="small"
           variant="outlined"
           onClick={handleViewDetails}
-          sx={{ flexGrow: 1 }}
+          sx={{ flex: 1, minWidth: 0, px: 1.25, whiteSpace: 'nowrap' }}
         >
           View Details
         </Button>
@@ -305,8 +305,8 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
                 size="small"
                 variant="contained"
                 color="primary"
-                startIcon={<ShoppingCartIcon />}
                 onClick={handleBuyNow}
+                sx={{ minWidth: 0, px: 1.25, whiteSpace: 'nowrap' }}
               >
                 Buy Now
               </Button>
@@ -316,8 +316,8 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
                 size="small"
                 variant="contained"
                 color="secondary"
-                startIcon={<EmailIcon />}
                 onClick={handleContactSeller}
+                sx={{ minWidth: 0, px: 1.25, whiteSpace: 'nowrap' }}
               >
                 Contact Seller
               </Button>

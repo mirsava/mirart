@@ -13,7 +13,9 @@ router.post('/', async (req, res) => {
       listing_id,
       quantity = 1,
       shipping_address,
-      payment_intent_id
+      payment_intent_id,
+      shippo_rate_id,
+      shipping_cost
     } = req.body;
 
     if (!cognito_username) {
@@ -72,8 +74,9 @@ router.post('/', async (req, res) => {
       `INSERT INTO orders (
         order_number, buyer_id, seller_id, listing_id, quantity,
         unit_price, total_price, platform_fee, artist_earnings,
-        status, shipping_address, payment_intent_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?)`,
+        status, shipping_address, payment_intent_id,
+        shippo_rate_id, shipping_cost
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?)`,
       [
         order_number,
         buyer_id,
@@ -85,7 +88,9 @@ router.post('/', async (req, res) => {
         platform_fee,
         artist_earnings,
         shipping_address || null,
-        payment_intent_id || null
+        payment_intent_id || null,
+        shippo_rate_id || null,
+        shipping_cost ? parseFloat(shipping_cost) : 0
       ]
     );
 
@@ -220,7 +225,8 @@ router.get('/user/:cognitoUsername', async (req, res) => {
       unit_price: parseFloat(order.unit_price),
       total_price: parseFloat(order.total_price),
       platform_fee: parseFloat(order.platform_fee),
-      artist_earnings: parseFloat(order.artist_earnings)
+      artist_earnings: parseFloat(order.artist_earnings),
+      shipping_cost: order.shipping_cost ? parseFloat(order.shipping_cost) : 0
     })));
   } catch (error) {
     console.error('Error fetching orders:', error);

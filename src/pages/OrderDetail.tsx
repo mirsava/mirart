@@ -10,12 +10,20 @@ import {
   Divider,
   CircularProgress,
   Alert,
+  Stepper,
+  Step,
+  StepLabel,
+  StepConnector,
 } from '@mui/material';
 import {
   Print as PrintIcon,
   ArrowBack as BackIcon,
   LocalShipping as ShippingIcon,
   Receipt as ReceiptIcon,
+  Inventory as PackageIcon,
+  FlightTakeoff as TransitIcon,
+  CheckCircle as DeliveredIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -247,25 +255,73 @@ const OrderDetail: React.FC = () => {
               <Divider sx={{ mb: 3 }} />
               <Grid container spacing={3}>
                 {order.tracking_number && (
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                       <ShippingIcon fontSize="small" color="primary" />
-                      <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 600 }}>Tracking</Typography>
+                      <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 600 }}>Shipment Tracking</Typography>
                     </Box>
-                    {order.tracking_url ? (
-                      <Typography
-                        variant="body2"
-                        component="a"
-                        href={order.tracking_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                      >
-                        {order.tracking_number}
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2">{order.tracking_number}</Typography>
-                    )}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                      {order.shipping_carrier && (
+                        <Chip label={order.shipping_carrier.toUpperCase()} size="small" variant="outlined" />
+                      )}
+                      {order.tracking_url ? (
+                        <Typography
+                          variant="body2"
+                          component="a"
+                          href={order.tracking_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                        >
+                          {order.tracking_number}
+                        </Typography>
+                      ) : (
+                        <Typography variant="body2">{order.tracking_number}</Typography>
+                      )}
+                      {order.label_url && (
+                        <Button size="small" variant="outlined" startIcon={<DownloadIcon sx={{ fontSize: 14 }} />} href={order.label_url} target="_blank" rel="noopener">
+                          Label
+                        </Button>
+                      )}
+                    </Box>
+                    {(() => {
+                      const trackingSteps = ['Label Created', 'In Transit', 'Out for Delivery', 'Delivered'];
+                      const statusMap: Record<string, number> = { PRE_TRANSIT: 0, TRANSIT: 1, OUT_FOR_DELIVERY: 2, DELIVERED: 3 };
+                      const activeStep = statusMap[order.tracking_status || ''] ?? (order.status === 'delivered' ? 3 : order.status === 'shipped' ? 0 : -1);
+                      return (
+                        <Stepper activeStep={activeStep} alternativeLabel connector={<StepConnector />} sx={{ mb: 2 }}>
+                          {trackingSteps.map((label, idx) => (
+                            <Step key={label} completed={idx <= activeStep}>
+                              <StepLabel
+                                StepIconComponent={() => {
+                                  const icons = [<PackageIcon />, <TransitIcon />, <ShippingIcon />, <DeliveredIcon />];
+                                  const done = idx <= activeStep;
+                                  return (
+                                    <Box sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: done ? 'primary.main' : 'action.disabledBackground', color: done ? 'primary.contrastText' : 'text.disabled' }}>
+                                      {React.cloneElement(icons[idx], { sx: { fontSize: 18 } })}
+                                    </Box>
+                                  );
+                                }}
+                              >
+                                <Typography variant="caption" sx={{ fontWeight: idx <= activeStep ? 600 : 400 }}>{label}</Typography>
+                              </StepLabel>
+                            </Step>
+                          ))}
+                        </Stepper>
+                      );
+                    })()}
+                    <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                      {order.shipped_at && (
+                        <Typography variant="caption" color="text.secondary">
+                          Shipped: {new Date(order.shipped_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </Typography>
+                      )}
+                      {order.delivered_at && (
+                        <Typography variant="caption" color="success.main">
+                          Delivered: {new Date(order.delivered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </Typography>
+                      )}
+                    </Box>
                   </Grid>
                 )}
                 {order.return_status && (

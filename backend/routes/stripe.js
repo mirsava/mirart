@@ -231,6 +231,21 @@ router.post('/create-checkout-session', async (req, res) => {
           quantity: 1,
         });
       }
+      const shippingCostStr = metadata?.shipping_cost;
+      if (shippingCostStr && parseFloat(shippingCostStr) > 0) {
+        const shippingCents = Math.round(parseFloat(shippingCostStr) * 100);
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: { name: 'Shipping' },
+            unit_amount: shippingCents,
+          },
+          quantity: 1,
+        });
+        if (artworkTransferData) {
+          artworkTransferData.amount += shippingCents;
+        }
+      }
     }
 
     const sessionMetadata = {};

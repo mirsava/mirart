@@ -178,16 +178,50 @@ const OrderCard: React.FC<OrderCardProps> = ({
               Ship to: {order.shipping_address.split('\n').slice(0, 2).join(', ')}
             </Typography>
           )}
-          {order.tracking_number && (
-            <Typography variant="caption" color="primary">
-              {order.tracking_url ? (
-                <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: 'inherit' }}>
-                  Tracking: {order.tracking_number}
-                </a>
-              ) : (
-                `Tracking: ${order.tracking_number}`
+          {order.shipping_address && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
+              <ShippingIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+              <Typography
+                variant="caption"
+                color={Number(order.shipping_cost || 0) > 0 ? 'text.secondary' : 'success.main'}
+              >
+                {Number(order.shipping_cost || 0) > 0
+                  ? `Shipping: $${Number(order.shipping_cost).toFixed(2)}`
+                  : 'Shipping: FREE'}
+              </Typography>
+              {order.shipping_carrier && !order.tracking_number && (
+                <Chip
+                  label={order.shipping_carrier.toUpperCase()}
+                  size="small"
+                  variant="outlined"
+                  sx={{ height: 20, fontSize: '0.65rem' }}
+                />
               )}
-            </Typography>
+            </Box>
+          )}
+          {order.tracking_number && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
+              {order.shipping_carrier && (
+                <Chip label={order.shipping_carrier.toUpperCase()} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+              )}
+              {order.tracking_status && (
+                <Chip
+                  label={order.tracking_status.replace(/_/g, ' ')}
+                  size="small"
+                  color={order.tracking_status === 'DELIVERED' ? 'success' : order.tracking_status === 'TRANSIT' ? 'info' : 'default'}
+                  sx={{ height: 20, fontSize: '0.65rem' }}
+                />
+              )}
+              <Typography variant="caption" color="primary">
+                {order.tracking_url ? (
+                  <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: 'inherit' }}>
+                    {order.tracking_number}
+                  </a>
+                ) : (
+                  order.tracking_number
+                )}
+              </Typography>
+            </Box>
           )}
           {type === 'sale' && order.return_status === 'requested' && order.return_reason && (
             <Typography variant="caption" color="warning.main">

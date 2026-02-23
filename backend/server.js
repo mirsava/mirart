@@ -18,6 +18,7 @@ import commentsRouter from './routes/comments.js';
 import subscriptionsRouter from './routes/subscriptions.js';
 import stripeRouter from './routes/stripe.js';
 import shippingRouter from './routes/shipping.js';
+import { stripe } from './config/stripe.js';
 import announcementsRouter from './routes/announcements.js';
 import notificationsRouter from './routes/notifications.js';
 import supportChatRouter from './routes/supportChat.js';
@@ -260,6 +261,30 @@ app.listen(PORT, async () => {
   }
 
   try {
+    const trackingCols = [
+      { name: 'shipping_carrier', sql: "ADD COLUMN shipping_carrier VARCHAR(50) NULL" },
+      { name: 'tracking_status', sql: "ADD COLUMN tracking_status VARCHAR(50) NULL" },
+      { name: 'tracking_last_updated', sql: "ADD COLUMN tracking_last_updated TIMESTAMP NULL" },
+      { name: 'shipped_at', sql: "ADD COLUMN shipped_at TIMESTAMP NULL" },
+      { name: 'delivered_at', sql: "ADD COLUMN delivered_at TIMESTAMP NULL" },
+      { name: 'shippo_transaction_id', sql: "ADD COLUMN shippo_transaction_id VARCHAR(100) NULL" },
+      { name: 'shippo_rate_id', sql: "ADD COLUMN shippo_rate_id VARCHAR(100) NULL" },
+    ];
+    for (const { name, sql } of trackingCols) {
+      const [tc] = await pool.execute(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'orders' AND COLUMN_NAME = ?",
+        [process.env.DB_NAME || 'mirart', name]
+      );
+      if (tc.length === 0) {
+        await pool.execute(`ALTER TABLE orders ${sql}`);
+        console.log(`[Startup] Added ${name} column to orders`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Startup] Tracking columns migration:', err?.message || err);
+  }
+
+  try {
     const [ratingCol] = await pool.execute(
       "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listing_comments' AND COLUMN_NAME = 'rating'",
       [process.env.DB_NAME || 'mirart']
@@ -416,6 +441,93 @@ app.listen(PORT, async () => {
     console.log(`ERROR: Subscriptions router not properly initialized!`);
   }
   console.log(`\n`);
+
+  // Tracking poll: check shipped orders every 30 minutes for delivery status
+  const TRACKING_POLL_INTERVAL = 30 * 60 * 1000;
+  async function pollShippedOrders() {
+    try {
+      const { shippoConfig } = await import('./config/shippo.js');
+      if (!shippoConfig.isConfigured) return;
+
+      const [orders] = await pool.execute(
+        "SELECT id, tracking_number, shipping_carrier, tracking_status, buyer_id, seller_id, order_number, payment_intent_id FROM orders WHERE status = 'shipped' AND tracking_number IS NOT NULL"
+      );
+      if (orders.length === 0) return;
+
+      const { createNotification } = await import('./services/notificationService.js');
+
+      for (const order of orders) {
+        try {
+          const carrier = order.shipping_carrier || 'usps';
+          const res = await fetch('https://api.goshippo.com/tracks', {
+            method: 'POST',
+            headers: {
+              Authorization: `ShippoToken ${shippoConfig.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ carrier, tracking_number: order.tracking_number }),
+          });
+          const data = await res.json();
+          const newStatus = data.tracking_status?.status || 'UNKNOWN';
+          const oldStatus = order.tracking_status || '';
+
+          if (newStatus !== oldStatus) {
+            await pool.execute(
+              'UPDATE orders SET tracking_status = ?, tracking_last_updated = NOW() WHERE id = ?',
+              [newStatus, order.id]
+            );
+
+            if (newStatus === 'TRANSIT' && oldStatus !== 'TRANSIT') {
+              await createNotification({ userId: order.buyer_id, type: 'order', title: 'Order in transit', body: `Order ${order.order_number} is on its way.`, link: `/orders?order=${order.id}`, referenceId: order.id, severity: 'info' }).catch(() => {});
+            }
+            if (newStatus === 'DELIVERED') {
+              await pool.execute(
+                "UPDATE orders SET status = 'delivered', delivered_at = NOW() WHERE id = ?",
+                [order.id]
+              );
+
+              // Auto-capture Stripe payment and transfer to seller
+              if (order.payment_intent_id && stripe) {
+                try {
+                  const pi = await stripe.paymentIntents.retrieve(order.payment_intent_id);
+                  if (pi.status === 'requires_capture') {
+                    await stripe.paymentIntents.capture(order.payment_intent_id);
+                  }
+                  if (pi.transfer_group) {
+                    const [orderRow] = await pool.execute('SELECT artist_earnings, seller_id FROM orders WHERE id = ?', [order.id]);
+                    if (orderRow.length > 0) {
+                      const [seller] = await pool.execute('SELECT stripe_account_id FROM users WHERE id = ?', [orderRow[0].seller_id]);
+                      if (seller.length > 0 && seller[0].stripe_account_id) {
+                        await stripe.transfers.create({
+                          amount: Math.round(parseFloat(orderRow[0].artist_earnings) * 100),
+                          currency: 'usd',
+                          destination: seller[0].stripe_account_id,
+                          transfer_group: pi.transfer_group,
+                        });
+                      }
+                    }
+                  }
+                } catch (stripeErr) {
+                  console.warn(`[Tracking] Stripe auto-capture failed for order ${order.id}:`, stripeErr.message);
+                }
+              }
+
+              await createNotification({ userId: order.buyer_id, type: 'order', title: 'Order delivered', body: `Order ${order.order_number} has been delivered.`, link: `/orders?order=${order.id}`, referenceId: order.id, severity: 'success' }).catch(() => {});
+              await createNotification({ userId: order.seller_id, type: 'order', title: 'Order delivered', body: `Order ${order.order_number} has been delivered. Payment released.`, link: `/orders?order=${order.id}`, referenceId: order.id, severity: 'success' }).catch(() => {});
+            }
+          }
+        } catch (orderErr) {
+          console.warn(`[Tracking] Failed to poll order ${order.id}:`, orderErr.message);
+        }
+      }
+    } catch (err) {
+      console.warn('[Tracking] Poll error:', err.message);
+    }
+  }
+
+  setTimeout(pollShippedOrders, 60000);
+  setInterval(pollShippedOrders, TRACKING_POLL_INTERVAL);
+  console.log('[Tracking] Polling shipped orders every 30 minutes');
 });
 }
 
