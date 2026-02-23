@@ -193,11 +193,20 @@ const AdminDashboard: React.FC = () => {
   const supportMessagesEndRef = useRef<HTMLDivElement>(null);
   const [userChatEnabled, setUserChatEnabled] = useState(false);
   const [userChatLoading, setUserChatLoading] = useState(false);
+  const [testDataEnabled, setTestDataEnabled] = useState(false);
+  const [testDataLoading, setTestDataLoading] = useState(false);
 
   const fetchUserChatEnabled = async () => {
     try {
       const { enabled } = await apiService.getUserChatEnabled();
       setUserChatEnabled(enabled);
+    } catch {}
+  };
+
+  const fetchTestDataEnabled = async () => {
+    try {
+      const { enabled } = await apiService.getTestDataEnabled();
+      setTestDataEnabled(enabled);
     } catch {}
   };
 
@@ -625,6 +634,7 @@ const AdminDashboard: React.FC = () => {
     if (section === 'settings') {
       fetchUserChatEnabled();
       fetchSupportConfig();
+      fetchTestDataEnabled();
     }
   };
 
@@ -2464,6 +2474,34 @@ const AdminDashboard: React.FC = () => {
                     </Button>
                   </Box>
                 )}
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Test Data on New Listing</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Show a "Fill with test data" button on the Create Listing page for admins.
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={testDataEnabled}
+                    onChange={async (e) => {
+                      setTestDataLoading(true);
+                      try {
+                        const { enabled } = await apiService.setTestDataEnabled(e.target.checked);
+                        setTestDataEnabled(enabled);
+                        window.dispatchEvent(new CustomEvent('testDataToggled', { detail: { enabled } }));
+                        enqueueSnackbar(`Test data fill ${enabled ? 'enabled' : 'disabled'}`, { variant: 'success' });
+                      } catch {
+                        enqueueSnackbar('Failed to update setting', { variant: 'error' });
+                      } finally {
+                        setTestDataLoading(false);
+                      }
+                    }}
+                    disabled={testDataLoading}
+                  />
+                </Box>
               </Paper>
             </Box>
           </Box>)}

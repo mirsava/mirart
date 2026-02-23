@@ -165,4 +165,33 @@ router.put('/user-chat-enabled', async (req, res) => {
   }
 });
 
+router.get('/test-data-enabled', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      "SELECT setting_value FROM site_settings WHERE setting_key = 'test_data_enabled'"
+    );
+    const enabled = rows.length > 0 ? JSON.parse(rows[0].setting_value) : false;
+    console.log('[DEBUG] GET test-data-enabled:', { rows: rows.length, enabled });
+    res.json({ enabled });
+  } catch (error) {
+    console.error('Error fetching test data setting:', error);
+    res.json({ enabled: false });
+  }
+});
+
+router.put('/test-data-enabled', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    console.log('[DEBUG] PUT test-data-enabled body:', req.body, '-> storing:', !!enabled);
+    await pool.execute(
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('test_data_enabled', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
+      [JSON.stringify(!!enabled), JSON.stringify(!!enabled)]
+    );
+    res.json({ success: true, enabled: !!enabled });
+  } catch (error) {
+    console.error('Error updating test data setting:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

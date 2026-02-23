@@ -986,6 +986,17 @@ class ApiService {
       body: JSON.stringify({ enabled }),
     });
   }
+
+  async getTestDataEnabled(): Promise<{ enabled: boolean }> {
+    return this.request<{ enabled: boolean }>('/support-chat/test-data-enabled');
+  }
+
+  async setTestDataEnabled(enabled: boolean): Promise<{ success: boolean; enabled: boolean }> {
+    return this.request<{ success: boolean; enabled: boolean }>('/support-chat/test-data-enabled', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  }
 }
 
 export interface Review {

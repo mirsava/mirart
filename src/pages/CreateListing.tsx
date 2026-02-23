@@ -35,8 +35,34 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
+import { UserRole } from '../types/userRoles';
 import apiService from '../services/api';
 import PageHeader from '../components/PageHeader';
+
+const TEST_DATA = {
+  title: 'Sunset Over the Pacific',
+  description: 'A vibrant acrylic painting capturing the golden hour along the California coastline. Rich warm tones blend with deep blues, creating a serene and contemplative atmosphere. The textured brushwork adds depth and movement to the waves and sky.',
+  category: 'Painting',
+  subcategory: 'Impressionism',
+  price: '425',
+  dimensions: '24 x 18 inches',
+  medium: 'Acrylic on canvas',
+  year: new Date().getFullYear().toString(),
+  weight_oz: '32',
+  length_in: '26',
+  width_in: '20',
+  height_in: '2',
+  in_stock: true,
+  quantity_available: '1',
+  status: 'draft' as 'draft',
+  shipping_info: 'Ships within 3-5 business days. Carefully packed in custom protective packaging.',
+  returns_info: 'Returns accepted within 14 days of delivery if artwork is in original condition.',
+  special_instructions: '',
+  allow_comments: true,
+  shipping_preference: 'buyer' as 'free' | 'buyer',
+  shipping_carrier: 'shippo' as 'shippo' | 'own',
+  return_days: 14 as number | null,
+};
 
 const CreateListing: React.FC = () => {
   const { user } = useAuth();
@@ -44,6 +70,7 @@ const CreateListing: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testDataEnabled, setTestDataEnabled] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -96,6 +123,20 @@ const CreateListing: React.FC = () => {
 
     fetchUserSettings();
   }, [user?.id]);
+
+  useEffect(() => {
+    const fetchTestData = () => {
+      apiService.getTestDataEnabled().then(({ enabled }) => setTestDataEnabled(enabled)).catch(() => setTestDataEnabled(false));
+    };
+    fetchTestData();
+    const handleToggle = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail != null) setTestDataEnabled(!!detail.enabled);
+    };
+    window.addEventListener('testDataToggled', handleToggle);
+    return () => window.removeEventListener('testDataToggled', handleToggle);
+  }, [user?.userRole, user?.id]);
+
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -139,65 +180,6 @@ const CreateListing: React.FC = () => {
     Other: [],
   };
 
-  const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-
-  const fillWithTestData = () => {
-    const paintingSubs = subcategories.Painting;
-    const woodSubs = subcategories.Woodworking;
-    const category = pick(['Painting', 'Woodworking']);
-    const subcategory = category === 'Painting' ? pick(paintingSubs) : pick(woodSubs);
-
-    const titles = [
-      'Sunset Over the Mountains', 'Abstract Blue No. 3', 'Morning Light', 'Ocean Dreams',
-      'Rustic Oak Side Table', 'Handcrafted Walnut Bowl', 'Coastal Driftwood Sculpture',
-      'Golden Hour', 'Forest Path', 'Urban Reflections', 'Cherry Blossom Branch',
-    ];
-    const descriptions = [
-      'A vibrant piece capturing the essence of natural beauty. Created with care and attention to detail.',
-      'This artwork explores the interplay of light and shadow. Each brushstroke tells a story.',
-      'Handcrafted with sustainably sourced materials. A unique addition to any space.',
-      'Inspired by the changing seasons and the beauty of the natural world.',
-    ];
-    const dimensions = ['24×36 inches', '18×24 inches', '12×16 inches', '36×48 inches', '20×30 inches', '16×20 inches'];
-    const mediums = ['Oil on Canvas', 'Acrylic on Canvas', 'Watercolor', 'Mixed media', 'Charcoal', 'Oil on Wood', 'Hand-carved wood', 'Reclaimed wood'];
-    const shippingOptions = [
-      'Free shipping within the US. International shipping available. Estimated delivery: 5-7 business days.',
-      'Ships within 3-5 business days. Secure packaging with insurance. Tracking included.',
-    ];
-    const returnPolicies = [
-      '30-day return policy. Full refund if returned in original condition. Buyer pays return shipping.',
-      '14-day return policy for unused items. Contact for return authorization.',
-    ];
-    const specialInstr = [
-      'Framing recommended. Handle with care. Avoid direct sunlight.',
-      'Ready to hang. Includes care instructions.',
-    ];
-
-    setFormData({
-      title: pick(titles),
-      description: pick(descriptions),
-      category,
-      subcategory,
-      price: String(Math.floor(Math.random() * 4500) + 50),
-      primary_image_url: '',
-      image_urls: [],
-      dimensions: pick(dimensions),
-      medium: pick(mediums),
-      year: String(2020 + Math.floor(Math.random() * 5)),
-      weight_oz: '24',
-      length_in: '24',
-      width_in: '18',
-      height_in: '3',
-      in_stock: Math.random() > 0.2,
-      quantity_available: String(Math.floor(Math.random() * 5) + 1),
-      status: 'draft',
-      shipping_info: pick(shippingOptions),
-      returns_info: pick(returnPolicies),
-      special_instructions: pick(specialInstr),
-      allow_comments: Math.random() > 0.3,
-    });
-    enqueueSnackbar('Form filled with test data', { variant: 'info' });
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -419,6 +401,27 @@ const CreateListing: React.FC = () => {
         disablePattern={true}
       />
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 4 }}>
+        {testDataEnabled && import.meta.env.MODE !== 'production' && (
+          <Alert
+            severity="info"
+            sx={{ mb: 3 }}
+            action={
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<ScienceIcon />}
+                onClick={() => {
+                  setFormData(prev => ({ ...prev, ...TEST_DATA, primary_image_url: prev.primary_image_url, image_urls: prev.image_urls }));
+                  enqueueSnackbar('Form filled with test data', { variant: 'info' });
+                }}
+              >
+                Fill with Test Data
+              </Button>
+            }
+          >
+            Test mode is enabled. You can auto-fill this form with sample data.
+          </Alert>
+        )}
         <Paper
           elevation={0}
           sx={{
@@ -430,17 +433,6 @@ const CreateListing: React.FC = () => {
             borderRadius: 1,
           }}
         >
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<ScienceIcon />}
-              onClick={fillWithTestData}
-              sx={{ textTransform: 'none' }}
-            >
-              Fill with test data
-            </Button>
-          </Box>
           <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
             {steps.map((label) => (
               <Step key={label}>
