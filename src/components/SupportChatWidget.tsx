@@ -15,6 +15,7 @@ import {
   Send as SendIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { useChat } from '../contexts/ChatContext';
 import apiService from '../services/api';
 
 interface SupportChatConfig {
@@ -28,6 +29,7 @@ interface SupportChatConfig {
 
 const SupportChatWidget: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
+  const { supportChatEnabled } = useChat();
   const [config, setConfig] = useState<SupportChatConfig | null>(null);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
@@ -105,7 +107,7 @@ const SupportChatWidget: React.FC = () => {
     setSending(false);
   };
 
-  if (!config?.enabled) return null;
+  if (supportChatEnabled === false || (!config?.enabled && supportChatEnabled === null)) return null;
 
   const online = isOnline();
 

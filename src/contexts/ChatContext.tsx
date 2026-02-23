@@ -4,6 +4,9 @@ import apiService from '../services/api';
 interface ChatContextType {
   chatOpen: boolean;
   chatEnabled: boolean;
+  setChatEnabled: (enabled: boolean) => void;
+  supportChatEnabled: boolean | null;
+  setSupportChatEnabled: (enabled: boolean) => void;
   openChat: (conversationId?: number | null) => void;
   closeChat: () => void;
   initialConversationId: number | null;
@@ -14,12 +17,16 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatEnabled, setChatEnabled] = useState(false);
+  const [supportChatEnabled, setSupportChatEnabled] = useState<boolean | null>(null);
   const [initialConversationId, setInitialConversationId] = useState<number | null>(null);
 
   useEffect(() => {
     apiService.getUserChatEnabled()
       .then(({ enabled }) => setChatEnabled(enabled))
       .catch(() => setChatEnabled(false));
+    apiService.getSupportChatConfig()
+      .then((config) => setSupportChatEnabled(config.enabled))
+      .catch(() => setSupportChatEnabled(false));
   }, []);
 
   const openChat = (conversationId?: number | null) => {
@@ -34,7 +41,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ChatContext.Provider value={{ chatOpen, chatEnabled, openChat, closeChat, initialConversationId }}>
+    <ChatContext.Provider value={{ chatOpen, chatEnabled, setChatEnabled, supportChatEnabled, setSupportChatEnabled, openChat, closeChat, initialConversationId }}>
       {children}
     </ChatContext.Provider>
   );

@@ -79,6 +79,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService, { SubscriptionPlan } from '../services/api';
 import { useSnackbar } from 'notistack';
+import { useChat } from '../contexts/ChatContext';
 import PageHeader from '../components/PageHeader';
 
 const SIDEBAR_WIDTH = 240;
@@ -87,6 +88,7 @@ const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
+  const { setChatEnabled: setGlobalChatEnabled, setSupportChatEnabled: setGlobalSupportChatEnabled } = useChat();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [activeSection, setActiveSection] = useState('users');
@@ -183,6 +185,7 @@ const AdminDashboard: React.FC = () => {
   const [supportChatConfig, setSupportChatConfig] = useState({ enabled: true, hours_start: 9, hours_end: 17, timezone: 'America/Los_Angeles', offline_message: 'Support is currently offline. Please leave a message and we will get back to you.', welcome_message: 'Hi! How can we help you today?' });
   const [supportConversations, setSupportConversations] = useState<any[]>([]);
   const [supportSelectedUserId, setSupportSelectedUserId] = useState<number | null>(null);
+  const [supportSelectedUserInfo, setSupportSelectedUserInfo] = useState<any>(null);
   const [supportMessages, setSupportMessages] = useState<any[]>([]);
   const [supportReply, setSupportReply] = useState('');
   const [supportSending, setSupportSending] = useState(false);
@@ -1980,80 +1983,81 @@ const AdminDashboard: React.FC = () => {
             </Box>
           </Box>)}
 
-          {activeSection === 'notifications' && (<Box sx={{ py: 3 }}>
-            <Box sx={{ px: 3, pb: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Send Notification</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Send a notification to one user or all users. Notifications appear in the notification panel.
-              </Typography>
-              <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <FormControl fullWidth>
-                    <InputLabel>Send to</InputLabel>
-                    <Select
-                      value={notificationForm.target}
-                      label="Send to"
-                      onChange={(e) => {
-                        const t = e.target.value as 'all' | 'specific';
-                        setNotificationForm({ ...notificationForm, target: t });
-                        if (t === 'all') setNotificationSelectedUser(null);
-                      }}
-                    >
-                      <MenuItem value="all">All users</MenuItem>
-                      <MenuItem value="specific">Specific user</MenuItem>
-                    </Select>
-                  </FormControl>
-                  {notificationForm.target === 'specific' && (
-                    <Autocomplete
-                      options={notificationUserOptions}
-                      value={notificationSelectedUser}
-                      onChange={(_, v) => setNotificationSelectedUser(v)}
-                      onInputChange={(_, v) => {
-                        if (v.length < 2) {
-                          setNotificationUserOptions([]);
-                          return;
-                        }
-                        apiService.getAdminUsers(user!.id, { search: v, limit: 20 }, user!.groups)
-                          .then((r) => setNotificationUserOptions(r.users || []));
-                      }}
-                      onOpen={() => {
-                        if (notificationUserOptions.length === 0) {
-                          apiService.getAdminUsers(user!.id, { limit: 50 }, user!.groups)
-                            .then((r) => setNotificationUserOptions(r.users || []));
-                        }
-                      }}
-                      getOptionLabel={(o) => o?.email || o?.cognito_username || o?.first_name || o?.last_name || String(o?.id || '')}
-                      renderInput={(params) => (
-                        <TextField {...params} label="Select user" placeholder="Search by email or name" />
-                      )}
-                    />
-                  )}
-                  <FormControl fullWidth>
-                    <InputLabel>Severity</InputLabel>
-                    <Select
-                      value={notificationForm.severity}
-                      label="Severity"
-                      onChange={(e) => setNotificationForm({ ...notificationForm, severity: e.target.value as 'info' | 'warning' | 'success' | 'error' })}
-                    >
-                      <MenuItem value="info">Info</MenuItem>
-                      <MenuItem value="warning">Warning</MenuItem>
-                      <MenuItem value="success">Success</MenuItem>
-                      <MenuItem value="error">Error</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <TextField
-                    label="Title"
+          {activeSection === 'notifications' && (<Box sx={{ py: 3, px: 3 }}>
+            <Typography variant="h6" sx={{ mb: 1 }}>Send Notification</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Send a notification to one user or all users. Notifications appear in the notification panel.
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              <Box sx={{ display: 'flex', gap: 2.5, flexDirection: { xs: 'column', sm: 'row' } }}>
+                <FormControl fullWidth>
+                  <InputLabel>Send to</InputLabel>
+                  <Select
+                    value={notificationForm.target}
+                    label="Send to"
+                    onChange={(e) => {
+                      const t = e.target.value as 'all' | 'specific';
+                      setNotificationForm({ ...notificationForm, target: t });
+                      if (t === 'all') setNotificationSelectedUser(null);
+                    }}
+                  >
+                    <MenuItem value="all">All users</MenuItem>
+                    <MenuItem value="specific">Specific user</MenuItem>
+                  </Select>
+                </FormControl>
+                {notificationForm.target === 'specific' && (
+                  <Autocomplete
                     fullWidth
-                    value={notificationForm.title}
-                    onChange={(e) => setNotificationForm({ ...notificationForm, title: e.target.value })}
-                    placeholder="e.g. New feature available"
-                    required
+                    options={notificationUserOptions}
+                    value={notificationSelectedUser}
+                    onChange={(_, v) => setNotificationSelectedUser(v)}
+                    onInputChange={(_, v) => {
+                      if (v.length < 2) {
+                        setNotificationUserOptions([]);
+                        return;
+                      }
+                      apiService.getAdminUsers(user!.id, { search: v, limit: 20 }, user!.groups)
+                        .then((r) => setNotificationUserOptions(r.users || []));
+                    }}
+                    onOpen={() => {
+                      if (notificationUserOptions.length === 0) {
+                        apiService.getAdminUsers(user!.id, { limit: 50 }, user!.groups)
+                          .then((r) => setNotificationUserOptions(r.users || []));
+                      }
+                    }}
+                    getOptionLabel={(o) => o?.email || o?.cognito_username || o?.first_name || o?.last_name || String(o?.id || '')}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Select user" placeholder="Search by email or name" />
+                    )}
                   />
-                  <Box sx={{ position: 'relative' }}>
+                )}
+                <FormControl fullWidth>
+                  <InputLabel>Severity</InputLabel>
+                  <Select
+                    value={notificationForm.severity}
+                    label="Severity"
+                    onChange={(e) => setNotificationForm({ ...notificationForm, severity: e.target.value as 'info' | 'warning' | 'success' | 'error' })}
+                  >
+                    <MenuItem value="info">Info</MenuItem>
+                    <MenuItem value="warning">Warning</MenuItem>
+                    <MenuItem value="success">Success</MenuItem>
+                    <MenuItem value="error">Error</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <TextField
+                label="Title"
+                fullWidth
+                value={notificationForm.title}
+                onChange={(e) => setNotificationForm({ ...notificationForm, title: e.target.value })}
+                placeholder="e.g. New feature available"
+                required
+              />
+              <Box sx={{ position: 'relative' }}>
                     <TextField
                       label="Message"
                       multiline
-                      rows={3}
+                      rows={4}
                       fullWidth
                       inputRef={notificationBodyRef}
                       value={notificationForm.body}
@@ -2154,45 +2158,45 @@ const AdminDashboard: React.FC = () => {
                         </Paper>
                       </ClickAwayListener>
                     </Popper>
-                  </Box>
-                  <Button
-                    variant="contained"
-                    onClick={async () => {
-                      if (!notificationForm.title.trim()) {
-                        enqueueSnackbar('Title is required', { variant: 'error' });
-                        return;
-                      }
-                      if (notificationForm.target === 'specific' && !notificationSelectedUser?.id) {
-                        enqueueSnackbar('Select a user', { variant: 'error' });
-                        return;
-                      }
-                      setSendingNotification(true);
-                      try {
-                        const res = await apiService.sendAdminNotification(user!.id, {
-                          title: notificationForm.title.trim(),
-                          body: notificationForm.body.trim() || undefined,
-                          link: notificationForm.link.trim() || undefined,
-                          target: notificationForm.target,
-                          user_ids: notificationForm.target === 'specific' && notificationSelectedUser?.id ? [notificationSelectedUser.id] : undefined,
-                          severity: notificationForm.severity,
-                        }, user!.groups);
-                        enqueueSnackbar(`Notification sent to ${res.sent} user${res.sent !== 1 ? 's' : ''}`, { variant: 'success' });
-                        setNotificationForm({ title: '', body: '', link: '', target: 'all', user_ids: [], severity: 'info' });
-                        setNotificationSelectedUser(null);
-                        setNotificationMentionOptions([]);
-                        setNotificationMentionOpen(false);
-                      } catch (err: any) {
-                        enqueueSnackbar(err.message || 'Failed to send', { variant: 'error' });
-                      } finally {
-                        setSendingNotification(false);
-                      }
-                    }}
-                    disabled={sendingNotification}
-                  >
-                    {sendingNotification ? 'Sending...' : 'Send Notification'}
-                  </Button>
-                </Box>
-              </Paper>
+              </Box>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={async () => {
+                  if (!notificationForm.title.trim()) {
+                    enqueueSnackbar('Title is required', { variant: 'error' });
+                    return;
+                  }
+                  if (notificationForm.target === 'specific' && !notificationSelectedUser?.id) {
+                    enqueueSnackbar('Select a user', { variant: 'error' });
+                    return;
+                  }
+                  setSendingNotification(true);
+                  try {
+                    const res = await apiService.sendAdminNotification(user!.id, {
+                      title: notificationForm.title.trim(),
+                      body: notificationForm.body.trim() || undefined,
+                      link: notificationForm.link.trim() || undefined,
+                      target: notificationForm.target,
+                      user_ids: notificationForm.target === 'specific' && notificationSelectedUser?.id ? [notificationSelectedUser.id] : undefined,
+                      severity: notificationForm.severity,
+                    }, user!.groups);
+                    enqueueSnackbar(`Notification sent to ${res.sent} user${res.sent !== 1 ? 's' : ''}`, { variant: 'success' });
+                    setNotificationForm({ title: '', body: '', link: '', target: 'all', user_ids: [], severity: 'info' });
+                    setNotificationSelectedUser(null);
+                    setNotificationMentionOptions([]);
+                    setNotificationMentionOpen(false);
+                  } catch (err: any) {
+                    enqueueSnackbar(err.message || 'Failed to send', { variant: 'error' });
+                  } finally {
+                    setSendingNotification(false);
+                  }
+                }}
+                disabled={sendingNotification}
+                sx={{ alignSelf: 'flex-start', px: 4 }}
+              >
+                {sendingNotification ? 'Sending...' : 'Send Notification'}
+              </Button>
             </Box>
           </Box>)}
 
@@ -2213,9 +2217,14 @@ const AdminDashboard: React.FC = () => {
                         <ListItem
                           key={conv.user_id}
                           component="div"
-                          onClick={() => {
+                          onClick={async () => {
                             setSupportSelectedUserId(conv.user_id);
+                            setSupportSelectedUserInfo(null);
                             fetchSupportMessages(conv.user_id);
+                            try {
+                              const u = await apiService.getAdminUserById(user!.id, conv.user_id, user!.groups);
+                              setSupportSelectedUserInfo(u);
+                            } catch {}
                           }}
                           sx={{
                             cursor: 'pointer',
@@ -2261,13 +2270,30 @@ const AdminDashboard: React.FC = () => {
                       </Box>
                     ) : (
                       <>
-                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                            {supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_name || `User ${supportSelectedUserId}`}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_email}
-                          </Typography>
+                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
+                            {(supportSelectedUserInfo?.first_name || supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_name || '?')[0].toUpperCase()}
+                          </Avatar>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                              {supportSelectedUserInfo
+                                ? (supportSelectedUserInfo.business_name || [supportSelectedUserInfo.first_name, supportSelectedUserInfo.last_name].filter(Boolean).join(' ') || supportSelectedUserInfo.cognito_username)
+                                : (supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_name || `User ${supportSelectedUserId}`)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {supportSelectedUserInfo?.email || supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_email}
+                            </Typography>
+                          </Box>
+                          {supportSelectedUserInfo && (
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
+                              <Chip label={supportSelectedUserInfo.user_type || 'artist'} size="small" color={supportSelectedUserInfo.user_type === 'admin' ? 'error' : supportSelectedUserInfo.user_type === 'buyer' ? 'info' : 'primary'} />
+                              {supportSelectedUserInfo.created_at && (
+                                <Typography variant="caption" color="text.secondary">
+                                  Joined {new Date(supportSelectedUserInfo.created_at).toLocaleDateString()}
+                                </Typography>
+                              )}
+                            </Box>
+                          )}
                         </Box>
                         <Box sx={{ flex: 1, overflow: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                           {supportMessages.map((msg: any) => (
@@ -2342,6 +2368,7 @@ const AdminDashboard: React.FC = () => {
                       try {
                         const { enabled } = await apiService.setUserChatEnabled(e.target.checked);
                         setUserChatEnabled(enabled);
+                        setGlobalChatEnabled(enabled);
                         enqueueSnackbar(`User chat ${enabled ? 'enabled' : 'disabled'}`, { variant: 'success' });
                       } catch {
                         enqueueSnackbar('Failed to update setting', { variant: 'error' });
@@ -2369,6 +2396,7 @@ const AdminDashboard: React.FC = () => {
                       setSupportChatConfig(updated);
                       try {
                         await apiService.updateSupportChatConfig(updated);
+                        setGlobalSupportChatEnabled(updated.enabled);
                         enqueueSnackbar(`Support chat ${updated.enabled ? 'enabled' : 'disabled'}`, { variant: 'success' });
                       } catch {
                         enqueueSnackbar('Failed to update setting', { variant: 'error' });
