@@ -50,6 +50,8 @@ import {
   LocalShipping as LocalShippingIcon,
   Search as SearchIcon,
   FilterList as FilterListIcon,
+  ViewList as ViewListIcon,
+  ViewModule as ViewModuleIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -57,7 +59,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User, UserSubscription } from '../services/api';
 import OrderCardComponent from '../components/OrderCard';
-import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment } from '@mui/material';
+import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
 
@@ -129,6 +131,7 @@ const ArtistDashboard: React.FC = () => {
   const [listingsStatusFilter, setListingsStatusFilter] = useState<string>('all');
   const [listingsPagination, setListingsPagination] = useState<{ page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } | null>(null);
   const [loadingListings, setLoadingListings] = useState(false);
+  const [listingsView, setListingsView] = useState<'grid' | 'table'>('table');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<Listing | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -1150,21 +1153,36 @@ const ArtistDashboard: React.FC = () => {
             
             {/* Filter Controls */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel>Filter by Status</InputLabel>
-                <Select
-                  value={listingsStatusFilter}
-                  label="Filter by Status"
-                  onChange={(e) => setListingsStatusFilter(e.target.value)}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel>Filter by Status</InputLabel>
+                  <Select
+                    value={listingsStatusFilter}
+                    label="Filter by Status"
+                    onChange={(e) => setListingsStatusFilter(e.target.value)}
+                  >
+                    <MenuItem value="all">All Listings</MenuItem>
+                    <MenuItem value="draft">Draft</MenuItem>
+                    <MenuItem value="active">Active</MenuItem>
+                    <MenuItem value="inactive">Inactive</MenuItem>
+                    <MenuItem value="sold">Sold</MenuItem>
+                    <MenuItem value="archived">Archived</MenuItem>
+                  </Select>
+                </FormControl>
+                <ToggleButtonGroup
+                  value={listingsView}
+                  exclusive
+                  onChange={(_, v) => v && setListingsView(v)}
+                  size="small"
                 >
-                  <MenuItem value="all">All Listings</MenuItem>
-                  <MenuItem value="draft">Draft</MenuItem>
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
-                  <MenuItem value="sold">Sold</MenuItem>
-                  <MenuItem value="archived">Archived</MenuItem>
-                </Select>
-              </FormControl>
+                  <ToggleButton value="table">
+                    <Tooltip title="List view"><ViewListIcon fontSize="small" /></Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="grid">
+                    <Tooltip title="Grid view"><ViewModuleIcon fontSize="small" /></Tooltip>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
               
               {listingsPagination && listingsPagination.total > 0 && (
                 <Typography variant="body2" color="text.secondary">
@@ -1177,168 +1195,184 @@ const ArtistDashboard: React.FC = () => {
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
                 <CircularProgress />
               </Box>
+            ) : recentListings.length === 0 ? (
+              <Paper elevation={0} sx={{ p: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <Typography variant="h6" gutterBottom>No listings yet</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Start selling your art by creating your first listing
+                </Typography>
+                <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/create-listing')}>
+                  Add New Listing
+                </Button>
+              </Paper>
             ) : (
               <>
-                
-                <Grid container spacing={2}>
-                  {recentListings.length === 0 ? (
-                    <Grid item xs={12}>
-                      <Paper elevation={0} sx={{ p: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                        <Typography variant="h6" gutterBottom>
-                          No listings yet
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                          Start selling your art by creating your first listing
-                        </Typography>
-                        <Button 
-                          variant="contained" 
-                          startIcon={<AddIcon />}
-                          onClick={() => navigate('/create-listing')}
+                {listingsView === 'table' ? (
+                  <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: 'action.hover' }}>
+                          <TableCell sx={{ fontWeight: 600, width: 60 }}>Image</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Price</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Views</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }} align="right">Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {recentListings.map((listing) => (
+                          <TableRow key={listing.id} hover sx={{ '&:last-child td': { border: 0 } }}>
+                            <TableCell sx={{ p: 1 }}>
+                              {listing.primary_image_url ? (
+                                <Box
+                                  component="img"
+                                  src={getImageUrl(listing.primary_image_url)}
+                                  alt={listing.title}
+                                  sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 1 }}
+                                />
+                              ) : (
+                                <Box sx={{ width: 48, height: 48, bgcolor: 'grey.200', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <ArtTrackIcon sx={{ fontSize: 20, color: 'text.disabled' }} />
+                                </Box>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={500} noWrap sx={{ maxWidth: 250 }}>
+                                {listing.title}
+                              </Typography>
+                              {listing.category && (
+                                <Typography variant="caption" color="text.secondary">{listing.category}</Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={600} color="primary">${listing.price ?? 0}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={listing.status === 'active' ? 'Active' : listing.status}
+                                color={listing.status === 'active' ? 'success' : listing.status === 'draft' ? 'warning' : 'default'}
+                                size="small"
+                                sx={{ textTransform: 'capitalize' }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color="text.secondary">{listing.views}</Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                                {listing.status === 'draft' && (
+                                  <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    size="small"
+                                    onClick={() => handleActivateListing(listing.id)}
+                                    disabled={activatingListing === listing.id}
+                                    sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.25, minWidth: 0 }}
+                                  >
+                                    {activatingListing === listing.id ? '...' : 'Activate'}
+                                  </Button>
+                                )}
+                                <Tooltip title="Edit">
+                                  <IconButton size="small" onClick={() => navigate(`/edit-listing/${listing.id}`)}>
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="View">
+                                  <IconButton size="small" onClick={() => navigate(`/painting/${listing.id}`)}>
+                                    <VisibilityIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete">
+                                  <IconButton size="small" color="error" onClick={() => handleDeleteClick(listing)}>
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Grid container spacing={1.5}>
+                    {recentListings.map((listing) => (
+                      <Grid item xs={6} sm={4} md={3} key={listing.id}>
+                        <Card
+                          elevation={0}
+                          sx={{
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                          }}
                         >
-                          Add New Listing
-                        </Button>
-                      </Paper>
-                    </Grid>
-                  ) : (
-                    recentListings.map((listing) => (
-                <Grid item xs={12} sm={6} md={4} key={listing.id}>
-                  <Card 
-                    elevation={0}
-                    sx={{ 
-                      height: '100%', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      overflow: 'hidden',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      '& .MuiCardMedia-root': {
-                        margin: 0,
-                        padding: 0,
-                        width: '100%',
-                      },
-                    }}
-                  >
-                    {listing.primary_image_url ? (
-                      <Box
-                        component="img"
-                        src={getImageUrl(listing.primary_image_url)}
-                        alt={listing.title}
-                        sx={{
-                          width: '100%',
-                          height: 200,
-                          objectFit: 'cover',
-                          display: 'block',
-                          margin: 0,
-                          padding: 0,
-                        }}
-                      />
-                    ) : (
-                      <Box
-                        sx={{
-                          height: 200,
-                          width: '100%',
-                          bgcolor: 'grey.200',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          margin: 0,
-                          padding: 0,
-                        }}
-                      >
-                        <Typography variant="body2" color="text.secondary">
-                          No Image
-                        </Typography>
-                      </Box>
-                    )}
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                        <Typography variant="h6" noWrap>
-                          {listing.title}
-                        </Typography>
-                        <Chip 
-                          label={listing.status === 'active' ? 'Active' : listing.status} 
-                          color={listing.status === 'active' ? 'success' : 'default'}
-                          size="small"
-                        />
-                      </Box>
-                      <Typography variant="h6" color="primary" gutterBottom>
-                        ${listing.price ?? 0}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        {listing.views} views
-                      </Typography>
-                      {listing.status === 'draft' && (
-                        <Box sx={{ mb: 2 }}>
-                          <Button
-                            variant="contained"
-                            color="primary"
-                            fullWidth
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleActivateListing(listing.id);
-                            }}
-                            disabled={activatingListing === listing.id}
-                            sx={{ mb: 1 }}
-                          >
-                            {activatingListing === listing.id ? 'Activating...' : 'Activate Listing'}
-                          </Button>
-                          {subscription && (
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
-                              {subscription.listings_remaining !== undefined && subscription.listings_remaining > 0
-                                ? `${subscription.listings_remaining} slots remaining`
-                                : 'Subscription limit reached'}
-                            </Typography>
+                          {listing.primary_image_url ? (
+                            <Box
+                              component="img"
+                              src={getImageUrl(listing.primary_image_url)}
+                              alt={listing.title}
+                              sx={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+                            />
+                          ) : (
+                            <Box sx={{ height: 120, width: '100%', bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <ArtTrackIcon sx={{ fontSize: 28, color: 'text.disabled' }} />
+                            </Box>
                           )}
-                          {!subscription && (
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
-                              Subscribe to activate listings
-                            </Typography>
-                          )}
-                        </Box>
-                      )}
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton 
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/edit-listing/${listing.id}`);
-                          }}
-                          title="Edit listing"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton 
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/painting/${listing.id}`);
-                          }}
-                          title="View listing"
-                        >
-                          <VisibilityIcon />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          color="error"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteClick(listing);
-                          }}
-                          title="Delete listing"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                    ))
-                  )}
-                </Grid>
+                          <CardContent sx={{ flexGrow: 1, p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="body2" fontWeight={600} noWrap>{listing.title}</Typography>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
+                              <Typography variant="body2" fontWeight={600} color="primary">${listing.price ?? 0}</Typography>
+                              <Chip
+                                label={listing.status}
+                                color={listing.status === 'active' ? 'success' : listing.status === 'draft' ? 'warning' : 'default'}
+                                size="small"
+                                sx={{ height: 20, fontSize: '0.7rem', textTransform: 'capitalize' }}
+                              />
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">{listing.views} views</Typography>
+                            {listing.status === 'draft' && (
+                              <Button
+                                variant="outlined"
+                                color="primary"
+                                fullWidth
+                                size="small"
+                                onClick={(e) => { e.stopPropagation(); handleActivateListing(listing.id); }}
+                                disabled={activatingListing === listing.id}
+                                sx={{ mt: 1, textTransform: 'none', fontSize: '0.75rem', py: 0.25 }}
+                              >
+                                {activatingListing === listing.id ? '...' : 'Activate'}
+                              </Button>
+                            )}
+                            <Box sx={{ display: 'flex', gap: 0.5, mt: 1 }}>
+                              <Tooltip title="Edit">
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/edit-listing/${listing.id}`); }}>
+                                  <EditIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="View">
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/painting/${listing.id}`); }}>
+                                  <VisibilityIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete">
+                                <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleDeleteClick(listing); }}>
+                                  <DeleteIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
 
                 {listingsPagination && listingsPagination.total > 0 && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                     <Pagination
                       count={listingsPagination.totalPages || 1}
                       page={listingsPagination.page || listingsPage}
