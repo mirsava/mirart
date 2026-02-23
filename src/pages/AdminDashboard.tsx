@@ -74,6 +74,10 @@ import {
   Circle as CircleIcon,
   Settings as SettingsIcon,
   Menu as MenuIcon,
+  TrendingUp as TrendingUpIcon,
+  AttachMoney as AttachMoneyIcon,
+  CalendarMonth as CalendarMonthIcon,
+  MonetizationOn as MonetizationOnIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -1043,206 +1047,185 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <Box sx={{ width: '100%' }}>
-      <PageHeader
-        title="Admin Dashboard"
-        subtitle="Manage users, listings, and platform content"
-        align="left"
-        sx={{
-          '& > div > div': {
-            borderLeftColor: 'secondary.main',
-            bgcolor: 'rgba(255, 143, 0, 0.18)',
-          },
-        }}
-      />
-      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: { xs: 4, sm: 5, md: 6 } }}>
-        {stats && (
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <PeopleIcon color="primary" sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4">{stats.users.total}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Total Users
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <InventoryIcon color="primary" sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4">{stats.listings.total}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Total Listings
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <EmailIcon color="primary" sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4">{stats.messages.total}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Total Messages
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <ShoppingCartIcon color="primary" sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4">{stats.orders?.total ?? 0}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Total Orders
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pt: { xs: 3, md: 4 }, pb: { xs: 4, sm: 5, md: 6 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar sx={{ bgcolor: 'warning.main', width: 36, height: 36 }}>
+              <SettingsIcon sx={{ fontSize: 20 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="h5" fontWeight={700}>Admin Dashboard</Typography>
+              <Typography variant="body2" color="text.secondary">Manage users, listings, and platform content</Typography>
+            </Box>
+          </Box>
+          {isMobile && (
+            <IconButton onClick={() => setSidebarOpen(true)}>
+              <MenuIcon />
+            </IconButton>
+          )}
+        </Box>
+        {stats && (<>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {[
+              { label: 'Total Users', value: stats.users.total, icon: <PeopleIcon />, color: '#6366f1' },
+              { label: 'Total Listings', value: stats.listings.total, icon: <InventoryIcon />, color: '#10b981' },
+              { label: 'Total Messages', value: stats.messages.total, icon: <EmailIcon />, color: '#f59e0b' },
+              { label: 'Total Orders', value: stats.orders?.total ?? 0, icon: <ShoppingCartIcon />, color: '#ef4444' },
+              { label: 'Total Revenue', value: `$${(stats.orders?.revenue?.total ?? 0).toFixed(0)}`, icon: <AttachMoneyIcon />, color: '#8b5cf6' },
+              { label: 'Active Subs', value: stats.subscriptions?.active ?? 0, icon: <CreditCardIcon />, color: '#06b6d4' },
+            ].map((stat) => (
+              <Grid item xs={6} sm={4} md={2} key={stat.label}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    textAlign: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Avatar sx={{ bgcolor: `${stat.color}15`, color: stat.color, width: 40, height: 40, mx: 'auto', mb: 1 }}>
+                    {stat.icon}
+                  </Avatar>
+                  <Typography variant="h5" fontWeight={700}>{stat.value}</Typography>
+                  <Typography variant="caption" color="text.secondary">{stat.label}</Typography>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Grid container spacing={2} sx={{ mb: 4 }}>
             <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                    <ShoppingCartIcon color="primary" sx={{ fontSize: 40 }} />
-                    <Typography variant="h6">Order Statistics</Typography>
-                  </Box>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6} sm={4}>
-                      <Typography variant="caption" color="text.secondary" display="block">By Status</Typography>
-                      {stats.orders?.byStatus && Object.keys(stats.orders.byStatus).length > 0 ? (
-                        <Box>
-                          {Object.entries(stats.orders.byStatus).map(([status, count]) => (
-                            <Typography key={status} variant="body2">
-                              {status}: {count as number}
-                            </Typography>
-                          ))}
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">—</Typography>
-                      )}
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Typography variant="caption" color="text.secondary" display="block">Revenue</Typography>
-                      <Typography variant="body2">Total: ${(stats.orders?.revenue?.total ?? 0).toFixed(2)}</Typography>
-                      <Typography variant="body2">Platform fees: ${(stats.orders?.revenue?.platformFees ?? 0).toFixed(2)}</Typography>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Typography variant="caption" color="text.secondary" display="block">This Month</Typography>
-                      <Typography variant="body2">${(stats.orders?.revenue?.thisMonth ?? 0).toFixed(2)}</Typography>
-                      <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.thisMonthFees ?? 0).toFixed(2)}</Typography>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Typography variant="caption" color="text.secondary" display="block">YTD</Typography>
-                      <Typography variant="body2">${(stats.orders?.revenue?.ytd ?? 0).toFixed(2)}</Typography>
-                      <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.ytdFees ?? 0).toFixed(2)}</Typography>
-                    </Grid>
+              <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                  <Avatar sx={{ bgcolor: 'error.main', width: 32, height: 32 }}>
+                    <ReceiptIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                  <Typography variant="subtitle1" fontWeight={700}>Order Statistics</Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      {stats.orders?.byStatus && Object.entries(stats.orders.byStatus).map(([status, count]) => (
+                        <Chip
+                          key={status}
+                          label={`${status}: ${count as number}`}
+                          size="small"
+                          sx={{ textTransform: 'capitalize', fontWeight: 500 }}
+                          color={status === 'delivered' ? 'success' : status === 'shipped' ? 'info' : status === 'pending' ? 'warning' : 'default'}
+                          variant="outlined"
+                        />
+                      ))}
+                    </Box>
                   </Grid>
-                </CardContent>
-              </Card>
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 0.5 }} />
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Revenue</Typography>
+                    <Typography variant="h6" fontWeight={700} color="success.main">${(stats.orders?.revenue?.total ?? 0).toFixed(2)}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Platform Fees</Typography>
+                    <Typography variant="h6" fontWeight={700}>${(stats.orders?.revenue?.platformFees ?? 0).toFixed(2)}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>This Month</Typography>
+                    <Typography variant="h6" fontWeight={700}>${(stats.orders?.revenue?.thisMonth ?? 0).toFixed(2)}</Typography>
+                    <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.thisMonthFees ?? 0).toFixed(2)}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Year to Date</Typography>
+                    <Typography variant="h6" fontWeight={700}>${(stats.orders?.revenue?.ytd ?? 0).toFixed(2)}</Typography>
+                    <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.ytdFees ?? 0).toFixed(2)}</Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
             </Grid>
+
             <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                    <CreditCardIcon color="primary" sx={{ fontSize: 40 }} />
-                    <Typography variant="h6">Subscriptions</Typography>
-                  </Box>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6} sm={4}>
+              <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                  <Avatar sx={{ bgcolor: 'info.main', width: 32, height: 32 }}>
+                    <CreditCardIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                  <Typography variant="subtitle1" fontWeight={700}>Subscriptions</Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  {[
+                    { label: 'Active', value: stats.subscriptions?.active ?? 0, color: 'success.main', filter: 'active' },
+                    { label: 'Expired', value: stats.subscriptions?.expired ?? 0, color: 'text.secondary', filter: 'expired' },
+                    { label: 'This Month', value: stats.subscriptions?.thisMonth ?? 0, color: 'info.main', filter: 'this_month' },
+                    { label: 'Year to Date', value: stats.subscriptions?.ytd ?? 0, color: 'warning.main', filter: 'ytd' },
+                  ].map((item) => (
+                    <Grid item xs={6} sm={3} key={item.label}>
                       <Box
-                        onClick={() => handleSubscriptionStatClick('active', 'Active Subscriptions')}
-                        sx={{ cursor: (stats.subscriptions?.active ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.active ?? 0) > 0 ? { opacity: 0.8 } : {} }}
+                        onClick={() => handleSubscriptionStatClick(item.filter, `${item.label} Subscriptions`)}
+                        sx={{
+                          cursor: item.value > 0 ? 'pointer' : 'default',
+                          p: 1.5,
+                          borderRadius: 1.5,
+                          textAlign: 'center',
+                          bgcolor: 'action.hover',
+                          transition: 'all 0.2s',
+                          '&:hover': item.value > 0 ? { bgcolor: 'action.selected', transform: 'translateY(-1px)' } : {},
+                        }}
                       >
-                        <Typography variant="h5" color="primary">{stats.subscriptions?.active ?? 0}</Typography>
-                        <Typography variant="caption" color="text.secondary">Active</Typography>
+                        <Typography variant="h5" fontWeight={700} color={item.color}>{item.value}</Typography>
+                        <Typography variant="caption" color="text.secondary">{item.label}</Typography>
                       </Box>
                     </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Box
-                        onClick={() => handleSubscriptionStatClick('expired', 'Expired Subscriptions')}
-                        sx={{ cursor: (stats.subscriptions?.expired ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.expired ?? 0) > 0 ? { opacity: 0.8 } : {} }}
-                      >
-                        <Typography variant="h5">{stats.subscriptions?.expired ?? 0}</Typography>
-                        <Typography variant="caption" color="text.secondary">Expired</Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Box
-                        onClick={() => handleSubscriptionStatClick('this_month', 'Subscriptions This Month')}
-                        sx={{ cursor: (stats.subscriptions?.thisMonth ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.thisMonth ?? 0) > 0 ? { opacity: 0.8 } : {} }}
-                      >
-                        <Typography variant="h5">{stats.subscriptions?.thisMonth ?? 0}</Typography>
-                        <Typography variant="caption" color="text.secondary">This Month</Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Box
-                        onClick={() => handleSubscriptionStatClick('ytd', 'Subscriptions YTD')}
-                        sx={{ cursor: (stats.subscriptions?.ytd ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.ytd ?? 0) > 0 ? { opacity: 0.8 } : {} }}
-                      >
-                        <Typography variant="h5">{stats.subscriptions?.ytd ?? 0}</Typography>
-                        <Typography variant="caption" color="text.secondary">YTD</Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Typography variant="caption" color="text.secondary" display="block">Billing</Typography>
-                      <Box
+                  ))}
+                </Grid>
+                <Divider sx={{ my: 2 }} />
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Billing Split</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                      <Chip
+                        label={`Monthly: ${stats.subscriptions?.byBilling?.monthly ?? 0}`}
+                        size="small"
+                        variant="outlined"
                         onClick={() => handleSubscriptionStatClick('active', 'Active Monthly', undefined, 'monthly')}
-                        sx={{ cursor: (stats.subscriptions?.byBilling?.monthly ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.byBilling?.monthly ?? 0) > 0 ? { opacity: 0.8 } : {} }}
-                      >
-                        <Typography variant="body2">Monthly: {stats.subscriptions?.byBilling?.monthly ?? 0}</Typography>
-                      </Box>
-                      <Box
+                        sx={{ cursor: 'pointer' }}
+                      />
+                      <Chip
+                        label={`Yearly: ${stats.subscriptions?.byBilling?.yearly ?? 0}`}
+                        size="small"
+                        variant="outlined"
                         onClick={() => handleSubscriptionStatClick('active', 'Active Yearly', undefined, 'yearly')}
-                        sx={{ cursor: (stats.subscriptions?.byBilling?.yearly ?? 0) > 0 ? 'pointer' : 'default', '&:hover': (stats.subscriptions?.byBilling?.yearly ?? 0) > 0 ? { opacity: 0.8 } : {} }}
-                      >
-                        <Typography variant="body2">Yearly: {stats.subscriptions?.byBilling?.yearly ?? 0}</Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <Typography variant="caption" color="text.secondary" display="block">By Plan (active)</Typography>
+                        sx={{ cursor: 'pointer' }}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>By Plan</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
                       {stats.subscriptions?.byPlan && Object.keys(stats.subscriptions.byPlan).length > 0 ? (
-                        <Box>
-                          {Object.entries(stats.subscriptions.byPlan).map(([plan, count]) => (
-                            <Box
-                              key={plan}
-                              onClick={() => handleSubscriptionStatClick('active', `${plan} Plan`, plan)}
-                              sx={{ cursor: (count as number) > 0 ? 'pointer' : 'default', '&:hover': (count as number) > 0 ? { opacity: 0.8 } : {} }}
-                            >
-                              <Typography variant="body2">
-                                {plan}: {count as number}
-                              </Typography>
-                            </Box>
-                          ))}
-                        </Box>
+                        Object.entries(stats.subscriptions.byPlan).map(([plan, count]) => (
+                          <Chip
+                            key={plan}
+                            label={`${plan}: ${count as number}`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            onClick={() => handleSubscriptionStatClick('active', `${plan} Plan`, plan)}
+                            sx={{ cursor: (count as number) > 0 ? 'pointer' : 'default', textTransform: 'capitalize' }}
+                          />
+                        ))
                       ) : (
                         <Typography variant="body2" color="text.secondary">—</Typography>
                       )}
-                    </Grid>
+                    </Box>
                   </Grid>
-                </CardContent>
-              </Card>
+                </Grid>
+              </Paper>
             </Grid>
           </Grid>
-        )}
+        </>)}
 
         <Box sx={{ display: 'flex', gap: 3 }}>
           {!isMobile ? (
