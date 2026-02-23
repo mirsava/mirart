@@ -6,8 +6,6 @@ import {
   Grid,
   Card,
   CardContent,
-  Tabs,
-  Tab,
   Table,
   TableBody,
   TableCell,
@@ -37,10 +35,17 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
+  ListItemButton,
+  ListItemIcon,
+  ListSubheader,
+  Drawer,
+  Divider,
   Autocomplete,
   Popper,
   MenuList,
   ClickAwayListener,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -64,6 +69,11 @@ import {
   LocalShipping as LocalShippingIcon,
   Campaign as CampaignIcon,
   Notifications as NotificationsIcon,
+  HeadsetMic as SupportIcon,
+  Send as SendIcon,
+  Circle as CircleIcon,
+  Settings as SettingsIcon,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -71,32 +81,16 @@ import apiService, { SubscriptionPlan } from '../services/api';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../components/PageHeader';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`admin-tabpanel-${index}`}
-      aria-labelledby={`admin-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
-    </div>
-  );
-}
+const SIDEBAR_WIDTH = 240;
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
-  const [tabValue, setTabValue] = useState(0);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [activeSection, setActiveSection] = useState('users');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
@@ -186,6 +180,77 @@ const AdminDashboard: React.FC = () => {
   const [notificationMentionQuery, setNotificationMentionQuery] = useState('');
   const notificationBodyRef = useRef<HTMLTextAreaElement>(null);
   const [sendingNotification, setSendingNotification] = useState(false);
+  const [supportChatConfig, setSupportChatConfig] = useState({ enabled: true, hours_start: 9, hours_end: 17, timezone: 'America/Los_Angeles', offline_message: 'Support is currently offline. Please leave a message and we will get back to you.', welcome_message: 'Hi! How can we help you today?' });
+  const [supportConversations, setSupportConversations] = useState<any[]>([]);
+  const [supportSelectedUserId, setSupportSelectedUserId] = useState<number | null>(null);
+  const [supportMessages, setSupportMessages] = useState<any[]>([]);
+  const [supportReply, setSupportReply] = useState('');
+  const [supportSending, setSupportSending] = useState(false);
+  const [savingSupportConfig, setSavingSupportConfig] = useState(false);
+  const supportMessagesEndRef = useRef<HTMLDivElement>(null);
+  const [userChatEnabled, setUserChatEnabled] = useState(false);
+  const [userChatLoading, setUserChatLoading] = useState(false);
+
+  const fetchUserChatEnabled = async () => {
+    try {
+      const { enabled } = await apiService.getUserChatEnabled();
+      setUserChatEnabled(enabled);
+    } catch {}
+  };
+
+  const fetchSupportConfig = async () => {
+    try {
+      const config = await apiService.getSupportChatConfig();
+      setSupportChatConfig(config);
+    } catch {}
+  };
+
+  const fetchSupportConversations = async () => {
+    try {
+      const convs = await apiService.getSupportChatConversations();
+      setSupportConversations(convs);
+    } catch {}
+  };
+
+  const fetchSupportMessages = async (userId: number) => {
+    try {
+      const msgs = await apiService.getSupportChatAdminMessages(userId);
+      setSupportMessages(msgs);
+      setTimeout(() => supportMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch {}
+  };
+
+  const handleSaveSupportConfig = async () => {
+    setSavingSupportConfig(true);
+    try {
+      await apiService.updateSupportChatConfig(supportChatConfig);
+      enqueueSnackbar('Support chat settings saved', { variant: 'success' });
+    } catch {
+      enqueueSnackbar('Failed to save settings', { variant: 'error' });
+    } finally {
+      setSavingSupportConfig(false);
+    }
+  };
+
+  const handleSendSupportReply = async () => {
+    if (!supportReply.trim() || !supportSelectedUserId || !user?.id) return;
+    setSupportSending(true);
+    try {
+      await apiService.sendSupportChatMessage({
+        message: supportReply.trim(),
+        sender: 'admin',
+        adminCognitoUsername: user.id,
+        targetUserId: supportSelectedUserId,
+      });
+      setSupportReply('');
+      await fetchSupportMessages(supportSelectedUserId);
+      await fetchSupportConversations();
+    } catch {
+      enqueueSnackbar('Failed to send reply', { variant: 'error' });
+    } finally {
+      setSupportSending(false);
+    }
+  };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -209,34 +274,34 @@ const AdminDashboard: React.FC = () => {
   }, [user?.id, messagesPage]);
 
   useEffect(() => {
-    if (!user?.id || (tabValue !== 4 && tabValue !== 5)) return;
+    if (!user?.id || (activeSection !== 'subscriptions' && activeSection !== 'plans')) return;
     fetchSubscriptionPlans();
-  }, [user?.id, tabValue]);
+  }, [user?.id, activeSection]);
 
   useEffect(() => {
-    if (!user?.id || tabValue !== 6) return;
+    if (!user?.id || activeSection !== 'announcements') return;
     fetchAnnouncements();
-  }, [user?.id, tabValue]);
+  }, [user?.id, activeSection]);
 
   useEffect(() => {
-    if (!user?.id || tabValue !== 4) return;
+    if (!user?.id || activeSection !== 'subscriptions') return;
     setSubscriptionsPage(1);
   }, [subscriptionsStatusFilter, subscriptionsPlanFilter, subscriptionsSearch]);
 
   useEffect(() => {
-    if (!user?.id || tabValue !== 4) return;
+    if (!user?.id || activeSection !== 'subscriptions') return;
     fetchSubscriptions();
-  }, [user?.id, tabValue, subscriptionsPage, subscriptionsStatusFilter, subscriptionsPlanFilter, subscriptionsSearch]);
+  }, [user?.id, activeSection, subscriptionsPage, subscriptionsStatusFilter, subscriptionsPlanFilter, subscriptionsSearch]);
 
   useEffect(() => {
-    if (!user?.id || tabValue !== 3) return;
+    if (!user?.id || activeSection !== 'orders') return;
     setOrdersPage(1);
   }, [ordersSearch, ordersStatusFilter]);
 
   useEffect(() => {
-    if (!user?.id || tabValue !== 3) return;
+    if (!user?.id || activeSection !== 'orders') return;
     fetchOrders();
-  }, [user?.id, tabValue, ordersPage, ordersSearch, ordersStatusFilter]);
+  }, [user?.id, activeSection, ordersPage, ordersSearch, ordersStatusFilter]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -547,8 +612,17 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number): void => {
-    setTabValue(newValue);
+  const handleSectionChange = (section: string): void => {
+    setActiveSection(section);
+    if (isMobile) setSidebarOpen(false);
+    if (section === 'support') {
+      fetchSupportConfig();
+      fetchSupportConversations();
+    }
+    if (section === 'settings') {
+      fetchUserChatEnabled();
+      fetchSupportConfig();
+    }
   };
 
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>, userData: any): void => {
@@ -909,6 +983,43 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const sidebarNav = (
+    <List component="nav" disablePadding>
+      {[
+        { label: 'Core', items: [
+          { key: 'users', name: 'Users', icon: <PeopleIcon fontSize="small" /> },
+          { key: 'listings', name: 'Listings', icon: <InventoryIcon fontSize="small" /> },
+          { key: 'orders', name: 'Orders', icon: <ReceiptIcon fontSize="small" /> },
+        ]},
+        { label: 'Communication', items: [
+          { key: 'messages', name: 'Messages', icon: <EmailIcon fontSize="small" /> },
+          { key: 'notifications', name: 'Notifications', icon: <NotificationsIcon fontSize="small" /> },
+          { key: 'announcements', name: 'Announcements', icon: <CampaignIcon fontSize="small" /> },
+          { key: 'support', name: 'Support Chat', icon: <SupportIcon fontSize="small" /> },
+        ]},
+        { label: 'Billing', items: [
+          { key: 'subscriptions', name: 'Subscriptions', icon: <CardMembershipIcon fontSize="small" /> },
+          { key: 'plans', name: 'Plans', icon: <CreditCardIcon fontSize="small" /> },
+        ]},
+      ].map(group => (
+        <React.Fragment key={group.label}>
+          <ListSubheader sx={{ lineHeight: '36px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'text.disabled', bgcolor: 'transparent' }}>{group.label}</ListSubheader>
+          {group.items.map(item => (
+            <ListItemButton key={item.key} selected={activeSection === item.key} onClick={() => handleSectionChange(item.key)} sx={{ py: 0.75, pl: 3 }}>
+              <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.name} primaryTypographyProps={{ variant: 'body2' }} />
+            </ListItemButton>
+          ))}
+        </React.Fragment>
+      ))}
+      <Divider sx={{ my: 1 }} />
+      <ListItemButton selected={activeSection === 'settings'} onClick={() => handleSectionChange('settings')} sx={{ py: 0.75, pl: 3 }}>
+        <ListItemIcon sx={{ minWidth: 36 }}><SettingsIcon fontSize="small" /></ListItemIcon>
+        <ListItemText primary="Settings" primaryTypographyProps={{ variant: 'body2' }} />
+      </ListItemButton>
+    </List>
+  );
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -1120,19 +1231,26 @@ const AdminDashboard: React.FC = () => {
           </Grid>
         )}
 
-        <Paper>
-          <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab icon={<PeopleIcon />} iconPosition="start" label="Users" />
-            <Tab icon={<InventoryIcon />} iconPosition="start" label="Listings" />
-            <Tab icon={<EmailIcon />} iconPosition="start" label="Messages" />
-            <Tab icon={<ReceiptIcon />} iconPosition="start" label="Orders" />
-            <Tab icon={<CardMembershipIcon />} iconPosition="start" label="Subscriptions" />
-            <Tab icon={<CreditCardIcon />} iconPosition="start" label="Subscription Plans" />
-            <Tab icon={<CampaignIcon />} iconPosition="start" label="Announcements" />
-            <Tab icon={<NotificationsIcon />} iconPosition="start" label="Notifications" />
-          </Tabs>
+        <Box sx={{ display: 'flex', gap: 3 }}>
+          {!isMobile ? (
+            <Paper sx={{ width: SIDEBAR_WIDTH, flexShrink: 0, alignSelf: 'flex-start', position: 'sticky', top: 80, overflow: 'hidden' }}>
+              {sidebarNav}
+            </Paper>
+          ) : (
+            <Drawer anchor="left" open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
+              <Box sx={{ width: SIDEBAR_WIDTH }}>{sidebarNav}</Box>
+            </Drawer>
+          )}
 
-          <TabPanel value={tabValue} index={0}>
+          <Paper sx={{ flex: 1, minWidth: 0 }}>
+            {isMobile && (
+              <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Button startIcon={<MenuIcon />} onClick={() => setSidebarOpen(true)} size="small" variant="outlined">
+                  Menu
+                </Button>
+              </Box>
+            )}
+            {activeSection === 'users' && (<Box sx={{ py: 3 }}>
             <Box sx={{ mb: 2, px: 3 }}>
               <TextField
                 fullWidth
@@ -1252,9 +1370,9 @@ const AdminDashboard: React.FC = () => {
                 />
               </Box>
             )}
-          </TabPanel>
+          </Box>)}
 
-          <TabPanel value={tabValue} index={1}>
+          {activeSection === 'listings' && (<Box sx={{ py: 3 }}>
             <Box sx={{ mb: 2, px: 3, display: 'flex', gap: 2 }}>
               <FormControl size="small" sx={{ minWidth: 150 }}>
                 <InputLabel>Status</InputLabel>
@@ -1377,9 +1495,9 @@ const AdminDashboard: React.FC = () => {
                 </Box>
               </Box>
             )}
-          </TabPanel>
+          </Box>)}
 
-          <TabPanel value={tabValue} index={2}>
+          {activeSection === 'messages' && (<Box sx={{ py: 3 }}>
             <TableContainer sx={{ px: 3 }}>
               <Table>
                 <TableHead>
@@ -1425,9 +1543,9 @@ const AdminDashboard: React.FC = () => {
                 </Box>
               </Box>
             )}
-          </TabPanel>
+          </Box>)}
 
-          <TabPanel value={tabValue} index={3}>
+          {activeSection === 'orders' && (<Box sx={{ py: 3 }}>
             <Box sx={{ mb: 2, px: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
               <TextField
                 size="small"
@@ -1552,9 +1670,9 @@ const AdminDashboard: React.FC = () => {
                 </Box>
               </Box>
             )}
-          </TabPanel>
+          </Box>)}
 
-          <TabPanel value={tabValue} index={4}>
+          {activeSection === 'subscriptions' && (<Box sx={{ py: 3 }}>
             <Box sx={{ mb: 2, px: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
               <TextField
                 size="small"
@@ -1706,9 +1824,9 @@ const AdminDashboard: React.FC = () => {
                 </Box>
               </Box>
             )}
-          </TabPanel>
+          </Box>)}
 
-          <TabPanel value={tabValue} index={5}>
+          {activeSection === 'plans' && (<Box sx={{ py: 3 }}>
             <Box sx={{ px: 3, pb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6">Subscription Plans</Typography>
@@ -1792,9 +1910,9 @@ const AdminDashboard: React.FC = () => {
                 </Table>
               </TableContainer>
             </Box>
-          </TabPanel>
+          </Box>)}
 
-          <TabPanel value={tabValue} index={6}>
+          {activeSection === 'announcements' && (<Box sx={{ py: 3 }}>
             <Box sx={{ px: 3, pb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6">Site Announcements</Typography>
@@ -1860,9 +1978,9 @@ const AdminDashboard: React.FC = () => {
                 </TableContainer>
               )}
             </Box>
-          </TabPanel>
+          </Box>)}
 
-          <TabPanel value={tabValue} index={7}>
+          {activeSection === 'notifications' && (<Box sx={{ py: 3 }}>
             <Box sx={{ px: 3, pb: 2 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>Send Notification</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -2076,8 +2194,253 @@ const AdminDashboard: React.FC = () => {
                 </Box>
               </Paper>
             </Box>
-          </TabPanel>
-        </Paper>
+          </Box>)}
+
+          {activeSection === 'support' && (<Box sx={{ py: 3 }}>
+            <Box sx={{ px: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                    <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Conversations</Typography>
+                    </Box>
+                    <List sx={{ maxHeight: 400, overflow: 'auto', p: 0 }}>
+                      {supportConversations.length === 0 ? (
+                        <ListItem>
+                          <ListItemText secondary="No conversations yet" />
+                        </ListItem>
+                      ) : supportConversations.map((conv: any) => (
+                        <ListItem
+                          key={conv.user_id}
+                          component="div"
+                          onClick={() => {
+                            setSupportSelectedUserId(conv.user_id);
+                            fetchSupportMessages(conv.user_id);
+                          }}
+                          sx={{
+                            cursor: 'pointer',
+                            borderBottom: '1px solid',
+                            borderColor: 'divider',
+                            bgcolor: supportSelectedUserId === conv.user_id ? 'action.selected' : 'transparent',
+                            '&:hover': { bgcolor: 'action.hover' },
+                          }}
+                        >
+                          <ListItemAvatar>
+                            <Avatar sx={{ width: 36, height: 36, fontSize: 14, bgcolor: conv.unread_count > 0 ? 'primary.main' : 'grey.400' }}>
+                              {(conv.user_name || conv.user_email || '?')[0].toUpperCase()}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: conv.unread_count > 0 ? 700 : 400 }} noWrap>
+                                  {conv.user_name || conv.user_email || `User ${conv.user_id}`}
+                                </Typography>
+                                {conv.unread_count > 0 && (
+                                  <Chip label={conv.unread_count} size="small" color="primary" sx={{ height: 20, fontSize: 11 }} />
+                                )}
+                              </Box>
+                            }
+                            secondary={
+                              <Typography variant="caption" color="text.secondary" noWrap>
+                                {conv.last_sender === 'admin' ? 'You: ' : ''}{conv.last_message?.slice(0, 50)}
+                              </Typography>
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} md={8}>
+                  <Paper variant="outlined" sx={{ display: 'flex', flexDirection: 'column', height: 600 }}>
+                    {!supportSelectedUserId ? (
+                      <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Typography color="text.secondary">Select a conversation to view messages</Typography>
+                      </Box>
+                    ) : (
+                      <>
+                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            {supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_name || `User ${supportSelectedUserId}`}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_email}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ flex: 1, overflow: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          {supportMessages.map((msg: any) => (
+                            <Box
+                              key={msg.id}
+                              sx={{
+                                display: 'flex',
+                                justifyContent: msg.sender === 'admin' ? 'flex-end' : 'flex-start',
+                              }}
+                            >
+                              <Box sx={{
+                                maxWidth: '70%',
+                                px: 2,
+                                py: 1,
+                                borderRadius: 2,
+                                bgcolor: msg.sender === 'admin' ? 'primary.main' : 'grey.100',
+                                color: msg.sender === 'admin' ? 'white' : 'text.primary',
+                              }}>
+                                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{msg.message}</Typography>
+                                <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mt: 0.25 }}>
+                                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          ))}
+                          <div ref={supportMessagesEndRef} />
+                        </Box>
+                        <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Type a reply..."
+                            value={supportReply}
+                            onChange={(e) => setSupportReply(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendSupportReply(); } }}
+                            multiline
+                            maxRows={3}
+                          />
+                          <Button
+                            variant="contained"
+                            onClick={handleSendSupportReply}
+                            disabled={!supportReply.trim() || supportSending}
+                            sx={{ minWidth: 44 }}
+                          >
+                            <SendIcon fontSize="small" />
+                          </Button>
+                        </Box>
+                      </>
+                    )}
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Box>
+          </Box>)}
+
+          {activeSection === 'settings' && (<Box sx={{ py: 3 }}>
+            <Box sx={{ px: 3, maxWidth: 600 }}>
+              <Typography variant="h6" sx={{ mb: 3 }}>Feature Settings</Typography>
+
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>User-to-User Chat</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Allow users to chat with each other about listings and orders.
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={userChatEnabled}
+                    onChange={async (e) => {
+                      setUserChatLoading(true);
+                      try {
+                        const { enabled } = await apiService.setUserChatEnabled(e.target.checked);
+                        setUserChatEnabled(enabled);
+                        enqueueSnackbar(`User chat ${enabled ? 'enabled' : 'disabled'}`, { variant: 'success' });
+                      } catch {
+                        enqueueSnackbar('Failed to update setting', { variant: 'error' });
+                      } finally {
+                        setUserChatLoading(false);
+                      }
+                    }}
+                    disabled={userChatLoading}
+                  />
+                </Box>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Artzyla Support Chat</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Enable the floating support chat widget for all users.
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={supportChatConfig.enabled}
+                    onChange={async (e) => {
+                      const updated = { ...supportChatConfig, enabled: e.target.checked };
+                      setSupportChatConfig(updated);
+                      try {
+                        await apiService.updateSupportChatConfig(updated);
+                        enqueueSnackbar(`Support chat ${updated.enabled ? 'enabled' : 'disabled'}`, { variant: 'success' });
+                      } catch {
+                        enqueueSnackbar('Failed to update setting', { variant: 'error' });
+                      }
+                    }}
+                  />
+                </Box>
+                {supportChatConfig.enabled && (
+                  <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField
+                        label="Start Hour (24h)"
+                        type="number"
+                        size="small"
+                        value={supportChatConfig.hours_start}
+                        onChange={(e) => setSupportChatConfig(prev => ({ ...prev, hours_start: parseInt(e.target.value) || 0 }))}
+                        inputProps={{ min: 0, max: 23 }}
+                        sx={{ width: 130 }}
+                      />
+                      <TextField
+                        label="End Hour (24h)"
+                        type="number"
+                        size="small"
+                        value={supportChatConfig.hours_end}
+                        onChange={(e) => setSupportChatConfig(prev => ({ ...prev, hours_end: parseInt(e.target.value) || 0 }))}
+                        inputProps={{ min: 0, max: 23 }}
+                        sx={{ width: 130 }}
+                      />
+                      <TextField
+                        label="Timezone"
+                        size="small"
+                        value={supportChatConfig.timezone}
+                        onChange={(e) => setSupportChatConfig(prev => ({ ...prev, timezone: e.target.value }))}
+                        sx={{ flex: 1 }}
+                      />
+                    </Box>
+                    <TextField
+                      label="Welcome Message"
+                      size="small"
+                      fullWidth
+                      value={supportChatConfig.welcome_message}
+                      onChange={(e) => setSupportChatConfig(prev => ({ ...prev, welcome_message: e.target.value }))}
+                    />
+                    <TextField
+                      label="Offline Message"
+                      size="small"
+                      fullWidth
+                      value={supportChatConfig.offline_message}
+                      onChange={(e) => setSupportChatConfig(prev => ({ ...prev, offline_message: e.target.value }))}
+                    />
+                    <Button
+                      variant="contained"
+                      size="small"
+                      sx={{ alignSelf: 'flex-start' }}
+                      onClick={async () => {
+                        try {
+                          await apiService.updateSupportChatConfig(supportChatConfig);
+                          enqueueSnackbar('Support chat settings saved', { variant: 'success' });
+                        } catch {
+                          enqueueSnackbar('Failed to save settings', { variant: 'error' });
+                        }
+                      }}
+                    >
+                      Save Support Chat Settings
+                    </Button>
+                  </Box>
+                )}
+              </Paper>
+            </Box>
+          </Box>)}
+          </Paper>
+        </Box>
 
         <Dialog open={announcementDialogOpen} onClose={() => setAnnouncementDialogOpen(false)} maxWidth="sm" fullWidth>
           <DialogTitle>{editingAnnouncement ? 'Edit Announcement' : 'Create Announcement'}</DialogTitle>

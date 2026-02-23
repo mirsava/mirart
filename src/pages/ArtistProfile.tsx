@@ -24,7 +24,7 @@ const ArtistProfile: React.FC = () => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const { openChat } = useChat();
+  const { openChat, chatEnabled } = useChat();
   const { enqueueSnackbar } = useSnackbar();
   const [artist, setArtist] = useState<User | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
@@ -161,7 +161,7 @@ const ArtistProfile: React.FC = () => {
                     {artist.first_name} {artist.last_name}
                   </Typography>
                 )}
-                {isAuthenticated && artist.id && artist.cognito_username !== user?.id && (
+                {isAuthenticated && artist.id && artist.cognito_username !== user?.id && chatEnabled && (
                   <Button
                     variant="contained"
                     startIcon={<ChatIcon />}

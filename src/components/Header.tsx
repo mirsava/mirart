@@ -67,7 +67,7 @@ const Header: React.FC = () => {
   const theme = useTheme();
   const { isDarkMode, toggleTheme } = useCustomTheme();
   const { user, signOut, isAuthenticated, refreshUser } = useAuth();
-  const { openChat } = useChat();
+  const { openChat, chatEnabled } = useChat();
   const { cartItems, getTotalItems, getTotalPrice, removeFromCart } = useCart();
   const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead, dismissNotification } = useNotifications();
   const { favorites, favoritesLoading, fetchFavorites, removeFavorite } = useFavorites();
@@ -189,7 +189,7 @@ const Header: React.FC = () => {
         { label: 'My Dashboard', path: '/artist-dashboard' },
         { label: 'Create Listing', path: '/create-listing' },
         { label: 'Messages', path: '/messages' },
-        { label: 'Chat', path: null, onClick: () => openChat() },
+        ...(chatEnabled ? [{ label: 'Chat', path: null, onClick: () => openChat() }] : []),
       ]
     : [
         { label: 'Sell Art', path: '/artist-signup' },
@@ -476,32 +476,34 @@ const Header: React.FC = () => {
                 }}
               />
             </ListItem>
-            <ListItem 
-              onClick={() => {
-                openChat();
-                handleDrawerToggle();
-              }}
-              sx={{
-                borderRadius: 2,
-                mb: 1,
-                cursor: 'pointer',
-                bgcolor: 'transparent',
-                color: 'inherit',
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                },
-              }}
-            >
-              <ListItemIcon>
-                <ChatIcon />
-              </ListItemIcon>
-              <ListItemText 
-                primary="Chat"
-                primaryTypographyProps={{
-                  fontWeight: 400,
+            {chatEnabled && (
+              <ListItem 
+                onClick={() => {
+                  openChat();
+                  handleDrawerToggle();
                 }}
-              />
-            </ListItem>
+                sx={{
+                  borderRadius: 2,
+                  mb: 1,
+                  cursor: 'pointer',
+                  bgcolor: 'transparent',
+                  color: 'inherit',
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                <ListItemIcon>
+                  <ChatIcon />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Chat"
+                  primaryTypographyProps={{
+                    fontWeight: 400,
+                  }}
+                />
+              </ListItem>
+            )}
             {user?.userRole === UserRole.SITE_ADMIN && (
               <ListItem 
                 onClick={() => {

@@ -71,7 +71,7 @@ interface ChatWidgetProps {
 const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversationId = null }) => {
   const theme = useTheme();
   const { user, isAuthenticated } = useAuth();
-  const { openChat: openChatFromContext } = useChat();
+  const { openChat: openChatFromContext, chatEnabled } = useChat();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<number | null>(initialConversationId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -390,7 +390,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
     };
   }, [isResizingWindow, resizeType, windowWidth]);
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || chatEnabled === false) {
     return null;
   }
 
@@ -970,9 +970,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
           color="primary"
           sx={{
             position: 'fixed',
-            bottom: 16,
-            right: 16,
+            bottom: 20,
+            right: 20,
             zIndex: 1300,
+            '@media print': { display: 'none' },
           }}
           onClick={() => {
             if (minimized) {

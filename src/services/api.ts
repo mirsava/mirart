@@ -927,6 +927,54 @@ class ApiService {
       body: JSON.stringify({ days }),
     });
   }
+
+  async getSupportChatConfig(): Promise<any> {
+    return this.request<any>('/support-chat/config');
+  }
+
+  async updateSupportChatConfig(config: any): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>('/support-chat/config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async getSupportChatMessages(cognitoUsername: string): Promise<any[]> {
+    return this.request<any[]>(`/support-chat/messages?cognitoUsername=${cognitoUsername}`);
+  }
+
+  async sendSupportChatMessage(data: { cognitoUsername?: string; message: string; sender: 'user' | 'admin'; adminCognitoUsername?: string; targetUserId?: number }): Promise<any> {
+    return this.request<any>('/support-chat/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async markSupportChatRead(cognitoUsername: string, sender: 'user' | 'admin'): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>('/support-chat/messages/read', {
+      method: 'PUT',
+      body: JSON.stringify({ cognitoUsername, sender }),
+    });
+  }
+
+  async getSupportChatConversations(): Promise<any[]> {
+    return this.request<any[]>('/support-chat/admin/conversations');
+  }
+
+  async getSupportChatAdminMessages(userId: number): Promise<any[]> {
+    return this.request<any[]>(`/support-chat/admin/messages/${userId}`);
+  }
+
+  async getUserChatEnabled(): Promise<{ enabled: boolean }> {
+    return this.request<{ enabled: boolean }>('/support-chat/user-chat-enabled');
+  }
+
+  async setUserChatEnabled(enabled: boolean): Promise<{ success: boolean; enabled: boolean }> {
+    return this.request<{ success: boolean; enabled: boolean }>('/support-chat/user-chat-enabled', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  }
 }
 
 export interface Review {

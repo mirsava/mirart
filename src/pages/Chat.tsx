@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { useChat } from '../contexts/ChatContext';
 import apiService from '../services/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -54,6 +55,7 @@ interface Conversation {
 
 const Chat: React.FC = () => {
   const { user } = useAuth();
+  const { chatEnabled } = useChat();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -182,6 +184,14 @@ const Chat: React.FC = () => {
            conversation.other_user_name.trim() || 
            conversation.other_user_email;
   };
+
+  if (chatEnabled === false) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Typography color="text.secondary">Chat is currently unavailable.</Typography>
+      </Box>
+    );
+  }
 
   if (loading) {
     return (

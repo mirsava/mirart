@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import Header from './Header';
 import Footer from './Footer';
 import ChatWidget from './ChatWidget';
+import SupportChatWidget from './SupportChatWidget';
 import DeactivatedUserBanner from './DeactivatedUserBanner';
 import AnnouncementBanner from './AnnouncementBanner';
 import { useChat } from '../contexts/ChatContext';
@@ -37,6 +38,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         onClose={closeChat}
         initialConversationId={initialConversationId}
       />
+      <SupportChatWidget />
     </Box>
   );
 };

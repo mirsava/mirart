@@ -20,6 +20,7 @@ import stripeRouter from './routes/stripe.js';
 import shippingRouter from './routes/shipping.js';
 import announcementsRouter from './routes/announcements.js';
 import notificationsRouter from './routes/notifications.js';
+import supportChatRouter from './routes/supportChat.js';
 
 dotenv.config();
 
@@ -115,6 +116,7 @@ app.use('/api/stripe', stripeRouter);
 app.use('/api/shipping', shippingRouter);
 app.use('/api/announcements', announcementsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/support-chat', supportChatRouter);
 
 // 404 handler - must be after all routes
 app.use((req, res, next) => {
@@ -323,6 +325,71 @@ app.listen(PORT, async () => {
     }
   } catch (err) {
     console.warn('[Startup] Notifications migration:', err?.message || err);
+  }
+
+  try {
+    const [ssTables] = await pool.execute(
+      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'site_settings'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (ssTables.length === 0) {
+      await pool.execute(`
+        CREATE TABLE site_settings (
+          setting_key VARCHAR(100) PRIMARY KEY,
+          setting_value JSON NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+      `);
+      await pool.execute(
+        "INSERT INTO site_settings (setting_key, setting_value) VALUES ('support_chat_config', ?)",
+        [JSON.stringify({ enabled: true, hours_start: 9, hours_end: 17, timezone: 'America/Los_Angeles', offline_message: 'Support is currently offline. Please leave a message and we will get back to you.', welcome_message: 'Hi! How can we help you today?' })]
+      );
+      console.log('[Startup] Created site_settings table with support chat defaults');
+    }
+  } catch (err) {
+    console.warn('[Startup] Site settings migration:', err?.message || err);
+  }
+
+  try {
+    const [ucRow] = await pool.execute(
+      "SELECT setting_key FROM site_settings WHERE setting_key = 'user_chat_enabled'"
+    );
+    if (ucRow.length === 0) {
+      await pool.execute(
+        "INSERT INTO site_settings (setting_key, setting_value) VALUES ('user_chat_enabled', ?)",
+        [JSON.stringify(false)]
+      );
+      console.log('[Startup] Added user_chat_enabled setting (default: off)');
+    }
+  } catch (err) {
+    console.warn('[Startup] User chat setting migration:', err?.message || err);
+  }
+
+  try {
+    const [scTables] = await pool.execute(
+      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'support_chat_messages'",
+      [process.env.DB_NAME || 'mirart']
+    );
+    if (scTables.length === 0) {
+      await pool.execute(`
+        CREATE TABLE support_chat_messages (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NULL,
+          user_email VARCHAR(255) NULL,
+          user_name VARCHAR(255) NULL,
+          sender ENUM('user', 'admin') NOT NULL,
+          message TEXT NOT NULL,
+          admin_id INT NULL,
+          read_at TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_user (user_id, created_at),
+          INDEX idx_unread (sender, read_at)
+        )
+      `);
+      console.log('[Startup] Created support_chat_messages table');
+    }
+  } catch (err) {
+    console.warn('[Startup] Support chat migration:', err?.message || err);
   }
 
   try {

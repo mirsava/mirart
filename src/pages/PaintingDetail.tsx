@@ -57,7 +57,7 @@ const PaintingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const { openChat } = useChat();
+  const { openChat, chatEnabled } = useChat();
   const { enqueueSnackbar } = useSnackbar();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; special_instructions?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean }) | null>(null);
@@ -1001,7 +1001,7 @@ const PaintingDetail: React.FC = () => {
                 >
                   Contact Seller
                 </Button>
-                {isAuthenticated && painting?.userId && (
+                {isAuthenticated && painting?.userId && chatEnabled && (
                   <Button
                     variant="contained"
                     size="large"
