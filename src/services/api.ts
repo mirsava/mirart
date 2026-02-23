@@ -344,6 +344,10 @@ class ApiService {
     return this.request<Order[]>(`/orders/user/${cognitoUsername}${params}`);
   }
 
+  async getOrderById(orderId: number, cognitoUsername: string): Promise<any> {
+    return this.request<any>(`/orders/${orderId}?cognitoUsername=${cognitoUsername}`);
+  }
+
   async markOrderShipped(orderId: number, cognitoUsername: string): Promise<{ success: boolean; status: string }> {
     return this.request(`/orders/${orderId}/mark-shipped`, {
       method: 'PUT',

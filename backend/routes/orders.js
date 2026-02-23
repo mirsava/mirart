@@ -228,6 +228,57 @@ router.get('/user/:cognitoUsername', async (req, res) => {
   }
 });
 
+router.get('/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { cognitoUsername } = req.query;
+
+    if (!cognitoUsername) return res.status(400).json({ error: 'cognitoUsername required' });
+
+    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
+    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+    const userId = users[0].id;
+
+    const [orders] = await pool.execute(
+      `SELECT o.*,
+        l.title as listing_title, l.primary_image_url, l.description as listing_description,
+        l.category, l.subcategory, l.medium, l.dimensions, l.year as listing_year,
+        l.return_days, l.returns_info, l.shipping_preference,
+        buyer.email as buyer_email, buyer.first_name as buyer_first_name, buyer.last_name as buyer_last_name,
+        buyer.phone as buyer_phone, buyer.address_line1 as buyer_address_line1, buyer.address_city as buyer_address_city,
+        buyer.address_state as buyer_address_state, buyer.address_zip as buyer_address_zip, buyer.address_country as buyer_address_country,
+        seller.email as seller_email, seller.first_name as seller_first_name, seller.last_name as seller_last_name,
+        seller.business_name as seller_business_name, seller.phone as seller_phone,
+        seller.address_line1 as seller_address_line1, seller.address_city as seller_address_city,
+        seller.address_state as seller_address_state, seller.address_zip as seller_address_zip, seller.address_country as seller_address_country
+      FROM orders o
+      JOIN listings l ON o.listing_id = l.id
+      JOIN users buyer ON o.buyer_id = buyer.id
+      JOIN users seller ON o.seller_id = seller.id
+      WHERE o.id = ?`,
+      [orderId]
+    );
+
+    if (orders.length === 0) return res.status(404).json({ error: 'Order not found' });
+    const order = orders[0];
+    if (order.buyer_id !== userId && order.seller_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    res.json({
+      ...order,
+      unit_price: parseFloat(order.unit_price),
+      total_price: parseFloat(order.total_price),
+      platform_fee: parseFloat(order.platform_fee),
+      artist_earnings: parseFloat(order.artist_earnings),
+      shipping_cost: order.shipping_cost ? parseFloat(order.shipping_cost) : 0,
+    });
+  } catch (error) {
+    console.error('Error fetching order:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Mark order as shipped (seller)
 router.put('/:orderId/mark-shipped', async (req, res) => {
   try {

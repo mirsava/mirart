@@ -33,6 +33,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import Chat from './pages/Chat';
 import SubscriptionPlans from './pages/SubscriptionPlans';
 import Orders from './pages/Orders';
+import OrderDetail from './pages/OrderDetail';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UserRole } from './types/userRoles';
 
@@ -94,6 +95,11 @@ function AppContent(): JSX.Element {
             />
             <Route path="/order-success" element={<OrderSuccess />} />
             <Route path="/orders" element={<Orders />} />
+            <Route path="/orders/:id" element={
+              <ProtectedRoute>
+                <OrderDetail />
+              </ProtectedRoute>
+            } />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy" element={<Privacy />} />

@@ -21,6 +21,7 @@ import {
   TrackChanges as TrackIcon,
   ThumbUp as ApproveIcon,
   ThumbDown as DenyIcon,
+  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../services/api';
@@ -224,6 +225,16 @@ const OrderCard: React.FC<OrderCardProps> = ({
               x{order.quantity}
             </Typography>
           </Box>
+
+          <Button
+            size="small"
+            variant="text"
+            startIcon={<ReceiptIcon />}
+            onClick={(e) => { e.stopPropagation(); navigate(`/orders/${order.id}`); }}
+            sx={{ alignSelf: { xs: 'flex-start', md: 'flex-end' } }}
+          >
+            Invoice / Order Details
+          </Button>
 
           <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
             {type === 'sale' && order.status === 'paid' && (
