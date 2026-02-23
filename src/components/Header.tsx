@@ -979,7 +979,13 @@ const Header: React.FC = () => {
                           onClick={() => { closeAllDrawers(); setFavoritesDrawerOpen(true); fetchFavorites(); }}
                           sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
                         >
-                          <FavoriteIcon sx={{ fontSize: 20 }} />
+                          <Badge
+                            badgeContent={favorites.length}
+                            color="error"
+                            sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}
+                          >
+                            <FavoriteIcon sx={{ fontSize: 20 }} />
+                          </Badge>
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Notifications">
@@ -1535,7 +1541,9 @@ const Header: React.FC = () => {
             '&:hover': { bgcolor: 'secondary.main', color: 'white' },
           }}
         >
-          <FavoriteIcon sx={{ mr: 2, fontSize: 20 }} />
+          <Badge badgeContent={favorites.length} color="error" sx={{ mr: 2 }}>
+            <FavoriteIcon sx={{ fontSize: 20 }} />
+          </Badge>
           Favorites
         </MenuItem>
         {user?.userRole === UserRole.SITE_ADMIN && (
