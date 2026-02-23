@@ -58,8 +58,10 @@ import { useCart } from '../contexts/CartContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User, UserSubscription } from '../services/api';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import OrderCardComponent from '../components/OrderCard';
-import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButtonGroup, ToggleButton } from '@mui/material';
+import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButtonGroup, ToggleButton, useTheme, LinearProgress } from '@mui/material';
+import { Lock as LockIcon, AttachMoney as AttachMoneyIcon, CalendarMonth as CalendarMonthIcon, ShowChart as ShowChartIcon } from '@mui/icons-material';
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
 
@@ -109,12 +111,15 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+const CATEGORY_COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
+
 const ArtistDashboard: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { enqueueSnackbar } = useSnackbar();
   const { addToCart } = useCart();
+  const theme = useTheme();
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,6 +201,13 @@ const ArtistDashboard: React.FC = () => {
   const [labelLoading, setLabelLoading] = useState(false);
   const [labelPurchasing, setLabelPurchasing] = useState(false);
   const [orderActionLoading, setOrderActionLoading] = useState<number | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<{
+    summary: { totalEarnings: number; totalOrders: number; avgOrderValue: number; thisMonth: number; lastMonth: number; ytd: number };
+    revenueOverTime: { month: string; earnings: number; orders: number }[];
+    topListings: { id: number; title: string; primaryImageUrl: string; category: string; totalRevenue: number; orderCount: number }[];
+    revenueByCategory: { category: string; earnings: number; orders: number }[];
+  } | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   const filterDashboardOrders = (orders: Order[]) => {
     return orders.filter((order) => {
@@ -226,14 +238,30 @@ const ArtistDashboard: React.FC = () => {
   const [returnLoading, setReturnLoading] = useState(false);
   const [connectLoading, setConnectLoading] = useState(false);
 
+  const fetchAnalytics = async () => {
+    if (!user?.id) return;
+    setLoadingAnalytics(true);
+    try {
+      const data = await apiService.getArtistAnalytics(user.id);
+      setAnalyticsData(data);
+    } catch {
+      setAnalyticsData(null);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
+
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
       fetchSubscription();
-      if (tabValue === 3 || tabValue === 4) {
+      if (tabValue === 2 && subscription?.tier === 'enterprise') {
+        fetchAnalytics();
+      }
+      if (tabValue === 4 || tabValue === 5) {
         fetchProfile();
       }
-      if (tabValue === 4) {
+      if (tabValue === 5) {
         fetchSettings();
         fetchConnectStatus();
       }
@@ -310,7 +338,7 @@ const ArtistDashboard: React.FC = () => {
   useEffect(() => {
     const state = location.state as { tab?: string } | null;
     if (state?.tab === 'subscription') {
-      setTabValue(2);
+      setTabValue(3);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state]);
@@ -1034,9 +1062,10 @@ const ArtistDashboard: React.FC = () => {
         {/* Main Content Tabs */}
         <Paper elevation={0} sx={{ width: '100%', mb: 4, border: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tabs value={tabValue} onChange={handleTabChange}>
+            <Tabs value={tabValue} onChange={handleTabChange} variant="scrollable" scrollButtons="auto">
               <Tab label="My Listings" />
               <Tab label="Orders" />
+              <Tab label="Analytics" />
               <Tab label="Subscription" />
               <Tab label="Profile" />
               <Tab label="Settings" />
@@ -1474,6 +1503,166 @@ const ArtistDashboard: React.FC = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={2}>
+            {subscription?.tier !== 'enterprise' ? (
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <LockIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h5" fontWeight={700} gutterBottom>
+                  Unlock Revenue Analytics
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 480, mx: 'auto' }}>
+                  Get detailed revenue insights, track earnings over time, see your top performing listings, and analyze sales by category with an Enterprise subscription.
+                </Typography>
+                <Button variant="contained" size="large" onClick={() => navigate('/subscription-plans')} startIcon={<ShowChartIcon />}>
+                  Upgrade to Enterprise
+                </Button>
+              </Box>
+            ) : loadingAnalytics ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
+            ) : !analyticsData ? (
+              <Alert severity="info">No analytics data available yet. Start selling to see your revenue insights.</Alert>
+            ) : (
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                  <ShowChartIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+                  <Typography variant="h5" fontWeight={600}>Revenue Analytics</Typography>
+                </Box>
+
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                  {[
+                    { label: 'Total Earnings', value: `$${analyticsData.summary.totalEarnings.toFixed(2)}`, icon: <AttachMoneyIcon /> },
+                    { label: 'This Month', value: `$${analyticsData.summary.thisMonth.toFixed(2)}`, icon: <CalendarMonthIcon /> },
+                    { label: 'Last Month', value: `$${analyticsData.summary.lastMonth.toFixed(2)}`, icon: <CalendarMonthIcon /> },
+                    { label: 'Year to Date', value: `$${analyticsData.summary.ytd.toFixed(2)}`, icon: <TrendingUpIcon /> },
+                    { label: 'Avg Order Value', value: `$${analyticsData.summary.avgOrderValue.toFixed(2)}`, icon: <ReceiptIcon /> },
+                    { label: 'Total Orders', value: String(analyticsData.summary.totalOrders), icon: <ShoppingBagIcon /> },
+                  ].map((stat) => (
+                    <Grid item xs={6} sm={4} md={2} key={stat.label}>
+                      <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2, textAlign: 'center' }}>
+                        <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32, mx: 'auto', mb: 1 }}>
+                          {React.cloneElement(stat.icon, { sx: { fontSize: 18 } })}
+                        </Avatar>
+                        <Typography variant="h6" fontWeight={700}>{stat.value}</Typography>
+                        <Typography variant="caption" color="text.secondary">{stat.label}</Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 4 }}>
+                  <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>Monthly Earnings (Last 12 Months)</Typography>
+                  {analyticsData.revenueOverTime.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>No revenue data yet</Typography>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={analyticsData.revenueOverTime} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                        <XAxis
+                          dataKey="month"
+                          tickFormatter={(v: string) => {
+                            const [y, m] = v.split('-');
+                            return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString('en-US', { month: 'short' });
+                          }}
+                          tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
+                        />
+                        <YAxis
+                          tickFormatter={(v: number) => `$${v}`}
+                          tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
+                        />
+                        <RechartsTooltip
+                          formatter={(value: number) => [`$${value.toFixed(2)}`, 'Earnings']}
+                          labelFormatter={(label: string) => {
+                            const [y, m] = label.split('-');
+                            return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                          }}
+                          contentStyle={{ backgroundColor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: 8 }}
+                        />
+                        <Bar dataKey="earnings" radius={[4, 4, 0, 0]} fill={theme.palette.primary.main} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </Paper>
+
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={7}>
+                    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
+                      <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>Top Performing Listings</Typography>
+                      {analyticsData.topListings.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>No sales data yet</Typography>
+                      ) : (
+                        <TableContainer>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 600 }}>#</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Listing</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 600 }}>Orders</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 600 }}>Revenue</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {analyticsData.topListings.map((listing, idx) => (
+                                <TableRow key={listing.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/painting/${listing.id}`)}>
+                                  <TableCell>{idx + 1}</TableCell>
+                                  <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                      <Box
+                                        component="img"
+                                        src={getImageUrl(listing.primaryImageUrl)}
+                                        sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }}
+                                      />
+                                      <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>{listing.title}</Typography>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell><Chip label={listing.category || 'N/A'} size="small" variant="outlined" /></TableCell>
+                                  <TableCell align="right">{listing.orderCount}</TableCell>
+                                  <TableCell align="right" sx={{ fontWeight: 600 }}>${listing.totalRevenue.toFixed(2)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} md={5}>
+                    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
+                      <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>Revenue by Category</Typography>
+                      {analyticsData.revenueByCategory.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>No category data yet</Typography>
+                      ) : (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {(() => {
+                            const maxEarnings = Math.max(...analyticsData.revenueByCategory.map(c => c.earnings));
+                            return analyticsData.revenueByCategory.map((cat, idx) => (
+                              <Box key={cat.category}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: CATEGORY_COLORS[idx % CATEGORY_COLORS.length], flexShrink: 0 }} />
+                                    <Typography variant="body2">{cat.category}</Typography>
+                                  </Box>
+                                  <Typography variant="body2" fontWeight={600}>${cat.earnings.toFixed(2)}</Typography>
+                                </Box>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={maxEarnings > 0 ? (cat.earnings / maxEarnings) * 100 : 0}
+                                  sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { bgcolor: CATEGORY_COLORS[idx % CATEGORY_COLORS.length], borderRadius: 3 } }}
+                                />
+                                <Typography variant="caption" color="text.secondary">{cat.orders} order{cat.orders !== 1 ? 's' : ''}</Typography>
+                              </Box>
+                            ));
+                          })()}
+                        </Box>
+                      )}
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={3}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <CreditCardIcon sx={{ fontSize: 28, color: 'primary.main' }} />
@@ -1662,7 +1851,7 @@ const ArtistDashboard: React.FC = () => {
             )}
           </TabPanel>
 
-          <TabPanel value={tabValue} index={3}>
+          <TabPanel value={tabValue} index={4}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <PersonIcon sx={{ fontSize: 28, color: 'primary.main' }} />
@@ -2207,7 +2396,7 @@ const ArtistDashboard: React.FC = () => {
             </form>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={4}>
+          <TabPanel value={tabValue} index={5}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <SettingsIcon sx={{ fontSize: 28, color: 'primary.main' }} />

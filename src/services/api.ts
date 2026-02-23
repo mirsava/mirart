@@ -327,6 +327,22 @@ class ApiService {
     return this.request<DashboardData>(`/dashboard/${cognitoUsername}`);
   }
 
+  async getArtistAnalytics(cognitoUsername: string): Promise<{
+    summary: {
+      totalEarnings: number;
+      totalOrders: number;
+      avgOrderValue: number;
+      thisMonth: number;
+      lastMonth: number;
+      ytd: number;
+    };
+    revenueOverTime: { month: string; earnings: number; orders: number }[];
+    topListings: { id: number; title: string; primaryImageUrl: string; category: string; totalRevenue: number; orderCount: number }[];
+    revenueByCategory: { category: string; earnings: number; orders: number }[];
+  }> {
+    return this.request(`/dashboard/${cognitoUsername}/analytics`);
+  }
+
   // Order endpoints
   async createOrder(orderData: {
     cognito_username: string;
