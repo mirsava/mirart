@@ -25,7 +25,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       }}
     >
       <Header />
-      <Box sx={{ pt: { xs: '100px', sm: '120px' } }}>
+      <Box sx={{ pt: { xs: '76px', md: '72px' } }}>
         <AnnouncementBanner />
         <DeactivatedUserBanner />
       </Box>

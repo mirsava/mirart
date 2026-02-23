@@ -811,8 +811,8 @@ const Gallery: React.FC = () => {
           sx: {
             width: { xs: '100%', sm: 380 },
             bgcolor: 'background.default',
-            top: { xs: '100px', md: '120px' },
-            height: { xs: 'calc(100vh - 100px)', md: 'calc(100vh - 120px)' },
+            top: { xs: 76, md: 72 },
+            height: { xs: 'calc(100vh - 76px)', md: 'calc(100vh - 72px)' },
           },
         }}
       >

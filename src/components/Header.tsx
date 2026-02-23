@@ -583,7 +583,7 @@ const Header: React.FC = () => {
         sx={{
           background: theme.palette.background.paper,
           transition: 'all 0.3s ease-in-out',
-          boxShadow: 'none',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
           zIndex: 1300,
           width: '100%',
           left: 0,
@@ -599,7 +599,7 @@ const Header: React.FC = () => {
             disableGutters
             sx={{ 
               width: '100%',
-              minHeight: { xs: 64, sm: 70 },
+              minHeight: { xs: 76, md: 72 },
               justifyContent: 'space-between',
             }}
           >
@@ -623,33 +623,22 @@ const Header: React.FC = () => {
                 display: 'flex', 
                 alignItems: 'center', 
                 cursor: 'pointer',
-                flex: { xs: 0, md: 0 },
               }}
               onClick={() => navigate('/')}
             >
               <Box
+                component="img"
+                src={logo}
+                alt="ArtZyla Logo"
                 sx={{
-                  position: 'relative',
-                  display: 'inline-block',
+                  height: { xs: 68, md: 64 },
+                  width: 'auto',
+                  objectFit: 'contain',
+                  display: 'block',
+                  transition: 'opacity 0.3s ease',
+                  '&:hover': { opacity: 0.9 },
                 }}
-              >
-                <Box
-                  component="img"
-                  src={logo}
-                  alt="ArtZyla Logo"
-                  sx={{
-                    height: { xs: 100, md: 120 },
-                    width: 'auto',
-                    objectFit: 'contain',
-                    py: 1,
-                    display: 'block',
-                    transition: 'opacity 0.3s ease',
-                    '&:hover': {
-                      opacity: 0.9,
-                    },
-                  }}
-                />
-              </Box>
+              />
             </Box>
 
             {!isMobile && (
@@ -657,14 +646,9 @@ const Header: React.FC = () => {
                 <Box 
                   sx={{ 
                     display: 'flex', 
-                    gap: { md: 0.15, lg: 0.3, xl: 0.5 },
+                    gap: { md: 0.5, lg: 1, xl: 1.5 },
                     alignItems: 'center',
-                    position: 'absolute',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    maxWidth: { md: 'calc(100% - 320px)', lg: 'calc(100% - 380px)', xl: 'none' },
-                    zIndex: 1,
-                    willChange: 'auto',
+                    mx: 'auto',
                   }}
                 >
                   {menuItems.map((item) => (
@@ -686,10 +670,10 @@ const Header: React.FC = () => {
                             ? 'primary.main'
                             : (isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'),
                           fontWeight: location.pathname === item.path ? 600 : 500,
-                          fontSize: { md: '0.75rem', lg: '0.85rem', xl: '0.9rem' },
+                          fontSize: { md: '0.85rem', lg: '0.9rem', xl: '0.95rem' },
                           textTransform: 'none',
-                          px: { md: 1, lg: 1.5, xl: 2.5 },
-                          py: { md: 0.4, lg: 0.6, xl: 0.75 },
+                          px: { md: 1.5, lg: 2, xl: 2.5 },
+                          py: 0.75,
                           position: 'relative',
                           transition: 'color 0.2s ease, border-color 0.2s ease',
                           minWidth: 'auto',
@@ -699,7 +683,6 @@ const Header: React.FC = () => {
                           borderColor: location.pathname === item.path ? 'primary.main' : 'transparent',
                           borderRadius: 0,
                           flexShrink: 0,
-                          contain: 'layout style',
                           '&:hover': {
                             bgcolor: 'transparent',
                             color: location.pathname === item.path 
@@ -933,11 +916,10 @@ const Header: React.FC = () => {
                       sx={{
                         color: isDarkMode ? 'white' : 'text.primary',
                         fontWeight: 500,
-                        position: 'relative',
                         bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
                         borderRadius: 2,
                         px: 2,
-                        py: 1,
+                        py: 0.75,
                         '&:hover': {
                           bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
                         },
@@ -951,59 +933,97 @@ const Header: React.FC = () => {
               </Fade>
             )}
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 0.5, md: 0.75, lg: 0.75, xl: 1 }, ml: 'auto', flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, md: 1, lg: 1.25 }, flexShrink: 0 }}>
               {isAuthenticated && user ? (
                 <>
-                  <Button
-                    variant="contained"
-                    onClick={() => navigate('/create-listing')}
-                    startIcon={<AddIcon />}
-                    sx={{
-                      mr: { xs: 0.5, sm: 0.5, md: 0.5, lg: 0.5, xl: 1 },
-                      textTransform: 'none',
-                      fontWeight: 500,
-                      display: { xs: 'none', md: 'none', lg: 'flex' },
-                      whiteSpace: 'nowrap',
-                      fontSize: { lg: '0.875rem', xl: '0.9375rem' },
-                      px: { lg: 1.5, xl: 2 },
-                    }}
-                  >
-                    Create Listing
-                  </Button>
+                  {!isMobile && (
+                    <>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<AddIcon />}
+                        onClick={() => navigate('/create-listing')}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 500,
+                          fontSize: '0.8rem',
+                          px: 1.5,
+                          py: 0.25,
+                          borderRadius: 1.5,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Create Listing
+                      </Button>
+                      <Tooltip title={unreadMessages > 0 ? `${unreadMessages} unread` : 'Messages'}>
+                        <IconButton
+                          size="small"
+                          onClick={() => navigate('/messages')}
+                          sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                        >
+                          <Badge badgeContent={unreadMessages} color="error" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
+                            <EmailIcon sx={{ fontSize: 20 }} />
+                          </Badge>
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Favorites">
+                        <IconButton
+                          size="small"
+                          onClick={() => { setFavoritesDrawerOpen(true); fetchFavorites(); }}
+                          sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                        >
+                          <FavoriteIcon sx={{ fontSize: 20 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Notifications">
+                        <IconButton
+                          size="small"
+                          onClick={() => { setNotificationDrawerOpen(true); fetchNotifications(); }}
+                          sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                        >
+                          <Badge badgeContent={unreadCount} color="error" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
+                            <NotificationsIcon sx={{ fontSize: 20 }} />
+                          </Badge>
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  )}
+                  <Tooltip title="Cart">
+                    <IconButton
+                      size="small"
+                      onClick={() => setCartDrawerOpen(true)}
+                      sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                    >
+                      <Badge badgeContent={getTotalItems()} color="primary" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
+                        <ShoppingCartIcon sx={{ fontSize: 20 }} />
+                      </Badge>
+                    </IconButton>
+                  </Tooltip>
                   <IconButton
-                    onClick={() => navigate('/create-listing')}
-                    sx={{
-                      mr: { xs: 0.5, sm: 0.5, md: 0.5, lg: 0 },
-                      display: { xs: 'flex', md: 'flex', lg: 'none' },
-                      bgcolor: 'primary.main',
-                      color: 'white',
-                      '&:hover': {
-                        bgcolor: 'primary.dark',
-                      },
-                    }}
-                    aria-label="Create Listing"
+                    size="small"
+                    onClick={toggleTheme}
+                    sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
                   >
-                    <AddIcon />
+                    {isDarkMode ? <LightModeIcon sx={{ fontSize: 20 }} /> : <DarkModeIcon sx={{ fontSize: 20 }} />}
                   </IconButton>
+                  <Divider orientation="vertical" flexItem sx={{ mx: 0.25, display: { xs: 'none', md: 'block' } }} />
                   <Button
                     onClick={handleUserMenuOpen}
-                    startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main' }}>
+                    startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
                       {user.name?.charAt(0).toUpperCase() || user.id?.charAt(0).toUpperCase() || 'U'}
                     </Avatar>}
-                    endIcon={<ExpandMoreIcon />}
+                    endIcon={<ExpandMoreIcon sx={{ fontSize: 16 }} />}
                     sx={{
                       color: isDarkMode ? 'white' : 'text.primary',
                       fontWeight: 500,
-                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
                       borderRadius: 2,
-                      px: { xs: 1, sm: 2 },
+                      px: 1.5,
                       py: 0.5,
                       textTransform: 'none',
-                      display: { xs: 'none', md: 'none', lg: 'flex' },
+                      display: { xs: 'none', md: 'flex' },
                       whiteSpace: 'nowrap',
-                      '&:hover': {
-                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
-                      },
+                      fontSize: '0.8125rem',
+                      '&:hover': { bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover' },
                     }}
                   >
                     {user.name || user.id || 'User'}
@@ -1011,46 +1031,39 @@ const Header: React.FC = () => {
                   <IconButton
                     onClick={handleUserMenuOpen}
                     sx={{
-                      display: { xs: 'flex', md: 'flex', lg: 'none' },
+                      display: { xs: 'flex', md: 'none' },
                       color: isDarkMode ? 'white' : 'text.primary',
-                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
-                      '&:hover': {
-                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
-                      },
                     }}
                     aria-label="User menu"
                   >
-                    <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main' }}>
+                    <Avatar sx={{ width: 26, height: 26, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
                       {user.name?.charAt(0).toUpperCase() || user.id?.charAt(0).toUpperCase() || 'U'}
                     </Avatar>
                   </IconButton>
                 </>
-              ) : null}
-              
-              <IconButton
-                onClick={() => setCartDrawerOpen(true)}
-                sx={{ 
-                  color: isDarkMode ? 'white' : 'text.primary',
-                  bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
-                  '&:hover': {
-                    bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
-                  },
-                }}
-              >
-                <Badge 
-                  badgeContent={getTotalItems()} 
-                  color="primary"
-                  sx={{
-                    '& .MuiBadge-badge': {
-                      bgcolor: 'primary.main',
-                      color: 'white',
-                      fontWeight: 600,
-                    },
-                  }}
-                >
-                  <ShoppingCartIcon />
-                </Badge>
-              </IconButton>
+              ) : (
+                <>
+                  <IconButton
+                    size="small"
+                    onClick={() => setCartDrawerOpen(true)}
+                    sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                  >
+                    <Badge badgeContent={getTotalItems()} color="primary" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
+                      <ShoppingCartIcon sx={{ fontSize: 20 }} />
+                    </Badge>
+                  </IconButton>
+                  <IconButton 
+                    size="small"
+                    onClick={toggleTheme}
+                    sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                  >
+                    {isDarkMode ? <LightModeIcon sx={{ fontSize: 20 }} /> : <DarkModeIcon sx={{ fontSize: 20 }} />}
+                  </IconButton>
+                </>
+              )}
+            </Box>
+          </Toolbar>
+
               <Drawer
                 anchor="right"
                 open={cartDrawerOpen}
@@ -1059,9 +1072,8 @@ const Header: React.FC = () => {
                 PaperProps={{
                   sx: {
                     width: { xs: '100%', sm: 380 },
-                    top: { xs: 100, sm: 120 },
-                    height: { xs: 'calc(100vh - 100px)', sm: 'calc(100vh - 120px)' },
-                    maxHeight: '100vh',
+                    top: { xs: 76, md: 72 },
+                    height: { xs: 'calc(100vh - 76px)', md: 'calc(100vh - 72px)' },
                     overflow: 'hidden',
                     zIndex: 1400,
                   },
@@ -1156,89 +1168,6 @@ const Header: React.FC = () => {
               </Drawer>
               {isAuthenticated && (
                 <>
-                  <Tooltip title={unreadMessages > 0 ? `${unreadMessages} unread messages` : 'Messages'}>
-                    <IconButton
-                      onClick={() => navigate('/messages')}
-                      aria-label="Messages"
-                      sx={{ 
-                        color: isDarkMode ? 'white' : 'text.primary',
-                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
-                        '&:hover': {
-                          bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
-                        },
-                      }}
-                    >
-                      <Badge 
-                        badgeContent={unreadMessages} 
-                        color="error"
-                        sx={{
-                          '& .MuiBadge-badge': {
-                            bgcolor: 'error.main',
-                            color: 'white',
-                            fontWeight: 600,
-                          },
-                        }}
-                      >
-                        <EmailIcon />
-                      </Badge>
-                    </IconButton>
-                  </Tooltip>
-                  <IconButton
-                    onClick={() => {
-                      setFavoritesDrawerOpen(true);
-                      fetchFavorites();
-                    }}
-                    aria-label="Favorites"
-                    sx={{ 
-                      color: isDarkMode ? 'white' : 'text.primary',
-                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
-                      '&:hover': {
-                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
-                      },
-                    }}
-                  >
-                    <Badge 
-                      badgeContent={favorites.length || 0} 
-                      color="error"
-                      sx={{
-                        '& .MuiBadge-badge': {
-                          bgcolor: 'error.main',
-                          color: 'white',
-                          fontWeight: 600,
-                        },
-                      }}
-                    >
-                      <FavoriteIcon />
-                    </Badge>
-                  </IconButton>
-                  <IconButton
-                    onClick={() => {
-                      setNotificationDrawerOpen(true);
-                      fetchNotifications();
-                    }}
-                    aria-label="Notifications"
-                    sx={{ 
-                      color: isDarkMode ? 'white' : 'text.primary',
-                      bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
-                      '&:hover': {
-                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
-                      },
-                    }}
-                  >
-                    <Badge 
-                      badgeContent={unreadCount} 
-                      color="error"
-                      sx={{
-                        '& .MuiBadge-badge': {
-                          bgcolor: 'error.main',
-                          color: 'white',
-                          fontWeight: 600,
-                        },
-                      }}
-                    >
-                      <NotificationsIcon />
-                    </Badge>
-                  </IconButton>
                   <Drawer
                     anchor="right"
                     open={notificationDrawerOpen}
@@ -1247,9 +1176,8 @@ const Header: React.FC = () => {
                     PaperProps={{
                       sx: {
                         width: { xs: '100%', sm: 380 },
-                        top: { xs: 100, sm: 120 },
-                        height: { xs: 'calc(100vh - 100px)', sm: 'calc(100vh - 120px)' },
-                        maxHeight: '100vh',
+                        top: { xs: 76, md: 72 },
+                        height: { xs: 'calc(100vh - 76px)', md: 'calc(100vh - 72px)' },
                         overflow: 'hidden',
                         zIndex: 1400,
                       },
@@ -1370,8 +1298,8 @@ const Header: React.FC = () => {
                     PaperProps={{
                       sx: {
                         width: { xs: '100%', sm: 380 },
-                        top: { xs: 100, sm: 120 },
-                        height: { xs: 'calc(100vh - 100px)', sm: 'calc(100vh - 120px)' },
+                        top: { xs: 76, md: 72 },
+                        height: { xs: 'calc(100vh - 76px)', md: 'calc(100vh - 72px)' },
                         maxHeight: '100vh',
                         overflow: 'hidden',
                         zIndex: 1400,
@@ -1479,21 +1407,6 @@ const Header: React.FC = () => {
                   </Drawer>
                 </>
               )}
-              <IconButton 
-                onClick={toggleTheme}
-                sx={{ 
-                  color: isDarkMode ? 'white' : 'text.primary',
-                  bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
-                  '&:hover': {
-                    bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
-                  },
-                }}
-              >
-                {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
-              </IconButton>
-
-            </Box>
-          </Toolbar>
       </AppBar>
 
       <Menu
