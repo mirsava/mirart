@@ -199,7 +199,7 @@ const SupportChatWidget: React.FC = () => {
                   py: 1.5,
                   borderRadius: 2,
                   borderTopLeftRadius: 0,
-                  bgcolor: 'grey.100',
+                  bgcolor: 'action.hover',
                 }}>
                   <Typography variant="body2">
                     {online ? config.welcome_message : config.offline_message}
@@ -221,7 +221,7 @@ const SupportChatWidget: React.FC = () => {
                       borderRadius: 2,
                       borderTopRightRadius: msg.sender === 'user' ? 0 : 2,
                       borderTopLeftRadius: msg.sender === 'admin' ? 0 : 2,
-                      bgcolor: msg.sender === 'user' ? 'primary.main' : 'grey.100',
+                      bgcolor: msg.sender === 'user' ? 'primary.main' : 'action.hover',
                       color: msg.sender === 'user' ? 'white' : 'text.primary',
                     }}>
                       <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{msg.message}</Typography>

@@ -169,6 +169,72 @@ router.get('/user/:cognitoUsername', async (req, res) => {
   }
 });
 
+router.post('/', async (req, res) => {
+  try {
+    const { cognitoUsername, listingId, subject, message } = req.body;
+    if (!cognitoUsername || !listingId || !subject || !message) {
+      return res.status(400).json({ error: 'cognitoUsername, listingId, subject, and message are required' });
+    }
+
+    const [senders] = await pool.execute(
+      'SELECT id, email, business_name, first_name, last_name FROM users WHERE cognito_username = ?',
+      [cognitoUsername]
+    );
+    if (senders.length === 0) return res.status(404).json({ error: 'Sender not found' });
+    const sender = senders[0];
+
+    const [listings] = await pool.execute(
+      'SELECT l.id, l.user_id, u.email as seller_email, u.cognito_username as seller_cognito FROM listings l JOIN users u ON l.user_id = u.id WHERE l.id = ?',
+      [listingId]
+    );
+    if (listings.length === 0) return res.status(404).json({ error: 'Listing not found' });
+    const listing = listings[0];
+
+    if (sender.id === listing.user_id) {
+      return res.status(400).json({ error: 'You cannot message yourself' });
+    }
+
+    const senderName = sender.business_name || `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || cognitoUsername;
+
+    const [result] = await pool.execute(
+      `INSERT INTO messages (listing_id, sender_id, recipient_id, subject, message, sender_email, sender_name, recipient_email, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent')`,
+      [listingId, sender.id, listing.user_id, subject, message, sender.email, senderName, listing.seller_email]
+    );
+
+    try {
+      await createNotification(
+        listing.user_id,
+        'New message',
+        `${senderName} sent you a message about a listing`,
+        '/messages',
+        'info'
+      );
+    } catch {}
+
+    res.json({ success: true, messageId: result.insertId });
+  } catch (error) {
+    console.error('Error creating message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/unread-count/:cognitoUsername', async (req, res) => {
+  try {
+    const { cognitoUsername } = req.params;
+    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
+    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+    const [[row]] = await pool.execute(
+      "SELECT COUNT(*) as count FROM messages WHERE recipient_id = ? AND status = 'sent'",
+      [users[0].id]
+    );
+    res.json({ count: row.count });
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.put('/:messageId/read', async (req, res) => {
   try {
     const { messageId } = req.params;

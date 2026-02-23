@@ -80,6 +80,7 @@ const PaintingDetail: React.FC = () => {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [userHasReviewed, setUserHasReviewed] = useState(false);
+  const [editingReview, setEditingReview] = useState(false);
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -409,6 +410,7 @@ const PaintingDetail: React.FC = () => {
       setNewReviewRating(0);
       setNewReviewComment('');
       setUserHasReviewed(true);
+      setEditingReview(false);
       fetchReviews(painting.id);
     } catch (error: any) {
       enqueueSnackbar(error?.message || 'Failed to post review', { variant: 'error' });
@@ -706,6 +708,7 @@ const PaintingDetail: React.FC = () => {
                   sx={{
                     bgcolor: 'rgba(255,255,255,0.9)',
                     '&:hover': { bgcolor: 'rgba(255,255,255,1)' },
+                    color: 'grey.800',
                   }}
                   onClick={handleShare}
                 >
@@ -992,15 +995,17 @@ const PaintingDetail: React.FC = () => {
                     Edit Listing
                   </Button>
                 )}
-                <Button
-                  variant="outlined"
-                  size="large"
-                  startIcon={<EmailIcon />}
-                  onClick={handleContactSeller}
-                  sx={{ flexGrow: { xs: 1, sm: 0 } }}
-                >
-                  Contact Seller
-                </Button>
+                {isAuthenticated && (
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    startIcon={<EmailIcon />}
+                    onClick={handleContactSeller}
+                    sx={{ flexGrow: { xs: 1, sm: 0 } }}
+                  >
+                    Contact Seller
+                  </Button>
+                )}
                 {isAuthenticated && painting?.userId && chatEnabled && (
                   <Button
                     variant="contained"
@@ -1025,7 +1030,7 @@ const PaintingDetail: React.FC = () => {
           listingId={painting.id}
         />
 
-        <Box sx={{ mt: 6 }}>
+        <Box id="reviews-section" sx={{ mt: 6 }}>
           <Divider sx={{ mb: 4 }} />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
             <Typography variant="h5" fontWeight={600}>Reviews</Typography>
@@ -1040,9 +1045,18 @@ const PaintingDetail: React.FC = () => {
 
           {painting.allow_comments === true ? (
             <>
-              {isAuthenticated && !userHasReviewed && painting.userId !== user?.id && (
+              {isAuthenticated && (!userHasReviewed || editingReview) && painting.userId !== user?.id && (
                 <Paper sx={{ p: 3, mb: 3 }}>
-                  <Typography variant="subtitle1" fontWeight={600} gutterBottom>Write a Review</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {editingReview ? 'Edit Your Review' : 'Write a Review'}
+                    </Typography>
+                    {editingReview && (
+                      <Button size="small" onClick={() => { setEditingReview(false); setNewReviewRating(0); setNewReviewComment(''); }}>
+                        Cancel
+                      </Button>
+                    )}
+                  </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                     <Typography variant="body2" color="text.secondary">Your rating:</Typography>
                     <Rating
@@ -1067,14 +1081,10 @@ const PaintingDetail: React.FC = () => {
                       disabled={!newReviewRating || submittingReview}
                       startIcon={<StarIcon />}
                     >
-                      {submittingReview ? 'Submitting...' : 'Submit Review'}
+                      {submittingReview ? 'Submitting...' : editingReview ? 'Update Review' : 'Submit Review'}
                     </Button>
                   </Box>
                 </Paper>
-              )}
-
-              {isAuthenticated && userHasReviewed && (
-                <Alert severity="success" sx={{ mb: 3 }}>You have already reviewed this listing.</Alert>
               )}
 
               {!isAuthenticated && (
@@ -1122,11 +1132,26 @@ const PaintingDetail: React.FC = () => {
                           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 0.5 }}>{review.comment}</Typography>
                         )}
                       </Box>
+                      {user?.id === review.cognito_username && (
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setEditingReview(true);
+                            setNewReviewRating(review.rating);
+                            setNewReviewComment(review.comment || '');
+                            window.scrollTo({ top: document.getElementById('reviews-section')?.offsetTop || 0, behavior: 'smooth' });
+                          }}
+                          sx={{ ml: 1 }}
+                          title="Edit review"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
                       {(user?.id === review.cognito_username || painting.userId === user?.id) && (
                         <IconButton
                           size="small"
                           onClick={() => { setReviewToDelete(review.id); setDeleteDialogOpen(true); }}
-                          sx={{ ml: 1 }}
+                          title="Delete review"
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>

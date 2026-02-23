@@ -47,10 +47,10 @@ interface ReturnEligibility {
   daysLeft?: number;
 }
 
-export const getReturnEligibility = (order: Order): ReturnEligibility => {
+export const getReturnEligibility = (order: Order): ReturnEligibility | null => {
   if (order.status !== 'delivered') return { eligible: false, reason: 'Order not yet delivered' };
   if (order.return_status) return { eligible: false, reason: `Return ${order.return_status}` };
-  if (!order.return_days || order.return_days <= 0) return { eligible: false, reason: 'No returns accepted' };
+  if (!order.return_days || order.return_days <= 0) return null;
   const deliveredDate = order.updated_at || order.created_at;
   const daysSince = Math.floor((Date.now() - new Date(deliveredDate).getTime()) / 86400000);
   if (daysSince > order.return_days) return { eligible: false, reason: 'Return window expired' };

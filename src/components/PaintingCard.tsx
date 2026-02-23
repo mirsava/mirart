@@ -311,15 +311,17 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
                 Buy Now
               </Button>
             )}
-            <Button
-              size="small"
-              variant="contained"
-              color="secondary"
-              startIcon={<EmailIcon />}
-              onClick={handleContactSeller}
-            >
-              Contact Seller
-            </Button>
+            {isAuthenticated && (
+              <Button
+                size="small"
+                variant="contained"
+                color="secondary"
+                startIcon={<EmailIcon />}
+                onClick={handleContactSeller}
+              >
+                Contact Seller
+              </Button>
+            )}
           </>
         )}
       </CardActions>

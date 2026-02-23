@@ -71,6 +71,7 @@ const Header: React.FC = () => {
   const { cartItems, getTotalItems, getTotalPrice, removeFromCart } = useCart();
   const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead, dismissNotification } = useNotifications();
   const { favorites, favoritesLoading, fetchFavorites, removeFavorite } = useFavorites();
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [artistMenuAnchor, setArtistMenuAnchor] = useState<null | HTMLElement>(null);
@@ -203,6 +204,16 @@ const Header: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) { setUnreadMessages(0); return; }
+    const fetchCount = () => apiService.getUnreadMessageCount(user.id).then(r => setUnreadMessages(r.count)).catch(() => {});
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000);
+    const onMessagesRead = () => fetchCount();
+    window.addEventListener('messagesRead', onMessagesRead);
+    return () => { clearInterval(interval); window.removeEventListener('messagesRead', onMessagesRead); };
+  }, [isAuthenticated, user?.id]);
 
   const handleDrawerToggle = (): void => {
     if (!drawerOpen && isAuthenticated) {
@@ -340,7 +351,11 @@ const Header: React.FC = () => {
                 }}
               >
                 <ListItemText 
-                  primary={item.label}
+                  primary={
+                    item.label === 'Messages' && unreadMessages > 0
+                      ? <Badge badgeContent={unreadMessages} color="error" sx={{ '& .MuiBadge-badge': { right: -16, top: 2 } }}>{item.label}</Badge>
+                      : item.label
+                  }
                   primaryTypographyProps={{
                     fontWeight: location.pathname === item.path ? 600 : 400,
                   }}
@@ -411,7 +426,7 @@ const Header: React.FC = () => {
               }}
             >
               <ListItemIcon>
-                <EmailIcon />
+                <Badge badgeContent={unreadMessages} color="error"><EmailIcon /></Badge>
               </ListItemIcon>
               <ListItemText 
                 primary="Messages"
@@ -1141,6 +1156,33 @@ const Header: React.FC = () => {
               </Drawer>
               {isAuthenticated && (
                 <>
+                  <Tooltip title={unreadMessages > 0 ? `${unreadMessages} unread messages` : 'Messages'}>
+                    <IconButton
+                      onClick={() => navigate('/messages')}
+                      aria-label="Messages"
+                      sx={{ 
+                        color: isDarkMode ? 'white' : 'text.primary',
+                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover',
+                        '&:hover': {
+                          bgcolor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'action.selected',
+                        },
+                      }}
+                    >
+                      <Badge 
+                        badgeContent={unreadMessages} 
+                        color="error"
+                        sx={{
+                          '& .MuiBadge-badge': {
+                            bgcolor: 'error.main',
+                            color: 'white',
+                            fontWeight: 600,
+                          },
+                        }}
+                      >
+                        <EmailIcon />
+                      </Badge>
+                    </IconButton>
+                  </Tooltip>
                   <IconButton
                     onClick={() => {
                       setFavoritesDrawerOpen(true);
@@ -1544,7 +1586,7 @@ const Header: React.FC = () => {
             '&:hover': { bgcolor: 'secondary.main', color: 'white' },
           }}
         >
-          <EmailIcon sx={{ mr: 2, fontSize: 20 }} />
+          <Badge badgeContent={unreadMessages} color="error" sx={{ mr: 2 }}><EmailIcon sx={{ fontSize: 20 }} /></Badge>
           Messages
         </MenuItem>
         <MenuItem 

@@ -2309,7 +2309,7 @@ const AdminDashboard: React.FC = () => {
                                 px: 2,
                                 py: 1,
                                 borderRadius: 2,
-                                bgcolor: msg.sender === 'admin' ? 'primary.main' : 'grey.100',
+                                bgcolor: msg.sender === 'admin' ? 'primary.main' : 'action.hover',
                                 color: msg.sender === 'admin' ? 'white' : 'text.primary',
                               }}>
                                 <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{msg.message}</Typography>

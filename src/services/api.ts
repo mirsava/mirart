@@ -470,6 +470,17 @@ class ApiService {
     return this.request<{ messages: Message[] }>(`/messages/user/${cognitoUsername}?type=${type}`);
   }
 
+  async sendMessage(cognitoUsername: string, listingId: number, subject: string, message: string): Promise<{ success: boolean; messageId: number }> {
+    return this.request<{ success: boolean; messageId: number }>('/messages', {
+      method: 'POST',
+      body: JSON.stringify({ cognitoUsername, listingId, subject, message }),
+    });
+  }
+
+  async getUnreadMessageCount(cognitoUsername: string): Promise<{ count: number }> {
+    return this.request<{ count: number }>(`/messages/unread-count/${cognitoUsername}`);
+  }
+
   async markMessageAsRead(messageId: number, cognitoUsername: string): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>(`/messages/${messageId}/read`, {
       method: 'PUT',
