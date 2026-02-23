@@ -216,7 +216,7 @@ const SubscriptionPlans: React.FC = () => {
                 Current Plan: {currentSubscription.plan_name} ({currentSubscription.billing_period})
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {currentSubscription.current_listings || 0} / {currentSubscription.max_listings} listings active
+                {currentSubscription.current_listings || 0} / {currentSubscription.max_listings >= 999999 ? 'Unlimited' : currentSubscription.max_listings} listings active
                 {currentSubscription.end_date && ` • Access until: ${new Date(currentSubscription.end_date).toLocaleDateString()}`}
                 {(currentSubscription.auto_renew === false || currentSubscription.auto_renew === 0) && (
                   <Chip label="Cancels at end of period" size="small" color="warning" sx={{ ml: 1 }} />
@@ -356,6 +356,11 @@ const SubscriptionPlans: React.FC = () => {
                     <Typography variant="h5" fontWeight={700} gutterBottom>
                       {plan.name}
                     </Typography>
+                    {plan.description && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        {plan.description}
+                      </Typography>
+                    )}
                     <Box sx={{ my: 3 }}>
                       <Typography variant="h3" fontWeight={700} color="primary.main">
                         ${(getPrice(plan, 'monthly') || 0).toFixed(2)}
@@ -376,7 +381,7 @@ const SubscriptionPlans: React.FC = () => {
                       </Typography>
                     </Box>
                     <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                      Up to {plan.max_listings} active listings
+                      {plan.max_listings >= 999999 ? 'Unlimited' : `Up to ${plan.max_listings}`} active listings
                     </Typography>
                     {features.length > 0 && (
                       <Box sx={{ mb: 3 }}>

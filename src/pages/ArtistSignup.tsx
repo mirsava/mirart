@@ -866,7 +866,7 @@ const ArtistSignup: React.FC = () => {
                                       {plan.name}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
-                                      {plan.tier}
+                                      {plan.description || plan.tier}
                                     </Typography>
                                   </Box>
                                   <Radio
@@ -892,7 +892,7 @@ const ArtistSignup: React.FC = () => {
                                 </Box>
                                 <Box sx={{ mb: 2 }}>
                                   <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>
-                                    Up to {plan.max_listings} active listings per month
+                                    {plan.max_listings >= 999999 ? 'Unlimited' : `Up to ${plan.max_listings}`} active listings per month
                                   </Typography>
                                   {features.length > 0 && (
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>

@@ -80,6 +80,8 @@ import {
   AttachMoney as AttachMoneyIcon,
   CalendarMonth as CalendarMonthIcon,
   MonetizationOn as MonetizationOnIcon,
+  Sync as SyncIcon,
+  CloudSync as CloudSyncIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -204,6 +206,12 @@ const AdminDashboard: React.FC = () => {
   const [userChatLoading, setUserChatLoading] = useState(false);
   const [testDataEnabled, setTestDataEnabled] = useState(false);
   const [testDataLoading, setTestDataLoading] = useState(false);
+  const [stripePlans, setStripePlans] = useState<any[]>([]);
+  const [loadingStripePlans, setLoadingStripePlans] = useState(false);
+  const [syncingPlans, setSyncingPlans] = useState(false);
+  const [editingStripePlan, setEditingStripePlan] = useState<any>(null);
+  const [stripePriceForm, setStripePriceForm] = useState({ price_monthly: 0, price_yearly: 0 });
+  const [savingStripePrice, setSavingStripePrice] = useState(false);
 
   const fetchUserChatEnabled = async () => {
     try {
@@ -636,6 +644,54 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const fetchStripePlans = async (): Promise<void> => {
+    if (!user?.id) return;
+    setLoadingStripePlans(true);
+    try {
+      const { plans } = await apiService.getStripePlans(user.id, user.groups);
+      setStripePlans(plans || []);
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to fetch Stripe plans', { variant: 'error' });
+    } finally {
+      setLoadingStripePlans(false);
+    }
+  };
+
+  const handleSyncStripePlans = async (): Promise<void> => {
+    if (!user?.id) return;
+    setSyncingPlans(true);
+    try {
+      const result = await apiService.syncStripePlans(user.id, user.groups);
+      enqueueSnackbar(result.message, { variant: 'success' });
+      await fetchStripePlans();
+      await fetchSubscriptionPlans();
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to sync plans', { variant: 'error' });
+    } finally {
+      setSyncingPlans(false);
+    }
+  };
+
+  const handleEditStripePrice = (plan: any): void => {
+    setEditingStripePlan(plan);
+    setStripePriceForm({ price_monthly: plan.price_monthly || 0, price_yearly: plan.price_yearly || 0 });
+  };
+
+  const handleSaveStripePrice = async (): Promise<void> => {
+    if (!user?.id || !editingStripePlan) return;
+    setSavingStripePrice(true);
+    try {
+      await apiService.updateStripePlanPrices(user.id, user.groups, editingStripePlan.stripe_product_id, stripePriceForm);
+      enqueueSnackbar('Prices updated successfully', { variant: 'success' });
+      setEditingStripePlan(null);
+      await fetchStripePlans();
+    } catch (error: any) {
+      enqueueSnackbar(error.message || 'Failed to update prices', { variant: 'error' });
+    } finally {
+      setSavingStripePrice(false);
+    }
+  };
+
   const handleSectionChange = (section: string): void => {
     setActiveSection(section);
     if (isMobile) setSidebarOpen(false);
@@ -647,6 +703,9 @@ const AdminDashboard: React.FC = () => {
       fetchUserChatEnabled();
       fetchSupportConfig();
       fetchTestDataEnabled();
+    }
+    if (section === 'plans') {
+      fetchStripePlans();
     }
   };
 
@@ -1846,22 +1905,95 @@ const AdminDashboard: React.FC = () => {
           {activeSection === 'plans' && (<Box sx={{ py: 3 }}>
             <Box sx={{ px: 3, pb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h6">Subscription Plans</Typography>
-                <Button variant="contained" onClick={handlePlanCreate} startIcon={<EditIcon />}>
+                <Typography variant="h6">Stripe Subscription Plans</Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button variant="outlined" onClick={handleSyncStripePlans} startIcon={syncingPlans ? <CircularProgress size={16} /> : <SyncIcon />} disabled={syncingPlans}>
+                    {syncingPlans ? 'Syncing...' : 'Sync to Database'}
+                  </Button>
+                  <Button variant="outlined" onClick={fetchStripePlans} startIcon={loadingStripePlans ? <CircularProgress size={16} /> : <CloudSyncIcon />} disabled={loadingStripePlans}>
+                    Refresh
+                  </Button>
+                </Box>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Plans are loaded directly from Stripe. Products with <code>active_listing_limit</code> metadata are shown. Edit prices here and they update in Stripe.
+              </Typography>
+              {loadingStripePlans ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+              ) : stripePlans.length === 0 ? (
+                <Paper elevation={0} sx={{ p: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <CreditCardIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    No subscription plans found in Stripe. Create products with <code>active_listing_limit</code> metadata in your Stripe dashboard.
+                  </Typography>
+                </Paper>
+              ) : (
+                <Grid container spacing={2}>
+                  {stripePlans.map((plan) => (
+                    <Grid item xs={12} sm={6} md={4} key={plan.stripe_product_id}>
+                      <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                          <Typography variant="subtitle1" fontWeight={700}>{plan.name}</Typography>
+                          <Chip
+                            label={plan.active_listing_limit === 'unlimited' ? 'Unlimited' : `${plan.active_listing_limit} listings`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        </Box>
+                        {plan.description && <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{plan.description}</Typography>}
+                        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                          <Box sx={{ flex: 1, p: 1.5, bgcolor: 'action.hover', borderRadius: 1, textAlign: 'center' }}>
+                            <Typography variant="caption" color="text.secondary">Monthly</Typography>
+                            <Typography variant="h6" fontWeight={700}>${plan.price_monthly.toFixed(2)}</Typography>
+                          </Box>
+                          <Box sx={{ flex: 1, p: 1.5, bgcolor: 'action.hover', borderRadius: 1, textAlign: 'center' }}>
+                            <Typography variant="caption" color="text.secondary">Yearly</Typography>
+                            <Typography variant="h6" fontWeight={700}>${plan.price_yearly.toFixed(2)}</Typography>
+                          </Box>
+                        </Box>
+                        {plan.features && (
+                          <Box sx={{ mb: 2, flex: 1 }}>
+                            {plan.features.split('\n').filter(Boolean).map((f: string, i: number) => (
+                              <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                                <CheckCircleIcon sx={{ fontSize: 14, color: 'success.main' }} />
+                                <Typography variant="caption">{f}</Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                        <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.65rem' }}>{plan.stripe_product_id}</Typography>
+                          <Button size="small" variant="outlined" onClick={() => handleEditStripePrice(plan)} startIcon={<EditIcon sx={{ fontSize: 14 }} />}>
+                            Edit Prices
+                          </Button>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+              <Divider sx={{ my: 4 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight={600}>Local Database Plans</Typography>
+                <Button variant="contained" size="small" onClick={handlePlanCreate} startIcon={<EditIcon sx={{ fontSize: 14 }} />}>
                   Create Plan
                 </Button>
               </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                These are stored in your database. Use "Sync to Database" to update them from Stripe.
+              </Typography>
               <TableContainer>
-                <Table>
+                <Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Name</TableCell>
                       <TableCell>Tier</TableCell>
                       <TableCell>Max Listings</TableCell>
-                      <TableCell>Monthly Price</TableCell>
-                      <TableCell>Yearly Price</TableCell>
+                      <TableCell>Monthly</TableCell>
+                      <TableCell>Yearly</TableCell>
+                      <TableCell>Stripe ID</TableCell>
                       <TableCell>Status</TableCell>
-                      <TableCell>Order</TableCell>
                       <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
@@ -1869,60 +2001,30 @@ const AdminDashboard: React.FC = () => {
                     {subscriptionPlans.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} align="center">
-                          <Typography variant="body2" color="text.secondary">
-                            No subscription plans found
-                          </Typography>
+                          <Typography variant="body2" color="text.secondary">No plans in database</Typography>
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      subscriptionPlans.map((plan) => {
-                        const monthlyPrice = typeof plan.price_monthly === 'number' 
-                          ? plan.price_monthly 
-                          : parseFloat(plan.price_monthly || '0');
-                        const yearlyPrice = typeof plan.price_yearly === 'number' 
-                          ? plan.price_yearly 
-                          : parseFloat(plan.price_yearly || '0');
-                        
-                        return (
-                          <TableRow key={plan.id}>
-                            <TableCell>{plan.name}</TableCell>
-                            <TableCell>{plan.tier}</TableCell>
-                            <TableCell>{plan.max_listings}</TableCell>
-                            <TableCell>${monthlyPrice.toFixed(2)}</TableCell>
-                            <TableCell>${yearlyPrice.toFixed(2)}</TableCell>
-                            <TableCell>
-                              <Chip
-                                label={plan.is_active ? 'Active' : 'Inactive'}
-                                color={plan.is_active ? 'success' : 'default'}
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell>{plan.display_order}</TableCell>
-                        <TableCell align="right">
-                          <IconButton
-                            size="small"
-                            onClick={() => handlePlanEdit(plan)}
-                            sx={{ mr: 1 }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => handlePlanDelete(plan.id)}
-                            disabled={deletingPlan === plan.id}
-                            color="error"
-                          >
-                            {deletingPlan === plan.id ? (
-                              <CircularProgress size={20} />
-                            ) : (
-                              <DeleteIcon fontSize="small" />
-                            )}
-                          </IconButton>
+                    ) : subscriptionPlans.map((plan) => {
+                      const mp = typeof plan.price_monthly === 'number' ? plan.price_monthly : parseFloat(plan.price_monthly || '0');
+                      const yp = typeof plan.price_yearly === 'number' ? plan.price_yearly : parseFloat(plan.price_yearly || '0');
+                      return (
+                        <TableRow key={plan.id}>
+                          <TableCell>{plan.name}</TableCell>
+                          <TableCell><Chip label={plan.tier} size="small" variant="outlined" /></TableCell>
+                          <TableCell>{plan.max_listings === 999999 ? 'Unlimited' : plan.max_listings}</TableCell>
+                          <TableCell>${mp.toFixed(2)}</TableCell>
+                          <TableCell>${yp.toFixed(2)}</TableCell>
+                          <TableCell><Typography variant="caption" sx={{ fontFamily: 'monospace', fontSize: '0.65rem' }}>{plan.stripe_product_id || '—'}</Typography></TableCell>
+                          <TableCell><Chip label={plan.is_active ? 'Active' : 'Inactive'} color={plan.is_active ? 'success' : 'default'} size="small" /></TableCell>
+                          <TableCell align="right">
+                            <IconButton size="small" onClick={() => handlePlanEdit(plan)} sx={{ mr: 0.5 }}><EditIcon fontSize="small" /></IconButton>
+                            <IconButton size="small" onClick={() => handlePlanDelete(plan.id)} disabled={deletingPlan === plan.id} color="error">
+                              {deletingPlan === plan.id ? <CircularProgress size={16} /> : <DeleteIcon fontSize="small" />}
+                            </IconButton>
                           </TableCell>
                         </TableRow>
-                        );
-                      })
-                    )}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -2770,6 +2872,42 @@ const AdminDashboard: React.FC = () => {
             <Button onClick={() => setPlanDialogOpen(false)}>Cancel</Button>
             <Button onClick={handlePlanSave} variant="contained">
               {editingPlan ? 'Update' : 'Create'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={!!editingStripePlan} onClose={() => setEditingStripePlan(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>Edit Prices — {editingStripePlan?.name}</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Listing limit: <strong>{editingStripePlan?.active_listing_limit === 'unlimited' ? 'Unlimited' : editingStripePlan?.active_listing_limit}</strong>
+              </Typography>
+              <TextField
+                label="Monthly Price ($)"
+                type="number"
+                fullWidth
+                value={stripePriceForm.price_monthly}
+                onChange={(e) => setStripePriceForm({ ...stripePriceForm, price_monthly: parseFloat(e.target.value) || 0 })}
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+              <TextField
+                label="Yearly Price ($)"
+                type="number"
+                fullWidth
+                value={stripePriceForm.price_yearly}
+                onChange={(e) => setStripePriceForm({ ...stripePriceForm, price_yearly: parseFloat(e.target.value) || 0 })}
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                This creates new Stripe prices and deactivates old ones. Existing subscribers keep their current price until renewal.
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditingStripePlan(null)}>Cancel</Button>
+            <Button onClick={handleSaveStripePrice} variant="contained" disabled={savingStripePrice}>
+              {savingStripePrice ? <CircularProgress size={20} /> : 'Update Prices'}
             </Button>
           </DialogActions>
         </Dialog>

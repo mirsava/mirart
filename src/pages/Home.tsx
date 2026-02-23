@@ -759,6 +759,11 @@ const Home: React.FC = () => {
                         <Typography variant="h5" fontWeight={700} gutterBottom>
                           {plan.name}
                         </Typography>
+                        {plan.description && (
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            {plan.description}
+                          </Typography>
+                        )}
                         <Box sx={{ my: 2 }}>
                           <Typography variant="h4" fontWeight={700} color="primary.main">
                             ${plan.price_monthly.toFixed(2)}
@@ -768,7 +773,7 @@ const Home: React.FC = () => {
                           </Typography>
                         </Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                          Up to {plan.max_listings} active listings
+                          {plan.max_listings >= 999999 ? 'Unlimited' : `Up to ${plan.max_listings}`} active listings
                         </Typography>
                         {features.length > 0 && (
                           <Box sx={{ mb: 2 }}>

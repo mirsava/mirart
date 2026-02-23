@@ -697,11 +697,160 @@ router.put('/user/:cognitoUsername/resume', async (req, res) => {
   }
 });
 
+router.get('/admin/stripe-plans', async (req, res) => {
+  try {
+    const { cognitoUsername, groups } = req.query;
+    if (!cognitoUsername) return res.status(401).json({ error: 'Authentication required' });
+
+    let userGroups = [];
+    try { userGroups = typeof groups === 'string' ? JSON.parse(groups) : (Array.isArray(groups) ? groups : [groups]); } catch { userGroups = [groups]; }
+    if (!userGroups.includes('site_admin') && !userGroups.includes('admin')) return res.status(403).json({ error: 'Admin access required' });
+
+    if (!stripe) return res.status(500).json({ error: 'Stripe not configured' });
+
+    const products = await stripe.products.list({ active: true, limit: 100, expand: ['data.default_price'] });
+    const subscriptionProducts = products.data.filter(p => p.metadata?.active_listing_limit);
+
+    const plans = [];
+    for (const product of subscriptionProducts) {
+      const prices = await stripe.prices.list({ product: product.id, active: true, limit: 20 });
+      const monthlyPrice = prices.data.find(p => p.recurring?.interval === 'month');
+      const yearlyPrice = prices.data.find(p => p.recurring?.interval === 'year');
+
+      plans.push({
+        stripe_product_id: product.id,
+        name: product.name,
+        description: product.description || '',
+        active_listing_limit: product.metadata.active_listing_limit,
+        features: product.marketing_features?.map(f => f.name).join('\n') || '',
+        price_monthly: monthlyPrice ? monthlyPrice.unit_amount / 100 : 0,
+        price_monthly_id: monthlyPrice?.id || null,
+        price_yearly: yearlyPrice ? yearlyPrice.unit_amount / 100 : 0,
+        price_yearly_id: yearlyPrice?.id || null,
+        metadata: product.metadata,
+      });
+    }
+
+    plans.sort((a, b) => {
+      const aLimit = a.active_listing_limit === 'unlimited' ? 999999 : parseInt(a.active_listing_limit) || 0;
+      const bLimit = b.active_listing_limit === 'unlimited' ? 999999 : parseInt(b.active_listing_limit) || 0;
+      return aLimit - bLimit;
+    });
+
+    res.json({ plans });
+  } catch (error) {
+    console.error('Error fetching Stripe plans:', error);
+    res.status(500).json({ error: 'Failed to fetch plans from Stripe' });
+  }
+});
+
+router.post('/admin/sync-stripe-plans', async (req, res) => {
+  try {
+    const { cognitoUsername, groups } = req.query;
+    if (!cognitoUsername) return res.status(401).json({ error: 'Authentication required' });
+
+    let userGroups = [];
+    try { userGroups = typeof groups === 'string' ? JSON.parse(groups) : (Array.isArray(groups) ? groups : [groups]); } catch { userGroups = [groups]; }
+    if (!userGroups.includes('site_admin') && !userGroups.includes('admin')) return res.status(403).json({ error: 'Admin access required' });
+
+    if (!stripe) return res.status(500).json({ error: 'Stripe not configured' });
+
+    const products = await stripe.products.list({ active: true, limit: 100 });
+    const subscriptionProducts = products.data.filter(p => p.metadata?.active_listing_limit);
+
+    let synced = 0;
+    for (const product of subscriptionProducts) {
+      const prices = await stripe.prices.list({ product: product.id, active: true, limit: 20 });
+      const monthlyPrice = prices.data.find(p => p.recurring?.interval === 'month');
+      const yearlyPrice = prices.data.find(p => p.recurring?.interval === 'year');
+      const limit = product.metadata.active_listing_limit;
+      const maxListings = limit === 'unlimited' ? 999999 : parseInt(limit) || 5;
+
+      const desc = product.description || '';
+      const [existing] = await pool.execute('SELECT id FROM subscription_plans WHERE stripe_product_id = ?', [product.id]);
+      if (existing.length > 0) {
+        await pool.execute(
+          `UPDATE subscription_plans SET name = ?, description = ?, max_listings = ?, price_monthly = ?, price_yearly = ?, features = ?, is_active = TRUE WHERE stripe_product_id = ?`,
+          [product.name, desc, maxListings, monthlyPrice ? monthlyPrice.unit_amount / 100 : 0, yearlyPrice ? yearlyPrice.unit_amount / 100 : 0, product.marketing_features?.map(f => f.name).join('\n') || '', product.id]
+        );
+      } else {
+        const tier = product.name.toLowerCase().replace(/\s+/g, '_');
+        await pool.execute(
+          `INSERT INTO subscription_plans (name, description, tier, max_listings, price_monthly, price_yearly, features, is_active, display_order, stripe_product_id) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?)`,
+          [product.name, desc, tier, maxListings, monthlyPrice ? monthlyPrice.unit_amount / 100 : 0, yearlyPrice ? yearlyPrice.unit_amount / 100 : 0, product.marketing_features?.map(f => f.name).join('\n') || '', synced + 1, product.id]
+        );
+      }
+      synced++;
+    }
+
+    res.json({ success: true, synced, message: `${synced} plan(s) synced from Stripe` });
+  } catch (error) {
+    console.error('Error syncing Stripe plans:', error);
+    res.status(500).json({ error: 'Failed to sync plans from Stripe' });
+  }
+});
+
+router.put('/admin/stripe-plans/:productId/prices', async (req, res) => {
+  try {
+    const { cognitoUsername, groups } = req.query;
+    if (!cognitoUsername) return res.status(401).json({ error: 'Authentication required' });
+
+    let userGroups = [];
+    try { userGroups = typeof groups === 'string' ? JSON.parse(groups) : (Array.isArray(groups) ? groups : [groups]); } catch { userGroups = [groups]; }
+    if (!userGroups.includes('site_admin') && !userGroups.includes('admin')) return res.status(403).json({ error: 'Admin access required' });
+
+    if (!stripe) return res.status(500).json({ error: 'Stripe not configured' });
+
+    const { productId } = req.params;
+    const { price_monthly, price_yearly } = req.body;
+
+    if (price_monthly !== undefined && price_monthly > 0) {
+      const existingPrices = await stripe.prices.list({ product: productId, active: true, limit: 20 });
+      const oldMonthly = existingPrices.data.find(p => p.recurring?.interval === 'month');
+      
+      const newMonthlyPrice = await stripe.prices.create({
+        product: productId,
+        unit_amount: Math.round(price_monthly * 100),
+        currency: 'usd',
+        recurring: { interval: 'month' },
+      });
+      
+      if (oldMonthly) await stripe.prices.update(oldMonthly.id, { active: false });
+      
+      await stripe.products.update(productId, { default_price: newMonthlyPrice.id });
+    }
+
+    if (price_yearly !== undefined && price_yearly > 0) {
+      const existingPrices = await stripe.prices.list({ product: productId, active: true, limit: 20 });
+      const oldYearly = existingPrices.data.find(p => p.recurring?.interval === 'year');
+      
+      const newYearlyPrice = await stripe.prices.create({
+        product: productId,
+        unit_amount: Math.round(price_yearly * 100),
+        currency: 'usd',
+        recurring: { interval: 'year' },
+      });
+      
+      if (oldYearly) await stripe.prices.update(oldYearly.id, { active: false });
+    }
+
+    await pool.execute(
+      'UPDATE subscription_plans SET price_monthly = ?, price_yearly = ? WHERE stripe_product_id = ?',
+      [price_monthly || 0, price_yearly || 0, productId]
+    );
+
+    res.json({ success: true, message: 'Prices updated in Stripe and database' });
+  } catch (error) {
+    console.error('Error updating Stripe prices:', error);
+    res.status(500).json({ error: 'Failed to update prices' });
+  }
+});
+
 // Admin: Create or update subscription plan
 router.post('/admin/plans', async (req, res) => {
   try {
     const { cognitoUsername, groups } = req.query;
-    const { id, name, tier, max_listings, price_monthly, price_yearly, features, is_active, display_order } = req.body;
+    const { id, name, description, tier, max_listings, price_monthly, price_yearly, features, is_active, display_order } = req.body;
 
     if (!cognitoUsername) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -729,18 +878,18 @@ router.post('/admin/plans', async (req, res) => {
     if (id) {
       await pool.execute(
         `UPDATE subscription_plans 
-         SET name = ?, tier = ?, max_listings = ?, price_monthly = ?, price_yearly = ?, 
+         SET name = ?, description = ?, tier = ?, max_listings = ?, price_monthly = ?, price_yearly = ?, 
              features = ?, is_active = ?, display_order = ?
          WHERE id = ?`,
-        [name, tier, max_listings, price_monthly, price_yearly, features || null, is_active !== false, display_order || 0, id]
+        [name, description || null, tier, max_listings, price_monthly, price_yearly, features || null, is_active !== false, display_order || 0, id]
       );
       res.json({ message: 'Plan updated successfully', id });
     } else {
       const [result] = await pool.execute(
         `INSERT INTO subscription_plans 
-         (name, tier, max_listings, price_monthly, price_yearly, features, is_active, display_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [name, tier, max_listings, price_monthly, price_yearly, features || null, is_active !== false, display_order || 0]
+         (name, description, tier, max_listings, price_monthly, price_yearly, features, is_active, display_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, description || null, tier, max_listings, price_monthly, price_yearly, features || null, is_active !== false, display_order || 0]
       );
       res.json({ message: 'Plan created successfully', id: result.insertId });
     }

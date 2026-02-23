@@ -114,6 +114,7 @@ export interface DashboardData {
 export interface SubscriptionPlan {
   id: number;
   name: string;
+  description?: string;
   tier: string;
   max_listings: number;
   price_monthly: number;
@@ -121,6 +122,7 @@ export interface SubscriptionPlan {
   features?: string;
   is_active: boolean;
   display_order: number;
+  stripe_product_id?: string;
 }
 
 export interface UserSubscription {
@@ -893,6 +895,30 @@ class ApiService {
     params.append('groups', JSON.stringify(groups));
     return this.request<{ message: string }>(`/subscriptions/admin/plans/${planId}?${params.toString()}`, {
       method: 'DELETE',
+    });
+  }
+
+  async getStripePlans(cognitoUsername: string, groups?: string[]): Promise<{ plans: any[] }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups?.length) params.append('groups', JSON.stringify(groups));
+    return this.request<{ plans: any[] }>(`/subscriptions/admin/stripe-plans?${params.toString()}`);
+  }
+
+  async syncStripePlans(cognitoUsername: string, groups?: string[]): Promise<{ success: boolean; synced: number; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    if (groups?.length) params.append('groups', JSON.stringify(groups));
+    return this.request<{ success: boolean; synced: number; message: string }>(`/subscriptions/admin/sync-stripe-plans?${params.toString()}`, { method: 'POST' });
+  }
+
+  async updateStripePlanPrices(cognitoUsername: string, groups: string[], productId: string, prices: { price_monthly?: number; price_yearly?: number }): Promise<{ success: boolean; message: string }> {
+    const params = new URLSearchParams();
+    params.append('cognitoUsername', cognitoUsername);
+    params.append('groups', JSON.stringify(groups));
+    return this.request<{ success: boolean; message: string }>(`/subscriptions/admin/stripe-plans/${productId}/prices?${params.toString()}`, {
+      method: 'PUT',
+      body: JSON.stringify(prices),
     });
   }
 

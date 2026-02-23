@@ -771,12 +771,12 @@ const Gallery: React.FC = () => {
                       <Button
                         variant="contained"
                         startIcon={<AddIcon />}
-                        onClick={() => navigate('/artist-signup')}
+                        onClick={() => navigate(user ? '/create-listing' : '/artist-signup')}
                         sx={{
                           textTransform: 'none',
                         }}
                       >
-                        Add Your Listing
+                        {user ? 'Create Listing' : 'Add Your Listing'}
                       </Button>
                     </CardContent>
                   </Card>

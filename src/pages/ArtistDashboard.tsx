@@ -934,7 +934,7 @@ const ArtistDashboard: React.FC = () => {
         ) : (
           <>
             {/* Listing limit reached banner */}
-            {subscription && subscription.status === 'active' && (subscription.current_listings ?? artistStats.activeListings) >= (subscription.max_listings ?? 0) && (
+            {subscription && subscription.status === 'active' && subscription.max_listings < 999999 && (subscription.current_listings ?? artistStats.activeListings) >= (subscription.max_listings ?? 0) && (
               <Alert
                 severity="warning"
                 sx={{ mb: 3 }}
@@ -950,7 +950,7 @@ const ArtistDashboard: React.FC = () => {
                 }
               >
                 <Typography variant="subtitle1" fontWeight={600}>
-                  Listing limit reached ({subscription.current_listings ?? artistStats.activeListings} / {subscription.max_listings} active)
+                  Listing limit reached ({subscription.current_listings ?? artistStats.activeListings} / {subscription.max_listings >= 999999 ? 'Unlimited' : subscription.max_listings} active)
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 0.5 }}>
                   You cannot activate more listings until you free up slots. Deactivate an existing listing to make room, or upgrade your plan for more active listings.
@@ -1002,7 +1002,7 @@ const ArtistDashboard: React.FC = () => {
                       {subscription.plan_name} Plan ({subscription.billing_period})
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {subscription.current_listings || 0} / {subscription.max_listings} active listings
+                      {subscription.current_listings || 0} / {subscription.max_listings >= 999999 ? 'Unlimited' : subscription.max_listings} active listings
                       {subscription.end_date && ` · Expires: ${new Date(subscription.end_date).toLocaleDateString()}`}
                     </Typography>
                   </Box>
@@ -1503,7 +1503,7 @@ const ArtistDashboard: React.FC = () => {
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
-                      Active listings: {subscription.current_listings || 0} / {subscription.max_listings}
+                      Active listings: {subscription.current_listings || 0} / {subscription.max_listings >= 999999 ? 'Unlimited' : subscription.max_listings}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6}>
