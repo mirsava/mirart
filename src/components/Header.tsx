@@ -215,6 +215,13 @@ const Header: React.FC = () => {
     return () => { clearInterval(interval); window.removeEventListener('messagesRead', onMessagesRead); };
   }, [isAuthenticated, user?.id]);
 
+  const closeAllDrawers = () => {
+    setCartDrawerOpen(false);
+    setNotificationDrawerOpen(false);
+    setFavoritesDrawerOpen(false);
+    setDrawerOpen(false);
+  };
+
   const handleDrawerToggle = (): void => {
     if (!drawerOpen && isAuthenticated) {
       refreshUser();
@@ -969,7 +976,7 @@ const Header: React.FC = () => {
                       <Tooltip title="Favorites">
                         <IconButton
                           size="small"
-                          onClick={() => { setFavoritesDrawerOpen(true); fetchFavorites(); }}
+                          onClick={() => { closeAllDrawers(); setFavoritesDrawerOpen(true); fetchFavorites(); }}
                           sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
                         >
                           <FavoriteIcon sx={{ fontSize: 20 }} />
@@ -978,7 +985,7 @@ const Header: React.FC = () => {
                       <Tooltip title="Notifications">
                         <IconButton
                           size="small"
-                          onClick={() => { setNotificationDrawerOpen(true); fetchNotifications(); }}
+                          onClick={() => { closeAllDrawers(); setNotificationDrawerOpen(true); fetchNotifications(); }}
                           sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
                         >
                           <Badge badgeContent={unreadCount} color="error" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
@@ -991,7 +998,7 @@ const Header: React.FC = () => {
                   <Tooltip title="Cart">
                     <IconButton
                       size="small"
-                      onClick={() => setCartDrawerOpen(true)}
+                      onClick={() => { closeAllDrawers(); setCartDrawerOpen(true); }}
                       sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
                     >
                       <Badge badgeContent={getTotalItems()} color="primary" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
@@ -1045,7 +1052,7 @@ const Header: React.FC = () => {
                 <>
                   <IconButton
                     size="small"
-                    onClick={() => setCartDrawerOpen(true)}
+                    onClick={() => { closeAllDrawers(); setCartDrawerOpen(true); }}
                     sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
                   >
                     <Badge badgeContent={getTotalItems()} color="primary" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
@@ -1067,7 +1074,7 @@ const Header: React.FC = () => {
               <Drawer
                 anchor="right"
                 open={cartDrawerOpen}
-                onClose={() => setCartDrawerOpen(false)}
+                onClose={closeAllDrawers}
                 disableScrollLock
                 PaperProps={{
                   sx: {
@@ -1171,7 +1178,7 @@ const Header: React.FC = () => {
                   <Drawer
                     anchor="right"
                     open={notificationDrawerOpen}
-                    onClose={() => setNotificationDrawerOpen(false)}
+                    onClose={closeAllDrawers}
                     disableScrollLock
                     PaperProps={{
                       sx: {
@@ -1293,7 +1300,7 @@ const Header: React.FC = () => {
                   <Drawer
                     anchor="right"
                     open={favoritesDrawerOpen}
-                    onClose={() => setFavoritesDrawerOpen(false)}
+                    onClose={closeAllDrawers}
                     disableScrollLock
                     PaperProps={{
                       sx: {
