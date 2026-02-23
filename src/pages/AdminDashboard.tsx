@@ -178,6 +178,8 @@ const AdminDashboard: React.FC = () => {
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<any>(null);
   const [announcementForm, setAnnouncementForm] = useState({ message: '', target_type: 'all', target_user_ids: [] as number[], severity: 'info', is_active: true });
+  const [maintenanceTemplate, setMaintenanceTemplate] = useState<{ active: boolean; date: string; startTime: string; endTime: string }>({ active: false, date: '', startTime: '', endTime: '' });
+  const [selectedTemplate, setSelectedTemplate] = useState('');
   const [announcementUserOptions, setAnnouncementUserOptions] = useState<any[]>([]);
   const [announcementUserLoading, setAnnouncementUserLoading] = useState(false);
   const [announcementSelectedUser, setAnnouncementSelectedUser] = useState<any>(null);
@@ -453,6 +455,8 @@ const AdminDashboard: React.FC = () => {
     setEditingAnnouncement(null);
     setAnnouncementForm({ message: '', target_type: 'all', target_user_ids: [], severity: 'info', is_active: true });
     setAnnouncementSelectedUser(null);
+    setMaintenanceTemplate({ active: false, date: '', startTime: '', endTime: '' });
+    setSelectedTemplate('');
     setAnnouncementDialogOpen(true);
   };
 
@@ -2512,6 +2516,98 @@ const AdminDashboard: React.FC = () => {
           <DialogTitle>{editingAnnouncement ? 'Edit Announcement' : 'Create Announcement'}</DialogTitle>
           <DialogContent>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <FormControl fullWidth>
+                <InputLabel>Quick Template</InputLabel>
+                <Select
+                  value={selectedTemplate}
+                  label="Quick Template"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedTemplate(val);
+                    if (!val) return;
+                    const templates: Record<string, { message: string; severity: string }> = {
+                      maintenance: { message: '', severity: 'warning' },
+                      issues: { message: 'We are currently experiencing technical difficulties. Our team is actively working to resolve the issue. Thank you for your understanding.', severity: 'error' },
+                      resolved: { message: 'The issue has been resolved and all services are operating normally. Thank you for your patience.', severity: 'success' },
+                      new_feature: { message: 'We just launched a new feature! Check it out and let us know what you think.', severity: 'info' },
+                      holiday: { message: 'Happy holidays from the Artzyla team! Please note that support response times may be longer during the holiday period.', severity: 'info' },
+                    };
+                    const t = templates[val];
+                    if (val === 'maintenance') {
+                      setMaintenanceTemplate({ active: true, date: '', startTime: '', endTime: '' });
+                      setAnnouncementForm(prev => ({ ...prev, message: '', severity: 'warning' }));
+                    } else {
+                      setMaintenanceTemplate({ active: false, date: '', startTime: '', endTime: '' });
+                      if (t) setAnnouncementForm(prev => ({ ...prev, message: t.message, severity: t.severity }));
+                    }
+                  }}
+                >
+                  <MenuItem value=""><em>Select a template (optional)</em></MenuItem>
+                  <MenuItem value="maintenance">Scheduled Maintenance</MenuItem>
+                  <MenuItem value="issues">Known Issues</MenuItem>
+                  <MenuItem value="resolved">Issue Resolved</MenuItem>
+                  <MenuItem value="new_feature">New Feature</MenuItem>
+                  <MenuItem value="holiday">Holiday Notice</MenuItem>
+                </Select>
+              </FormControl>
+              {maintenanceTemplate.active && (
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <TextField
+                    label="Date"
+                    type="date"
+                    size="small"
+                    value={maintenanceTemplate.date}
+                    onChange={(e) => {
+                      const mt = { ...maintenanceTemplate, date: e.target.value };
+                      setMaintenanceTemplate(mt);
+                      if (mt.date && mt.startTime && mt.endTime) {
+                        const d = new Date(mt.date + 'T00:00:00');
+                        const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                        const fmt = (t: string) => { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; };
+                        setAnnouncementForm(prev => ({ ...prev, message: `Scheduled maintenance: Artzyla will be briefly unavailable on ${dateStr} from ${fmt(mt.startTime)} to ${fmt(mt.endTime)} (PST) for system upgrades. Thank you for your patience.` }));
+                      }
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ flex: 1, minWidth: 160 }}
+                  />
+                  <TextField
+                    label="Start Time"
+                    type="time"
+                    size="small"
+                    value={maintenanceTemplate.startTime}
+                    onChange={(e) => {
+                      const mt = { ...maintenanceTemplate, startTime: e.target.value };
+                      setMaintenanceTemplate(mt);
+                      if (mt.date && mt.startTime && mt.endTime) {
+                        const d = new Date(mt.date + 'T00:00:00');
+                        const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                        const fmt = (t: string) => { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; };
+                        setAnnouncementForm(prev => ({ ...prev, message: `Scheduled maintenance: Artzyla will be briefly unavailable on ${dateStr} from ${fmt(mt.startTime)} to ${fmt(mt.endTime)} (PST) for system upgrades. Thank you for your patience.` }));
+                      }
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ flex: 1, minWidth: 130 }}
+                  />
+                  <TextField
+                    label="End Time"
+                    type="time"
+                    size="small"
+                    value={maintenanceTemplate.endTime}
+                    onChange={(e) => {
+                      const mt = { ...maintenanceTemplate, endTime: e.target.value };
+                      setMaintenanceTemplate(mt);
+                      if (mt.date && mt.startTime && mt.endTime) {
+                        const d = new Date(mt.date + 'T00:00:00');
+                        const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                        const fmt = (t: string) => { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; };
+                        setAnnouncementForm(prev => ({ ...prev, message: `Scheduled maintenance: Artzyla will be briefly unavailable on ${dateStr} from ${fmt(mt.startTime)} to ${fmt(mt.endTime)} (PST) for system upgrades. Thank you for your patience.` }));
+                      }
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ flex: 1, minWidth: 130 }}
+                  />
+                </Box>
+              )}
               <TextField
                 label="Message"
                 multiline
@@ -2521,6 +2617,7 @@ const AdminDashboard: React.FC = () => {
                 onChange={(e) => setAnnouncementForm({ ...announcementForm, message: e.target.value })}
                 placeholder="This message will appear as a banner at the top of the site"
                 required
+                helperText={maintenanceTemplate.active ? 'Select date and times above to auto-generate, or edit directly' : 'You can edit the template text or write your own message'}
               />
               <FormControl fullWidth>
                 <InputLabel>Show to</InputLabel>

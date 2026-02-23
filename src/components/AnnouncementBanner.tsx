@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Box, IconButton, Typography } from '@mui/material';
+import { Box, IconButton, Typography, Collapse } from '@mui/material';
 import {
   Close as CloseIcon,
   InfoOutlined as InfoIcon,
   WarningAmber as WarningIcon,
-  CheckCircle as SuccessIcon,
+  CheckCircleOutline as SuccessIcon,
   ErrorOutline as ErrorIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,11 +12,11 @@ import apiService from '../services/api';
 
 const STORAGE_KEY = 'artzy_dismissed_announcements';
 
-const severityStyles: Record<string, { bg: string; color: string; icon: React.ReactNode }> = {
-  info: { bg: '#e3f2fd', color: '#0d47a1', icon: <InfoIcon /> },
-  warning: { bg: '#fff3e0', color: '#e65100', icon: <WarningIcon /> },
-  success: { bg: '#e8f5e9', color: '#1b5e20', icon: <SuccessIcon /> },
-  error: { bg: '#ffebee', color: '#b71c1c', icon: <ErrorIcon /> },
+const severityConfig: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
+  info: { bg: 'rgba(59,130,246,0.07)', border: 'rgba(59,130,246,0.2)', text: '#2563eb', icon: <InfoIcon sx={{ fontSize: 18 }} /> },
+  warning: { bg: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.2)', text: '#d97706', icon: <WarningIcon sx={{ fontSize: 18 }} /> },
+  success: { bg: 'rgba(16,185,129,0.07)', border: 'rgba(16,185,129,0.2)', text: '#059669', icon: <SuccessIcon sx={{ fontSize: 18 }} /> },
+  error: { bg: 'rgba(239,68,68,0.07)', border: 'rgba(239,68,68,0.2)', text: '#dc2626', icon: <ErrorIcon sx={{ fontSize: 18 }} /> },
 };
 
 const AnnouncementBanner: React.FC = () => {
@@ -56,37 +56,48 @@ const AnnouncementBanner: React.FC = () => {
   if (visible.length === 0) return null;
 
   return (
-    <Box sx={{ position: 'sticky', top: { xs: 100, sm: 120 }, zIndex: 1200, width: '100%' }}>
-      {visible.map((a) => {
-        const style = severityStyles[a.severity] || severityStyles.info;
-        const msg = typeof a.message === 'string' ? a.message : (a.message ? String(a.message) : '');
+    <Box sx={{ width: '100%', zIndex: 1200 }}>
+      {visible.map((a, i) => {
+        const config = severityConfig[a.severity] || severityConfig.info;
+        const msg = typeof a.message === 'string' ? a.message : String(a.message || '');
         return (
-          <Box
-            key={a.id}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              minHeight: 64,
-              py: 2,
-              px: 2,
-              backgroundColor: style.bg,
-              color: style.color,
-              borderRadius: 0,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
-              <Box sx={{ color: 'inherit', flexShrink: 0 }}>
-                {style.icon}
+          <Collapse key={a.id} in>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                px: { xs: 2, sm: 3, md: 4 },
+                py: 1.25,
+                bgcolor: config.bg,
+                borderBottom: i < visible.length - 1 ? '1px solid' : 'none',
+                borderBottomColor: config.border,
+              }}
+            >
+              <Box sx={{ color: config.text, flexShrink: 0, display: 'flex' }}>
+                {config.icon}
               </Box>
-              <Typography component="span" variant="body1" sx={{ color: 'inherit', lineHeight: 1.6 }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  flex: 1,
+                  color: 'text.primary',
+                  fontWeight: 450,
+                  fontSize: '0.84rem',
+                  lineHeight: 1.5,
+                }}
+              >
                 {msg.trim() || 'Site announcement'}
               </Typography>
+              <IconButton
+                size="small"
+                onClick={() => handleDismiss(a.id)}
+                sx={{ color: 'text.disabled', '&:hover': { color: 'text.secondary' }, p: 0.5, flexShrink: 0 }}
+              >
+                <CloseIcon sx={{ fontSize: 16 }} />
+              </IconButton>
             </Box>
-            <IconButton size="small" onClick={() => handleDismiss(a.id)} sx={{ color: 'inherit', ml: 1 }}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Box>
+          </Collapse>
         );
       })}
     </Box>
