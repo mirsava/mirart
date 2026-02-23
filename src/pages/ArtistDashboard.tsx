@@ -230,10 +230,10 @@ const ArtistDashboard: React.FC = () => {
     if (user?.id) {
       fetchDashboardData();
       fetchSubscription();
-      if (tabValue === 4 || tabValue === 5) {
+      if (tabValue === 3 || tabValue === 4) {
         fetchProfile();
       }
-      if (tabValue === 5) {
+      if (tabValue === 4) {
         fetchSettings();
         fetchConnectStatus();
       }
@@ -310,7 +310,7 @@ const ArtistDashboard: React.FC = () => {
   useEffect(() => {
     const state = location.state as { tab?: string } | null;
     if (state?.tab === 'subscription') {
-      setTabValue(3);
+      setTabValue(2);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state]);
@@ -909,12 +909,18 @@ const ArtistDashboard: React.FC = () => {
 
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
-      <PageHeader
-        title={`Welcome back, ${user?.name || 'Artist'}!`}
-        subtitle="Manage your listings, track engagement, and grow your art business."
-        icon={<PersonIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
-      />
-      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
+      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pt: { xs: 3, md: 4 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>
+              <PersonIcon sx={{ fontSize: 20 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="h5" fontWeight={700}>Welcome back, {user?.name || 'Artist'}!</Typography>
+              <Typography variant="body2" color="text.secondary">Manage your listings, track engagement, and grow your art business.</Typography>
+            </Box>
+          </Box>
+        </Box>
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             {error}
@@ -952,161 +958,78 @@ const ArtistDashboard: React.FC = () => {
               </Alert>
             )}
 
-            {/* Stats Overview */}
-            <Grid container spacing={2} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'primary.main' }}>
-                    <PersonIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6">{artistStats.totalListings}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Listings
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'success.main' }}>
-                    <VisibilityIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6">{artistStats.activeListings}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Active Listings
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'info.main' }}>
-                    <VisibilityIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6">{artistStats.totalViews}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Views
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'warning.main' }}>
-                    <DraftIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6">{artistStats.draftListings}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Draft Listings
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'error.main' }}>
-                    <EmailIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6">{artistStats.messagesReceived}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Messages Received
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                    <FavoriteIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6">{artistStats.totalLikes}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Likes
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          {subscription && (
-            <Grid item xs={12}>
-              <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', bgcolor: 'rgba(74, 58, 154, 0.05)' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-                    <Box>
-                      <Typography variant="h6" fontWeight={600}>
-                        {subscription.plan_name} Plan ({subscription.billing_period})
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {subscription.current_listings || 0} / {subscription.max_listings} active listings
-                        {subscription.end_date && ` • Expires: ${new Date(subscription.end_date).toLocaleDateString()}`}
-                      </Typography>
-                    </Box>
-                    <Button
-                      variant="outlined"
-                      onClick={() => navigate('/subscription-plans')}
-                    >
-                      Manage Subscription
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {[
+                { label: 'Total Listings', value: artistStats.totalListings, icon: <ArtTrackIcon />, color: '#6366f1' },
+                { label: 'Active', value: artistStats.activeListings, icon: <CheckCircleIcon />, color: '#10b981' },
+                { label: 'Drafts', value: artistStats.draftListings, icon: <DraftIcon />, color: '#f59e0b' },
+                { label: 'Total Views', value: artistStats.totalViews, icon: <VisibilityIcon />, color: '#3b82f6' },
+                { label: 'Messages', value: artistStats.messagesReceived, icon: <EmailIcon />, color: '#ef4444' },
+                { label: 'Likes', value: artistStats.totalLikes, icon: <FavoriteIcon />, color: '#ec4899' },
+              ].map((stat) => (
+                <Grid item xs={4} sm={4} md={2} key={stat.label}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      textAlign: 'center',
+                    }}
+                  >
+                    <Avatar sx={{ bgcolor: `${stat.color}15`, color: stat.color, width: 40, height: 40, mx: 'auto', mb: 1 }}>
+                      {stat.icon}
+                    </Avatar>
+                    <Typography variant="h5" fontWeight={700}>{stat.value}</Typography>
+                    <Typography variant="caption" color="text.secondary">{stat.label}</Typography>
+                  </Paper>
+                </Grid>
+              ))}
             </Grid>
-          )}
-          {!subscription && (
-            <Grid item xs={12}>
-              <Card elevation={0} sx={{ border: '1px solid', borderColor: 'warning.main', bgcolor: 'rgba(255, 143, 0, 0.05)' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-                    <Box>
-                      <Typography variant="h6" fontWeight={600} color="warning.main">
-                        No Active Subscription
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Subscribe to a plan to activate your listings and start selling
-                      </Typography>
-                    </Box>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={() => navigate('/subscription-plans')}
-                    >
-                      View Plans
-                    </Button>
+
+            {subscription ? (
+              <Paper
+                elevation={0}
+                sx={{ p: 2, mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
+                    <CreditCardIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="body1" fontWeight={600}>
+                      {subscription.plan_name} Plan ({subscription.billing_period})
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {subscription.current_listings || 0} / {subscription.max_listings} active listings
+                      {subscription.end_date && ` · Expires: ${new Date(subscription.end_date).toLocaleDateString()}`}
+                    </Typography>
                   </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-        </Grid>
+                </Box>
+                <Button variant="outlined" size="small" onClick={() => navigate('/subscription-plans')} sx={{ textTransform: 'none' }}>
+                  Manage Subscription
+                </Button>
+              </Paper>
+            ) : (
+              <Paper
+                elevation={0}
+                sx={{ p: 2, mb: 3, border: '1px solid', borderColor: 'warning.main', borderRadius: 2, bgcolor: 'rgba(255, 143, 0, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Avatar sx={{ bgcolor: 'warning.main', width: 32, height: 32 }}>
+                    <CreditCardIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="body1" fontWeight={600} color="warning.main">No Active Subscription</Typography>
+                    <Typography variant="caption" color="text.secondary">Subscribe to start selling your artwork</Typography>
+                  </Box>
+                </Box>
+                <Button variant="contained" size="small" color="primary" onClick={() => navigate('/subscription-plans')} sx={{ textTransform: 'none' }}>
+                  View Plans
+                </Button>
+              </Paper>
+            )}
 
         {/* Main Content Tabs */}
         <Paper elevation={0} sx={{ width: '100%', mb: 4, border: '1px solid', borderColor: 'divider' }}>
@@ -1114,7 +1037,6 @@ const ArtistDashboard: React.FC = () => {
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="My Listings" />
               <Tab label="Orders" />
-              <Tab label="Analytics" />
               <Tab label="Subscription" />
               <Tab label="Profile" />
               <Tab label="Settings" />
@@ -1554,329 +1476,6 @@ const ArtistDashboard: React.FC = () => {
           <TabPanel value={tabValue} index={2}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                <BarChartIcon sx={{ fontSize: 28, color: 'primary.main' }} />
-                <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                  Analytics Overview
-                </Typography>
-              </Box>
-              <Typography variant="body2" color="text.secondary">
-                Track your artwork performance and engagement metrics
-              </Typography>
-            </Box>
-
-            <Grid container spacing={3}>
-              {/* Listing Performance Cards */}
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 3,
-                    height: '100%',
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 48,
-                        height: 48,
-                        borderRadius: 2,
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                      }}
-                    >
-                      <ArtTrackIcon sx={{ fontSize: 24 }} />
-                    </Box>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
-                    {artistStats.totalListings}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                    Total Listings
-                  </Typography>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 3,
-                    height: '100%',
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 48,
-                        height: 48,
-                        borderRadius: 2,
-                        bgcolor: 'success.main',
-                        color: 'white',
-                      }}
-                    >
-                      <CheckCircleIcon sx={{ fontSize: 24 }} />
-                    </Box>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
-                    {artistStats.activeListings}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                    Active Listings
-                  </Typography>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 3,
-                    height: '100%',
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 48,
-                        height: 48,
-                        borderRadius: 2,
-                        bgcolor: 'warning.main',
-                        color: 'white',
-                      }}
-                    >
-                      <DraftIcon sx={{ fontSize: 24 }} />
-                    </Box>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
-                    {artistStats.draftListings}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                    Draft Listings
-                  </Typography>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 3,
-                    height: '100%',
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 48,
-                        height: 48,
-                        borderRadius: 2,
-                        bgcolor: 'info.main',
-                        color: 'white',
-                      }}
-                    >
-                      <VisibilityIcon sx={{ fontSize: 24 }} />
-                    </Box>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
-                    {artistStats.totalViews.toLocaleString()}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                    Total Views
-                  </Typography>
-                </Paper>
-              </Grid>
-
-              {/* Engagement Cards */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 3.5,
-                    height: '100%',
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 56,
-                        height: 56,
-                        borderRadius: 2,
-                        bgcolor: 'error.main',
-                        color: 'white',
-                      }}
-                    >
-                      <FavoriteIcon sx={{ fontSize: 28 }} />
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="h3" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                        {artistStats.totalLikes.toLocaleString()}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                        Total Likes
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Box
-                    sx={{
-                      mt: 2,
-                      pt: 2,
-                      borderTop: '1px solid',
-                      borderColor: 'divider',
-                    }}
-                  >
-                    <Typography variant="caption" color="text.secondary">
-                      Average per listing: {artistStats.totalListings > 0 
-                        ? Math.round(artistStats.totalLikes / artistStats.totalListings) 
-                        : 0}
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={4}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 3.5,
-                    height: '100%',
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 56,
-                        height: 56,
-                        borderRadius: 2,
-                        bgcolor: 'secondary.main',
-                        color: 'white',
-                      }}
-                    >
-                      <MessageIcon sx={{ fontSize: 28 }} />
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="h3" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                        {artistStats.messagesReceived.toLocaleString()}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                        Messages Received
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Box
-                    sx={{
-                      mt: 2,
-                      pt: 2,
-                      borderTop: '1px solid',
-                      borderColor: 'divider',
-                    }}
-                  >
-                    <Typography variant="caption" color="text.secondary">
-                      From potential buyers and interested collectors
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={4}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 3.5,
-                    height: '100%',
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 56,
-                        height: 56,
-                        borderRadius: 2,
-                        bgcolor: '#00bcd4',
-                        color: 'white',
-                      }}
-                    >
-                      <TrendingUpIcon sx={{ fontSize: 28 }} />
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="h3" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                        {artistStats.totalListings > 0 
-                          ? Math.round((artistStats.totalViews / artistStats.totalListings) * 10) / 10 
-                          : 0}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                        Avg Views per Listing
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Box
-                    sx={{
-                      mt: 2,
-                      pt: 2,
-                      borderTop: '1px solid',
-                      borderColor: 'divider',
-                    }}
-                  >
-                    <Typography variant="caption" color="text.secondary">
-                      Engagement rate indicator
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-            </Grid>
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={3}>
-            <Box sx={{ mb: 4 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <CreditCardIcon sx={{ fontSize: 28, color: 'primary.main' }} />
                 <Typography variant="h5" sx={{ fontWeight: 600 }}>
                   Subscription
@@ -2063,7 +1662,7 @@ const ArtistDashboard: React.FC = () => {
             )}
           </TabPanel>
 
-          <TabPanel value={tabValue} index={4}>
+          <TabPanel value={tabValue} index={3}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <PersonIcon sx={{ fontSize: 28, color: 'primary.main' }} />
@@ -2608,7 +2207,7 @@ const ArtistDashboard: React.FC = () => {
             </form>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={5}>
+          <TabPanel value={tabValue} index={4}>
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <SettingsIcon sx={{ fontSize: 28, color: 'primary.main' }} />

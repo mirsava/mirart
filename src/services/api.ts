@@ -606,7 +606,7 @@ class ApiService {
     return this.request<any>(`/admin/users?${params.toString()}`);
   }
 
-  async getAdminListings(cognitoUsername: string, filters?: { page?: number; limit?: number; status?: string; category?: string }, groups?: string[]): Promise<any> {
+  async getAdminListings(cognitoUsername: string, filters?: { page?: number; limit?: number; status?: string; category?: string; search?: string }, groups?: string[]): Promise<any> {
     const params = new URLSearchParams();
     params.append('cognitoUsername', cognitoUsername);
     if (groups && groups.length > 0) {

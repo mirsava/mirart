@@ -46,6 +46,7 @@ import {
   ClickAwayListener,
   useMediaQuery,
   useTheme,
+  InputAdornment,
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -74,6 +75,7 @@ import {
   Circle as CircleIcon,
   Settings as SettingsIcon,
   Menu as MenuIcon,
+  Search as SearchIcon,
   TrendingUp as TrendingUpIcon,
   AttachMoney as AttachMoneyIcon,
   CalendarMonth as CalendarMonthIcon,
@@ -112,6 +114,7 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [listingsSearch, setListingsSearch] = useState('');
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userTypeDialogOpen, setUserTypeDialogOpen] = useState(false);
@@ -277,12 +280,12 @@ const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (!user?.id) return;
     setListingsPage(1);
-  }, [statusFilter, categoryFilter]);
+  }, [statusFilter, categoryFilter, listingsSearch]);
 
   useEffect(() => {
     if (!user?.id) return;
     fetchListings();
-  }, [user?.id, listingsPage, statusFilter, categoryFilter]);
+  }, [user?.id, listingsPage, statusFilter, categoryFilter, listingsSearch]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -384,6 +387,7 @@ const AdminDashboard: React.FC = () => {
         limit: 20,
         status: statusFilter || undefined,
         category: categoryFilter || undefined,
+        search: listingsSearch || undefined,
       }, user.groups);
       setListings(response.listings || []);
       setListingsPagination(response.pagination);
@@ -1104,7 +1108,7 @@ const AdminDashboard: React.FC = () => {
                   <Avatar sx={{ bgcolor: 'error.main', width: 32, height: 32 }}>
                     <ReceiptIcon sx={{ fontSize: 18 }} />
                   </Avatar>
-                  <Typography variant="subtitle1" fontWeight={700}>Order Statistics</Typography>
+                  <Typography variant="subtitle1" fontWeight={700}>Orders</Typography>
                 </Box>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
@@ -1369,7 +1373,15 @@ const AdminDashboard: React.FC = () => {
           </Box>)}
 
           {activeSection === 'listings' && (<Box sx={{ py: 3 }}>
-            <Box sx={{ mb: 2, px: 3, display: 'flex', gap: 2 }}>
+            <Box sx={{ mb: 2, px: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              <TextField
+                size="small"
+                placeholder="Search by title, artist..."
+                value={listingsSearch}
+                onChange={(e) => setListingsSearch(e.target.value)}
+                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment> }}
+                sx={{ minWidth: 220 }}
+              />
               <FormControl size="small" sx={{ minWidth: 150 }}>
                 <InputLabel>Status</InputLabel>
                 <Select
@@ -1404,6 +1416,11 @@ const AdminDashboard: React.FC = () => {
                   <MenuItem value="Other">Other</MenuItem>
                 </Select>
               </FormControl>
+              {listingsPagination && (
+                <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
+                  {listingsPagination.total} listing{listingsPagination.total !== 1 ? 's' : ''}
+                </Typography>
+              )}
             </Box>
             <TableContainer sx={{ px: 3 }}>
               <Table>

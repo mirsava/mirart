@@ -360,7 +360,7 @@ router.get('/users', checkAdminAccess, async (req, res) => {
 
 router.get('/listings', checkAdminAccess, async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, category } = req.query;
+    const { page = 1, limit = 20, status, category, search } = req.query;
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 20;
     const offset = (pageNum - 1) * limitNum;
@@ -380,6 +380,12 @@ router.get('/listings', checkAdminAccess, async (req, res) => {
       WHERE 1=1
     `;
     const params = [];
+
+    if (search) {
+      query += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)';
+      const term = `%${String(search)}%`;
+      params.push(term, term, term, term, term, term);
+    }
 
     if (status) {
       query += ' AND l.status = ?';
@@ -402,6 +408,12 @@ router.get('/listings', checkAdminAccess, async (req, res) => {
       WHERE 1=1
     `;
     const countParams = [];
+
+    if (search) {
+      countQuery += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)';
+      const term = `%${String(search)}%`;
+      countParams.push(term, term, term, term, term, term);
+    }
 
     if (status) {
       countQuery += ' AND l.status = ?';
