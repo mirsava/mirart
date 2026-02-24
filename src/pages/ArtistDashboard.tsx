@@ -2492,6 +2492,16 @@ const ArtistDashboard: React.FC = () => {
                               <FormControlLabel value="shippo" control={<Radio color="primary" />} label="Shippo label workflow" />
                               <FormControlLabel value="own" control={<Radio color="primary" />} label="Own carrier workflow" />
                             </RadioGroup>
+                            {settings.default_shipping_carrier === 'shippo' && (
+                              <Alert severity="info" sx={{ mt: 1.5 }}>
+                                Shippo workflow: buyers see live shipping rates at checkout, you select and purchase a label from the order, tracking is attached automatically, and delivery updates sync into order status and notifications.
+                              </Alert>
+                            )}
+                            {settings.default_shipping_carrier === 'own' && (
+                              <Alert severity="info" sx={{ mt: 1.5 }}>
+                                Own carrier workflow: you arrange shipping outside Artzyla, enter tracking details manually when marking orders as shipped, and buyers follow updates using your provided tracking link.
+                              </Alert>
+                            )}
                           </FormControl>
 
                           <FormControl component="fieldset" sx={{ display: 'block' }}>
