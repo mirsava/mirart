@@ -1,6 +1,6 @@
 import React from 'react';
-import { Box, Typography, useTheme, useMediaQuery } from '@mui/material';
-import { SxProps, Theme, alpha } from '@mui/material/styles';
+import { Box, Typography, Avatar, Divider } from '@mui/material';
+import { SxProps, Theme } from '@mui/material/styles';
 
 interface PageHeaderProps {
   title: string;
@@ -10,6 +10,7 @@ interface PageHeaderProps {
   titleGradient?: string;
   disablePattern?: boolean;
   align?: 'left' | 'center';
+  subtitleLines?: number;
   sx?: SxProps<Theme>;
 }
 
@@ -21,22 +22,16 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   titleGradient,
   disablePattern = false,
   align = 'left',
+  subtitleLines = 1,
   sx,
 }) => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-
-  const alignment = align === 'center' ? 'center' : 'left';
-  const justifyContent = align === 'center' ? 'center' : 'flex-start';
-  const headerGradient =
-    backgroundGradient ||
-    `linear-gradient(132deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 52%, ${alpha(theme.palette.primary.light, 0.92)} 100%)`;
-  const titleColor = titleGradient || 'white';
+  const isCenter = align === 'center';
+  const titleColor = titleGradient || 'text.primary';
 
   return (
     <Box 
       sx={{ 
-        mb: { xs: 2.5, md: 3.5 }, 
+        mb: { xs: 2.5, md: 3 }, 
         pt: { xs: 3, md: 4 },
         width: '100%',
         position: 'relative',
@@ -46,100 +41,74 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Box 
           sx={{ 
-            textAlign: alignment,
-            position: 'relative',
-            overflow: 'hidden',
-            pl: { xs: 2.75, md: align === 'left' ? 4 : 3.5 },
-            pr: { xs: 2.75, md: 3.5 },
-            py: { xs: 3, md: 3.5 },
-            borderRadius: 3,
-            background: headerGradient,
-            border: '1px solid',
-            borderColor: alpha('#ffffff', 0.22),
-            boxShadow: '0 12px 34px rgba(22, 16, 58, 0.2)',
-            '&::before': disablePattern
-              ? undefined
-              : {
-                  content: '""',
-                  position: 'absolute',
-                  inset: 0,
-                  backgroundImage: `
-                    radial-gradient(540px 280px at 100% 0%, rgba(255,255,255,0.16), transparent 64%),
-                    radial-gradient(520px 260px at 0% 100%, rgba(255,255,255,0.1), transparent 66%)
-                  `,
-                  opacity: 0.9,
-                  pointerEvents: 'none',
-                },
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: isCenter ? 'center' : 'flex-start',
+            gap: 1.5,
+            py: { xs: 0.5, md: 0.75 },
           }}
         >
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent,
-              gap: 1.25,
-              mb: subtitle ? 1.5 : 0,
-              position: 'relative',
-              zIndex: 1,
-            }}
-          >
-            {icon && (
-              <Box
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: { xs: 38, md: 44 },
-                  height: { xs: 38, md: 44 },
-                  borderRadius: '50%',
-                  bgcolor: alpha('#ffffff', 0.16),
-                  border: `1px solid ${alpha('#ffffff', 0.3)}`,
-                  flexShrink: 0,
-                  '& .MuiSvgIcon-root': {
-                    color: '#fff',
-                    fontSize: { xs: 22, md: 24 },
-                  },
-                }}
-              >
-                {icon}
-              </Box>
-            )}
+          {icon && (
+            <Avatar
+              sx={{
+                bgcolor: 'primary.main',
+                width: { xs: 34, md: 38 },
+                height: { xs: 34, md: 38 },
+                flexShrink: 0,
+                '& .MuiSvgIcon-root': {
+                  color: 'white',
+                  fontSize: { xs: 20, md: 22 },
+                },
+              }}
+            >
+              {icon}
+            </Avatar>
+          )}
+          <Box sx={{ minWidth: 0, textAlign: isCenter ? 'center' : 'left' }}>
             <Typography
-              variant={isMobile ? 'h3' : 'h2'}
               component="h1"
               sx={{
                 fontWeight: 700,
                 color: titleColor,
-                fontSize: { xs: '1.8rem', sm: '2.35rem', md: '2.85rem' },
-                lineHeight: 1.2,
-                letterSpacing: '-0.02em',
+                fontSize: { xs: '1.35rem', sm: '1.45rem', md: '1.55rem' },
+                lineHeight: 1.25,
+                letterSpacing: '-0.01em',
                 m: 0,
               }}
             >
               {title}
             </Typography>
-          </Box>
-
-          {subtitle && (
-            <Typography
-              variant="h6"
-              color="text.secondary"
+            <Divider
               sx={{
-                color: alpha('#f7f5ff', 0.92),
-                maxWidth: { xs: '100%', md: '840px' },
-                mx: align === 'center' ? 'auto' : 0,
-                mt: 1.2,
-                lineHeight: 1.6,
-                fontSize: { xs: '0.95rem', sm: '1.03rem', md: '1.1rem' },
-                fontWeight: 400,
-                textAlign: alignment,
-                position: 'relative',
-                zIndex: 1,
+                mt: 0.7,
+                mb: subtitle ? 0.55 : 0,
+                border: 0,
+                height: 3,
+                borderRadius: 999,
+                background: 'linear-gradient(90deg, rgba(74,58,154,0.95) 0%, rgba(74,58,154,0.6) 65%, rgba(74,58,154,0.2) 100%)',
+                width: isCenter ? { xs: 150, md: 210 } : { xs: 140, md: 190 },
+                mx: isCenter ? 'auto' : 0,
               }}
-            >
-              {subtitle}
-            </Typography>
-          )}
+            />
+            {subtitle && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  mt: 0.35,
+                  lineHeight: 1.5,
+                  fontSize: { xs: '0.88rem', md: '0.93rem' },
+                  maxWidth: isCenter ? { xs: '100%', md: '860px' } : '100%',
+                  overflow: 'hidden',
+                  display: '-webkit-box',
+                  WebkitLineClamp: subtitleLines,
+                  WebkitBoxOrient: 'vertical',
+                }}
+              >
+                {subtitle}
+              </Typography>
+            )}
+          </Box>
         </Box>
       </Box>
     </Box>

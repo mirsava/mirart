@@ -48,6 +48,7 @@ const About: React.FC = () => {
         icon={<PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
         align="left"
+        subtitleLines={2}
       />
 
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
