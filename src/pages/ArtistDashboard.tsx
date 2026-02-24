@@ -2426,261 +2426,187 @@ const ArtistDashboard: React.FC = () => {
                 <CircularProgress />
               </Box>
             ) : (
-              <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                      Payouts (Stripe Connect)
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Set up your payout account to receive payments when buyers confirm delivery. Funds are held securely until the buyer receives their artwork.
-                    </Typography>
-                    {connectStatus?.chargesEnabled ? (
-                      <Chip icon={<CheckCircleIcon />} label="Payout account connected" color="success" />
-                    ) : (
-                      <Button
-                        variant="outlined"
-                        startIcon={<CreditCardIcon />}
-                        onClick={handleConnectOnboarding}
-                        disabled={connectLoading || !profileData?.email}
-                      >
-                        {connectLoading ? 'Redirecting...' : connectStatus?.connected ? 'Complete setup' : 'Set up payouts'}
-                      </Button>
-                    )}
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 2 }} />
-                  </Grid>
-
-                  <Grid item xs={12}>
+              <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
                 <form onSubmit={handleSettingsSubmit}>
-                  <Grid container spacing={2}>
+                  <Grid container spacing={2.5}>
                     <Grid item xs={12}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                        <LocalShippingIcon sx={{ color: 'primary.main' }} />
-                        <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
-                          Shipping Defaults
-                        </Typography>
-                      </Box>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Default shipping option for new listings. You can override this when creating or editing individual listings.
-                      </Typography>
-                      <FormControl component="fieldset" sx={{ display: 'block' }}>
-                        <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
-                          Who pays for shipping?
-                        </FormLabel>
-                        <RadioGroup
-                          row
-                          value={settings.default_shipping_preference}
-                          onChange={(e) => handleShippingPreferenceChange(e.target.value as 'free' | 'buyer')}
-                        >
-                          <FormControlLabel
-                            value="free"
-                            control={<Radio color="primary" />}
-                            label={
-                              <Box>
-                                <Typography variant="body1" fontWeight={500}>
-                                  Free shipping
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  You absorb shipping costs
-                                </Typography>
-                              </Box>
-                            }
-                          />
-                          <FormControlLabel
-                            value="buyer"
-                            control={<Radio color="primary" />}
-                            label={
-                              <Box>
-                                <Typography variant="body1" fontWeight={500}>
-                                  By buyer
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Buyer pays shipping at checkout
-                                </Typography>
-                              </Box>
-                            }
-                          />
-                        </RadioGroup>
-                      </FormControl>
+                      <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                        <CardContent sx={{ p: 2.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <CreditCardIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                            <Typography variant="subtitle1" fontWeight={700}>Payouts</Typography>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Connect Stripe once to receive payouts automatically after delivery is confirmed.
+                          </Typography>
+                          {connectStatus?.chargesEnabled ? (
+                            <Chip icon={<CheckCircleIcon />} label="Payout account connected" color="success" />
+                          ) : (
+                            <Button
+                              variant="outlined"
+                              startIcon={<CreditCardIcon />}
+                              onClick={handleConnectOnboarding}
+                              disabled={connectLoading || !profileData?.email}
+                            >
+                              {connectLoading ? 'Redirecting...' : connectStatus?.connected ? 'Complete setup' : 'Set up payouts'}
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
                     </Grid>
 
-                    <Grid item xs={12}>
-                      <FormControl component="fieldset" sx={{ display: 'block' }}>
-                        <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
-                          How do you ship?
-                        </FormLabel>
-                        <RadioGroup
-                          row
-                          value={settings.default_shipping_carrier}
-                          onChange={(e) => handleShippingCarrierChange(e.target.value as 'shippo' | 'own')}
-                        >
-                          <FormControlLabel
-                            value="shippo"
-                            control={<Radio color="primary" />}
-                            label={
-                              <Box>
-                                <Typography variant="body1" fontWeight={500}>
-                                  Shippo service
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  You package and ship. We provide the label and it is automatically attached to your order.
-                                </Typography>
+                    <Grid item xs={12} md={7}>
+                      <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
+                        <CardContent sx={{ p: 2.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <LocalShippingIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                            <Typography variant="subtitle1" fontWeight={700}>Selling Defaults</Typography>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                            These defaults are pre-filled for new listings and can be overridden per listing.
+                          </Typography>
+
+                          <FormControl component="fieldset" sx={{ display: 'block', mb: 2.5 }}>
+                            <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
+                              Shipping cost
+                            </FormLabel>
+                            <RadioGroup
+                              row
+                              value={settings.default_shipping_preference}
+                              onChange={(e) => handleShippingPreferenceChange(e.target.value as 'free' | 'buyer')}
+                            >
+                              <FormControlLabel value="free" control={<Radio color="primary" />} label="Free shipping (you pay)" />
+                              <FormControlLabel value="buyer" control={<Radio color="primary" />} label="Buyer pays at checkout" />
+                            </RadioGroup>
+                          </FormControl>
+
+                          <FormControl component="fieldset" sx={{ display: 'block', mb: 2.5 }}>
+                            <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
+                              Shipping method
+                            </FormLabel>
+                            <RadioGroup
+                              row
+                              value={settings.default_shipping_carrier}
+                              onChange={(e) => handleShippingCarrierChange(e.target.value as 'shippo' | 'own')}
+                            >
+                              <FormControlLabel value="shippo" control={<Radio color="primary" />} label="Shippo label workflow" />
+                              <FormControlLabel value="own" control={<Radio color="primary" />} label="Own carrier workflow" />
+                            </RadioGroup>
+                          </FormControl>
+
+                          <FormControl component="fieldset" sx={{ display: 'block' }}>
+                            <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
+                              Returns
+                            </FormLabel>
+                            <RadioGroup
+                              row
+                              value={settings.default_return_days === null ? 'none' : 'days'}
+                              onChange={(e) => handleReturnDaysChange(e.target.value === 'none' ? null : 30)}
+                            >
+                              <FormControlLabel value="none" control={<Radio color="primary" />} label="No returns" />
+                              <FormControlLabel value="days" control={<Radio color="primary" />} label="Return window" />
+                            </RadioGroup>
+                            {settings.default_return_days !== null && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, ml: 4 }}>
+                                <TextField
+                                  type="number"
+                                  size="small"
+                                  value={settings.default_return_days}
+                                  onChange={handleReturnDaysInputChange}
+                                  inputProps={{ min: 1, max: 365 }}
+                                  sx={{ width: 88 }}
+                                />
+                                <Typography variant="body2" color="text.secondary">days</Typography>
                               </Box>
-                            }
-                          />
-                          <FormControlLabel
-                            value="own"
-                            control={<Radio color="primary" />}
-                            label={
-                              <Box>
-                                <Typography variant="body1" fontWeight={500}>
-                                  Your own carrier
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  You ship yourself. Trackable shipping required.
-                                </Typography>
-                              </Box>
-                            }
-                          />
-                        </RadioGroup>
-                      </FormControl>
+                            )}
+                          </FormControl>
+                        </CardContent>
+                      </Card>
                     </Grid>
 
-                    <Grid item xs={12}>
-                      <FormControl component="fieldset" sx={{ display: 'block' }}>
-                        <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
-                          Refund & Return
-                        </FormLabel>
-                        <RadioGroup
-                          row
-                          value={settings.default_return_days === null ? 'none' : 'days'}
-                          onChange={(e) => handleReturnDaysChange(e.target.value === 'none' ? null : 30)}
-                        >
-                          <FormControlLabel value="none" control={<Radio color="primary" />} label="No returns" />
-                          <FormControlLabel value="days" control={<Radio color="primary" />} label="Return within" />
-                        </RadioGroup>
-                        {settings.default_return_days !== null && (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, ml: 4 }}>
-                            <TextField
-                              type="number"
-                              size="small"
-                              value={settings.default_return_days}
-                              onChange={handleReturnDaysInputChange}
-                              inputProps={{ min: 1, max: 365 }}
-                              sx={{ width: 80 }}
+                    <Grid item xs={12} md={5}>
+                      <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
+                        <CardContent sx={{ p: 2.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <MessageIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                            <Typography variant="subtitle1" fontWeight={700}>Communication</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+                            <FormControlLabel
+                              control={<Switch checked={settings.default_allow_comments} onChange={handleSettingsChange('default_allow_comments')} color="primary" />}
+                              label={
+                                <Box>
+                                  <Typography variant="body2" fontWeight={600}>Allow comments by default</Typography>
+                                  <Typography variant="caption" color="text.secondary">Apply to new listings automatically</Typography>
+                                </Box>
+                              }
                             />
-                            <Typography variant="body2">days</Typography>
+                            <Divider />
+                            <FormControlLabel
+                              control={<Switch checked={settings.email_notifications} onChange={handleSettingsChange('email_notifications')} color="primary" />}
+                              label={
+                                <Box>
+                                  <Typography variant="body2" fontWeight={600}>Email notifications</Typography>
+                                  <Typography variant="caption" color="text.secondary">Messages and inquiries</Typography>
+                                </Box>
+                              }
+                            />
+                            <Divider />
+                            <FormControlLabel
+                              control={<Switch checked={settings.comment_notifications} onChange={handleSettingsChange('comment_notifications')} color="primary" />}
+                              label={
+                                <Box>
+                                  <Typography variant="body2" fontWeight={600}>Comment notifications</Typography>
+                                  <Typography variant="caption" color="text.secondary">Activity on your listings</Typography>
+                                </Box>
+                              }
+                            />
                           </Box>
-                        )}
-                      </FormControl>
+                        </CardContent>
+                      </Card>
                     </Grid>
 
                     <Grid item xs={12}>
-                      <Divider sx={{ my: 2 }} />
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                        Comment Settings
-                      </Typography>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={settings.default_allow_comments}
-                            onChange={handleSettingsChange('default_allow_comments')}
-                            color="primary"
+                      <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                        <CardContent sx={{ p: 2.5 }}>
+                          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                            Default special instructions
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Auto-fill helper text for new listings.
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            multiline
+                            rows={4}
+                            label="Special instructions template"
+                            value={settings.default_special_instructions || ''}
+                            onChange={handleSettingsChange('default_special_instructions')}
+                            placeholder="Example: Include framing notes, care instructions, or customization details."
+                            helperText="You can still edit this on each listing."
+                            sx={{ bgcolor: 'background.default' }}
                           />
-                        }
-                        label={
-                          <Box>
-                            <Typography variant="body1" fontWeight={500}>
-                              Allow Comments by Default
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              New listings will have comments enabled by default. You can change this for individual listings.
-                            </Typography>
-                          </Box>
-                        }
-                      />
+                        </CardContent>
+                      </Card>
                     </Grid>
 
                     <Grid item xs={12}>
-                      <Divider sx={{ my: 2 }} />
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                        Notification Settings
-                      </Typography>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={settings.email_notifications}
-                            onChange={handleSettingsChange('email_notifications')}
-                            color="primary"
-                          />
-                        }
-                        label={
-                          <Box>
-                            <Typography variant="body1" fontWeight={500}>
-                              Email Notifications
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Receive email notifications for messages and inquiries
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={settings.comment_notifications}
-                            onChange={handleSettingsChange('comment_notifications')}
-                            color="primary"
-                          />
-                        }
-                        label={
-                          <Box>
-                            <Typography variant="body1" fontWeight={500}>
-                              Comment Notifications
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Get notified when someone comments on your listings
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <Divider sx={{ my: 2 }} />
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                        Default Special Instructions
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        multiline
-                        rows={4}
-                        label="Default Special Instructions"
-                        value={settings.default_special_instructions || ''}
-                        onChange={handleSettingsChange('default_special_instructions')}
-                        placeholder="Enter default special instructions that will be pre-filled for all new listings (e.g., framing recommendations, care instructions, customization options)..."
-                        helperText="This will be automatically filled in when creating new listings. You can edit it for individual listings."
-                        sx={{ bgcolor: 'background.default' }}
-                      />
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 2 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: 2,
+                          p: 2,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 2,
+                          bgcolor: 'background.paper',
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Review your defaults and save to apply them across new listings.
+                        </Typography>
                         <Button
                           type="submit"
                           variant="contained"
@@ -2693,8 +2619,6 @@ const ArtistDashboard: React.FC = () => {
                     </Grid>
                   </Grid>
                 </form>
-                  </Grid>
-                </Grid>
               </Paper>
             )}
           </TabPanel>
