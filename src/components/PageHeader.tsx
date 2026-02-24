@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Avatar, Divider } from '@mui/material';
+import { Box, Typography, Divider } from '@mui/material';
 import { SxProps, Theme } from '@mui/material/styles';
 
 interface PageHeaderProps {
@@ -49,20 +49,23 @@ const PageHeader: React.FC<PageHeaderProps> = ({
           }}
         >
           {icon && (
-            <Avatar
+            <Box
               sx={{
-                bgcolor: 'primary.main',
-                width: { xs: 34, md: 38 },
-                height: { xs: 34, md: 38 },
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: { xs: 44, md: 50 },
+                height: { xs: 44, md: 50 },
                 flexShrink: 0,
                 '& .MuiSvgIcon-root': {
-                  color: 'white',
-                  fontSize: { xs: 20, md: 22 },
+                  color: 'primary.main',
+                  fontSize: { xs: 34, md: 38 },
+                  opacity: 0.9,
                 },
               }}
             >
               {icon}
-            </Avatar>
+            </Box>
           )}
           <Box sx={{ minWidth: 0, textAlign: isCenter ? 'center' : 'left' }}>
             <Typography

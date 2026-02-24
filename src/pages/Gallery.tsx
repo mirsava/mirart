@@ -28,8 +28,6 @@ import {
 import { 
   Search as SearchIcon, 
   Add as AddIcon, 
-  Palette as PaletteIcon, 
-  Brush as BrushIcon,
   Tune as FilterIcon,
   Close as CloseIcon,
   Clear as ClearIcon,
@@ -549,12 +547,7 @@ const Gallery: React.FC = () => {
       <PageHeader
         title="Art Gallery"
         subtitle="Explore our curated collection of original paintings and handcrafted woodworking pieces from talented artists around the world."
-        icon={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-            <BrushIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-          </Box>
-        }
+        icon={<CategoryIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
       />
 
