@@ -148,6 +148,7 @@ const SubscriptionPlans: React.FC = () => {
         <PageHeader
           title="Subscription Plans"
           subtitle="Choose the perfect plan for your art business"
+          icon={<SecurityIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
           align="left"
         />
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
@@ -180,6 +181,7 @@ const SubscriptionPlans: React.FC = () => {
       <PageHeader
         title="Subscription Plans"
         subtitle="Choose the perfect plan for your art business"
+        icon={<SecurityIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         align="left"
       />
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: 6 }}>

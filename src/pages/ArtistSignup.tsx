@@ -313,69 +313,92 @@ const ArtistSignup: React.FC = () => {
       <Box sx={{ width: '100%', maxWidth: 1180, mx: 'auto', px: { xs: 2, sm: 3, md: 4 }, py: { xs: 6, md: 8 } }}>
       <Box 
         sx={{ 
-          textAlign: 'left',
           position: 'relative',
-          px: { xs: 3, md: 5 },
-          py: { xs: 3.5, md: 4.5 },
-          background: 'linear-gradient(145deg, rgba(74, 58, 154, 0.12) 0%, rgba(74, 58, 154, 0.06) 40%, rgba(74, 58, 154, 0.02) 100%)',
+          px: { xs: 3, md: 4.5 },
+          py: { xs: 3.5, md: 4 },
+          background: 'linear-gradient(135deg, #1f1741 0%, #2f2370 52%, #4a3a9a 100%)',
           borderRadius: 3,
           border: '1px solid',
-          borderColor: 'rgba(74, 58, 154, 0.18)',
+          borderColor: 'rgba(180, 166, 255, 0.28)',
           mb: 4.5,
           overflow: 'hidden',
         }}
       >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: -120,
-            right: -80,
-            width: 320,
-            height: 320,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(74, 58, 154, 0.22), rgba(74, 58, 154, 0.02) 68%)',
-            pointerEvents: 'none',
-          }}
-        />
-        <Chip
-          icon={<StarIcon />}
-          label="For Independent Artists"
-          color="primary"
-          sx={{ mb: 2, fontWeight: 600 }}
-        />
-        <Typography 
-          variant="h3" 
-          component="h1" 
-          sx={{ 
-            fontWeight: 700,
-            color: 'text.primary',
-            mb: 1.5,
-            fontSize: { xs: '1.9rem', sm: '2.4rem', md: '2.9rem' },
-            lineHeight: 1.2,
-            letterSpacing: '-0.02em',
-            maxWidth: 800,
-          }}
-        >
-          Build your artist storefront and start selling with confidence
-        </Typography>
-        <Typography 
-          variant="body1" 
-          color="text.secondary" 
-          sx={{ 
-            fontSize: { xs: '1rem', md: '1.08rem' }, 
-            lineHeight: 1.75,
-            maxWidth: 860,
-            mb: 2.5,
-          }}
-        >
-          Join ArtZyla to showcase original work, connect with buyers, and manage listings in one place.
-          You can start now and choose your subscription timing based on your launch plan.
-        </Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          <Chip icon={<CheckIcon />} label="No activation fees" variant="outlined" />
-          <Chip icon={<CheckIcon />} label="Transparent plans" variant="outlined" />
-          <Chip icon={<CheckIcon />} label="Direct buyer connection" variant="outlined" />
-        </Box>
+        <Grid container spacing={3} alignItems="center">
+          <Grid item xs={12} md={8}>
+            <Chip
+              icon={<StarIcon />}
+              label="Artist Onboarding"
+              sx={{
+                mb: 2,
+                fontWeight: 600,
+                color: 'white',
+                bgcolor: 'rgba(255,255,255,0.14)',
+                border: '1px solid rgba(255,255,255,0.28)',
+              }}
+            />
+            <Typography
+              variant="h3"
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                color: 'white',
+                mb: 1.5,
+                fontSize: { xs: '1.85rem', sm: '2.3rem', md: '2.7rem' },
+                lineHeight: 1.2,
+                letterSpacing: '-0.02em',
+                maxWidth: 760,
+              }}
+            >
+              Turn your art practice into a storefront collectors trust
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{
+                color: 'rgba(244, 241, 255, 0.92)',
+                fontSize: { xs: '0.98rem', md: '1.05rem' },
+                lineHeight: 1.75,
+                maxWidth: 760,
+                mb: 2.25,
+              }}
+            >
+              Create your artist profile, pick how you want to subscribe, and start preparing listings in minutes.
+              The setup keeps everything simple so you can focus on creating and selling.
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <Chip icon={<CheckIcon />} label="No activation fees" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
+              <Chip icon={<CheckIcon />} label="Flexible subscription timing" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
+              <Chip icon={<CheckIcon />} label="Direct buyer connection" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.5,
+                borderRadius: 2.5,
+                bgcolor: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.22)',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              <Typography variant="overline" sx={{ color: 'rgba(241, 236, 255, 0.9)', letterSpacing: '0.08em' }}>
+                Why artists choose ArtZyla
+              </Typography>
+              <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
+                  Fast setup with guided onboarding
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
+                  Transparent plans and clear listing limits
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
+                  Built for independent artists and makers
+                </Typography>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
       </Box>
 
       <Paper 

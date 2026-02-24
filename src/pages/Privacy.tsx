@@ -5,28 +5,69 @@ import {
   Typography,
   Paper,
   Divider,
+  Chip,
+  Stack,
 } from '@mui/material';
+import { Shield as ShieldIcon } from '@mui/icons-material';
 
 import SEO from '../components/SEO';
+import PageHeader from '../components/PageHeader';
 
 const Privacy: React.FC = () => {
   return (
-    <Box sx={{ py: 8, bgcolor: 'background.default', minHeight: '100vh' }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        pb: 8,
+        background: 'radial-gradient(1000px 420px at 6% 0%, rgba(74, 58, 154, 0.1), transparent 68%), radial-gradient(800px 360px at 96% 8%, rgba(74, 58, 154, 0.08), transparent 72%), linear-gradient(180deg, #faf9ff 0%, #f6f4ff 100%)',
+      }}
+    >
       <SEO
         title="Privacy Policy"
         description="ArtZyla Privacy Policy. Learn how we collect, use, and protect your personal information when you use our art marketplace."
         url="/privacy"
       />
-      <Container maxWidth="md">
-        <Paper sx={{ p: 4 }}>
-          <Typography variant="h3" component="h1" gutterBottom>
-            Privacy Policy
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+      <PageHeader
+        title="Privacy Policy"
+        subtitle="Learn how ArtZyla collects, uses, shares, and protects your information when you use our marketplace."
+        icon={<ShieldIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
+        align="left"
+      />
+      <Container maxWidth="lg">
+        <Paper
+          sx={{
+            p: { xs: 2.5, sm: 3.5, md: 4.5 },
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'rgba(74, 58, 154, 0.18)',
+            boxShadow: '0 14px 36px rgba(30, 22, 71, 0.08)',
+            bgcolor: 'rgba(255,255,255,0.92)',
+            backdropFilter: 'blur(6px)',
+            '& .MuiTypography-h5': {
+              fontWeight: 700,
+              color: 'text.primary',
+              mb: 1.25,
+            },
+            '& .MuiTypography-h6': {
+              fontWeight: 700,
+              color: 'primary.main',
+              mb: 1,
+            },
+            '& ul': {
+              marginTop: 0,
+            },
+          }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
+            <Chip icon={<ShieldIcon />} label="Data Protection" color="primary" />
+            <Chip label="User Privacy Rights" variant="outlined" />
+            <Chip label="Secure Marketplace Practices" variant="outlined" />
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3.5 }}>
             Last updated: {new Date().toLocaleDateString()}
           </Typography>
 
-          <Divider sx={{ mb: 4 }} />
+          <Divider sx={{ mb: 3.5 }} />
 
           <Box sx={{ mb: 4 }}>
             <Typography variant="h5" component="h2" gutterBottom>
