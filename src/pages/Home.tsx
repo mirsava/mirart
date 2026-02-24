@@ -14,6 +14,8 @@ import {
   Card,
   CardContent,
   IconButton,
+  Divider,
+  alpha,
 } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
@@ -150,17 +152,57 @@ const Home: React.FC = () => {
   }, [user?.id]);
 
 
+  const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const structuredData = {
     '@context': 'https://schema.org',
-    '@type': 'WebSite',
-    name: 'ArtZyla',
-    description: 'Discover unique paintings, woodworking, and handmade art from independent artists.',
-    url: typeof window !== 'undefined' ? window.location.origin : '',
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: { '@type': 'EntryPoint', urlTemplate: `${typeof window !== 'undefined' ? window.location.origin : ''}/gallery?search={search_term_string}` },
-      'query-input': 'required name=search_term_string',
-    },
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        name: 'ArtZyla',
+        description: 'Discover original paintings, woodworking, and handmade art from independent artists.',
+        url: siteUrl,
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: { '@type': 'EntryPoint', urlTemplate: `${siteUrl}/gallery?search={search_term_string}` },
+          'query-input': 'required name=search_term_string',
+        },
+      },
+      {
+        '@type': 'Organization',
+        name: 'ArtZyla',
+        url: siteUrl,
+        description: 'Online art marketplace connecting collectors with independent artists and makers.',
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'What can I buy on ArtZyla?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'You can buy original paintings, handcrafted woodworking pieces, and other handmade art directly from independent artists.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Is ArtZyla a marketplace for independent artists?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. ArtZyla is built for independent artists and makers who want to sell directly to art collectors and design-minded buyers.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'How do I find artwork by style or category?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Use the gallery filters and search to browse by category, medium, price, and keywords so you can quickly discover artwork that matches your style.',
+            },
+          },
+        ],
+      },
+    ],
   };
 
   return (
@@ -173,11 +215,14 @@ const Home: React.FC = () => {
       <Box
         sx={{
           position: 'relative',
-          height: { xs: 'calc(85vh - 45px)', md: 'calc(90vh - 45px)' },
-          minHeight: 600,
+          height: { xs: 'calc(72vh - 45px)', md: 'calc(78vh - 45px)' },
+          minHeight: { xs: 460, md: 520 },
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
+          borderRadius: { xs: 3, md: 4 },
+          border: '2px solid',
+          borderColor: 'rgba(16,12,30,0.9)',
         }}
       >
         <Box
@@ -187,137 +232,134 @@ const Home: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            bgcolor: 'primary.main',
+            bgcolor: '#4f5f7f',
             overflow: 'hidden',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundImage: `url("https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=1200&h=800&fit=crop&q=80")`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              opacity: 0.12,
-              filter: 'blur(2px) grayscale(30%)',
-              pointerEvents: 'none',
-            },
           }}
         >
           <Box
             sx={{
               position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
+              inset: 0,
+              background: `linear-gradient(138deg, ${theme.palette.primary.dark} 0%, ${alpha(theme.palette.primary.main, 0.92)} 52%, ${alpha(theme.palette.primary.light, 0.86)} 100%)`,
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: alpha(theme.palette.primary.dark, 0.22),
               backgroundImage: `
-                url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cstyle%3E.polygon%7Bfill:none;stroke:rgba(255,255,255,0.08);stroke-width:1.5%7D%3C/style%3E%3C/defs%3E%3Cpolygon points='100,10 190,60 190,150 100,190 10,150 10,60' class='polygon'/%3E%3Cpolygon points='100,40 150,70 150,130 100,160 50,130 50,70' class='polygon'/%3E%3C/svg%3E"),
-                url("data:image/svg+xml,%3Csvg width='150' height='150' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cstyle%3E.rect%7Bfill:none;stroke:rgba(255,112,67,0.12);stroke-width:2%7D%3C/style%3E%3C/defs%3E%3Crect x='25' y='25' width='100' height='100' transform='rotate(45 75 75)' class='rect'/%3E%3Crect x='50' y='50' width='50' height='50' transform='rotate(45 75 75)' class='rect'/%3E%3C/svg%3E")
+                linear-gradient(33deg, ${alpha(theme.palette.primary.light, 0.5)} 14%, transparent 14.5%, transparent 84%, ${alpha(theme.palette.primary.light, 0.5)} 84.5%, ${alpha(theme.palette.primary.light, 0.5)}),
+                linear-gradient(147deg, ${alpha(theme.palette.primary.main, 0.44)} 12%, transparent 12.4%, transparent 88%, ${alpha(theme.palette.primary.main, 0.44)} 88.4%, ${alpha(theme.palette.primary.main, 0.44)}),
+                linear-gradient(27deg, ${alpha(theme.palette.primary.dark, 0.56)} 16%, transparent 16.3%, transparent 82%, ${alpha(theme.palette.primary.dark, 0.56)} 82.3%, ${alpha(theme.palette.primary.dark, 0.56)}),
+                linear-gradient(153deg, ${alpha(theme.palette.primary.light, 0.34)} 10%, transparent 10.4%, transparent 90%, ${alpha(theme.palette.primary.light, 0.34)} 90.4%, ${alpha(theme.palette.primary.light, 0.34)}),
+                linear-gradient(64deg, ${alpha(theme.palette.primary.main, 0.46)} 24%, transparent 24.5%, transparent 76%, ${alpha(theme.palette.primary.main, 0.46)} 76.5%, ${alpha(theme.palette.primary.main, 0.46)}),
+                linear-gradient(118deg, ${alpha(theme.palette.primary.dark, 0.5)} 18%, transparent 18.4%, transparent 82%, ${alpha(theme.palette.primary.dark, 0.5)} 82.4%, ${alpha(theme.palette.primary.dark, 0.5)}),
+                linear-gradient(92deg, ${alpha(theme.palette.primary.light, 0.3)} 22%, transparent 22.4%, transparent 78%, ${alpha(theme.palette.primary.light, 0.3)} 78.4%, ${alpha(theme.palette.primary.light, 0.3)})
               `,
-              backgroundSize: '200px 200px, 150px 150px',
-              backgroundPosition: '0 0, 100px 100px',
-              opacity: 0.6,
+              backgroundSize: { xs: '138px 228px, 124px 210px, 164px 256px, 112px 186px, 144px 232px, 172px 268px, 130px 214px', md: '188px 304px, 172px 280px, 226px 352px, 158px 250px, 194px 314px, 238px 372px, 182px 292px' },
+              backgroundPosition: '0 0, 42px 26px, 84px 132px, 18px 154px, 102px 44px, 136px 186px, 56px 96px',
+              backgroundRepeat: 'repeat',
+              opacity: 0.74,
+              mixBlendMode: 'normal',
               pointerEvents: 'none',
             }}
           />
           <Box
             sx={{
               position: 'absolute',
-              top: '15%',
-              right: '10%',
-              width: '200px',
-              height: '200px',
-              border: `2px solid rgba(255, 255, 255, 0.15)`,
-              borderRadius: '20px',
-              transform: 'rotate(25deg)',
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              bottom: { xs: -300, md: -390 },
+              left: { xs: '-4%', md: '4%' },
+              width: { xs: 500, md: 740 },
+              height: { xs: 760, md: 1100 },
+              clipPath: 'polygon(48% 0%, 100% 100%, 8% 94%)',
+              backgroundImage: `
+                linear-gradient(96deg, ${alpha('#ffffff', 0.22)} 0%, transparent 46%),
+                conic-gradient(from 212deg at 50% 24%, ${alpha(theme.palette.primary.light, 0.44)}, ${alpha(theme.palette.primary.main, 0.68)}, ${alpha(theme.palette.primary.dark, 0.86)}, ${alpha(theme.palette.primary.light, 0.44)}),
+                linear-gradient(182deg, ${alpha(theme.palette.primary.light, 0.52)} 0%, ${alpha(theme.palette.primary.main, 0.7)} 52%, ${alpha(theme.palette.primary.dark, 0.86)} 100%)
+              `,
+              backgroundBlendMode: 'screen, normal, normal',
+              transform: 'rotate(39deg) scaleX(0.93)',
+              filter: 'drop-shadow(0 14px 30px rgba(6, 14, 40, 0.44))',
+              opacity: 0.78,
               pointerEvents: 'none',
             }}
           />
           <Box
             sx={{
               position: 'absolute',
-              top: '25%',
-              right: '15%',
-              width: '120px',
-              height: '120px',
-              border: `2px solid rgba(255, 143, 0, 0.2)`,
-              borderRadius: '20px',
-              transform: 'rotate(-15deg)',
-              bgcolor: 'rgba(255, 255, 255, 0.08)',
+              top: { xs: -330, md: -450 },
+              left: { xs: '-10%', md: '6%' },
+              width: { xs: 560, md: 820 },
+              height: { xs: 860, md: 1240 },
+              clipPath: 'polygon(54% 0%, 96% 100%, 2% 90%)',
+              backgroundImage: `
+                linear-gradient(92deg, ${alpha('#ffffff', 0.2)} 0%, transparent 48%),
+                conic-gradient(from 36deg at 50% 22%, ${alpha(theme.palette.primary.light, 0.46)}, ${alpha(theme.palette.primary.main, 0.66)}, ${alpha(theme.palette.primary.dark, 0.88)}, ${alpha(theme.palette.primary.light, 0.46)}),
+                linear-gradient(186deg, ${alpha(theme.palette.primary.light, 0.44)} 0%, ${alpha(theme.palette.primary.main, 0.62)} 52%, ${alpha(theme.palette.primary.dark, 0.88)} 100%)
+              `,
+              backgroundBlendMode: 'screen, normal, normal',
+              transform: 'rotate(34deg) scaleX(1.02)',
+              filter: 'drop-shadow(0 16px 34px rgba(6, 14, 40, 0.46))',
+              opacity: 0.72,
               pointerEvents: 'none',
             }}
           />
           <Box
             sx={{
               position: 'absolute',
-              bottom: '20%',
-              left: '8%',
-              width: '0',
-              height: '0',
-              borderLeft: '100px solid transparent',
-              borderRight: '100px solid transparent',
-              borderBottom: `180px solid ${theme.palette.primary.main}30`,
-              borderTop: 'none',
-              filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.12))',
-              transform: 'rotate(30deg)',
+              bottom: { xs: -420, md: -560 },
+              right: { xs: '-16%', md: '-8%' },
+              width: { xs: 700, md: 1040 },
+              height: { xs: 1040, md: 1500 },
+              clipPath: 'polygon(44% 0%, 92% 100%, 0% 96%)',
+              backgroundImage: `
+                linear-gradient(94deg, ${alpha('#ffffff', 0.18)} 0%, transparent 46%),
+                conic-gradient(from 204deg at 50% 24%, ${alpha(theme.palette.primary.light, 0.38)}, ${alpha(theme.palette.primary.main, 0.62)}, ${alpha(theme.palette.primary.dark, 0.9)}, ${alpha(theme.palette.primary.light, 0.38)}),
+                linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.54)} 0%, ${alpha(theme.palette.primary.dark, 0.74)} 54%, ${alpha('#0b1a43', 0.9)} 100%)
+              `,
+              backgroundBlendMode: 'screen, normal, normal',
+              transform: 'rotate(-6deg) scaleX(1.12)',
+              filter: 'drop-shadow(0 18px 38px rgba(6, 14, 40, 0.5))',
+              opacity: 0.84,
               pointerEvents: 'none',
             }}
           />
           <Box
             sx={{
               position: 'absolute',
-              bottom: '15%',
-              left: '12%',
-              width: '0',
-              height: '0',
-              borderLeft: '60px solid transparent',
-              borderRight: '60px solid transparent',
-              borderBottom: `100px solid ${theme.palette.secondary.main}25`,
-              borderTop: 'none',
-              filter: 'drop-shadow(0 0 1.5px rgba(255, 143, 0, 0.18))',
-              transform: 'rotate(-20deg)',
+              inset: 0,
+              backgroundImage: `
+                linear-gradient(128deg, ${alpha(theme.palette.primary.light, 0.62)} 0%, ${alpha(theme.palette.primary.main, 0.38)} 36%, transparent 74%),
+                linear-gradient(308deg, ${alpha(theme.palette.primary.dark, 0.62)} 0%, ${alpha(theme.palette.primary.main, 0.32)} 44%, transparent 80%),
+                radial-gradient(760px 460px at 20% 24%, ${alpha(theme.palette.primary.light, 0.46)}, transparent 70%)
+              `,
+              backgroundRepeat: 'no-repeat, no-repeat, no-repeat',
+              opacity: 0.72,
+              mixBlendMode: 'screen',
               pointerEvents: 'none',
             }}
           />
           <Box
             sx={{
               position: 'absolute',
-              top: '50%',
-              left: '5%',
-              width: '150px',
-              height: '150px',
-              border: `2px solid rgba(255, 255, 255, 0.1)`,
-              borderRadius: '50%',
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              inset: 0,
+              backgroundImage: `
+                radial-gradient(980px 520px at 100% 0%, ${alpha(theme.palette.primary.light, 0.3)}, transparent 62%),
+                radial-gradient(760px 460px at 0% 100%, ${alpha(theme.palette.primary.main, 0.24)}, transparent 68%)
+              `,
+              backgroundSize: 'auto, auto',
+              backgroundRepeat: 'no-repeat, no-repeat',
+              opacity: 0.72,
               pointerEvents: 'none',
             }}
           />
           <Box
             sx={{
               position: 'absolute',
-              top: '60%',
-              right: '5%',
-              width: '180px',
-              height: '180px',
-              border: `2px solid rgba(255, 143, 0, 0.15)`,
-              borderRadius: '50%',
-              bgcolor: 'rgba(255, 255, 255, 0.08)',
-              pointerEvents: 'none',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: '10%',
-              right: '20%',
-              width: '140px',
-              height: '140px',
-              border: `2px solid rgba(255, 255, 255, 0.12)`,
-              transform: 'rotate(45deg)',
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              inset: 0,
+              background: 'linear-gradient(to top, rgba(9,18,46,0.36) 0%, rgba(14,32,78,0.16) 46%, rgba(8,18,42,0.12) 100%)',
               pointerEvents: 'none',
             }}
           />
@@ -325,23 +367,23 @@ const Home: React.FC = () => {
         
         <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, position: 'relative', zIndex: 2 }}>
           <Grid container spacing={6} alignItems="center" justifyContent="center">
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={12}>
               <Fade in={true} timeout={1000}>
-                <Box>
-                  <Box sx={{ mb: 4 }}>
+                <Box sx={{ textAlign: 'center', maxWidth: 760, mx: 'auto' }}>
+                  <Box sx={{ mb: 3 }}>
                     <Chip
-                      label="Art Marketplace"
+                      label="Curated Art Marketplace"
                       sx={{ 
-                        mb: 2, 
-                        bgcolor: 'rgba(255, 143, 0, 0.2)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 143, 0, 0.4)',
-                        backdropFilter: 'blur(10px)',
-                        fontWeight: 500,
+                        mb: 2.5, 
+                        bgcolor: 'rgba(255, 106, 142, 0.2)',
+                        color: '#ffeaf1',
+                        border: '1px solid rgba(255, 106, 142, 0.5)',
+                        backdropFilter: 'blur(12px)',
+                        fontWeight: 600,
                         fontSize: '0.85rem',
                         px: 2,
-                        py: 0.5,
-                        letterSpacing: '0.5px',
+                        py: 0.35,
+                        letterSpacing: '0.4px',
                       }}
                     />
                   </Box>
@@ -349,64 +391,65 @@ const Home: React.FC = () => {
                     variant={isMobile ? 'h2' : 'h1'}
                     component="h1"
                     gutterBottom
-                    sx={{ 
-                      fontWeight: 300, 
+                    sx={{
+                      fontWeight: 300,
                       mb: 3,
                       color: 'white',
-                      fontSize: { xs: '3rem', md: '4.5rem' },
-                      lineHeight: 1.1,
+                      fontSize: { xs: '2.7rem', md: '4.3rem' },
+                      lineHeight: 1.05,
                       letterSpacing: '-0.02em',
-                      textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                      textShadow: '0 3px 12px rgba(0,0,0,0.35)',
                     }}
                   >
-                    Discover
+                    Collect
                     <br />
                     <Box component="span" sx={{ 
                       fontWeight: 700,
-                      color: 'white',
-                      textShadow: '0 4px 12px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4)',
+                      color: '#fff6ea',
+                      textShadow: '0 6px 18px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35)',
                       position: 'relative',
                     }}>
-                      Handmade Art
+                      Art With Character
                     </Box>
                   </Typography>
                   <Typography
                     variant={isMobile ? 'body1' : 'h6'}
                     component="p"
                     sx={{ 
-                      mb: 5, 
-                      maxWidth: '520px',
+                      mb: 3.5,
+                      maxWidth: '620px',
                       color: 'rgba(255,255,255,0.95)',
                       fontWeight: 300,
-                      lineHeight: 1.7,
-                      fontSize: { xs: '1rem', md: '1.25rem' },
+                      lineHeight: 1.65,
+                      fontSize: { xs: '1rem', md: '1.18rem' },
                       textShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                      mx: 'auto',
                     }}
                   >
-                    A curated marketplace for original paintings and handcrafted woodworking. 
-                    Connect with talented artists and discover unique creations.
+                    Original paintings and handcrafted pieces from independent artists.
+                    Shop thoughtfully, connect directly, and bring home work that feels personal.
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 2.5, flexWrap: 'wrap', mb: 4, alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', gap: 2.5, flexWrap: 'wrap', mb: 1, alignItems: 'center', justifyContent: 'center' }}>
                     <Button
                       variant="contained"
                       size="large"
                       sx={{
-                        bgcolor: 'white',
-                        color: 'primary.main',
+                        background: 'linear-gradient(135deg, #ffd27a 0%, #ffb347 48%, #ff9548 100%)',
+                        color: '#3a2208',
                         px: 5,
                         py: 2,
-                        borderRadius: 2,
+                        borderRadius: 3,
                         textTransform: 'none',
-                        fontWeight: 600,
+                        fontWeight: 700,
                         fontSize: '1rem',
-                        letterSpacing: '0.5px',
-                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2)',
-                        border: '2px solid white',
+                        letterSpacing: '0.2px',
+                        boxShadow: '0 8px 24px rgba(255, 149, 72, 0.45), 0 3px 10px rgba(0, 0, 0, 0.25)',
+                        border: '1px solid rgba(255, 232, 188, 0.8)',
                         '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.95)',
-                          color: 'primary.dark',
+                          background: 'linear-gradient(135deg, #ffd98f 0%, #ffbd5e 48%, #ffa15d 100%)',
+                          color: '#2f1b06',
                           transform: 'translateY(-2px)',
-                          boxShadow: '0 6px 30px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3)',
+                          boxShadow: '0 12px 32px rgba(255, 149, 72, 0.58), 0 5px 14px rgba(0, 0, 0, 0.32)',
                         },
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
@@ -415,18 +458,25 @@ const Home: React.FC = () => {
                       Browse Artwork
                     </Button>
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       size="large"
                       sx={{
-                        bgcolor: 'secondary.main',
-                        color: 'white',
+                        color: '#fff1f7',
+                        borderColor: 'rgba(255, 122, 154, 0.65)',
                         px: 5,
                         py: 2,
-                        borderRadius: 1,
+                        borderRadius: 3,
                         textTransform: 'none',
-                        fontWeight: 500,
+                        fontWeight: 600,
                         fontSize: '1rem',
-                        letterSpacing: '0.5px',
+                        letterSpacing: '0.2px',
+                        backdropFilter: 'blur(10px)',
+                        bgcolor: 'rgba(255, 122, 154, 0.16)',
+                        '&:hover': {
+                          borderColor: 'rgba(255, 180, 198, 0.9)',
+                          bgcolor: 'rgba(255, 122, 154, 0.24)',
+                          color: 'white',
+                        },
                       }}
                       onClick={() => navigate('/artist-signup')}
                     >
@@ -442,6 +492,53 @@ const Home: React.FC = () => {
 
       </Box>
 
+
+      <Box sx={{ bgcolor: 'background.paper', py: { xs: 6, md: 7 } }}>
+        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
+          <Grid container spacing={4} alignItems="stretch">
+            <Grid item xs={12} md={7}>
+              <Typography variant="h4" component="h2" sx={{ fontWeight: 600, mb: 2 }}>
+                Buy Original Art Online From Independent Artists
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.75, mb: 2 }}>
+                ArtZyla is a curated online art marketplace where collectors discover original paintings, handcrafted woodworking, and one-of-a-kind handmade art. Every listing comes from an independent artist or maker, so each piece has a direct story and a personal connection.
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.75 }}>
+                Explore contemporary wall art, statement pieces for home decor, and handmade gifts with character. Whether you are decorating a new space or expanding your personal collection, ArtZyla makes it easy to shop unique art by category, style, and budget.
+              </Typography>
+            </Grid>
+            <Grid item xs={12} md={5}>
+              <Paper
+                elevation={0}
+                sx={{
+                  height: '100%',
+                  p: { xs: 2.5, md: 3 },
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  bgcolor: 'background.default',
+                }}
+              >
+                <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mb: 1.5 }}>
+                  Popular Art Categories
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Original paintings for living rooms and offices
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Handmade woodworking decor and functional pieces
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Unique wall art and collectible artisan work
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Giftable handmade art from verified independent creators
+                </Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Box>
+      </Box>
 
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8 }}>
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', gap: 2 }}>

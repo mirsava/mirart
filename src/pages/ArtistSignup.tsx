@@ -304,53 +304,96 @@ const ArtistSignup: React.FC = () => {
   };
 
   return (
-    <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8 }}>
+    <Box
+      sx={{
+        background: 'radial-gradient(1200px 500px at 10% 0%, rgba(74, 58, 154, 0.12), transparent 68%), radial-gradient(900px 520px at 95% 12%, rgba(74, 58, 154, 0.1), transparent 72%), linear-gradient(180deg, #faf9ff 0%, #f5f3ff 100%)',
+        minHeight: '100vh',
+      }}
+    >
+      <Box sx={{ width: '100%', maxWidth: 1180, mx: 'auto', px: { xs: 2, sm: 3, md: 4 }, py: { xs: 6, md: 8 } }}>
       <Box 
         sx={{ 
-          textAlign: 'center',
+          textAlign: 'left',
           position: 'relative',
-          px: 3,
-          py: 3,
-          bgcolor: 'rgba(74, 58, 154, 0.04)',
-          borderRadius: 1,
-          mb: 4,
+          px: { xs: 3, md: 5 },
+          py: { xs: 3.5, md: 4.5 },
+          background: 'linear-gradient(145deg, rgba(74, 58, 154, 0.12) 0%, rgba(74, 58, 154, 0.06) 40%, rgba(74, 58, 154, 0.02) 100%)',
+          borderRadius: 3,
+          border: '1px solid',
+          borderColor: 'rgba(74, 58, 154, 0.18)',
+          mb: 4.5,
+          overflow: 'hidden',
         }}
       >
+        <Box
+          sx={{
+            position: 'absolute',
+            top: -120,
+            right: -80,
+            width: 320,
+            height: 320,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(74, 58, 154, 0.22), rgba(74, 58, 154, 0.02) 68%)',
+            pointerEvents: 'none',
+          }}
+        />
+        <Chip
+          icon={<StarIcon />}
+          label="For Independent Artists"
+          color="primary"
+          sx={{ mb: 2, fontWeight: 600 }}
+        />
         <Typography 
           variant="h3" 
           component="h1" 
           sx={{ 
             fontWeight: 700,
-            color: 'primary.main',
-            mb: 2,
-            fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+            color: 'text.primary',
+            mb: 1.5,
+            fontSize: { xs: '1.9rem', sm: '2.4rem', md: '2.9rem' },
             lineHeight: 1.2,
             letterSpacing: '-0.02em',
+            maxWidth: 800,
           }}
         >
-          Join Our Artist Community
+          Build your artist storefront and start selling with confidence
         </Typography>
         <Typography 
           variant="body1" 
           color="text.secondary" 
           sx={{ 
-            fontSize: '1.1rem', 
-            lineHeight: 1.7,
-            maxWidth: '800px',
-            mx: 'auto',
+            fontSize: { xs: '1rem', md: '1.08rem' }, 
+            lineHeight: 1.75,
+            maxWidth: 860,
+            mb: 2.5,
           }}
         >
-          Start selling your artwork to a global audience. Choose a subscription plan that fits your needs and start listing your work today. No activation fees, transparent pricing.
+          Join ArtZyla to showcase original work, connect with buyers, and manage listings in one place.
+          You can start now and choose your subscription timing based on your launch plan.
         </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          <Chip icon={<CheckIcon />} label="No activation fees" variant="outlined" />
+          <Chip icon={<CheckIcon />} label="Transparent plans" variant="outlined" />
+          <Chip icon={<CheckIcon />} label="Direct buyer connection" variant="outlined" />
+        </Box>
       </Box>
 
       <Paper 
         elevation={0}
         sx={{ 
-          p: { xs: 3, sm: 4, md: 6 }, 
-          borderRadius: 1,
+          p: { xs: 2.5, sm: 4, md: 5 }, 
+          borderRadius: 3,
           border: '1px solid',
-          borderColor: 'divider',
+          borderColor: 'rgba(74, 58, 154, 0.2)',
+          boxShadow: '0 14px 40px rgba(31, 24, 71, 0.08)',
+          bgcolor: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(8px)',
+          '& .MuiTextField-root .MuiOutlinedInput-root': {
+            borderRadius: 2,
+          },
+          '& .MuiFormControl-root .MuiOutlinedInput-root': {
+            borderRadius: 2,
+          },
         }}
       >
 
@@ -427,7 +470,7 @@ const ArtistSignup: React.FC = () => {
                   </Box>
                 </Alert>
               )}
-              <Grid container spacing={3}>
+              <Grid container spacing={2.5}>
               <Grid item xs={12} sm={6} id="field-firstName">
                 <TextField
                   fullWidth
@@ -632,11 +675,11 @@ const ArtistSignup: React.FC = () => {
                 sx={{ 
                   mt: 4, 
                   mb: 4,
-                  p: { xs: 3, sm: 4 },
-                  borderRadius: 1,
-                  bgcolor: 'rgba(74, 58, 154, 0.03)',
+                  p: { xs: 2.5, sm: 3.5 },
+                  borderRadius: 2.5,
+                  bgcolor: 'rgba(74, 58, 154, 0.04)',
                   border: '1px solid',
-                  borderColor: 'divider',
+                  borderColor: 'rgba(74, 58, 154, 0.16)',
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
@@ -670,9 +713,10 @@ const ArtistSignup: React.FC = () => {
                       cursor: 'pointer',
                       border: '2px solid',
                       borderColor: formData.paymentOption === 'payLater' ? 'primary.main' : 'divider',
-                      bgcolor: formData.paymentOption === 'payLater' ? 'rgba(74, 58, 154, 0.08)' : 'background.paper',
-                      borderRadius: 1,
-                      '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(74, 58, 154, 0.04)' },
+                      bgcolor: formData.paymentOption === 'payLater' ? 'rgba(74, 58, 154, 0.09)' : 'background.paper',
+                      borderRadius: 2,
+                      transition: 'all 0.2s ease',
+                      '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(74, 58, 154, 0.05)', transform: 'translateY(-2px)' },
                     }}
                   >
                     <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -692,9 +736,10 @@ const ArtistSignup: React.FC = () => {
                       cursor: 'pointer',
                       border: '2px solid',
                       borderColor: formData.paymentOption === 'payNow' ? 'primary.main' : 'divider',
-                      bgcolor: formData.paymentOption === 'payNow' ? 'rgba(74, 58, 154, 0.08)' : 'background.paper',
-                      borderRadius: 1,
-                      '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(74, 58, 154, 0.04)' },
+                      bgcolor: formData.paymentOption === 'payNow' ? 'rgba(74, 58, 154, 0.09)' : 'background.paper',
+                      borderRadius: 2,
+                      transition: 'all 0.2s ease',
+                      '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(74, 58, 154, 0.05)', transform: 'translateY(-2px)' },
                     }}
                   >
                     <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -818,11 +863,12 @@ const ArtistSignup: React.FC = () => {
                                 borderColor: isSelected ? 'primary.main' : 'divider',
                                 bgcolor: isSelected ? 'rgba(74, 58, 154, 0.05)' : 'background.paper',
                                 position: 'relative',
-                                borderRadius: 1,
-                                transition: 'border-color 0.2s',
+                                borderRadius: 2,
+                                transition: 'all 0.2s ease',
                                 overflow: 'hidden',
                                 '&:hover': {
                                   borderColor: 'primary.main',
+                                  transform: 'translateY(-2px)',
                                 },
                                 ...(isPopular && {
                                   borderColor: 'secondary.main',
@@ -962,7 +1008,7 @@ const ArtistSignup: React.FC = () => {
                   variant="contained"
                   size="large"
                   disabled={isLoading}
-                  sx={{ px: 6, py: 1.5 }}
+                  sx={{ px: 6, py: 1.6, borderRadius: 2, fontWeight: 700, boxShadow: '0 10px 28px rgba(74, 58, 154, 0.35)' }}
                 >
                   {isLoading
                     ? (isCompletingProfile ? 'Saving Profile...' : (formData.paymentOption === 'payNow' && formData.selectedPlanId ? 'Loading...' : 'Creating Account...'))
@@ -986,6 +1032,7 @@ const ArtistSignup: React.FC = () => {
             </form>
           )}
         </Paper>
+      </Box>
     </Box>
   );
 };
