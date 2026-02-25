@@ -192,7 +192,7 @@ const ConfirmSignup: React.FC = () => {
             </Alert>
           )}
 
-          <form onSubmit={handleConfirm}>
+          <form onSubmit={handleConfirm} noValidate>
             {!usernameFromState && (
               <TextField
                 fullWidth

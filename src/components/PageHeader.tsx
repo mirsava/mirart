@@ -84,7 +84,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
             <Divider
               sx={{
                 mt: 0.7,
-                mb: subtitle ? 0.55 : 0,
+                mb: 0,
                 border: 0,
                 height: 3,
                 borderRadius: 999,
@@ -93,24 +93,6 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                 mx: isCenter ? 'auto' : 0,
               }}
             />
-            {subtitle && (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{
-                  mt: 0.35,
-                  lineHeight: 1.5,
-                  fontSize: { xs: '0.88rem', md: '0.93rem' },
-                  maxWidth: isCenter ? { xs: '100%', md: '860px' } : '100%',
-                  overflow: 'hidden',
-                  display: '-webkit-box',
-                  WebkitLineClamp: subtitleLines,
-                  WebkitBoxOrient: 'vertical',
-                }}
-              >
-                {subtitle}
-              </Typography>
-            )}
           </Box>
         </Box>
       </Box>

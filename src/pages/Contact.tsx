@@ -27,17 +27,52 @@ const Contact: React.FC = () => {
     subject: '',
     message: '',
   });
+  const [formErrors, setFormErrors] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: '',
+  });
   const [submitted, setSubmitted] = useState<boolean>(false);
+
+  const validateForm = () => {
+    const nextErrors = {
+      name: '',
+      email: '',
+      subject: '',
+      message: '',
+    };
+
+    if (!formData.name.trim()) nextErrors.name = 'Name is required';
+    if (!formData.email.trim()) {
+      nextErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      nextErrors.email = 'Enter a valid email address';
+    }
+    if (!formData.subject.trim()) nextErrors.subject = 'Subject is required';
+    if (!formData.message.trim()) {
+      nextErrors.message = 'Message is required';
+    } else if (formData.message.trim().length < 10) {
+      nextErrors.message = 'Message should be at least 10 characters';
+    }
+
+    setFormErrors(nextErrors);
+    return !Object.values(nextErrors).some(Boolean);
+  };
 
   const handleInputChange = (field: keyof typeof formData) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [field]: event.target.value,
     });
+    if (formErrors[field]) {
+      setFormErrors((prev) => ({ ...prev, [field]: '' }));
+    }
   };
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
+    if (!validateForm()) return;
     setSubmitted(true);
   };
 
@@ -94,7 +129,7 @@ const Contact: React.FC = () => {
                 </Alert>
               ) : null}
 
-              <Box component="form" onSubmit={handleSubmit}>
+              <Box component="form" onSubmit={handleSubmit} noValidate>
                 <Grid container spacing={3}>
                   <Grid item xs={12} sm={6}>
                     <TextField
@@ -103,6 +138,8 @@ const Contact: React.FC = () => {
                       label="Your Name"
                       value={formData.name}
                       onChange={handleInputChange('name')}
+                      error={!!formErrors.name}
+                      helperText={formErrors.name}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
@@ -113,6 +150,8 @@ const Contact: React.FC = () => {
                       type="email"
                       value={formData.email}
                       onChange={handleInputChange('email')}
+                      error={!!formErrors.email}
+                      helperText={formErrors.email}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -122,6 +161,8 @@ const Contact: React.FC = () => {
                       label="Subject"
                       value={formData.subject}
                       onChange={handleInputChange('subject')}
+                      error={!!formErrors.subject}
+                      helperText={formErrors.subject}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -133,6 +174,8 @@ const Contact: React.FC = () => {
                       rows={6}
                       value={formData.message}
                       onChange={handleInputChange('message')}
+                      error={!!formErrors.message}
+                      helperText={formErrors.message}
                     />
                   </Grid>
                   <Grid item xs={12}>

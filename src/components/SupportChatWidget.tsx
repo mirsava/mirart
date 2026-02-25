@@ -8,6 +8,7 @@ import {
   IconButton,
   Badge,
   CircularProgress,
+  MenuItem,
 } from '@mui/material';
 import {
   HeadsetMic as SupportIcon,
@@ -27,9 +28,35 @@ interface SupportChatConfig {
   welcome_message: string;
 }
 
+const getOrCreateGuestSessionId = (): string => {
+  const key = 'support_guest_session_id';
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+  const generated = `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  localStorage.setItem(key, generated);
+  return generated;
+};
+
+const createGuestSessionId = (): string => `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+
+const getGuestUserId = (sessionId: string): number => {
+  let hash = 0;
+  for (let i = 0; i < sessionId.length; i += 1) {
+    hash = (hash * 31 + sessionId.charCodeAt(i)) | 0;
+  }
+  const positive = Math.abs(hash) || 1;
+  return -positive;
+};
+
 const SupportChatWidget: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { supportChatEnabled } = useChat();
+  const [guestSessionId, setGuestSessionId] = useState<string>(() => getOrCreateGuestSessionId());
+  const [guestName, setGuestName] = useState<string>(() => localStorage.getItem('support_guest_name') || '');
+  const [guestEmail, setGuestEmail] = useState<string>(() => localStorage.getItem('support_guest_email') || '');
+  const [guestSupportType, setGuestSupportType] = useState<'sales' | 'signup' | 'subscription' | 'billing' | 'technical' | 'general'>(
+    () => (localStorage.getItem('support_guest_type') as any) || 'sales'
+  );
   const [config, setConfig] = useState<SupportChatConfig | null>(null);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
@@ -39,6 +66,28 @@ const SupportChatWidget: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastGuestIdentityRef = useRef({ name: guestName.trim(), email: guestEmail.trim() });
+  const currentSupportUserId = isAuthenticated && user?.id ? Number(user.id) : getGuestUserId(guestSessionId);
+
+  const resetGuestThread = useCallback(() => {
+    if (isAuthenticated) return;
+    const nextSessionId = createGuestSessionId();
+    localStorage.setItem('support_guest_session_id', nextSessionId);
+    setGuestSessionId(nextSessionId);
+    setMessages([]);
+    setUnreadCount(0);
+    setNewMessage('');
+  }, [isAuthenticated]);
+
+  const handleCloseWidget = () => {
+    setOpen(false);
+    setNewMessage('');
+    setMessages([]);
+    setUnreadCount(0);
+    if (!isAuthenticated) {
+      resetGuestThread();
+    }
+  };
 
   useEffect(() => {
     apiService.getSupportChatConfig().then(setConfig).catch(() => {});
@@ -60,31 +109,35 @@ const SupportChatWidget: React.FC = () => {
   }, [config]);
 
   const fetchMessages = useCallback(async () => {
-    if (!user?.id) return;
     try {
-      const msgs = await apiService.getSupportChatMessages(user.id);
+      const msgs = await apiService.getSupportChatMessages({
+        cognitoUsername: isAuthenticated ? user?.id : undefined,
+        userId: currentSupportUserId,
+      });
       setMessages(msgs);
       const unread = msgs.filter((m: any) => m.sender === 'admin' && !m.read_at).length;
       setUnreadCount(unread);
     } catch {}
-  }, [user?.id]);
+  }, [currentSupportUserId, isAuthenticated, user?.id]);
 
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      fetchMessages();
-    }
-  }, [isAuthenticated, user?.id, fetchMessages]);
+    fetchMessages();
+  }, [fetchMessages]);
 
   useEffect(() => {
-    if (open && user?.id) {
+    if (open) {
       setLoading(true);
       fetchMessages().finally(() => setLoading(false));
-      apiService.markSupportChatRead(user.id, 'admin').then(() => setUnreadCount(0)).catch(() => {});
+      apiService.markSupportChatRead({
+        cognitoUsername: isAuthenticated ? user?.id : undefined,
+        userId: currentSupportUserId,
+        sender: 'admin',
+      }).then(() => setUnreadCount(0)).catch(() => {});
       pollRef.current = setInterval(fetchMessages, 5000);
       return () => { if (pollRef.current) clearInterval(pollRef.current); };
     }
     if (pollRef.current) clearInterval(pollRef.current);
-  }, [open, user?.id, fetchMessages]);
+  }, [open, fetchMessages, isAuthenticated, user?.id, currentSupportUserId]);
 
   useEffect(() => {
     if (open) {
@@ -93,11 +146,16 @@ const SupportChatWidget: React.FC = () => {
   }, [messages, open]);
 
   const handleSend = async () => {
-    if (!newMessage.trim() || !user?.id) return;
+    if (!newMessage.trim()) return;
     setSending(true);
     try {
       await apiService.sendSupportChatMessage({
-        cognitoUsername: user.id,
+        cognitoUsername: isAuthenticated ? user?.id : undefined,
+        userId: currentSupportUserId,
+        guestSessionId: isAuthenticated ? undefined : guestSessionId,
+        guestName: isAuthenticated ? undefined : guestName.trim() || undefined,
+        guestEmail: isAuthenticated ? undefined : guestEmail.trim() || undefined,
+        supportType: isAuthenticated ? undefined : guestSupportType,
         message: newMessage.trim(),
         sender: 'user',
       });
@@ -139,7 +197,7 @@ const SupportChatWidget: React.FC = () => {
       <Drawer
         anchor="right"
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={handleCloseWidget}
         disableScrollLock
         PaperProps={{
           sx: {
@@ -180,7 +238,7 @@ const SupportChatWidget: React.FC = () => {
                 </Box>
               </Box>
             </Box>
-            <IconButton onClick={() => setOpen(false)} sx={{ color: 'white' }} size="small">
+            <IconButton onClick={handleCloseWidget} sx={{ color: 'white' }} size="small">
               <CloseIcon />
             </IconButton>
           </Box>
@@ -236,8 +294,74 @@ const SupportChatWidget: React.FC = () => {
             )}
           </Box>
 
-          {isAuthenticated ? (
-            <Box sx={{ p: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1, bgcolor: 'background.paper', flexShrink: 0 }}>
+          <Box sx={{ p: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 1, bgcolor: 'background.paper', flexShrink: 0 }}>
+            {!isAuthenticated && (
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Your name (optional)"
+                  value={guestName}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setGuestName(value);
+                    localStorage.setItem('support_guest_name', value);
+                  }}
+                  onBlur={() => {
+                    const nextName = guestName.trim();
+                    const nextEmail = guestEmail.trim();
+                    const identityChanged =
+                      nextName !== lastGuestIdentityRef.current.name ||
+                      nextEmail !== lastGuestIdentityRef.current.email;
+                    if (identityChanged) {
+                      lastGuestIdentityRef.current = { name: nextName, email: nextEmail };
+                      resetGuestThread();
+                    }
+                  }}
+                />
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Your email (optional)"
+                  value={guestEmail}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setGuestEmail(value);
+                    localStorage.setItem('support_guest_email', value);
+                  }}
+                  onBlur={() => {
+                    const nextName = guestName.trim();
+                    const nextEmail = guestEmail.trim();
+                    const identityChanged =
+                      nextName !== lastGuestIdentityRef.current.name ||
+                      nextEmail !== lastGuestIdentityRef.current.email;
+                    if (identityChanged) {
+                      lastGuestIdentityRef.current = { name: nextName, email: nextEmail };
+                      resetGuestThread();
+                    }
+                  }}
+                />
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  value={guestSupportType}
+                  onChange={(e) => {
+                    const value = e.target.value as 'sales' | 'signup' | 'subscription' | 'billing' | 'technical' | 'general';
+                    setGuestSupportType(value);
+                    localStorage.setItem('support_guest_type', value);
+                  }}
+                >
+                  <MenuItem value="sales">Sales</MenuItem>
+                  <MenuItem value="signup">Signup Help</MenuItem>
+                  <MenuItem value="subscription">Subscription</MenuItem>
+                  <MenuItem value="billing">Billing</MenuItem>
+                  <MenuItem value="technical">Technical</MenuItem>
+                  <MenuItem value="general">General</MenuItem>
+                </TextField>
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', gap: 1 }}>
               <TextField
                 fullWidth
                 size="small"
@@ -257,13 +381,12 @@ const SupportChatWidget: React.FC = () => {
                 <SendIcon />
               </IconButton>
             </Box>
-          ) : (
-            <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', textAlign: 'center', bgcolor: 'background.paper', flexShrink: 0 }}>
-              <Typography variant="body2" color="text.secondary">
-                Please sign in to chat with support
+            {!isAuthenticated && (
+              <Typography variant="caption" color="text.secondary" sx={{ px: 0.5 }}>
+                Guest mode is available for signup and subscription questions.
               </Typography>
-            </Box>
-          )}
+            )}
+          </Box>
         </Box>
       </Drawer>
     </>

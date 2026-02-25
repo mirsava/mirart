@@ -23,6 +23,7 @@ import {
   RadioGroup,
   Radio,
   FormLabel,
+  FormHelperText,
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -70,6 +71,11 @@ const CreateListing: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState({
+    title: '',
+    category: '',
+    price: '',
+  });
   const [testDataEnabled, setTestDataEnabled] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -82,10 +88,10 @@ const CreateListing: React.FC = () => {
     dimensions: '',
     medium: '',
     year: '',
-    weight_oz: '24',
-    length_in: '24',
-    width_in: '18',
-    height_in: '3',
+    weight_oz: '',
+    length_in: '',
+    width_in: '',
+    height_in: '',
     in_stock: true,
     quantity_available: '1',
     status: 'draft' as 'draft',
@@ -183,6 +189,9 @@ const CreateListing: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    if (name === 'title' || name === 'category' || name === 'price') {
+      setFieldErrors((prev) => ({ ...prev, [name]: '' }));
+    }
     setFormData((prev) => {
       const updated = {
         ...prev,
@@ -202,10 +211,40 @@ const CreateListing: React.FC = () => {
 
   const handleSelectChange = (e: any) => {
     const { name, value } = e.target;
+    if (name === 'title' || name === 'category' || name === 'price') {
+      setFieldErrors((prev) => ({ ...prev, [name]: '' }));
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+  };
+
+  const validateRequiredFields = (): boolean => {
+    const nextErrors = {
+      title: '',
+      category: '',
+      price: '',
+    };
+
+    if (!formData.title.trim()) nextErrors.title = 'Title is required';
+    if (!formData.category.trim()) nextErrors.category = 'Category is required';
+    if (!formData.price.trim()) {
+      nextErrors.price = 'Price is required';
+    } else {
+      const priceNum = parseFloat(formData.price);
+      if (isNaN(priceNum) || priceNum < 0) {
+        nextErrors.price = 'Enter a valid non-negative price';
+      }
+    }
+
+    setFieldErrors(nextErrors);
+    const hasErrors = Object.values(nextErrors).some(Boolean);
+    if (hasErrors) {
+      if (nextErrors.title || nextErrors.category) setActiveStep(0);
+      else if (nextErrors.price) setActiveStep(3);
+    }
+    return !hasErrors;
   };
 
   const handleSwitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -339,6 +378,11 @@ const CreateListing: React.FC = () => {
       return;
     }
 
+    if (!validateRequiredFields()) {
+      setError('Please fix the highlighted required fields.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -364,10 +408,10 @@ const CreateListing: React.FC = () => {
         dimensions: formData.dimensions || undefined,
         medium: formData.medium || undefined,
         year: formData.year ? parseInt(formData.year) : undefined,
-        weight_oz: parseFloat(formData.weight_oz) || 24,
-        length_in: parseFloat(formData.length_in) || 24,
-        width_in: parseFloat(formData.width_in) || 18,
-        height_in: parseFloat(formData.height_in) || 3,
+        weight_oz: formData.weight_oz.trim() ? parseFloat(formData.weight_oz) : undefined,
+        length_in: formData.length_in.trim() ? parseFloat(formData.length_in) : undefined,
+        width_in: formData.width_in.trim() ? parseFloat(formData.width_in) : undefined,
+        height_in: formData.height_in.trim() ? parseFloat(formData.height_in) : undefined,
         in_stock: (parseInt(formData.quantity_available || '1') || 1) > 0,
         quantity_available: parseInt(formData.quantity_available || '1') || 1,
         status: 'draft',
@@ -447,7 +491,7 @@ const CreateListing: React.FC = () => {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <Grid container spacing={4}>
               <Grid item xs={12}>
                 <Paper
@@ -477,6 +521,8 @@ const CreateListing: React.FC = () => {
                         value={formData.title}
                         onChange={handleChange}
                         placeholder="e.g., Sunset Over Mountains"
+                        error={!!fieldErrors.title}
+                        helperText={fieldErrors.title}
                         sx={{ bgcolor: 'background.default' }}
                       />
                     </Grid>
@@ -496,7 +542,7 @@ const CreateListing: React.FC = () => {
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth required>
+                      <FormControl fullWidth required error={!!fieldErrors.category}>
                         <InputLabel>Category</InputLabel>
                         <Select
                           name="category"
@@ -511,6 +557,7 @@ const CreateListing: React.FC = () => {
                             </MenuItem>
                           ))}
                         </Select>
+                        {fieldErrors.category && <FormHelperText>{fieldErrors.category}</FormHelperText>}
                       </FormControl>
                     </Grid>
 
@@ -956,6 +1003,8 @@ const CreateListing: React.FC = () => {
                         value={formData.price}
                         onChange={handleChange}
                         inputProps={{ min: 0, step: 0.01 }}
+                        error={!!fieldErrors.price}
+                        helperText={fieldErrors.price}
                         sx={{ bgcolor: 'background.default' }}
                       />
                     </Grid>

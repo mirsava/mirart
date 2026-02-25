@@ -475,7 +475,7 @@ const EditListing: React.FC = () => {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <Grid container spacing={3}>
               <Grid item xs={12}>
                 <TextField

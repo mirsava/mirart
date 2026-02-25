@@ -1002,21 +1002,35 @@ class ApiService {
     });
   }
 
-  async getSupportChatMessages(cognitoUsername: string): Promise<any[]> {
-    return this.request<any[]>(`/support-chat/messages?cognitoUsername=${cognitoUsername}`);
+  async getSupportChatMessages(params: { cognitoUsername?: string; userId?: number }): Promise<any[]> {
+    const qs = new URLSearchParams();
+    if (params.cognitoUsername) qs.append('cognitoUsername', params.cognitoUsername);
+    if (params.userId !== undefined) qs.append('userId', String(params.userId));
+    return this.request<any[]>(`/support-chat/messages?${qs.toString()}`);
   }
 
-  async sendSupportChatMessage(data: { cognitoUsername?: string; message: string; sender: 'user' | 'admin'; adminCognitoUsername?: string; targetUserId?: number }): Promise<any> {
+  async sendSupportChatMessage(data: {
+    cognitoUsername?: string;
+    userId?: number;
+    guestSessionId?: string;
+    guestName?: string;
+    guestEmail?: string;
+    supportType?: 'sales' | 'signup' | 'subscription' | 'billing' | 'technical' | 'general';
+    message: string;
+    sender: 'user' | 'admin';
+    adminCognitoUsername?: string;
+    targetUserId?: number;
+  }): Promise<any> {
     return this.request<any>('/support-chat/messages', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async markSupportChatRead(cognitoUsername: string, sender: 'user' | 'admin'): Promise<{ success: boolean }> {
+  async markSupportChatRead(params: { cognitoUsername?: string; userId?: number; sender: 'user' | 'admin' }): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>('/support-chat/messages/read', {
       method: 'PUT',
-      body: JSON.stringify({ cognitoUsername, sender }),
+      body: JSON.stringify(params),
     });
   }
 

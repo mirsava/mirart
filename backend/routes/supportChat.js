@@ -55,11 +55,19 @@ router.get('/messages', async (req, res) => {
 
 router.post('/messages', async (req, res) => {
   try {
-    const { cognitoUsername, message, sender, adminCognitoUsername, targetUserId } = req.body;
-    let userId = targetUserId || null;
+    const { cognitoUsername, userId: bodyUserId, guestSessionId, guestName, guestEmail, supportType, message, sender, adminCognitoUsername, targetUserId } = req.body;
+    let userId = targetUserId || bodyUserId || null;
     let userEmail = null;
     let userName = null;
     let adminId = null;
+    const supportTypeLabel = {
+      sales: 'Sales',
+      signup: 'Signup',
+      subscription: 'Subscription',
+      billing: 'Billing',
+      technical: 'Technical',
+      general: 'General',
+    }[String(supportType || '').toLowerCase()] || 'General';
 
     if (sender === 'user' && cognitoUsername) {
       const [users] = await pool.execute('SELECT id, email, first_name, last_name FROM users WHERE cognito_username = ?', [cognitoUsername]);
@@ -69,6 +77,12 @@ router.post('/messages', async (req, res) => {
         userName = [users[0].first_name, users[0].last_name].filter(Boolean).join(' ') || users[0].email;
       }
     }
+    if (sender === 'user' && !cognitoUsername && userId) {
+      const sessionLabel = guestSessionId ? `guest:${guestSessionId}` : null;
+      userEmail = guestEmail || sessionLabel || null;
+      const baseGuestName = guestName || guestEmail || 'Guest';
+      userName = `${baseGuestName} (${supportTypeLabel})`;
+    }
     if (sender === 'admin' && adminCognitoUsername) {
       const [admins] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [adminCognitoUsername]);
       if (admins.length > 0) adminId = admins[0].id;
@@ -77,6 +91,16 @@ router.post('/messages', async (req, res) => {
         if (targets.length > 0) {
           userEmail = targets[0].email;
           userName = [targets[0].first_name, targets[0].last_name].filter(Boolean).join(' ') || targets[0].email;
+        }
+        if (!userEmail && !userName) {
+          const [prior] = await pool.execute(
+            'SELECT user_email, user_name FROM support_chat_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+            [userId]
+          );
+          if (prior.length > 0) {
+            userEmail = prior[0].user_email || null;
+            userName = prior[0].user_name || null;
+          }
         }
       }
     }
@@ -95,14 +119,18 @@ router.post('/messages', async (req, res) => {
 
 router.put('/messages/read', async (req, res) => {
   try {
-    const { cognitoUsername, sender } = req.body;
-    if (!cognitoUsername) return res.status(400).json({ error: 'cognitoUsername required' });
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+    const { cognitoUsername, userId, sender } = req.body;
+    let resolvedUserId = userId || null;
+    if (!resolvedUserId && cognitoUsername) {
+      const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
+      if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+      resolvedUserId = users[0].id;
+    }
+    if (!resolvedUserId) return res.status(400).json({ error: 'cognitoUsername or userId required' });
     const readSender = sender || 'admin';
     await pool.execute(
       'UPDATE support_chat_messages SET read_at = NOW() WHERE user_id = ? AND sender = ? AND read_at IS NULL',
-      [users[0].id, readSender]
+      [resolvedUserId, readSender]
     );
     res.json({ success: true });
   } catch (error) {

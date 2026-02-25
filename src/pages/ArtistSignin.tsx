@@ -147,7 +147,7 @@ const ArtistSignin: React.FC = () => {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <Box sx={{ mb: 3 }}>
               <TextField
                 fullWidth

@@ -1877,7 +1877,7 @@ const ArtistDashboard: React.FC = () => {
               </Alert>
             )}
 
-            <form onSubmit={handleProfileSubmit}>
+            <form onSubmit={handleProfileSubmit} noValidate>
               <Grid container spacing={3}>
                 {/* Personal Information Section */}
                 <Grid item xs={12}>
@@ -2428,7 +2428,7 @@ const ArtistDashboard: React.FC = () => {
               </Box>
             ) : (
               <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                <form onSubmit={handleSettingsSubmit}>
+                <form onSubmit={handleSettingsSubmit} noValidate>
                   <Grid container spacing={2.5}>
                     <Grid item xs={12}>
                       <Card variant="outlined" sx={{ borderRadius: 2 }}>
