@@ -91,3 +91,29 @@ See `database/schema.sql` for full schema details.
 - All prices are stored as DECIMAL(10, 2)
 - Dashboard stats are cached for performance but recalculated on each request
 
+## SEO Sitemap Operations
+
+Configure the canonical site URL for sitemap generation:
+
+```env
+SITE_URL=https://artzyla.com
+```
+
+If `SITE_URL` is not set, the backend falls back to `FRONTEND_URL`.
+
+Dynamic sitemap endpoints:
+
+- `GET /sitemap.xml` and `GET /api/sitemap.xml`
+- `GET /sitemap-static.xml` and `GET /api/sitemap-static.xml`
+- `GET /sitemap-listings.xml` and `GET /api/sitemap-listings.xml`
+
+Post-deploy sitemap check and ping:
+
+```bash
+npm run seo:ping
+```
+
+This command validates sitemap availability and pings Bing with the sitemap index URL.
+
+Google no longer supports sitemap ping endpoints; submit `https://artzyla.com/sitemap.xml` in Google Search Console.
+
