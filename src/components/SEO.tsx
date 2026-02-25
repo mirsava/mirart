@@ -10,6 +10,8 @@ interface SEOProps {
   description?: string;
   image?: string;
   url?: string;
+  prevUrl?: string;
+  nextUrl?: string;
   type?: 'website' | 'article' | 'product';
   noindex?: boolean;
   structuredData?: object;
@@ -20,12 +22,16 @@ const SEO: React.FC<SEOProps> = ({
   description = DEFAULT_DESCRIPTION,
   image,
   url,
+  prevUrl,
+  nextUrl,
   type = 'website',
   noindex = false,
   structuredData,
 }) => {
   const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} - Premium Art Marketplace`;
   const fullUrl = url ? (url.startsWith('http') ? url : `${BASE_URL}${url}`) : BASE_URL;
+  const fullPrevUrl = prevUrl ? (prevUrl.startsWith('http') ? prevUrl : `${BASE_URL}${prevUrl}`) : '';
+  const fullNextUrl = nextUrl ? (nextUrl.startsWith('http') ? nextUrl : `${BASE_URL}${nextUrl}`) : '';
   const fullImage = image ? (image.startsWith('http') ? image : `${BASE_URL}${image}`) : `${BASE_URL}/og-image.png`;
 
   return (
@@ -33,6 +39,8 @@ const SEO: React.FC<SEOProps> = ({
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
       <link rel="canonical" href={fullUrl} />
+      {fullPrevUrl && <link rel="prev" href={fullPrevUrl} />}
+      {fullNextUrl && <link rel="next" href={fullNextUrl} />}
       {noindex && <meta name="robots" content="noindex, nofollow" />}
 
       <meta property="og:title" content={fullTitle} />

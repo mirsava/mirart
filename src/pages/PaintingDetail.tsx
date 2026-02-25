@@ -478,19 +478,67 @@ const PaintingDetail: React.FC = () => {
     setCurrentImageIndex((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
   };
 
+  const siteOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const canonicalPath = getPaintingDetailPath(painting.id, painting.title);
   const imageUrl = painting.image?.startsWith('http') ? painting.image : (typeof window !== 'undefined' ? `${window.location.origin}${painting.image}` : painting.image);
-  const structuredData = {
-    '@context': 'https://schema.org',
+  const productData: any = {
     '@type': 'Product',
+    '@id': `${siteOrigin}${canonicalPath}#product`,
     name: painting.title,
     description: painting.description?.slice(0, 200) || painting.title,
     image: imageUrl,
+    sku: String(painting.id),
+    category: painting.category,
+    brand: {
+      '@type': 'Brand',
+      name: 'ArtZyla',
+    },
     offers: {
       '@type': 'Offer',
+      url: `${siteOrigin}${canonicalPath}`,
       price: painting.price,
       priceCurrency: 'USD',
       availability: painting.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      itemCondition: 'https://schema.org/NewCondition',
     },
+  };
+  if (reviewCount > 0 && averageRating > 0) {
+    productData.aggregateRating = {
+      '@type': 'AggregateRating',
+      ratingValue: Number(averageRating.toFixed(1)),
+      reviewCount,
+      bestRating: 5,
+      worstRating: 1,
+    };
+  }
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      productData,
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: `${siteOrigin}/`,
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Gallery',
+            item: `${siteOrigin}/gallery`,
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: painting.title,
+            item: `${siteOrigin}${canonicalPath}`,
+          },
+        ],
+      },
+    ],
   };
 
   return (
@@ -499,7 +547,7 @@ const PaintingDetail: React.FC = () => {
         title={painting.title}
         description={painting.description?.slice(0, 160) || `${painting.title} by ${painting.artist} - Original art for sale`}
         image={imageUrl}
-        url={getPaintingDetailPath(painting.id, painting.title)}
+        url={canonicalPath}
         type="product"
         structuredData={structuredData}
       />

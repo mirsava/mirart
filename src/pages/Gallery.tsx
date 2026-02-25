@@ -532,6 +532,25 @@ const Gallery: React.FC = () => {
   };
 
   const drawerShift = filterPinned && filterDrawerOpen && !isSmallScreen;
+  const buildCanonicalGalleryUrl = (targetPage?: number): string => {
+    const params = new URLSearchParams(searchParams);
+
+    params.delete('limit');
+    if (params.get('page') === '1') params.delete('page');
+    if (params.get('sortBy') === 'created_at') params.delete('sortBy');
+    if (params.get('sortOrder') === 'DESC') params.delete('sortOrder');
+    if (targetPage !== undefined) {
+      if (targetPage <= 1) params.delete('page');
+      else params.set('page', String(targetPage));
+    }
+
+    const query = params.toString();
+    return `/gallery${query ? `?${query}` : ''}`;
+  };
+
+  const canonicalGalleryUrl = buildCanonicalGalleryUrl();
+  const prevPageUrl = pagination && pagination.page > 1 ? buildCanonicalGalleryUrl(pagination.page - 1) : undefined;
+  const nextPageUrl = pagination && pagination.page < pagination.totalPages ? buildCanonicalGalleryUrl(pagination.page + 1) : undefined;
 
   return (
     <Box sx={{
@@ -542,7 +561,9 @@ const Gallery: React.FC = () => {
       <SEO
         title="Art Gallery"
         description="Explore original paintings, woodworking, prints, and handmade art from talented independent artists. Browse and buy unique artwork worldwide."
-        url="/gallery"
+        url={canonicalGalleryUrl}
+        prevUrl={prevPageUrl}
+        nextUrl={nextPageUrl}
       />
       <PageHeader
         title="Art Gallery"
