@@ -203,6 +203,8 @@ const AdminDashboard: React.FC = () => {
   const [supportSending, setSupportSending] = useState(false);
   const [savingSupportConfig, setSavingSupportConfig] = useState(false);
   const supportMessagesEndRef = useRef<HTMLDivElement>(null);
+  const supportMessagesRequestRef = useRef(0);
+  const supportUserInfoRequestRef = useRef(0);
   const [userChatEnabled, setUserChatEnabled] = useState(false);
   const [userChatLoading, setUserChatLoading] = useState(false);
   const [testDataEnabled, setTestDataEnabled] = useState(false);
@@ -238,17 +240,73 @@ const AdminDashboard: React.FC = () => {
   const fetchSupportConversations = async () => {
     try {
       const convs = await apiService.getSupportChatConversations();
-      setSupportConversations(convs);
-    } catch {}
+      const normalizedConversations = Array.isArray(convs) ? convs : [];
+      setSupportConversations(normalizedConversations);
+      if (
+        supportSelectedUserId &&
+        !normalizedConversations.some((c: any) => Number(c.user_id) === Number(supportSelectedUserId))
+      ) {
+        setSupportSelectedUserId(null);
+        setSupportSelectedUserInfo(null);
+        setSupportMessages([]);
+        setSupportReply('');
+      }
+    } catch {
+      setSupportConversations([]);
+      setSupportSelectedUserId(null);
+      setSupportSelectedUserInfo(null);
+      setSupportMessages([]);
+      setSupportReply('');
+    }
   };
 
   const fetchSupportMessages = async (userId: number) => {
+    const requestId = ++supportMessagesRequestRef.current;
     try {
       const msgs = await apiService.getSupportChatAdminMessages(userId);
+      if (requestId !== supportMessagesRequestRef.current) return;
       setSupportMessages(msgs);
       setTimeout(() => supportMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch {}
   };
+
+  const handleSelectSupportConversation = async (rawUserId: number | string) => {
+    const selectedId = Number(rawUserId);
+    if (!Number.isFinite(selectedId) || !user?.id) return;
+
+    setSupportSelectedUserId(selectedId);
+    setSupportReply('');
+  };
+
+  useEffect(() => {
+    if (activeSection !== 'support' || !supportSelectedUserId || !user?.id) return;
+
+    const selectedId = Number(supportSelectedUserId);
+    if (!Number.isFinite(selectedId)) return;
+
+    setSupportSelectedUserInfo(null);
+    setSupportMessages([]);
+
+    fetchSupportMessages(selectedId);
+
+    const userInfoRequestId = ++supportUserInfoRequestRef.current;
+    apiService
+      .getAdminUserById(user.id, selectedId, user.groups)
+      .then((u) => {
+        if (userInfoRequestId !== supportUserInfoRequestRef.current) return;
+        setSupportSelectedUserInfo(u);
+      })
+      .catch(() => {});
+  }, [activeSection, supportSelectedUserId, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || activeSection !== 'support') return;
+    fetchSupportConversations();
+    const intervalId = setInterval(() => {
+      fetchSupportConversations();
+    }, 5000);
+    return () => clearInterval(intervalId);
+  }, [activeSection, user?.id]);
 
   const handleSaveSupportConfig = async () => {
     setSavingSupportConfig(true);
@@ -697,6 +755,11 @@ const AdminDashboard: React.FC = () => {
     setActiveSection(section);
     if (isMobile) setSidebarOpen(false);
     if (section === 'support') {
+      setSupportConversations([]);
+      setSupportSelectedUserId(null);
+      setSupportSelectedUserInfo(null);
+      setSupportMessages([]);
+      setSupportReply('');
       fetchSupportConfig();
       fetchSupportConversations();
     }
@@ -2334,45 +2397,41 @@ const AdminDashboard: React.FC = () => {
                         <ListItem
                           key={conv.user_id}
                           component="div"
-                          onClick={async () => {
-                            setSupportSelectedUserId(conv.user_id);
-                            setSupportSelectedUserInfo(null);
-                            fetchSupportMessages(conv.user_id);
-                            try {
-                              const u = await apiService.getAdminUserById(user!.id, conv.user_id, user!.groups);
-                              setSupportSelectedUserInfo(u);
-                            } catch {}
-                          }}
-                          sx={{
-                            cursor: 'pointer',
-                            borderBottom: '1px solid',
-                            borderColor: 'divider',
-                            bgcolor: supportSelectedUserId === conv.user_id ? 'action.selected' : 'transparent',
-                            '&:hover': { bgcolor: 'action.hover' },
-                          }}
+                          disablePadding
+                          sx={{ borderBottom: '1px solid', borderColor: 'divider' }}
                         >
-                          <ListItemAvatar>
-                            <Avatar sx={{ width: 36, height: 36, fontSize: 14, bgcolor: conv.unread_count > 0 ? 'primary.main' : 'grey.400' }}>
-                              {(conv.user_name || conv.user_email || '?')[0].toUpperCase()}
-                            </Avatar>
-                          </ListItemAvatar>
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Typography variant="body2" sx={{ fontWeight: conv.unread_count > 0 ? 700 : 400 }} noWrap>
-                                  {conv.user_name || conv.user_email || `User ${conv.user_id}`}
+                          <ListItemButton
+                            selected={supportSelectedUserId === Number(conv.user_id)}
+                            onClick={() => handleSelectSupportConversation(conv.user_id)}
+                            sx={{
+                              alignItems: 'flex-start',
+                              '&.Mui-selected': { bgcolor: 'action.selected' },
+                              '&.Mui-selected:hover': { bgcolor: 'action.selected' },
+                            }}
+                          >
+                            <ListItemAvatar>
+                              <Avatar sx={{ width: 36, height: 36, fontSize: 14, bgcolor: conv.unread_count > 0 ? 'primary.main' : 'grey.400' }}>
+                                {(conv.user_name || conv.user_email || '?')[0].toUpperCase()}
+                              </Avatar>
+                            </ListItemAvatar>
+                            <ListItemText
+                              primary={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: conv.unread_count > 0 ? 700 : 400 }} noWrap>
+                                    {conv.user_name || conv.user_email || `User ${conv.user_id}`}
+                                  </Typography>
+                                  {conv.unread_count > 0 && (
+                                    <Chip label={conv.unread_count} size="small" color="primary" sx={{ height: 20, fontSize: 11 }} />
+                                  )}
+                                </Box>
+                              }
+                              secondary={
+                                <Typography variant="caption" color="text.secondary" noWrap>
+                                  {conv.last_sender === 'admin' ? 'You: ' : ''}{conv.last_message?.slice(0, 50)}
                                 </Typography>
-                                {conv.unread_count > 0 && (
-                                  <Chip label={conv.unread_count} size="small" color="primary" sx={{ height: 20, fontSize: 11 }} />
-                                )}
-                              </Box>
-                            }
-                            secondary={
-                              <Typography variant="caption" color="text.secondary" noWrap>
-                                {conv.last_sender === 'admin' ? 'You: ' : ''}{conv.last_message?.slice(0, 50)}
-                              </Typography>
-                            }
-                          />
+                              }
+                            />
+                          </ListItemButton>
                         </ListItem>
                       ))}
                     </List>
@@ -2389,16 +2448,16 @@ const AdminDashboard: React.FC = () => {
                       <>
                         <Box sx={{ p: 2, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
-                            {(supportSelectedUserInfo?.first_name || supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_name || '?')[0].toUpperCase()}
+                            {(supportSelectedUserInfo?.first_name || supportConversations.find((c: any) => Number(c.user_id) === Number(supportSelectedUserId))?.user_name || '?')[0].toUpperCase()}
                           </Avatar>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                               {supportSelectedUserInfo
                                 ? (supportSelectedUserInfo.business_name || [supportSelectedUserInfo.first_name, supportSelectedUserInfo.last_name].filter(Boolean).join(' ') || supportSelectedUserInfo.cognito_username)
-                                : (supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_name || `User ${supportSelectedUserId}`)}
+                                : (supportConversations.find((c: any) => Number(c.user_id) === Number(supportSelectedUserId))?.user_name || `User ${supportSelectedUserId}`)}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {supportSelectedUserInfo?.email || supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_email}
+                              {supportSelectedUserInfo?.email || supportConversations.find((c: any) => Number(c.user_id) === Number(supportSelectedUserId))?.user_email}
                             </Typography>
                           </Box>
                           {supportSelectedUserInfo && (

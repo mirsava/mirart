@@ -31,7 +31,8 @@
     "reset-db": "node scripts/reset-database.js",
     "set-admin": "node scripts/set-admin.js",
     "expire-subscriptions": "node scripts/expire-subscriptions.js",
-    "seo:ping": "node scripts/ping-sitemaps.js"
+    "seo:ping": "node scripts/ping-sitemaps.js",
+    "clear:support-chat": "node scripts/clear-support-chat.js"
   },
   "keywords": [],
   "author": "",

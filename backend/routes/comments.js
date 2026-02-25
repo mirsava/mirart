@@ -55,6 +55,7 @@ router.get('/average/:listingId', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { listingId, cognitoUsername, comment, rating } = req.body;
+    const safeComment = typeof comment === 'string' ? comment.trim() : '';
 
     if (!listingId || !cognitoUsername || !rating) {
       return res.status(400).json({ error: 'listingId, cognitoUsername, and rating are required' });
@@ -85,7 +86,7 @@ router.post('/', async (req, res) => {
     if (existing.length > 0) {
       await pool.execute(
         'UPDATE listing_comments SET comment = ?, rating = ? WHERE id = ?',
-        [comment?.trim() || null, ratingNum, existing[0].id]
+        [safeComment, ratingNum, existing[0].id]
       );
       const [updated] = await pool.execute(
         `SELECT c.id, c.listing_id, c.user_id, c.comment, c.rating, c.created_at, c.updated_at,
@@ -100,7 +101,7 @@ router.post('/', async (req, res) => {
 
     const [result] = await pool.execute(
       'INSERT INTO listing_comments (listing_id, user_id, comment, rating) VALUES (?, ?, ?, ?)',
-      [parseInt(listingId), userId, comment?.trim() || null, ratingNum]
+      [parseInt(listingId), userId, safeComment, ratingNum]
     );
 
     const [newReview] = await pool.execute(

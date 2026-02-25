@@ -72,6 +72,13 @@ router.post('/messages', async (req, res) => {
     if (sender === 'admin' && adminCognitoUsername) {
       const [admins] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [adminCognitoUsername]);
       if (admins.length > 0) adminId = admins[0].id;
+      if (userId) {
+        const [targets] = await pool.execute('SELECT email, first_name, last_name FROM users WHERE id = ?', [userId]);
+        if (targets.length > 0) {
+          userEmail = targets[0].email;
+          userName = [targets[0].first_name, targets[0].last_name].filter(Boolean).join(' ') || targets[0].email;
+        }
+      }
     }
 
     const [result] = await pool.execute(
@@ -107,14 +114,23 @@ router.put('/messages/read', async (req, res) => {
 router.get('/admin/conversations', async (req, res) => {
   try {
     const [conversations] = await pool.execute(`
-      SELECT m.user_id, m.user_email, m.user_name,
+      SELECT
+        m.user_id,
+        COALESCE(
+          MAX(NULLIF(m.user_email, '')),
+          (SELECT u.email FROM users u WHERE u.id = m.user_id LIMIT 1)
+        ) as user_email,
+        COALESCE(
+          MAX(NULLIF(m.user_name, '')),
+          (SELECT COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.email) FROM users u WHERE u.id = m.user_id LIMIT 1)
+        ) as user_name,
         MAX(m.created_at) as last_message_at,
         (SELECT message FROM support_chat_messages m2 WHERE m2.user_id = m.user_id ORDER BY m2.created_at DESC LIMIT 1) as last_message,
         (SELECT sender FROM support_chat_messages m2 WHERE m2.user_id = m.user_id ORDER BY m2.created_at DESC LIMIT 1) as last_sender,
         SUM(CASE WHEN m.sender = 'user' AND m.read_at IS NULL THEN 1 ELSE 0 END) as unread_count
       FROM support_chat_messages m
       WHERE m.user_id IS NOT NULL
-      GROUP BY m.user_id, m.user_email, m.user_name
+      GROUP BY m.user_id
       ORDER BY last_message_at DESC
     `);
     res.json(conversations);
