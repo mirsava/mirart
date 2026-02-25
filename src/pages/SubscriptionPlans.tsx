@@ -19,8 +19,6 @@ import {
   Security as SecurityIcon,
   TrendingUp as TrendingUpIcon,
   Support as SupportIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -28,6 +26,8 @@ import apiService, { SubscriptionPlan, UserSubscription } from '../services/api'
 import { useSnackbar } from 'notistack';
 import PageHeader from '../components/PageHeader';
 import SEO from '../components/SEO';
+import FAQSection from '../components/FAQSection';
+import { FAQ_ITEMS } from '../data/faqs';
 
 const SubscriptionPlans: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
@@ -41,7 +41,6 @@ const SubscriptionPlans: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<{ plan: SubscriptionPlan; billingPeriod: 'monthly' | 'yearly' } | null>(null);
 
   useEffect(() => {
@@ -433,78 +432,7 @@ const SubscriptionPlans: React.FC = () => {
           })}
         </Grid>
 
-        <Box sx={{ mt: 8 }}>
-          <Typography variant="h4" fontWeight={700} gutterBottom sx={{ mb: 4, color: 'primary.main' }}>
-            Frequently Asked Questions
-          </Typography>
-          <Grid container spacing={2}>
-            {[
-              {
-                question: 'How does the subscription work?',
-                answer: 'Choose a plan that fits your needs based on how many active listings you want. You can upgrade or downgrade your plan at any time. Your subscription renews automatically based on your billing period (monthly or yearly).',
-              },
-              {
-                question: 'What happens if I exceed my listing limit?',
-                answer: 'If you reach your plan\'s listing limit, you can either upgrade to a higher tier or wait until one of your listings expires or is sold. You can always upgrade your plan to accommodate more listings.',
-              },
-              {
-                question: 'Can I cancel my subscription?',
-                answer: 'Yes, you can cancel your subscription at any time. Your active listings will remain active until they expire or are sold. You won\'t be able to create new listings after cancellation, but you can resubscribe anytime.',
-              },
-              {
-                question: 'What payment methods do you accept?',
-                answer: 'We accept all major credit cards and debit cards. Payments are processed securely through our payment partners. Your billing information is encrypted and stored securely.',
-              },
-              {
-                question: 'Do you offer refunds?',
-                answer: 'We offer a 30-day money-back guarantee for new subscriptions. If you\'re not satisfied with your plan, contact our support team within 30 days of your initial subscription for a full refund.',
-              },
-              {
-                question: 'Can I change my billing period?',
-                answer: 'Yes, you can switch between monthly and yearly billing when you renew your subscription. Yearly plans offer significant savings compared to monthly billing.',
-              },
-            ].map((faq, index) => (
-              <Grid item xs={12} key={index}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Box
-                    onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
-                    sx={{
-                      p: 3,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      bgcolor: expandedFaq === index ? 'action.hover' : 'transparent',
-                      '&:hover': {
-                        bgcolor: 'action.hover',
-                      },
-                    }}
-                  >
-                    <Typography variant="h6" fontWeight={600}>
-                      {faq.question}
-                    </Typography>
-                    {expandedFaq === index ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                  </Box>
-                  {expandedFaq === index && (
-                    <Box sx={{ px: 3, pb: 3 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        {faq.answer}
-                      </Typography>
-                    </Box>
-                  )}
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
+        <FAQSection id="subscription-faq" items={FAQ_ITEMS} />
 
         <Box sx={{ mt: 6, p: 4, bgcolor: 'rgba(74, 58, 154, 0.04)', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="h5" fontWeight={600} gutterBottom>

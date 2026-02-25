@@ -36,6 +36,7 @@ import { useAuth } from '../contexts/AuthContext';
 import joinCommunityBg from '../assets/images/bg/join_our_community.png';
 import { Check as CheckIcon, Star as StarIcon } from '@mui/icons-material';
 import SEO from '../components/SEO';
+import { FAQ_ITEMS } from '../data/faqs';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -175,32 +176,14 @@ const Home: React.FC = () => {
       },
       {
         '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: 'What can I buy on ArtZyla?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'You can buy original paintings, handcrafted woodworking pieces, and other handmade art directly from independent artists.',
-            },
+        mainEntity: FAQ_ITEMS.slice(0, 3).map((item) => ({
+          '@type': 'Question',
+          name: item.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: item.answer,
           },
-          {
-            '@type': 'Question',
-            name: 'Is ArtZyla a marketplace for independent artists?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Yes. ArtZyla is built for independent artists and makers who want to sell directly to art collectors and design-minded buyers.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'How do I find artwork by style or category?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Use the gallery filters and search to browse by category, medium, price, and keywords so you can quickly discover artwork that matches your style.',
-            },
-          },
-        ],
+        })),
       },
     ],
   };

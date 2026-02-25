@@ -8,6 +8,7 @@ import {
   Chip,
   Stack,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Shield as ShieldIcon } from '@mui/icons-material';
 
 import SEO from '../components/SEO';
@@ -19,7 +20,10 @@ const Privacy: React.FC = () => {
       sx={{
         minHeight: '100vh',
         pb: 8,
-        background: 'radial-gradient(1000px 420px at 6% 0%, rgba(74, 58, 154, 0.1), transparent 68%), radial-gradient(800px 360px at 96% 8%, rgba(74, 58, 154, 0.08), transparent 72%), linear-gradient(180deg, #faf9ff 0%, #f6f4ff 100%)',
+        background: (theme) =>
+          theme.palette.mode === 'dark'
+            ? `radial-gradient(1000px 420px at 6% 0%, ${alpha(theme.palette.primary.main, 0.26)}, transparent 68%), radial-gradient(800px 360px at 96% 8%, ${alpha(theme.palette.primary.light, 0.18)}, transparent 72%), linear-gradient(180deg, ${alpha(theme.palette.background.default, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.96)} 100%)`
+            : `radial-gradient(1000px 420px at 6% 0%, ${alpha(theme.palette.primary.main, 0.1)}, transparent 68%), radial-gradient(800px 360px at 96% 8%, ${alpha(theme.palette.primary.main, 0.08)}, transparent 72%), linear-gradient(180deg, #faf9ff 0%, #f6f4ff 100%)`,
       }}
     >
       <SEO
@@ -39,9 +43,18 @@ const Privacy: React.FC = () => {
             p: { xs: 2.5, sm: 3.5, md: 4.5 },
             borderRadius: 3,
             border: '1px solid',
-            borderColor: 'rgba(74, 58, 154, 0.18)',
-            boxShadow: '0 14px 36px rgba(30, 22, 71, 0.08)',
-            bgcolor: 'rgba(255,255,255,0.92)',
+            borderColor: (theme) =>
+              theme.palette.mode === 'dark'
+                ? alpha(theme.palette.primary.light, 0.28)
+                : alpha(theme.palette.primary.main, 0.2),
+            boxShadow: (theme) =>
+              theme.palette.mode === 'dark'
+                ? '0 18px 40px rgba(0, 0, 0, 0.45)'
+                : '0 14px 36px rgba(30, 22, 71, 0.08)',
+            bgcolor: (theme) =>
+              theme.palette.mode === 'dark'
+                ? alpha(theme.palette.background.paper, 0.88)
+                : alpha(theme.palette.background.paper, 0.92),
             backdropFilter: 'blur(6px)',
             '& .MuiTypography-h5': {
               fontWeight: 700,
@@ -60,8 +73,8 @@ const Privacy: React.FC = () => {
         >
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
             <Chip icon={<ShieldIcon />} label="Data Protection" color="primary" />
-            <Chip label="User Privacy Rights" variant="outlined" />
-            <Chip label="Secure Marketplace Practices" variant="outlined" />
+            <Chip label="User Privacy Rights" variant="outlined" sx={{ borderColor: 'divider' }} />
+            <Chip label="Secure Marketplace Practices" variant="outlined" sx={{ borderColor: 'divider' }} />
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3.5 }}>
             Last updated: {new Date().toLocaleDateString()}
@@ -351,7 +364,8 @@ const Privacy: React.FC = () => {
               <strong>Email:</strong> info@artzyla.com
             </Typography>
             <Typography variant="body1">
-              <strong>Website:</strong> <a href="/contact" style={{ color: 'inherit' }}>Contact Page</a>
+              <strong>Website:</strong>{' '}
+              <a href="/contact" style={{ color: 'var(--mui-palette-primary-main)' }}>Contact Page</a>
             </Typography>
           </Box>
 

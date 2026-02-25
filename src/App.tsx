@@ -19,6 +19,7 @@ import Checkout from './pages/Checkout';
 import OrderSuccess from './pages/OrderSuccess';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import FAQ from './pages/FAQ';
 import Privacy from './pages/Privacy';
 import ArtistSignup from './pages/ArtistSignup';
 import ArtistSignin from './pages/ArtistSignin';
@@ -103,6 +104,7 @@ function AppContent(): JSX.Element {
             } />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/faq" element={<FAQ />} />
             <Route path="/privacy" element={<Privacy />} />
                     <Route path="/artist-signup" element={<ArtistSignup />} />
                     <Route path="/artist-signin" element={<ArtistSignin />} />

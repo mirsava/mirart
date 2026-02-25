@@ -17,6 +17,8 @@ import {
 } from '@mui/icons-material';
 import PageHeader from '../components/PageHeader';
 import SEO from '../components/SEO';
+import FAQSection from '../components/FAQSection';
+import { FAQ_ITEMS } from '../data/faqs';
 
 const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -172,68 +174,7 @@ const Contact: React.FC = () => {
           </Grid>
         </Grid>
 
-        <Box sx={{ mt: 8, textAlign: 'center' }}>
-          <Typography variant="h5" component="h2" gutterBottom>
-            Frequently Asked Questions
-          </Typography>
-          <Grid container spacing={4} sx={{ mt: 2 }}>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="h6" gutterBottom>
-                  How does the marketplace work?
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  ArtZyla is a marketplace connecting artists and buyers. Each seller manages 
-                  their own listings, shipping, and customer service. You purchase directly from the artist.
-                </Typography>
-
-                <Typography variant="h6" gutterBottom>
-                  What is the return policy?
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Return policies are determined by each individual seller. Please check the 
-                  return information provided on each listing page before making a purchase.
-                </Typography>
-
-                <Typography variant="h6" gutterBottom>
-                  How do I contact a seller?
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  You can contact sellers directly through their artist profile page. Each 
-                  artist provides their own contact information and preferred communication method.
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="h6" gutterBottom>
-                  How is shipping handled?
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Shipping is handled directly by each seller. Shipping methods, costs, and 
-                  delivery times vary by seller and are specified on each listing page.
-                </Typography>
-
-                <Typography variant="h6" gutterBottom>
-                  How is the artwork packaged?
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Packaging methods are determined by each seller. Artists are responsible 
-                  for ensuring their artwork is properly protected during shipping.
-                </Typography>
-
-                <Typography variant="h6" gutterBottom>
-                  Do sellers offer certificates of authenticity?
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Some sellers may provide certificates of authenticity with their artwork. 
-                  This varies by artist and is not guaranteed. Please check with individual 
-                  sellers or review their listing details for more information.
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
-        </Box>
+        <FAQSection id="faq" items={FAQ_ITEMS} titleVariant="h5" />
       </Box>
     </Box>
   );

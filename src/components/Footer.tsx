@@ -87,7 +87,7 @@ const Footer: React.FC = () => {
               <Link href="/subscription-plans" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 Subscription Plans
               </Link>
-              <Link href="/contact" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
+              <Link href="/faq" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 FAQ
               </Link>
               <Link href="/privacy" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
