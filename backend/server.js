@@ -19,6 +19,7 @@ import subscriptionsRouter from './routes/subscriptions.js';
 import stripeRouter from './routes/stripe.js';
 import shippingRouter from './routes/shipping.js';
 import { stripe } from './config/stripe.js';
+import pool from './config/database.js';
 import announcementsRouter from './routes/announcements.js';
 import notificationsRouter from './routes/notifications.js';
 import supportChatRouter from './routes/supportChat.js';
@@ -87,6 +88,123 @@ try {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/email-previews', express.static(emailPreviewsDir));
 
+const SITE_URL = (process.env.FRONTEND_URL || 'https://artzyla.com').replace(/\/$/, '');
+
+const escapeXml = (value = '') =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const slugify = (value = '') =>
+  String(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+const getListingPath = (id, title) => {
+  const slug = slugify(title);
+  return slug ? `/painting/${slug}-${id}` : `/painting/${id}`;
+};
+
+const STATIC_SITEMAP_ENTRIES = [
+  { path: '/', changefreq: 'daily', priority: '1.0' },
+  { path: '/gallery', changefreq: 'daily', priority: '0.9' },
+  { path: '/gallery?category=Painting', changefreq: 'daily', priority: '0.8' },
+  { path: '/gallery?category=Woodworking', changefreq: 'daily', priority: '0.8' },
+  { path: '/gallery?category=Prints', changefreq: 'daily', priority: '0.8' },
+  { path: '/about', changefreq: 'monthly', priority: '0.7' },
+  { path: '/contact', changefreq: 'monthly', priority: '0.7' },
+  { path: '/privacy', changefreq: 'yearly', priority: '0.3' },
+  { path: '/subscription-plans', changefreq: 'weekly', priority: '0.8' },
+  { path: '/artist-signup', changefreq: 'monthly', priority: '0.6' },
+];
+
+const sendSitemapIndex = (_req, res) => {
+  res.set('Content-Type', 'application/xml; charset=utf-8');
+  const now = new Date().toISOString();
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>${SITE_URL}/sitemap-static.xml</loc>
+    <lastmod>${now}</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>${SITE_URL}/sitemap-listings.xml</loc>
+    <lastmod>${now}</lastmod>
+  </sitemap>
+</sitemapindex>`;
+  res.send(xml);
+};
+
+app.get('/sitemap.xml', sendSitemapIndex);
+app.get('/api/sitemap.xml', sendSitemapIndex);
+
+const sendStaticSitemap = (_req, res) => {
+  const lastmod = new Date().toISOString();
+  const urls = STATIC_SITEMAP_ENTRIES.map(
+    (entry) => `  <url>
+    <loc>${escapeXml(`${SITE_URL}${entry.path}`)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>${entry.changefreq}</changefreq>
+    <priority>${entry.priority}</priority>
+  </url>`
+  ).join('\n');
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>`;
+  res.set('Content-Type', 'application/xml; charset=utf-8');
+  res.send(xml);
+};
+
+app.get('/sitemap-static.xml', sendStaticSitemap);
+app.get('/api/sitemap-static.xml', sendStaticSitemap);
+
+const sendListingsSitemap = async (_req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT l.id, l.title, l.created_at
+       FROM listings l
+       JOIN users u ON l.user_id = u.id
+       WHERE l.status = 'active' AND COALESCE(u.blocked, 0) = 0
+       ORDER BY l.created_at DESC`
+    );
+
+    const urls = rows
+      .map((row) => {
+        const loc = `${SITE_URL}${getListingPath(row.id, row.title)}`;
+        const lastmod = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
+        return `  <url>
+    <loc>${escapeXml(loc)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`;
+      })
+      .join('\n');
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>`;
+
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.send(xml);
+  } catch (error) {
+    console.error('Sitemap listings generation failed:', error);
+    res.status(500).send('Failed to generate sitemap');
+  }
+};
+
+app.get('/sitemap-listings.xml', sendListingsSitemap);
+app.get('/api/sitemap-listings.xml', sendListingsSitemap);
+
 // Debug middleware to log all requests
 app.use((req, res, next) => {
   if (req.path.includes('subscriptions') || req.url.includes('subscriptions')) {
@@ -140,8 +258,6 @@ if (process.env.NODE_ENV !== 'test') {
 app.listen(PORT, async () => {
   console.log(`\n=== SERVER STARTED ===`);
   console.log(`Server is running on port ${PORT}`);
-
-  const pool = (await import('./config/database.js')).default;
   try {
     const [cols] = await pool.execute(
       "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'default_shipping_preference'",
