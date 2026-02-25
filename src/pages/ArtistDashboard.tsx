@@ -64,6 +64,7 @@ import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, Tex
 import { Lock as LockIcon, AttachMoney as AttachMoneyIcon, CalendarMonth as CalendarMonthIcon, ShowChart as ShowChartIcon } from '@mui/icons-material';
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
+import ImagePlaceholder from '../components/ImagePlaceholder';
 
 const dataURLtoBlob = (dataURL: string): Promise<Blob> => {
   return new Promise((resolve) => {
@@ -137,6 +138,7 @@ const ArtistDashboard: React.FC = () => {
   const [listingsPagination, setListingsPagination] = useState<{ page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } | null>(null);
   const [loadingListings, setLoadingListings] = useState(false);
   const [listingsView, setListingsView] = useState<'grid' | 'table'>('table');
+  const [listingImageErrors, setListingImageErrors] = useState<Record<number, boolean>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<Listing | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -1175,17 +1177,16 @@ const ArtistDashboard: React.FC = () => {
                         {recentListings.map((listing) => (
                           <TableRow key={listing.id} hover sx={{ '&:last-child td': { border: 0 } }}>
                             <TableCell sx={{ p: 1 }}>
-                              {listing.primary_image_url ? (
+                              {listing.primary_image_url && !listingImageErrors[listing.id] ? (
                                 <Box
                                   component="img"
                                   src={getImageUrl(listing.primary_image_url)}
                                   alt={listing.title}
+                                  onError={() => setListingImageErrors(prev => ({ ...prev, [listing.id]: true }))}
                                   sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 1 }}
                                 />
                               ) : (
-                                <Box sx={{ width: 48, height: 48, bgcolor: 'grey.200', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <ArtTrackIcon sx={{ fontSize: 20, color: 'text.disabled' }} />
-                                </Box>
+                                <ImagePlaceholder sx={{ width: 48, height: 48, borderRadius: 1 }} iconSize={24} />
                               )}
                             </TableCell>
                             <TableCell>
@@ -1261,17 +1262,16 @@ const ArtistDashboard: React.FC = () => {
                             borderColor: 'divider',
                           }}
                         >
-                          {listing.primary_image_url ? (
+                          {listing.primary_image_url && !listingImageErrors[listing.id] ? (
                             <Box
                               component="img"
                               src={getImageUrl(listing.primary_image_url)}
                               alt={listing.title}
+                              onError={() => setListingImageErrors(prev => ({ ...prev, [listing.id]: true }))}
                               sx={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
                             />
                           ) : (
-                            <Box sx={{ height: 120, width: '100%', bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <ArtTrackIcon sx={{ fontSize: 28, color: 'text.disabled' }} />
-                            </Box>
+                            <ImagePlaceholder sx={{ height: 120, width: '100%' }} iconSize={32} />
                           )}
                           <CardContent sx={{ flexGrow: 1, p: 1.5, '&:last-child': { pb: 1.5 } }}>
                             <Typography variant="body2" fontWeight={600} noWrap>{listing.title}</Typography>

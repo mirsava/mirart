@@ -60,6 +60,7 @@ import { useFavorites } from '../contexts/FavoritesContext';
 import apiService from '../services/api';
 import { UserRole } from '../types/userRoles';
 import logo from '../assets/images/logo.png';
+import ImagePlaceholder from './ImagePlaceholder';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -79,8 +80,10 @@ const Header: React.FC = () => {
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [favoritesDrawerOpen, setFavoritesDrawerOpen] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  const [cartImageErrors, setCartImageErrors] = useState<Record<string, boolean>>({});
+  const [favoriteImageErrors, setFavoriteImageErrors] = useState<Record<number, boolean>>({});
   const [galleryMenuAnchor, setGalleryMenuAnchor] = useState<null | HTMLElement>(null);
-  const galleryCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const galleryCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [artists, setArtists] = useState<Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }>>([]);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isMediumScreen = useMediaQuery(theme.breakpoints.between('md', 'lg'));
@@ -1118,18 +1121,17 @@ const Header: React.FC = () => {
                       cartItems.map((item) => (
                         <Card key={`${item.id}-${item.type}`} sx={{ mb: 1.5, overflow: 'hidden', boxShadow: 1 }}>
                           <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
-                            <Box sx={{ width: 80, minWidth: 80, flexShrink: 0, position: 'relative', bgcolor: 'grey.200' }}>
-                              {getImageUrl(item.image) ? (
+                            <Box sx={{ width: 80, minWidth: 80, flexShrink: 0, position: 'relative' }}>
+                              {getImageUrl(item.image) && !cartImageErrors[`${item.id}-${item.type}`] ? (
                                 <CardMedia
                                   component="img"
                                   image={getImageUrl(item.image)}
                                   alt={item.title}
+                                  onError={() => setCartImageErrors(prev => ({ ...prev, [`${item.id}-${item.type}`]: true }))}
                                   sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                                 />
                               ) : (
-                                <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <ShoppingCartIcon sx={{ color: 'grey.400' }} />
-                                </Box>
+                                <ImagePlaceholder sx={{ position: 'absolute', top: 0, left: 0 }} iconSize={{ xs: 26, md: 30 }} />
                               )}
                             </Box>
                             <Box sx={{ flex: 1, p: 1.5, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -1358,18 +1360,17 @@ const Header: React.FC = () => {
                                 }}
                                 sx={{ display: 'flex', alignItems: 'stretch', p: 0 }}
                               >
-                                <Box sx={{ width: 80, minWidth: 80, flexShrink: 0, position: 'relative', bgcolor: 'grey.200' }}>
-                                  {getImageUrl(item.primary_image_url) ? (
+                                <Box sx={{ width: 80, minWidth: 80, flexShrink: 0, position: 'relative' }}>
+                                  {getImageUrl(item.primary_image_url) && !favoriteImageErrors[item.id] ? (
                                     <CardMedia
                                       component="img"
                                       image={getImageUrl(item.primary_image_url)}
                                       alt={item.title}
+                                      onError={() => setFavoriteImageErrors(prev => ({ ...prev, [item.id]: true }))}
                                       sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                                     />
                                   ) : (
-                                    <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <FavoriteBorderIcon sx={{ color: 'grey.400' }} />
-                                    </Box>
+                                    <ImagePlaceholder sx={{ position: 'absolute', top: 0, left: 0 }} iconSize={{ xs: 26, md: 30 }} />
                                   )}
                                 </Box>
                                 <Box sx={{ flex: 1, p: 1.5, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

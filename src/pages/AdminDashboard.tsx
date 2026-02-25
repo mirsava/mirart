@@ -2321,8 +2321,8 @@ const AdminDashboard: React.FC = () => {
               <Grid container spacing={3}>
                 <Grid item xs={12} md={4}>
                   <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-                    <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Conversations</Typography>
+                    <Box sx={{ p: 2, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.primary' }}>Conversations</Typography>
                     </Box>
                     <List sx={{ maxHeight: 400, overflow: 'auto', p: 0 }}>
                       {supportConversations.length === 0 ? (
@@ -2386,7 +2386,7 @@ const AdminDashboard: React.FC = () => {
                       </Box>
                     ) : (
                       <>
-                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ p: 2, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
                             {(supportSelectedUserInfo?.first_name || supportConversations.find((c: any) => c.user_id === supportSelectedUserId)?.user_name || '?')[0].toUpperCase()}
                           </Avatar>

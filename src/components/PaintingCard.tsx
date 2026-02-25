@@ -21,6 +21,7 @@ import { useFavorites } from '../contexts/FavoritesContext';
 import { useSnackbar } from 'notistack';
 import ContactSellerDialog from './ContactSellerDialog';
 import { Artwork } from '../types';
+import ImagePlaceholder from './ImagePlaceholder';
 
 interface PaintingCardProps {
   painting: Artwork;
@@ -37,6 +38,8 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
   const [likeCount, setLikeCount] = useState(painting.likeCount || 0);
   const [liking, setLiking] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+  const hasImage = Boolean(painting.image) && !imageLoadError;
 
   const handleViewDetails = (): void => {
     navigate(`/painting/${painting.id}`);
@@ -117,31 +120,20 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
       onClick={contactDialogOpen ? undefined : handleViewDetails}
     >
       <Box sx={{ position: 'relative' }}>
-        {painting.image ? (
+        {hasImage ? (
           <CardMedia
             component="img"
             height="300"
             image={painting.image}
             alt={painting.title}
+            onError={() => setImageLoadError(true)}
             sx={{
               objectFit: 'cover',
+              bgcolor: 'action.hover',
             }}
           />
         ) : (
-          <Box
-            sx={{
-              height: 300,
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'grey.200',
-            }}
-          >
-            <Typography variant="body2" color="text.secondary">
-              No Image
-            </Typography>
-          </Box>
+          <ImagePlaceholder sx={{ height: 300, width: '100%' }} iconSize={{ xs: 60, md: 72 }} />
         )}
         {!painting.inStock && (
           <Box

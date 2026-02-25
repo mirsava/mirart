@@ -50,6 +50,7 @@ import ContactSellerDialog from '../components/ContactSellerDialog';
 import { UserRole } from '../types/userRoles';
 import { useFavorites } from '../contexts/FavoritesContext';
 import PageHeader from '../components/PageHeader';
+import ImagePlaceholder from '../components/ImagePlaceholder';
 import { Painting } from '../types';
 import SEO from '../components/SEO';
 
@@ -63,6 +64,7 @@ const PaintingDetail: React.FC = () => {
   const [painting, setPainting] = useState<(Painting & { shipping_info?: string; returns_info?: string; special_instructions?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean }) | null>(null);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [mainImageError, setMainImageError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [defaultSpecialInstructions, setDefaultSpecialInstructions] = useState<string>('');
@@ -148,6 +150,10 @@ const PaintingDetail: React.FC = () => {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [allImages.length]);
+
+  useEffect(() => {
+    setMainImageError(false);
+  }, [currentImageIndex, allImages, painting?.image]);
 
   useEffect(() => {
     const fetchPainting = async () => {
@@ -549,11 +555,12 @@ const PaintingDetail: React.FC = () => {
                     </Typography>
                   </Box>
                 )}
-                {(allImages[currentImageIndex] || painting.image) ? (
+                {(allImages[currentImageIndex] || painting.image) && !mainImageError ? (
                   <Box
                     component="img"
                     src={allImages[currentImageIndex] || painting.image}
                     alt={`${painting.title} - Image ${currentImageIndex + 1}`}
+                    onError={() => setMainImageError(true)}
                     sx={{
                       width: '100%',
                       height: { xs: 400, md: 600 },
@@ -563,20 +570,7 @@ const PaintingDetail: React.FC = () => {
                     }}
                   />
                 ) : (
-                  <Box
-                    sx={{
-                      width: '100%',
-                      height: { xs: 400, md: 600 },
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      bgcolor: 'grey.200',
-                    }}
-                  >
-                    <Typography variant="body1" color="text.secondary">
-                      No Image
-                    </Typography>
-                  </Box>
+                  <ImagePlaceholder sx={{ width: '100%', height: { xs: 400, md: 600 } }} iconSize={{ xs: 44, md: 56 }} />
                 )}
                 
                 {allImages.length > 1 && (

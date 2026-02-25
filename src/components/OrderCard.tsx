@@ -25,6 +25,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../services/api';
+import ImagePlaceholder from './ImagePlaceholder';
 
 const statusColor: Record<string, 'default' | 'primary' | 'success' | 'warning' | 'error'> = {
   pending: 'warning',
@@ -85,6 +86,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
   const navigate = useNavigate();
   const cardRef = useRef<HTMLDivElement>(null);
   const [confirmDeliveryOpen, setConfirmDeliveryOpen] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+  const orderImage = getImageUrl(order.primary_image_url);
+  const hasOrderImage = Boolean(orderImage) && !imageLoadError;
 
   useEffect(() => {
     if (highlighted && cardRef.current) {
@@ -128,20 +132,18 @@ const OrderCard: React.FC<OrderCardProps> = ({
         height: { xs: 180, sm: 'auto' },
         minHeight: { sm: 140 },
         flexShrink: 0,
-        bgcolor: 'grey.100',
         position: 'relative',
       }}>
-        {getImageUrl(order.primary_image_url) ? (
+        {hasOrderImage ? (
           <CardMedia
             component="img"
             sx={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }}
-            image={getImageUrl(order.primary_image_url)!}
+            image={orderImage}
             alt={order.listing_title}
+            onError={() => setImageLoadError(true)}
           />
         ) : (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-            <Typography variant="body2" color="text.secondary">No Image</Typography>
-          </Box>
+          <ImagePlaceholder iconSize={{ xs: 28, md: 34 }} />
         )}
       </Box>
 
