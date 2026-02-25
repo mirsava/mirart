@@ -89,6 +89,7 @@ import apiService, { SubscriptionPlan } from '../services/api';
 import { useSnackbar } from 'notistack';
 import { useChat } from '../contexts/ChatContext';
 import PageHeader from '../components/PageHeader';
+import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const SIDEBAR_WIDTH = 240;
 
@@ -1716,7 +1717,7 @@ const AdminDashboard: React.FC = () => {
                           </TableCell>
                           <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
                           <TableCell>
-                            <IconButton size="small" onClick={() => navigate(`/painting/${order.listing_id}`)}>
+                            <IconButton size="small" onClick={() => navigate(getPaintingDetailPath(order.listing_id, order.listing_title))}>
                               <OpenInNewIcon fontSize="small" />
                             </IconButton>
                           </TableCell>
@@ -2208,7 +2209,7 @@ const AdminDashboard: React.FC = () => {
                               apiService.getListings({ search, limit: 20, status: 'active' }).then((r) => {
                                 const listingOpts = (r.listings || []).map((l: any) => ({
                                   label: `${l.title} (${l.category})`,
-                                  value: `/painting/${l.id}`,
+                                  value: getPaintingDetailPath(l.id, l.title),
                                 }));
                                 setNotificationMentionOptions([...filtered, ...listingOpts]);
                               });
@@ -2219,7 +2220,7 @@ const AdminDashboard: React.FC = () => {
                             apiService.getListings({ limit: 30, status: 'active' }).then((r) => {
                               const listingOpts = (r.listings || []).map((l: any) => ({
                                 label: `${l.title} (${l.category})`,
-                                value: `/painting/${l.id}`,
+                                value: getPaintingDetailPath(l.id, l.title),
                               }));
                               setNotificationMentionOptions([...filtered, ...listingOpts]);
                             });

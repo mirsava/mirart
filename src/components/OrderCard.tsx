@@ -26,6 +26,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../services/api';
 import ImagePlaceholder from './ImagePlaceholder';
+import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const statusColor: Record<string, 'default' | 'primary' | 'success' | 'warning' | 'error'> = {
   pending: 'warning',
@@ -124,7 +125,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
           boxShadow: '0 0 16px rgba(25, 118, 210, 0.25)',
         }),
       }}
-      onClick={() => navigate(`/painting/${order.listing_id}`)}
+      onClick={() => navigate(getPaintingDetailPath(order.listing_id, order.listing_title))}
     >
       <Box sx={{
         width: { xs: '100%', sm: 140 },

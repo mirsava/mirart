@@ -44,6 +44,7 @@ import { useAuth } from '../contexts/AuthContext';
 import apiService, { Message } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
+import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const Messages: React.FC = () => {
   const { user } = useAuth();
@@ -129,8 +130,8 @@ const Messages: React.FC = () => {
     }
   };
 
-  const handleViewListing = (listingId: number): void => {
-    navigate(`/painting/${listingId}`);
+  const handleViewListing = (listingId: number, listingTitle?: string): void => {
+    navigate(getPaintingDetailPath(listingId, listingTitle));
   };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, messageId: number): void => {
@@ -564,7 +565,7 @@ const Messages: React.FC = () => {
                   variant="contained"
                   onClick={() => {
                     setDialogOpen(false);
-                    handleViewListing(selectedMessage.listing_id);
+                    handleViewListing(selectedMessage.listing_id, selectedMessage.listing_title);
                   }}
                 >
                   View Listing

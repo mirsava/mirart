@@ -29,6 +29,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 import PageHeader from '../components/PageHeader';
+import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const statusColor: Record<string, 'default' | 'primary' | 'success' | 'warning' | 'error'> = {
   pending: 'warning',
@@ -188,14 +189,14 @@ const OrderDetail: React.FC = () => {
                   flexShrink: 0,
                   cursor: 'pointer',
                 }}
-                onClick={() => navigate(`/painting/${order.listing_id}`)}
+                onClick={() => navigate(getPaintingDetailPath(order.listing_id, order.listing_title))}
               />
             )}
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography
                 variant="h6"
                 sx={{ fontWeight: 600, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
-                onClick={() => navigate(`/painting/${order.listing_id}`)}
+                onClick={() => navigate(getPaintingDetailPath(order.listing_id, order.listing_title))}
               >
                 {order.listing_title}
               </Typography>

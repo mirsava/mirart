@@ -22,6 +22,7 @@ import { useSnackbar } from 'notistack';
 import ContactSellerDialog from './ContactSellerDialog';
 import { Artwork } from '../types';
 import ImagePlaceholder from './ImagePlaceholder';
+import { getPaintingDetailPath } from '../utils/seoPaths';
 
 interface PaintingCardProps {
   painting: Artwork;
@@ -42,7 +43,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
   const hasImage = Boolean(painting.image) && !imageLoadError;
 
   const handleViewDetails = (): void => {
-    navigate(`/painting/${painting.id}`);
+    navigate(getPaintingDetailPath(painting.id, painting.title));
   };
 
   const handleContactSeller = (e: React.MouseEvent): void => {

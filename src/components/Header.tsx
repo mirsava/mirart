@@ -61,6 +61,7 @@ import apiService from '../services/api';
 import { UserRole } from '../types/userRoles';
 import logo from '../assets/images/logo.png';
 import ImagePlaceholder from './ImagePlaceholder';
+import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -1356,7 +1357,7 @@ const Header: React.FC = () => {
                               <CardActionArea
                                 onClick={() => {
                                   setFavoritesDrawerOpen(false);
-                                  navigate(`/painting/${item.id}`);
+                                  navigate(getPaintingDetailPath(item.id, item.title));
                                 }}
                                 sx={{ display: 'flex', alignItems: 'stretch', p: 0 }}
                               >

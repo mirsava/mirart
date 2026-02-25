@@ -53,9 +53,10 @@ import PageHeader from '../components/PageHeader';
 import ImagePlaceholder from '../components/ImagePlaceholder';
 import { Painting } from '../types';
 import SEO from '../components/SEO';
+import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const PaintingDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id, slug } = useParams<{ id: string; slug?: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { openChat, chatEnabled } = useChat();
@@ -83,6 +84,12 @@ const PaintingDetail: React.FC = () => {
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [userHasReviewed, setUserHasReviewed] = useState(false);
   const [editingReview, setEditingReview] = useState(false);
+  const resolvedListingId = (() => {
+    if (!id) return null;
+    if (/^\d+$/.test(id)) return parseInt(id, 10);
+    const trailingId = id.match(/(\d+)$/);
+    return trailingId ? parseInt(trailingId[1], 10) : null;
+  })();
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -157,7 +164,7 @@ const PaintingDetail: React.FC = () => {
 
   useEffect(() => {
     const fetchPainting = async () => {
-      if (!id) {
+      if (!resolvedListingId) {
         setError('Invalid painting ID');
         setLoading(false);
         return;
@@ -168,7 +175,7 @@ const PaintingDetail: React.FC = () => {
 
       try {
         // Try to fetch from database first
-        const listingId = parseInt(id);
+        const listingId = resolvedListingId;
         if (!isNaN(listingId)) {
           try {
             const url = user?.id 
@@ -296,7 +303,15 @@ const PaintingDetail: React.FC = () => {
     };
 
     fetchPainting();
-  }, [id, user?.id]);
+  }, [resolvedListingId, user?.id]);
+
+  useEffect(() => {
+    if (!painting?.id || !painting.title) return;
+    const canonicalPath = getPaintingDetailPath(painting.id, painting.title);
+    if (window.location.pathname !== canonicalPath) {
+      navigate(canonicalPath, { replace: true });
+    }
+  }, [painting?.id, painting?.title, navigate, id, slug]);
 
   if (loading) {
     return (
@@ -484,7 +499,7 @@ const PaintingDetail: React.FC = () => {
         title={painting.title}
         description={painting.description?.slice(0, 160) || `${painting.title} by ${painting.artist} - Original art for sale`}
         image={imageUrl}
-        url={`/painting/${painting.id}`}
+        url={getPaintingDetailPath(painting.id, painting.title)}
         type="product"
         structuredData={structuredData}
       />

@@ -65,6 +65,7 @@ import { Lock as LockIcon, AttachMoney as AttachMoneyIcon, CalendarMonth as Cale
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
 import ImagePlaceholder from '../components/ImagePlaceholder';
+import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const dataURLtoBlob = (dataURL: string): Promise<Blob> => {
   return new Promise((resolve) => {
@@ -1231,7 +1232,7 @@ const ArtistDashboard: React.FC = () => {
                                   </IconButton>
                                 </Tooltip>
                                 <Tooltip title="View">
-                                  <IconButton size="small" onClick={() => navigate(`/painting/${listing.id}`)}>
+                                  <IconButton size="small" onClick={() => navigate(getPaintingDetailPath(listing.id, listing.title))}>
                                     <VisibilityIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
@@ -1305,7 +1306,7 @@ const ArtistDashboard: React.FC = () => {
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="View">
-                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/painting/${listing.id}`); }}>
+                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(getPaintingDetailPath(listing.id, listing.title)); }}>
                                   <VisibilityIcon sx={{ fontSize: 16 }} />
                                 </IconButton>
                               </Tooltip>
@@ -1602,7 +1603,7 @@ const ArtistDashboard: React.FC = () => {
                             </TableHead>
                             <TableBody>
                               {analyticsData.topListings.map((listing, idx) => (
-                                <TableRow key={listing.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/painting/${listing.id}`)}>
+                                <TableRow key={listing.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(getPaintingDetailPath(listing.id, listing.title))}>
                                   <TableCell>{idx + 1}</TableCell>
                                   <TableCell>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>

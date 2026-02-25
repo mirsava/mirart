@@ -76,6 +76,7 @@ function AppContent(): JSX.Element {
             <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/gallery" element={<Gallery />} />
+            <Route path="/painting/:slug-:id" element={<PaintingDetail />} />
             <Route path="/painting/:id" element={<PaintingDetail />} />
             <Route
               path="/cart"

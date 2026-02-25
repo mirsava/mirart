@@ -19,6 +19,7 @@ import { useChat } from '../contexts/ChatContext';
 import { useSnackbar } from 'notistack';
 import apiService, { User, Listing } from '../services/api';
 import SEO from '../components/SEO';
+import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const ArtistProfile: React.FC = () => {
   const { username } = useParams<{ username: string }>();
@@ -274,7 +275,7 @@ const ArtistProfile: React.FC = () => {
                         transform: 'translateY(-4px)',
                       },
                     }}
-                    onClick={() => navigate(`/painting/${listing.id}`)}
+                    onClick={() => navigate(getPaintingDetailPath(listing.id, listing.title))}
                   >
                     {listing.primary_image_url && (
                       <Box
