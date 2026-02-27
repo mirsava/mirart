@@ -140,6 +140,7 @@ const ArtistDashboard: React.FC = () => {
   const [loadingListings, setLoadingListings] = useState(false);
   const [listingsView, setListingsView] = useState<'grid' | 'table'>('table');
   const [listingImageErrors, setListingImageErrors] = useState<Record<number, boolean>>({});
+  const [analyticsListingImageErrors, setAnalyticsListingImageErrors] = useState<Record<number, boolean>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listingToDelete, setListingToDelete] = useState<Listing | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -1796,11 +1797,18 @@ const ArtistDashboard: React.FC = () => {
                                   <TableCell>{idx + 1}</TableCell>
                                   <TableCell>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                      <Box
-                                        component="img"
-                                        src={getImageUrl(listing.primaryImageUrl)}
-                                        sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }}
-                                      />
+                                      {getImageUrl(listing.primaryImageUrl) && !analyticsListingImageErrors[listing.id] ? (
+                                        <Box
+                                          component="img"
+                                          src={getImageUrl(listing.primaryImageUrl)}
+                                          onError={() => setAnalyticsListingImageErrors((prev) => ({ ...prev, [listing.id]: true }))}
+                                          sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }}
+                                        />
+                                      ) : (
+                                        <Box sx={{ width: 40, height: 40, borderRadius: 1, overflow: 'hidden', flexShrink: 0 }}>
+                                          <ImagePlaceholder iconSize={{ xs: 16, md: 16 }} />
+                                        </Box>
+                                      )}
                                       <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>{listing.title}</Typography>
                                     </Box>
                                   </TableCell>
