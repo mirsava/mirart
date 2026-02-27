@@ -60,8 +60,8 @@ import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User, UserSubscription } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import OrderCardComponent from '../components/OrderCard';
-import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButtonGroup, ToggleButton, useTheme, LinearProgress, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
-import { Lock as LockIcon, AttachMoney as AttachMoneyIcon, CalendarMonth as CalendarMonthIcon, ShowChart as ShowChartIcon, ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
+import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButtonGroup, ToggleButton, useTheme, LinearProgress, Collapse } from '@mui/material';
+import { Lock as LockIcon, AttachMoney as AttachMoneyIcon, CalendarMonth as CalendarMonthIcon, ShowChart as ShowChartIcon, KeyboardArrowDown as KeyboardArrowDownIcon, KeyboardArrowUp as KeyboardArrowUpIcon } from '@mui/icons-material';
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
 import ImagePlaceholder from '../components/ImagePlaceholder';
@@ -269,10 +269,12 @@ const ArtistDashboard: React.FC = () => {
   } | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [monthlyNetGoal, setMonthlyNetGoal] = useState<number>(0);
-  const [analyticsPanelsOpen, setAnalyticsPanelsOpen] = useState({
-    funnel: true,
-    opportunities: true,
-    goal: true,
+  const [analyticsRowsOpen, setAnalyticsRowsOpen] = useState({
+    summary: true,
+    deductions: true,
+    trend: true,
+    performance: true,
+    growth: true,
     pricing: true,
   });
 
@@ -326,10 +328,9 @@ const ArtistDashboard: React.FC = () => {
       setLoadingAnalytics(false);
     }
   };
-  const handleToggleAnalyticsPanel = (panel: 'funnel' | 'opportunities' | 'goal' | 'pricing') =>
-    (_event: React.SyntheticEvent, expanded: boolean) => {
-      setAnalyticsPanelsOpen((prev) => ({ ...prev, [panel]: expanded }));
-    };
+  const toggleAnalyticsRow = (key: keyof typeof analyticsRowsOpen) => {
+    setAnalyticsRowsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1654,6 +1655,14 @@ const ArtistDashboard: React.FC = () => {
                   <Typography variant="h5" fontWeight={600}>Revenue Analytics</Typography>
                 </Box>
 
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>Summary</Typography>
+                    <IconButton size="small" onClick={() => toggleAnalyticsRow('summary')}>
+                      {analyticsRowsOpen.summary ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                    </IconButton>
+                  </Box>
+                  <Collapse in={analyticsRowsOpen.summary}>
                 <Grid container spacing={2} sx={{ mb: 4 }}>
                   {[
                     { label: 'Total Net Payout', value: `$${analyticsData.summary.totalNetEarnings.toFixed(2)}`, icon: <AttachMoneyIcon /> },
@@ -1677,7 +1686,17 @@ const ArtistDashboard: React.FC = () => {
                     </Grid>
                   ))}
                 </Grid>
+                  </Collapse>
+                </Paper>
 
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>Deductions</Typography>
+                    <IconButton size="small" onClick={() => toggleAnalyticsRow('deductions')}>
+                      {analyticsRowsOpen.deductions ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                    </IconButton>
+                  </Box>
+                  <Collapse in={analyticsRowsOpen.deductions}>
                 <Grid container spacing={2} sx={{ mb: 4 }}>
                   {[
                     { label: 'Stripe Fees', value: analyticsData.summary.totalStripeFees },
@@ -1694,9 +1713,17 @@ const ArtistDashboard: React.FC = () => {
                     </Grid>
                   ))}
                 </Grid>
+                  </Collapse>
+                </Paper>
 
                 <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 4 }}>
-                  <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>Monthly Gross vs Net (Last 12 Months)</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>Monthly Gross vs Net (Last 12 Months)</Typography>
+                    <IconButton size="small" onClick={() => toggleAnalyticsRow('trend')}>
+                      {analyticsRowsOpen.trend ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                    </IconButton>
+                  </Box>
+                  <Collapse in={analyticsRowsOpen.trend}>
                   {analyticsData.revenueOverTime.length === 0 ? (
                     <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>No revenue data yet</Typography>
                   ) : (
@@ -1734,8 +1761,17 @@ const ArtistDashboard: React.FC = () => {
                       </BarChart>
                     </ResponsiveContainer>
                   )}
+                  </Collapse>
                 </Paper>
 
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>Top Listings & Categories</Typography>
+                    <IconButton size="small" onClick={() => toggleAnalyticsRow('performance')}>
+                      {analyticsRowsOpen.performance ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                    </IconButton>
+                  </Box>
+                  <Collapse in={analyticsRowsOpen.performance}>
                 <Grid container spacing={3}>
                   <Grid item xs={12} md={7}>
                     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
@@ -1812,144 +1848,142 @@ const ArtistDashboard: React.FC = () => {
                     </Paper>
                   </Grid>
                 </Grid>
+                  </Collapse>
+                </Paper>
 
-                <Box sx={{ mt: 4 }}>
-                  <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-                    Growth Insights
-                  </Typography>
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, mt: 4, mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      Growth Insights
+                    </Typography>
+                    <IconButton size="small" onClick={() => toggleAnalyticsRow('growth')}>
+                      {analyticsRowsOpen.growth ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                    </IconButton>
+                  </Box>
+                  <Collapse in={analyticsRowsOpen.growth}>
                   <Grid container spacing={3}>
                     <Grid item xs={12} md={4}>
-                      <Accordion
-                        disableGutters
-                        expanded={analyticsPanelsOpen.funnel}
-                        onChange={handleToggleAnalyticsPanel('funnel')}
-                        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, boxShadow: 'none', '&:before': { display: 'none' } }}
-                      >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Typography variant="subtitle1" fontWeight={600}>Conversion Funnel</Typography>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          {[
-                            { label: 'Views', value: analyticsData.conversionFunnel.views },
-                            { label: 'Likes', value: analyticsData.conversionFunnel.likes },
-                            { label: 'Inquiries', value: analyticsData.conversionFunnel.inquiries },
-                            { label: 'Orders', value: analyticsData.conversionFunnel.orders },
-                          ].map((stage) => (
-                            <Box key={stage.label} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.75 }}>
-                              <Typography variant="body2" color="text.secondary">{stage.label}</Typography>
-                              <Typography variant="body2" fontWeight={600}>{stage.value}</Typography>
-                            </Box>
-                          ))}
-                          <Divider sx={{ my: 1.5 }} />
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            View to Like: {analyticsData.conversionFunnel.viewToLikeRate.toFixed(1)}%
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Like to Inquiry: {analyticsData.conversionFunnel.likeToInquiryRate.toFixed(1)}%
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Inquiry to Order: {analyticsData.conversionFunnel.inquiryToOrderRate.toFixed(1)}%
-                          </Typography>
-                          <Typography variant="caption" color="primary.main" display="block" sx={{ mt: 0.5, fontWeight: 600 }}>
-                            View to Order: {analyticsData.conversionFunnel.viewToOrderRate.toFixed(2)}%
-                          </Typography>
-                        </AccordionDetails>
-                      </Accordion>
+                      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
+                        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>Conversion Funnel</Typography>
+                        {[
+                          { label: 'Views', value: analyticsData.conversionFunnel.views },
+                          { label: 'Likes', value: analyticsData.conversionFunnel.likes },
+                          { label: 'Inquiries', value: analyticsData.conversionFunnel.inquiries },
+                          { label: 'Orders', value: analyticsData.conversionFunnel.orders },
+                        ].map((stage) => (
+                          <Box key={stage.label} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.75 }}>
+                            <Typography variant="body2" color="text.secondary">{stage.label}</Typography>
+                            <Typography variant="body2" fontWeight={600}>{stage.value}</Typography>
+                          </Box>
+                        ))}
+                        <Divider sx={{ my: 1.5 }} />
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          View to Like: {analyticsData.conversionFunnel.viewToLikeRate.toFixed(1)}%
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          Like to Inquiry: {analyticsData.conversionFunnel.likeToInquiryRate.toFixed(1)}%
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          Inquiry to Order: {analyticsData.conversionFunnel.inquiryToOrderRate.toFixed(1)}%
+                        </Typography>
+                        <Typography variant="caption" color="primary.main" display="block" sx={{ mt: 0.5, fontWeight: 600 }}>
+                          View to Order: {analyticsData.conversionFunnel.viewToOrderRate.toFixed(2)}%
+                        </Typography>
+                      </Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
-                      <Accordion
-                        disableGutters
-                        expanded={analyticsPanelsOpen.opportunities}
-                        onChange={handleToggleAnalyticsPanel('opportunities')}
-                        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, boxShadow: 'none', '&:before': { display: 'none' } }}
-                      >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Typography variant="subtitle1" fontWeight={600}>Missed Revenue</Typography>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          {analyticsData.missedRevenueOpportunities.length === 0 ? (
-                            <Typography variant="body2" color="text.secondary">Not enough listing traffic yet.</Typography>
-                          ) : (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-                              {analyticsData.missedRevenueOpportunities.slice(0, 4).map((item) => (
-                                <Box key={item.id} sx={{ p: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
-                                  <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>{item.title}</Typography>
-                                  <Typography variant="caption" color="text.secondary" display="block">
-                                    {item.views} views, {item.currentOrders} orders
-                                  </Typography>
-                                  <Typography variant="caption" color="warning.main" sx={{ fontWeight: 600 }}>
-                                    Est. +${item.estimatedExtraRevenue.toFixed(2)}
-                                  </Typography>
-                                </Box>
-                              ))}
-                            </Box>
-                          )}
-                        </AccordionDetails>
-                      </Accordion>
+                      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
+                        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>Missed Revenue</Typography>
+                        {analyticsData.missedRevenueOpportunities.length === 0 ? (
+                          <Typography variant="body2" color="text.secondary">Not enough listing traffic yet.</Typography>
+                        ) : (
+                          <TableContainer>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ fontWeight: 600 }}>Listing</TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>Views</TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>Orders</TableCell>
+                                  <TableCell align="right" sx={{ fontWeight: 600 }}>Est. Upside</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {analyticsData.missedRevenueOpportunities.slice(0, 4).map((item) => (
+                                  <TableRow key={item.id}>
+                                    <TableCell>
+                                      <Typography variant="body2" noWrap sx={{ maxWidth: 160, fontWeight: 600 }}>{item.title}</Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        +{item.estimatedExtraOrders.toFixed(2)} est. orders
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell>{item.views}</TableCell>
+                                    <TableCell>{item.currentOrders}</TableCell>
+                                    <TableCell align="right">
+                                      <Typography variant="caption" color="warning.main" sx={{ fontWeight: 700 }}>
+                                        +${item.estimatedExtraRevenue.toFixed(0)}
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        )}
+                      </Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
-                      <Accordion
-                        disableGutters
-                        expanded={analyticsPanelsOpen.goal}
-                        onChange={handleToggleAnalyticsPanel('goal')}
-                        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, boxShadow: 'none', '&:before': { display: 'none' } }}
-                      >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Typography variant="subtitle1" fontWeight={600}>Goal Forecast</Typography>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          {(() => {
-                            const now = new Date();
-                            const dayOfMonth = now.getDate();
-                            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-                            const monthProjected = dayOfMonth > 0 ? (analyticsData.summary.thisMonth / dayOfMonth) * daysInMonth : 0;
-                            const goal = monthlyNetGoal > 0 ? monthlyNetGoal : 0;
-                            const progress = goal > 0 ? Math.min(100, (analyticsData.summary.thisMonth / goal) * 100) : 0;
-                            const remaining = Math.max(0, goal - analyticsData.summary.thisMonth);
-                            const remainingDays = Math.max(1, daysInMonth - dayOfMonth);
-                            const neededPerDay = remaining / remainingDays;
-                            return (
-                              <Box>
-                                <TextField
-                                  label="Monthly Net Goal ($)"
-                                  size="small"
-                                  type="number"
-                                  value={monthlyNetGoal}
-                                  onChange={(e) => setMonthlyNetGoal(Number(e.target.value) || 0)}
-                                  sx={{ mb: 2, width: '100%' }}
-                                />
-                                <Typography variant="body2" color="text.secondary">Current month net</Typography>
-                                <Typography variant="h6" fontWeight={700}>${analyticsData.summary.thisMonth.toFixed(2)}</Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Projected month end</Typography>
-                                <Typography variant="h6" fontWeight={700} color="primary.main">${monthProjected.toFixed(2)}</Typography>
-                                <LinearProgress variant="determinate" value={progress} sx={{ mt: 1.5, height: 8, borderRadius: 4 }} />
-                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
-                                  Goal progress: {progress.toFixed(1)}%
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" display="block">
-                                  Needed per day: ${neededPerDay.toFixed(2)} for next {remainingDays} day{remainingDays !== 1 ? 's' : ''}
-                                </Typography>
-                              </Box>
-                            );
-                          })()}
-                        </AccordionDetails>
-                      </Accordion>
+                      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
+                        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>Goal Forecast</Typography>
+                        {(() => {
+                          const now = new Date();
+                          const dayOfMonth = now.getDate();
+                          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                          const monthProjected = dayOfMonth > 0 ? (analyticsData.summary.thisMonth / dayOfMonth) * daysInMonth : 0;
+                          const goal = monthlyNetGoal > 0 ? monthlyNetGoal : 0;
+                          const progress = goal > 0 ? Math.min(100, (analyticsData.summary.thisMonth / goal) * 100) : 0;
+                          const remaining = Math.max(0, goal - analyticsData.summary.thisMonth);
+                          const remainingDays = Math.max(1, daysInMonth - dayOfMonth);
+                          const neededPerDay = remaining / remainingDays;
+                          return (
+                            <Box>
+                              <TextField
+                                label="Monthly Net Goal ($)"
+                                size="small"
+                                type="number"
+                                value={monthlyNetGoal}
+                                onChange={(e) => setMonthlyNetGoal(Number(e.target.value) || 0)}
+                                sx={{ mb: 2, width: '100%' }}
+                              />
+                              <Typography variant="body2" color="text.secondary">Current month net</Typography>
+                              <Typography variant="h6" fontWeight={700}>${analyticsData.summary.thisMonth.toFixed(2)}</Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Projected month end</Typography>
+                              <Typography variant="h6" fontWeight={700} color="primary.main">${monthProjected.toFixed(2)}</Typography>
+                              <LinearProgress variant="determinate" value={progress} sx={{ mt: 1.5, height: 8, borderRadius: 4 }} />
+                              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
+                                Goal progress: {progress.toFixed(1)}%
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                Needed per day: ${neededPerDay.toFixed(2)} for next {remainingDays} day{remainingDays !== 1 ? 's' : ''}
+                              </Typography>
+                            </Box>
+                          );
+                        })()}
+                      </Paper>
                     </Grid>
                   </Grid>
-                </Box>
+                  </Collapse>
+                </Paper>
 
-                <Accordion
-                  disableGutters
-                  expanded={analyticsPanelsOpen.pricing}
-                  onChange={handleToggleAnalyticsPanel('pricing')}
-                  sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mt: 3, boxShadow: 'none', '&:before': { display: 'none' } }}
-                >
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, mt: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="subtitle1" fontWeight={600}>Pricing Intelligence</Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
+                    <IconButton size="small" onClick={() => toggleAnalyticsRow('pricing')}>
+                      {analyticsRowsOpen.pricing ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                    </IconButton>
+                  </Box>
+                  <Collapse in={analyticsRowsOpen.pricing}>
                     {analyticsData.pricingIntelligence.length === 0 ? (
                       <Typography variant="body2" color="text.secondary">Not enough pricing data yet.</Typography>
                     ) : (
@@ -1962,6 +1996,7 @@ const ArtistDashboard: React.FC = () => {
                               <TableCell sx={{ fontWeight: 600 }}>Market Avg</TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>Suggested Range</TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>Price Delta</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Views / Orders</TableCell>
                               <TableCell align="right" sx={{ fontWeight: 600 }}>Conv.</TableCell>
                             </TableRow>
                           </TableHead>
@@ -1989,6 +2024,7 @@ const ArtistDashboard: React.FC = () => {
                                     </Typography>
                                   ) : 'N/A'}
                                 </TableCell>
+                                <TableCell>{item.views} / {item.soldOrders}</TableCell>
                                 <TableCell align="right">{item.listingConversionRate.toFixed(2)}%</TableCell>
                               </TableRow>
                             ))}
@@ -1996,8 +2032,8 @@ const ArtistDashboard: React.FC = () => {
                         </Table>
                       </TableContainer>
                     )}
-                  </AccordionDetails>
-                </Accordion>
+                  </Collapse>
+                </Paper>
               </Box>
             )}
           </TabPanel>
