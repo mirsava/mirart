@@ -57,7 +57,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
-import apiService, { DashboardData, Listing, Order, User, UserSubscription } from '../services/api';
+import apiService, { DashboardData, Listing, Order, SubscriptionPlan, User, UserSubscription } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import OrderCardComponent from '../components/OrderCard';
 import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButtonGroup, ToggleButton, useTheme, LinearProgress, Collapse } from '@mui/material';
@@ -152,6 +152,10 @@ const ArtistDashboard: React.FC = () => {
     phone: '',
     country: '',
     website: '',
+    socialInstagram: '',
+    socialTikTok: '',
+    socialBehance: '',
+    socialYouTube: '',
     addressLine1: '',
     addressLine2: '',
     addressCity: '',
@@ -191,6 +195,22 @@ const ArtistDashboard: React.FC = () => {
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
   const [resumingSubscription, setResumingSubscription] = useState(false);
   const [cancelSubscriptionDialogOpen, setCancelSubscriptionDialogOpen] = useState(false);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
+  const [subscriptionRoi, setSubscriptionRoi] = useState<{
+    last30Net: number;
+    last30Orders: number;
+    monthlyCost: number;
+    costPerOrder: number | null;
+    costPerActiveListing: number | null;
+    roiMultiple: number | null;
+  }>({
+    last30Net: 0,
+    last30Orders: 0,
+    monthlyCost: 0,
+    costPerOrder: null,
+    costPerActiveListing: null,
+    roiMultiple: null,
+  });
   const [purchasesOrders, setPurchasesOrders] = useState<Order[]>([]);
   const [salesOrders, setSalesOrders] = useState<Order[]>([]);
   const [ordersSubTab, setOrdersSubTab] = useState(0);
@@ -309,6 +329,33 @@ const ArtistDashboard: React.FC = () => {
     profileFormData.addressZip.trim() &&
     profileFormData.addressCountry.trim()
   );
+  const profileCompletenessChecks = [
+    Boolean(profileFormData.firstName.trim()),
+    Boolean(profileFormData.lastName.trim()),
+    Boolean(profileFormData.businessName.trim()),
+    Boolean(profileFormData.phone.trim()),
+    Boolean(profileFormData.country.trim()),
+    Boolean(profileFormData.website.trim()),
+    Boolean(profileFormData.bio.trim()),
+    Boolean(profileFormData.experience.trim()),
+    profileFormData.specialties.length > 0,
+    Boolean(profileFormData.signatureUrl),
+    isShippingAddressComplete,
+    Boolean(
+      profileFormData.socialInstagram.trim() ||
+      profileFormData.socialTikTok.trim() ||
+      profileFormData.socialBehance.trim() ||
+      profileFormData.socialYouTube.trim()
+    ),
+  ];
+  const profileCompletenessPercent = Math.round(
+    (profileCompletenessChecks.filter(Boolean).length / profileCompletenessChecks.length) * 100
+  );
+  const payoutReadiness = {
+    stripeConnected: Boolean(connectStatus?.connected && connectStatus?.chargesEnabled),
+    shippingAddress: isShippingAddressComplete,
+    profileQuality: profileCompletenessPercent >= 70,
+  };
   const shippingProfileComplete = profileData ? isShippingAddressComplete : undefined;
   const needsShippingProfile = shippingProfileComplete === false;
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -371,12 +418,24 @@ const ArtistDashboard: React.FC = () => {
       if (tabValue === 4 || tabValue === 5) {
         fetchProfile();
       }
+      if (tabValue === 4 || tabValue === 5) {
+        fetchConnectStatus();
+      }
       if (tabValue === 5) {
         fetchSettings();
-        fetchConnectStatus();
       }
     }
   }, [user?.id, tabValue]);
+
+  useEffect(() => {
+    if (tabValue !== 3 || !user?.id) return;
+    fetchSubscriptionPlans();
+  }, [tabValue, user?.id]);
+
+  useEffect(() => {
+    if (tabValue !== 3 || !subscription || !user?.id) return;
+    fetchSubscriptionRoi();
+  }, [tabValue, subscription?.id, subscription?.billing_period, user?.id]);
 
   const fetchConnectStatus = async () => {
     if (!user?.id) return;
@@ -631,6 +690,60 @@ const ArtistDashboard: React.FC = () => {
     }
   };
 
+  const fetchSubscriptionPlans = async () => {
+    try {
+      const plans = await apiService.getSubscriptionPlans();
+      setSubscriptionPlans(Array.isArray(plans) ? plans : []);
+    } catch {
+      setSubscriptionPlans([]);
+    }
+  };
+
+  const fetchSubscriptionRoi = async () => {
+    if (!user?.id || !subscription) return;
+    try {
+      const orders = await apiService.getUserOrders(user.id, 'seller');
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      const last30Orders = (orders || []).filter((order) => {
+        const createdAt = order.created_at ? new Date(order.created_at) : null;
+        return Boolean(createdAt && createdAt >= cutoff && order.status !== 'cancelled');
+      }).length;
+      const last30Net = (orders || []).reduce((sum, order) => {
+        const createdAt = order.created_at ? new Date(order.created_at) : null;
+        if (!createdAt || createdAt < cutoff || order.status === 'cancelled') return sum;
+        const net = Number(order.payout_amount ?? order.artist_earnings ?? 0);
+        return sum + (Number.isFinite(net) ? net : 0);
+      }, 0);
+      const monthlyCost = Number(
+        subscription.billing_period === 'yearly'
+          ? ((subscription.price_yearly || 0) / 12)
+          : (subscription.price_monthly || 0)
+      );
+      const roiMultiple = monthlyCost > 0 ? last30Net / monthlyCost : null;
+      const activeListings = Number(subscription.current_listings || 0);
+      const costPerOrder = last30Orders > 0 && monthlyCost > 0 ? (monthlyCost / last30Orders) : null;
+      const costPerActiveListing = activeListings > 0 && monthlyCost > 0 ? (monthlyCost / activeListings) : null;
+      setSubscriptionRoi({
+        last30Net,
+        last30Orders,
+        monthlyCost,
+        costPerOrder,
+        costPerActiveListing,
+        roiMultiple,
+      });
+    } catch {
+      setSubscriptionRoi({
+        last30Net: 0,
+        last30Orders: 0,
+        monthlyCost: 0,
+        costPerOrder: null,
+        costPerActiveListing: null,
+        roiMultiple: null,
+      });
+    }
+  };
+
   const fetchListings = async () => {
     if (!user?.id) return;
     
@@ -693,6 +806,10 @@ const ArtistDashboard: React.FC = () => {
         phone: data.phone || '',
         country: data.country || '',
         website: data.website || '',
+        socialInstagram: (data as any).social_instagram || '',
+        socialTikTok: (data as any).social_tiktok || '',
+        socialBehance: (data as any).social_behance || '',
+        socialYouTube: (data as any).social_youtube || '',
         addressLine1: (data as any).address_line1 || '',
         addressLine2: (data as any).address_line2 || '',
         addressCity: (data as any).address_city || '',
@@ -796,6 +913,10 @@ const ArtistDashboard: React.FC = () => {
         phone: profileFormData.phone || null,
         country: profileFormData.country,
         website: profileFormData.website || null,
+        social_instagram: profileFormData.socialInstagram || null,
+        social_tiktok: profileFormData.socialTikTok || null,
+        social_behance: profileFormData.socialBehance || null,
+        social_youtube: profileFormData.socialYouTube || null,
         address_line1: profileFormData.addressLine1 || null,
         address_line2: profileFormData.addressLine2 || null,
         address_city: profileFormData.addressCity || null,
@@ -1187,7 +1308,7 @@ const ArtistDashboard: React.FC = () => {
           </Box>
 
           <TabPanel value={tabValue} index={0}>
-            <Box sx={{ mb: 4 }}>
+            <Box sx={{ mb: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <ArtTrackIcon sx={{ fontSize: 28, color: 'primary.main' }} />
@@ -2074,6 +2195,142 @@ const ArtistDashboard: React.FC = () => {
                   Current Plan: {subscription.plan_name} ({subscription.billing_period})
                 </Typography>
                 <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} md={4}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+                      <Typography variant="caption" color="text.secondary">Plan Usage</Typography>
+                      <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5 }}>
+                        {subscription.current_listings || 0} / {subscription.max_listings >= 999999 ? 'Unlimited' : subscription.max_listings}
+                      </Typography>
+                      {subscription.max_listings && subscription.max_listings < 999999 && (
+                        <>
+                          <LinearProgress
+                            variant="determinate"
+                            value={Math.min(100, ((subscription.current_listings || 0) / subscription.max_listings) * 100)}
+                            sx={{ mt: 1, height: 8, borderRadius: 4 }}
+                          />
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
+                            {subscription.listings_remaining ?? Math.max(0, subscription.max_listings - (subscription.current_listings || 0))} listing slots left
+                          </Typography>
+                          {(() => {
+                            const daysSinceStart = subscription.start_date
+                              ? Math.max(1, Math.ceil((Date.now() - new Date(subscription.start_date).getTime()) / 86400000))
+                              : 30;
+                            const pace = (subscription.current_listings || 0) / daysSinceStart;
+                            if (pace <= 0) return null;
+                            const remaining = subscription.listings_remaining ?? Math.max(0, subscription.max_listings - (subscription.current_listings || 0));
+                            const daysToExhaust = remaining / pace;
+                            if (!Number.isFinite(daysToExhaust) || daysToExhaust > 365) return null;
+                            return (
+                              <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
+                                At current pace, slots may be full in ~{Math.max(1, Math.round(daysToExhaust))} days
+                              </Typography>
+                            );
+                          })()}
+                        </>
+                      )}
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+                      <Typography variant="caption" color="text.secondary">ROI (Last 30 Days)</Typography>
+                      <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5 }}>
+                        {subscriptionRoi.roiMultiple != null ? `${subscriptionRoi.roiMultiple.toFixed(1)}x` : 'N/A'}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                        Net payout: ${subscriptionRoi.last30Net.toFixed(2)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Est. monthly plan cost: ${subscriptionRoi.monthlyCost.toFixed(2)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+                      <Typography variant="caption" color="text.secondary">Upgrade Impact</Typography>
+                      {(() => {
+                        const currentCap = Number(subscription.max_listings || 0);
+                        const currentPrice = Number(
+                          subscription.billing_period === 'yearly'
+                            ? (subscription.price_yearly || 0)
+                            : (subscription.price_monthly || 0)
+                        );
+                        const candidates = subscriptionPlans
+                          .filter((plan) =>
+                            plan?.is_active &&
+                            Number(plan.max_listings || 0) > currentCap
+                          )
+                          .sort((a, b) =>
+                            Number((subscription.billing_period === 'yearly' ? a.price_yearly : a.price_monthly) || 0) -
+                            Number((subscription.billing_period === 'yearly' ? b.price_yearly : b.price_monthly) || 0)
+                          );
+                        const nextPlan = candidates[0];
+                        if (!nextPlan) {
+                          return <Typography variant="body2" sx={{ mt: 0.75 }}>You are on the highest listing tier.</Typography>;
+                        }
+                        const nextPrice = Number(
+                          subscription.billing_period === 'yearly'
+                            ? (nextPlan.price_yearly || 0)
+                            : (nextPlan.price_monthly || 0)
+                        );
+                        const moreSlots = Number(nextPlan.max_listings || 0) - currentCap;
+                        return (
+                          <>
+                            <Typography variant="body2" sx={{ mt: 0.75, fontWeight: 600 }}>
+                              Next: {nextPlan.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                              +{moreSlots} listing slots
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                              {subscription.billing_period === 'yearly' ? 'Yearly' : 'Monthly'} price change: ${(nextPrice - currentPrice).toFixed(2)}
+                            </Typography>
+                          </>
+                        );
+                      })()}
+                    </Paper>
+                  </Grid>
+                </Grid>
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} md={6}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+                      <Typography variant="caption" color="text.secondary">Billing Snapshot</Typography>
+                      <Typography variant="body2" sx={{ mt: 0.75 }}>
+                        Next charge date: {subscription.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'N/A'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Amount: $
+                        {(subscription.billing_period === 'yearly'
+                          ? Number(subscription.price_yearly || 0)
+                          : Number(subscription.price_monthly || 0)
+                        ).toFixed(2)} {subscription.billing_period === 'yearly' ? '/ year' : '/ month'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Auto-renew: {(subscription.auto_renew === false || subscription.auto_renew === 0) ? 'Off' : 'On'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Payment method: Managed in Stripe checkout
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+                      <Typography variant="caption" color="text.secondary">Value Indicators</Typography>
+                      <Typography variant="body2" sx={{ mt: 0.75 }}>
+                        Cost per active listing: {subscriptionRoi.costPerActiveListing != null ? `$${subscriptionRoi.costPerActiveListing.toFixed(2)}` : 'N/A'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Cost per order (30d): {subscriptionRoi.costPerOrder != null ? `$${subscriptionRoi.costPerOrder.toFixed(2)}` : 'N/A'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Orders in last 30 days: {subscriptionRoi.last30Orders}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Monthly plan cost baseline: ${subscriptionRoi.monthlyCost.toFixed(2)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+                <Grid container spacing={2} sx={{ mb: 3 }}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
                       Active listings: {subscription.current_listings || 0} / {subscription.max_listings >= 999999 ? 'Unlimited' : subscription.max_listings}
@@ -2187,22 +2444,75 @@ const ArtistDashboard: React.FC = () => {
                 Shipping address is incomplete. Fill Street, City, State/Province, ZIP/Postal code, and Country to enable shipping workflows.
               </Alert>
             )}
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} md={6}>
+                <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.25 }}>Payout Readiness</Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" color="text.secondary">Stripe payouts connected</Typography>
+                      <Chip
+                        size="small"
+                        label={payoutReadiness.stripeConnected ? 'Ready' : 'Action needed'}
+                        color={payoutReadiness.stripeConnected ? 'success' : 'warning'}
+                        variant={payoutReadiness.stripeConnected ? 'filled' : 'outlined'}
+                      />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" color="text.secondary">Shipping address complete</Typography>
+                      <Chip
+                        size="small"
+                        label={payoutReadiness.shippingAddress ? 'Ready' : 'Action needed'}
+                        color={payoutReadiness.shippingAddress ? 'success' : 'warning'}
+                        variant={payoutReadiness.shippingAddress ? 'filled' : 'outlined'}
+                      />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" color="text.secondary">Profile quality</Typography>
+                      <Chip
+                        size="small"
+                        label={payoutReadiness.profileQuality ? 'Strong' : 'Improve'}
+                        color={payoutReadiness.profileQuality ? 'success' : 'warning'}
+                        variant={payoutReadiness.profileQuality ? 'filled' : 'outlined'}
+                      />
+                    </Box>
+                  </Box>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.25 }}>Public Profile Completeness</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">Current completeness</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>{profileCompletenessPercent}%</Typography>
+                  </Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={profileCompletenessPercent}
+                    sx={{ height: 8, borderRadius: 4, mb: 1 }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    Add bio, signature, socials, and shipping details to improve trust and conversion.
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
 
             <form onSubmit={handleProfileSubmit} noValidate>
-              <Grid container spacing={3}>
+              <Grid container spacing={2}>
                 {/* Personal Information Section */}
-                <Grid item xs={12}>
+                <Grid item xs={12} md={6} sx={{ order: { xs: 1, md: 1 } }}>
                   <Paper
                     elevation={0}
                     sx={{
-                      p: 4,
+                      p: 3,
                       border: '1px solid',
                       borderColor: 'divider',
                       borderRadius: 1,
                       bgcolor: 'background.paper',
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2 }}>
                       <Box
                         sx={{
                           display: 'flex',
@@ -2221,7 +2531,7 @@ const ArtistDashboard: React.FC = () => {
                         Personal Information
                       </Typography>
                     </Box>
-                    <Divider sx={{ mb: 3 }} />
+                    <Divider sx={{ mb: 2 }} />
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
                         <TextField
@@ -2271,18 +2581,18 @@ const ArtistDashboard: React.FC = () => {
                 </Grid>
 
                 {/* Contact Information Section */}
-                <Grid item xs={12}>
+                <Grid item xs={12} md={6} sx={{ order: { xs: 3, md: 3 } }}>
                   <Paper
                     elevation={0}
                     sx={{
-                      p: 4,
+                      p: 3,
                       border: '1px solid',
                       borderColor: 'divider',
                       borderRadius: 1,
                       bgcolor: 'background.paper',
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2 }}>
                       <Box
                         sx={{
                           display: 'flex',
@@ -2301,7 +2611,7 @@ const ArtistDashboard: React.FC = () => {
                         Contact Information
                       </Typography>
                     </Box>
-                    <Divider sx={{ mb: 3 }} />
+                    <Divider sx={{ mb: 2 }} />
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
                         <FormControl fullWidth required sx={{ bgcolor: 'background.paper' }}>
@@ -2534,23 +2844,63 @@ const ArtistDashboard: React.FC = () => {
                           sx={{ bgcolor: 'background.paper' }}
                         />
                       </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Instagram"
+                          value={profileFormData.socialInstagram}
+                          onChange={handleProfileInputChange('socialInstagram')}
+                          placeholder="https://instagram.com/yourhandle"
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="TikTok"
+                          value={profileFormData.socialTikTok}
+                          onChange={handleProfileInputChange('socialTikTok')}
+                          placeholder="https://tiktok.com/@yourhandle"
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Behance"
+                          value={profileFormData.socialBehance}
+                          onChange={handleProfileInputChange('socialBehance')}
+                          placeholder="https://behance.net/yourprofile"
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="YouTube"
+                          value={profileFormData.socialYouTube}
+                          onChange={handleProfileInputChange('socialYouTube')}
+                          placeholder="https://youtube.com/@yourchannel"
+                          sx={{ bgcolor: 'background.paper' }}
+                        />
+                      </Grid>
                     </Grid>
                   </Paper>
                 </Grid>
 
                 {/* Professional Information Section */}
-                <Grid item xs={12}>
+                <Grid item xs={12} md={6} sx={{ order: { xs: 2, md: 2 } }}>
                   <Paper
                     elevation={0}
                     sx={{
-                      p: 4,
+                      p: 3,
                       border: '1px solid',
                       borderColor: 'divider',
                       borderRadius: 1,
                       bgcolor: 'background.paper',
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2 }}>
                       <Box
                         sx={{
                           display: 'flex',
@@ -2569,7 +2919,7 @@ const ArtistDashboard: React.FC = () => {
                         Professional Information
                       </Typography>
                     </Box>
-                    <Divider sx={{ mb: 3 }} />
+                    <Divider sx={{ mb: 2 }} />
                     <Grid container spacing={2}>
                       <Grid item xs={12}>
                         <FormControl fullWidth sx={{ bgcolor: 'background.paper' }}>
@@ -2634,18 +2984,18 @@ const ArtistDashboard: React.FC = () => {
                 </Grid>
 
                 {/* Signature Section */}
-                <Grid item xs={12}>
+                <Grid item xs={12} md={6} sx={{ order: { xs: 4, md: 4 } }}>
                   <Paper
                     elevation={0}
                     sx={{
-                      p: 4,
+                      p: 3,
                       border: '1px solid',
                       borderColor: 'divider',
                       borderRadius: 1,
                       bgcolor: 'background.paper',
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2 }}>
                       <Box
                         sx={{
                           display: 'flex',
@@ -2665,10 +3015,10 @@ const ArtistDashboard: React.FC = () => {
                       </Typography>
                     </Box>
                     <Divider sx={{ mb: 2 }} />
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       Your signature will be displayed on your public profile and artwork pages, helping collectors identify and authenticate your work.
                     </Typography>
-                    <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 2 }}>
+                    <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, p: 1.5 }}>
                       <SignatureInput
                         value={profileFormData.signatureUrl}
                         onChange={(url) => {
@@ -2684,7 +3034,7 @@ const ArtistDashboard: React.FC = () => {
                 </Grid>
 
                 {/* Submit Button */}
-                <Grid item xs={12}>
+                <Grid item xs={12} sx={{ order: { xs: 5, md: 5 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
                     <Button
                       type="submit"

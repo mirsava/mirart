@@ -122,6 +122,10 @@ router.post('/', async (req, res) => {
       phone,
       country,
       website,
+      social_instagram,
+      social_tiktok,
+      social_behance,
+      social_youtube,
       specialties,
       experience_level,
       bio,
@@ -152,7 +156,7 @@ router.post('/', async (req, res) => {
       await pool.execute(
         `UPDATE users SET 
           email = ?, first_name = ?, last_name = ?, business_name = ?, 
-          phone = ?, country = ?, website = ?, specialties = ?, 
+          phone = ?, country = ?, website = ?, social_instagram = ?, social_tiktok = ?, social_behance = ?, social_youtube = ?, specialties = ?, 
           experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?,
           address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?,
           billing_line1 = ?, billing_line2 = ?, billing_city = ?, billing_state = ?, billing_zip = ?, billing_country = ?
@@ -165,6 +169,10 @@ router.post('/', async (req, res) => {
           (phone && phone.trim()) || null, 
           (country && country.trim()) || null, 
           (website && website.trim()) || null, 
+          (social_instagram && social_instagram.trim()) || null,
+          (social_tiktok && social_tiktok.trim()) || null,
+          (social_behance && social_behance.trim()) || null,
+          (social_youtube && social_youtube.trim()) || null,
           specialties ? JSON.stringify(specialties) : null,
           (experience_level && experience_level.trim()) || null, 
           (bio && bio.trim()) || null, 
@@ -197,8 +205,8 @@ router.post('/', async (req, res) => {
       const [result] = await pool.execute(
         `INSERT INTO users (
           cognito_username, email, first_name, last_name, business_name,
-          phone, country, website, specialties, experience_level, bio, profile_image_url, signature_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          phone, country, website, social_instagram, social_tiktok, social_behance, social_youtube, specialties, experience_level, bio, profile_image_url, signature_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           cognito_username, 
           (email && email.trim()) || null, 
@@ -208,6 +216,10 @@ router.post('/', async (req, res) => {
           (phone && phone.trim()) || null, 
           (country && country.trim()) || null, 
           (website && website.trim()) || null, 
+          (social_instagram && social_instagram.trim()) || null,
+          (social_tiktok && social_tiktok.trim()) || null,
+          (social_behance && social_behance.trim()) || null,
+          (social_youtube && social_youtube.trim()) || null,
           specialties ? JSON.stringify(specialties) : null,
           (experience_level && experience_level.trim()) || null, 
           (bio && bio.trim()) || null, 
@@ -451,6 +463,10 @@ router.put('/:cognitoUsername', async (req, res) => {
       phone,
       country,
       website,
+      social_instagram,
+      social_tiktok,
+      social_behance,
+      social_youtube,
       specialties,
       experience_level,
       bio,
@@ -473,7 +489,7 @@ router.put('/:cognitoUsername', async (req, res) => {
     await pool.execute(
       `UPDATE users SET 
         first_name = ?, last_name = ?, business_name = ?, 
-        phone = ?, country = ?, website = ?, specialties = ?, 
+        phone = ?, country = ?, website = ?, social_instagram = ?, social_tiktok = ?, social_behance = ?, social_youtube = ?, specialties = ?, 
         experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?,
         address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?,
         billing_line1 = ?, billing_line2 = ?, billing_city = ?, billing_state = ?, billing_zip = ?, billing_country = ?
@@ -485,6 +501,10 @@ router.put('/:cognitoUsername', async (req, res) => {
         (phone && phone.trim()) || null, 
         (country && country.trim()) || null, 
         (website && website.trim()) || null, 
+        (social_instagram && social_instagram.trim()) || null,
+        (social_tiktok && social_tiktok.trim()) || null,
+        (social_behance && social_behance.trim()) || null,
+        (social_youtube && social_youtube.trim()) || null,
         specialties ? JSON.stringify(specialties) : null,
         (experience_level && experience_level.trim()) || null, 
         (bio && bio.trim()) || null, 

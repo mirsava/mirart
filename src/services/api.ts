@@ -10,6 +10,10 @@ export interface User {
   phone?: string;
   country?: string;
   website?: string;
+  social_instagram?: string;
+  social_tiktok?: string;
+  social_behance?: string;
+  social_youtube?: string;
   specialties?: string;
   experience_level?: string;
   bio?: string;
@@ -151,6 +155,8 @@ export interface UserSubscription {
   max_listings?: number;
   current_listings?: number;
   listings_remaining?: number;
+  price_monthly?: number;
+  price_yearly?: number;
 }
 
 class ApiService {

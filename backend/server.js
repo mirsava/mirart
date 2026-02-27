@@ -336,6 +336,22 @@ app.listen(PORT, async () => {
         console.log(`[Startup] Added ${name} column to users`);
       }
     }
+    const userSocialCols = [
+      { name: 'social_instagram', sql: 'ADD COLUMN social_instagram VARCHAR(255) NULL' },
+      { name: 'social_tiktok', sql: 'ADD COLUMN social_tiktok VARCHAR(255) NULL' },
+      { name: 'social_behance', sql: 'ADD COLUMN social_behance VARCHAR(255) NULL' },
+      { name: 'social_youtube', sql: 'ADD COLUMN social_youtube VARCHAR(255) NULL' },
+    ];
+    for (const { name, sql } of userSocialCols) {
+      const [sc] = await pool.execute(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = ?",
+        [process.env.DB_NAME || 'mirart', name]
+      );
+      if (sc.length === 0) {
+        await pool.execute(`ALTER TABLE users ${sql}`);
+        console.log(`[Startup] Added ${name} column to users`);
+      }
+    }
     const listingCols = [
       { name: 'shipping_info', sql: 'ADD COLUMN shipping_info TEXT DEFAULT NULL' },
       { name: 'returns_info', sql: 'ADD COLUMN returns_info TEXT DEFAULT NULL' },
