@@ -171,12 +171,16 @@ const Orders: React.FC = () => {
     }
   };
 
-  const handleMarkShipped = async (orderId: number) => {
+  const handleMarkShipped = async (orderId: number, trackingNumber?: string, trackingUrl?: string) => {
     if (!user?.id) return;
     setActionLoading(orderId);
     setError(null);
     try {
-      await apiService.markOrderShipped(orderId, user.id);
+      await apiService.markOrderShipped(orderId, user.id, {
+        shipping_carrier: 'own',
+        tracking_number: trackingNumber,
+        tracking_url: trackingUrl,
+      });
       await refreshOrders();
       enqueueSnackbar('Order marked as shipped', { variant: 'success' });
     } catch (err: unknown) {

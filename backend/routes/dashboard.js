@@ -208,12 +208,20 @@ router.get('/:cognitoUsername/analytics', async (req, res) => {
 
     const [summary] = await pool.execute(
       `SELECT
-        COALESCE(SUM(artist_earnings), 0) as total_earnings,
+        COALESCE(SUM(CASE
+          WHEN payout_amount IS NOT NULL THEN payout_amount + COALESCE(payout_stripe_fee, 0) + COALESCE(payout_label_cost, 0) + COALESCE(payout_commission_amount, 0)
+          ELSE (total_price - platform_fee)
+        END), 0) as total_gross_earnings,
+        COALESCE(SUM(COALESCE(payout_amount, artist_earnings)), 0) as total_net_earnings,
+        COALESCE(SUM(COALESCE(payout_stripe_fee, 0)), 0) as total_stripe_fees,
+        COALESCE(SUM(COALESCE(payout_label_cost, 0)), 0) as total_label_costs,
+        COALESCE(SUM(COALESCE(payout_commission_amount, 0)), 0) as total_commission,
+        COALESCE(SUM(COALESCE(payout_stripe_fee, 0) + COALESCE(payout_label_cost, 0) + COALESCE(payout_commission_amount, 0)), 0) as total_deductions,
         COUNT(*) as total_orders,
-        COALESCE(AVG(artist_earnings), 0) as avg_order_value,
-        COALESCE(SUM(CASE WHEN created_at >= ? THEN artist_earnings ELSE 0 END), 0) as this_month,
-        COALESCE(SUM(CASE WHEN created_at >= ? AND created_at < ? THEN artist_earnings ELSE 0 END), 0) as last_month,
-        COALESCE(SUM(CASE WHEN created_at >= ? THEN artist_earnings ELSE 0 END), 0) as ytd
+        COALESCE(AVG(COALESCE(payout_amount, artist_earnings)), 0) as avg_order_value,
+        COALESCE(SUM(CASE WHEN created_at >= ? THEN COALESCE(payout_amount, artist_earnings) ELSE 0 END), 0) as this_month,
+        COALESCE(SUM(CASE WHEN created_at >= ? AND created_at < ? THEN COALESCE(payout_amount, artist_earnings) ELSE 0 END), 0) as last_month,
+        COALESCE(SUM(CASE WHEN created_at >= ? THEN COALESCE(payout_amount, artist_earnings) ELSE 0 END), 0) as ytd
        FROM orders
        WHERE seller_id = ? AND status NOT IN ('cancelled')`,
       [thisMonthStart, lastMonthStart, lastMonthEnd, ytdStart, userId]
@@ -221,7 +229,14 @@ router.get('/:cognitoUsername/analytics', async (req, res) => {
 
     const [revenueOverTime] = await pool.execute(
       `SELECT DATE_FORMAT(created_at, '%Y-%m') as month,
-              COALESCE(SUM(artist_earnings), 0) as earnings,
+              COALESCE(SUM(CASE
+                WHEN payout_amount IS NOT NULL THEN payout_amount + COALESCE(payout_stripe_fee, 0) + COALESCE(payout_label_cost, 0) + COALESCE(payout_commission_amount, 0)
+                ELSE (total_price - platform_fee)
+              END), 0) as gross_earnings,
+              COALESCE(SUM(COALESCE(payout_amount, artist_earnings)), 0) as net_earnings,
+              COALESCE(SUM(COALESCE(payout_stripe_fee, 0)), 0) as stripe_fees,
+              COALESCE(SUM(COALESCE(payout_label_cost, 0)), 0) as label_costs,
+              COALESCE(SUM(COALESCE(payout_commission_amount, 0)), 0) as commission_costs,
               COUNT(*) as orders
        FROM orders
        WHERE seller_id = ? AND status NOT IN ('cancelled')
@@ -233,7 +248,7 @@ router.get('/:cognitoUsername/analytics', async (req, res) => {
 
     const [topListings] = await pool.execute(
       `SELECT l.id, l.title, l.primary_image_url, l.category,
-              COALESCE(SUM(o.artist_earnings), 0) as total_revenue,
+              COALESCE(SUM(COALESCE(o.payout_amount, o.artist_earnings)), 0) as total_revenue,
               COUNT(o.id) as order_count
        FROM orders o
        JOIN listings l ON o.listing_id = l.id
@@ -246,7 +261,7 @@ router.get('/:cognitoUsername/analytics', async (req, res) => {
 
     const [revenueByCategory] = await pool.execute(
       `SELECT l.category,
-              COALESCE(SUM(o.artist_earnings), 0) as earnings,
+              COALESCE(SUM(COALESCE(o.payout_amount, o.artist_earnings)), 0) as earnings,
               COUNT(o.id) as orders
        FROM orders o
        JOIN listings l ON o.listing_id = l.id
@@ -256,9 +271,99 @@ router.get('/:cognitoUsername/analytics', async (req, res) => {
       [userId]
     );
 
+    const [funnelViews] = await pool.execute(
+      `SELECT COALESCE(SUM(views), 0) as views
+       FROM listings
+       WHERE user_id = ?`,
+      [userId]
+    );
+
+    const [funnelLikes] = await pool.execute(
+      `SELECT COUNT(*) as likes
+       FROM likes lk
+       JOIN listings li ON lk.listing_id = li.id
+       WHERE li.user_id = ?`,
+      [userId]
+    );
+
+    const [funnelInquiries] = await pool.execute(
+      `SELECT COUNT(DISTINCT c.id) as inquiries
+       FROM chat_conversations c
+       JOIN listings l ON c.listing_id = l.id
+       WHERE l.user_id = ?`,
+      [userId]
+    );
+
+    const [funnelOrders] = await pool.execute(
+      `SELECT COUNT(*) as orders
+       FROM orders
+       WHERE seller_id = ? AND status IN ('paid', 'shipped', 'delivered')`,
+      [userId]
+    );
+
+    const viewsCount = Number(funnelViews[0]?.views || 0);
+    const likesCount = Number(funnelLikes[0]?.likes || 0);
+    const inquiriesCount = Number(funnelInquiries[0]?.inquiries || 0);
+    const ordersCount = Number(funnelOrders[0]?.orders || 0);
+    const benchmarkConversionRate = viewsCount > 0 ? ordersCount / viewsCount : 0.01;
+
+    const [missedOpportunities] = await pool.execute(
+      `SELECT
+          l.id,
+          l.title,
+          l.price,
+          l.views,
+          l.status,
+          COUNT(o.id) as orders_count
+       FROM listings l
+       LEFT JOIN orders o ON o.listing_id = l.id AND o.status IN ('paid', 'shipped', 'delivered')
+       WHERE l.user_id = ?
+       GROUP BY l.id, l.title, l.price, l.views, l.status
+       HAVING l.views >= 20
+       ORDER BY l.views DESC, orders_count ASC
+       LIMIT 20`,
+      [userId]
+    );
+
+    const [pricingInsights] = await pool.execute(
+      `SELECT
+          l.id,
+          l.title,
+          l.category,
+          l.medium,
+          l.price,
+          l.views,
+          COUNT(o.id) as sold_orders,
+          cat.market_avg_price,
+          cat.market_sales
+       FROM listings l
+       LEFT JOIN orders o ON o.listing_id = l.id AND o.status IN ('paid', 'shipped', 'delivered')
+       LEFT JOIN (
+         SELECT l2.category, AVG(o2.unit_price) as market_avg_price, COUNT(*) as market_sales
+         FROM orders o2
+         JOIN listings l2 ON o2.listing_id = l2.id
+         WHERE o2.status IN ('paid', 'shipped', 'delivered')
+         GROUP BY l2.category
+       ) cat ON cat.category = l.category
+       WHERE l.user_id = ? AND l.status IN ('active', 'inactive')
+       GROUP BY l.id, l.title, l.category, l.medium, l.price, l.views, cat.market_avg_price, cat.market_sales
+       ORDER BY l.views DESC, l.created_at DESC
+       LIMIT 12`,
+      [userId]
+    );
+
     res.json({
       summary: {
-        totalEarnings: parseFloat(summary[0].total_earnings),
+        totalEarnings: parseFloat(summary[0].total_net_earnings),
+        totalGrossEarnings: parseFloat(summary[0].total_gross_earnings),
+        totalNetEarnings: parseFloat(summary[0].total_net_earnings),
+        totalStripeFees: parseFloat(summary[0].total_stripe_fees),
+        totalLabelCosts: parseFloat(summary[0].total_label_costs),
+        totalCommission: parseFloat(summary[0].total_commission),
+        totalDeductions: parseFloat(summary[0].total_deductions),
+        netMarginPercent: parseFloat(summary[0].total_gross_earnings) > 0
+          ? (parseFloat(summary[0].total_net_earnings) / parseFloat(summary[0].total_gross_earnings)) * 100
+          : 0,
         totalOrders: summary[0].total_orders,
         avgOrderValue: parseFloat(summary[0].avg_order_value),
         thisMonth: parseFloat(summary[0].this_month),
@@ -267,7 +372,12 @@ router.get('/:cognitoUsername/analytics', async (req, res) => {
       },
       revenueOverTime: revenueOverTime.map(r => ({
         month: r.month,
-        earnings: parseFloat(r.earnings),
+        earnings: parseFloat(r.net_earnings),
+        grossEarnings: parseFloat(r.gross_earnings),
+        netEarnings: parseFloat(r.net_earnings),
+        stripeFees: parseFloat(r.stripe_fees),
+        labelCosts: parseFloat(r.label_costs),
+        commissionCosts: parseFloat(r.commission_costs),
         orders: r.orders,
       })),
       topListings: topListings.map(l => ({
@@ -283,6 +393,62 @@ router.get('/:cognitoUsername/analytics', async (req, res) => {
         earnings: parseFloat(c.earnings),
         orders: c.orders,
       })),
+      conversionFunnel: {
+        views: viewsCount,
+        likes: likesCount,
+        inquiries: inquiriesCount,
+        orders: ordersCount,
+        viewToLikeRate: viewsCount > 0 ? (likesCount / viewsCount) * 100 : 0,
+        likeToInquiryRate: likesCount > 0 ? (inquiriesCount / likesCount) * 100 : 0,
+        inquiryToOrderRate: inquiriesCount > 0 ? (ordersCount / inquiriesCount) * 100 : 0,
+        viewToOrderRate: viewsCount > 0 ? (ordersCount / viewsCount) * 100 : 0,
+      },
+      missedRevenueOpportunities: (missedOpportunities || [])
+        .map((item) => {
+          const price = parseFloat(item.price) || 0;
+          const views = Number(item.views || 0);
+          const ordersForListing = Number(item.orders_count || 0);
+          const expectedOrders = views * benchmarkConversionRate;
+          const potentialIncrementalOrders = Math.max(0, expectedOrders - ordersForListing);
+          return {
+            id: item.id,
+            title: item.title,
+            status: item.status,
+            views,
+            currentOrders: ordersForListing,
+            estimatedExtraOrders: potentialIncrementalOrders,
+            estimatedExtraRevenue: potentialIncrementalOrders * price,
+          };
+        })
+        .sort((a, b) => b.estimatedExtraRevenue - a.estimatedExtraRevenue)
+        .slice(0, 6),
+      pricingIntelligence: (pricingInsights || []).map((item) => {
+        const price = parseFloat(item.price) || 0;
+        const marketAvgPrice = item.market_avg_price != null ? parseFloat(item.market_avg_price) : null;
+        const soldOrders = Number(item.sold_orders || 0);
+        const views = Number(item.views || 0);
+        const listingConversionRate = views > 0 ? (soldOrders / views) * 100 : 0;
+        const suggestedMin = marketAvgPrice != null ? marketAvgPrice * 0.9 : null;
+        const suggestedMax = marketAvgPrice != null ? marketAvgPrice * 1.1 : null;
+        const priceDeltaPercent = marketAvgPrice && marketAvgPrice > 0
+          ? ((price - marketAvgPrice) / marketAvgPrice) * 100
+          : null;
+        return {
+          id: item.id,
+          title: item.title,
+          category: item.category || 'Uncategorized',
+          medium: item.medium || '',
+          listingPrice: price,
+          marketAvgPrice,
+          suggestedMin,
+          suggestedMax,
+          priceDeltaPercent,
+          listingConversionRate,
+          soldOrders,
+          views,
+          marketSales: Number(item.market_sales || 0),
+        };
+      }),
     });
   } catch (error) {
     console.error('Error fetching analytics:', error);

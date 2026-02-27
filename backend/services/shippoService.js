@@ -65,6 +65,19 @@ export async function purchaseLabel(rateId) {
     rate: rateId,
     async: false,
   });
+  const txStatus = String(transaction.status || '').toUpperCase();
+  if (txStatus && txStatus !== 'SUCCESS') {
+    const txMessage = Array.isArray(transaction.messages) && transaction.messages.length > 0
+      ? transaction.messages.map((m) => m?.text || m?.message || '').filter(Boolean).join('; ')
+      : (transaction.object_state || transaction.status || 'Unknown transaction status');
+    throw new Error(`Shippo transaction failed: ${txMessage}`);
+  }
+  if (!transaction.label_url) {
+    throw new Error('Shippo did not return a label URL for this rate. Please refresh rates and try again.');
+  }
+  if (!transaction.tracking_number) {
+    throw new Error('Shippo did not return a tracking number for this label.');
+  }
 
   return {
     transactionId: transaction.object_id,

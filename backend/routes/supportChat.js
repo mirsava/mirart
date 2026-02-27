@@ -3,6 +3,42 @@ import pool from '../config/database.js';
 
 const router = express.Router();
 
+router.get('/payout-config', async (_req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      "SELECT setting_value FROM site_settings WHERE setting_key = 'payout_config'"
+    );
+    if (rows.length === 0) {
+      return res.json({ commission_percent: 10 });
+    }
+    const val = typeof rows[0].setting_value === 'string' ? JSON.parse(rows[0].setting_value) : rows[0].setting_value;
+    const commission = Number(val?.commission_percent);
+    const commissionPercent = Number.isFinite(commission) ? Math.min(100, Math.max(0, commission)) : 10;
+    res.json({ commission_percent: commissionPercent });
+  } catch (error) {
+    console.error('Error fetching payout config:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/payout-config', async (req, res) => {
+  try {
+    const commissionRaw = Number(req.body?.commission_percent);
+    if (!Number.isFinite(commissionRaw) || commissionRaw < 0 || commissionRaw > 100) {
+      return res.status(400).json({ error: 'commission_percent must be a number between 0 and 100' });
+    }
+    const config = { commission_percent: Number(commissionRaw.toFixed(2)) };
+    await pool.execute(
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('payout_config', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
+      [JSON.stringify(config), JSON.stringify(config)]
+    );
+    res.json({ success: true, ...config });
+  } catch (error) {
+    console.error('Error updating payout config:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/config', async (req, res) => {
   try {
     const [rows] = await pool.execute(

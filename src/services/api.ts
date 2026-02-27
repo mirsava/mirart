@@ -84,6 +84,11 @@ export interface Order {
   return_requested_at?: string;
   shipping_address?: string;
   shipping_cost?: number;
+  payout_amount?: number | null;
+  payout_stripe_fee?: number | null;
+  payout_label_cost?: number | null;
+  payout_commission_percent?: number | null;
+  payout_commission_amount?: number | null;
   shippo_rate_id?: string;
   shipping_carrier?: string;
   tracking_number?: string;
@@ -336,15 +341,65 @@ class ApiService {
   async getArtistAnalytics(cognitoUsername: string): Promise<{
     summary: {
       totalEarnings: number;
+      totalGrossEarnings: number;
+      totalNetEarnings: number;
+      totalStripeFees: number;
+      totalLabelCosts: number;
+      totalCommission: number;
+      totalDeductions: number;
+      netMarginPercent: number;
       totalOrders: number;
       avgOrderValue: number;
       thisMonth: number;
       lastMonth: number;
       ytd: number;
     };
-    revenueOverTime: { month: string; earnings: number; orders: number }[];
+    revenueOverTime: {
+      month: string;
+      earnings: number;
+      grossEarnings: number;
+      netEarnings: number;
+      stripeFees: number;
+      labelCosts: number;
+      commissionCosts: number;
+      orders: number;
+    }[];
     topListings: { id: number; title: string; primaryImageUrl: string; category: string; totalRevenue: number; orderCount: number }[];
     revenueByCategory: { category: string; earnings: number; orders: number }[];
+    conversionFunnel: {
+      views: number;
+      likes: number;
+      inquiries: number;
+      orders: number;
+      viewToLikeRate: number;
+      likeToInquiryRate: number;
+      inquiryToOrderRate: number;
+      viewToOrderRate: number;
+    };
+    missedRevenueOpportunities: Array<{
+      id: number;
+      title: string;
+      status: string;
+      views: number;
+      currentOrders: number;
+      estimatedExtraOrders: number;
+      estimatedExtraRevenue: number;
+    }>;
+    pricingIntelligence: Array<{
+      id: number;
+      title: string;
+      category: string;
+      medium: string;
+      listingPrice: number;
+      marketAvgPrice: number | null;
+      suggestedMin: number | null;
+      suggestedMax: number | null;
+      priceDeltaPercent: number | null;
+      listingConversionRate: number;
+      soldOrders: number;
+      views: number;
+      marketSales: number;
+    }>;
   }> {
     return this.request(`/dashboard/${cognitoUsername}/analytics`);
   }
@@ -372,10 +427,14 @@ class ApiService {
     return this.request<any>(`/orders/${orderId}?cognitoUsername=${cognitoUsername}`);
   }
 
-  async markOrderShipped(orderId: number, cognitoUsername: string): Promise<{ success: boolean; status: string }> {
+  async markOrderShipped(
+    orderId: number,
+    cognitoUsername: string,
+    options?: { tracking_number?: string; tracking_url?: string; shipping_carrier?: string }
+  ): Promise<{ success: boolean; status: string }> {
     return this.request(`/orders/${orderId}/mark-shipped`, {
       method: 'PUT',
-      body: JSON.stringify({ cognito_username: cognitoUsername }),
+      body: JSON.stringify({ cognito_username: cognitoUsername, ...(options || {}) }),
     });
   }
 
@@ -999,6 +1058,17 @@ class ApiService {
     return this.request<{ success: boolean }>('/support-chat/config', {
       method: 'PUT',
       body: JSON.stringify(config),
+    });
+  }
+
+  async getPayoutConfig(): Promise<{ commission_percent: number }> {
+    return this.request<{ commission_percent: number }>('/support-chat/payout-config');
+  }
+
+  async updatePayoutConfig(commission_percent: number): Promise<{ success: boolean; commission_percent: number }> {
+    return this.request<{ success: boolean; commission_percent: number }>('/support-chat/payout-config', {
+      method: 'PUT',
+      body: JSON.stringify({ commission_percent }),
     });
   }
 

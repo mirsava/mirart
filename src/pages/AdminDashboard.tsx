@@ -209,6 +209,8 @@ const AdminDashboard: React.FC = () => {
   const [userChatLoading, setUserChatLoading] = useState(false);
   const [testDataEnabled, setTestDataEnabled] = useState(false);
   const [testDataLoading, setTestDataLoading] = useState(false);
+  const [payoutConfig, setPayoutConfig] = useState<{ commission_percent: number }>({ commission_percent: 10 });
+  const [savingPayoutConfig, setSavingPayoutConfig] = useState(false);
   const [stripePlans, setStripePlans] = useState<any[]>([]);
   const [loadingStripePlans, setLoadingStripePlans] = useState(false);
   const [syncingPlans, setSyncingPlans] = useState(false);
@@ -234,6 +236,13 @@ const AdminDashboard: React.FC = () => {
     try {
       const config = await apiService.getSupportChatConfig();
       setSupportChatConfig(config);
+    } catch {}
+  };
+
+  const fetchPayoutConfig = async () => {
+    try {
+      const config = await apiService.getPayoutConfig();
+      setPayoutConfig({ commission_percent: Number(config?.commission_percent ?? 10) });
     } catch {}
   };
 
@@ -767,6 +776,7 @@ const AdminDashboard: React.FC = () => {
       fetchUserChatEnabled();
       fetchSupportConfig();
       fetchTestDataEnabled();
+      fetchPayoutConfig();
     }
     if (section === 'plans') {
       fetchStripePlans();
@@ -2554,6 +2564,48 @@ const AdminDashboard: React.FC = () => {
                     }}
                     disabled={userChatLoading}
                   />
+                </Box>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>Seller Payout Commission</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Commission percent deducted from seller earnings during payout confirmation.
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                  <TextField
+                    label="Commission %"
+                    type="number"
+                    size="small"
+                    value={payoutConfig.commission_percent}
+                    onChange={(e) => setPayoutConfig((prev) => ({ ...prev, commission_percent: Number(e.target.value) }))}
+                    inputProps={{ min: 0, max: 100, step: 0.1 }}
+                    sx={{ width: 160 }}
+                  />
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disabled={savingPayoutConfig}
+                    onClick={async () => {
+                      const value = Number(payoutConfig.commission_percent);
+                      if (!Number.isFinite(value) || value < 0 || value > 100) {
+                        enqueueSnackbar('Commission must be between 0 and 100', { variant: 'error' });
+                        return;
+                      }
+                      setSavingPayoutConfig(true);
+                      try {
+                        const result = await apiService.updatePayoutConfig(value);
+                        setPayoutConfig({ commission_percent: Number(result.commission_percent) });
+                        enqueueSnackbar('Payout commission saved', { variant: 'success' });
+                      } catch (error: any) {
+                        enqueueSnackbar(error?.message || 'Failed to save payout commission', { variant: 'error' });
+                      } finally {
+                        setSavingPayoutConfig(false);
+                      }
+                    }}
+                  >
+                    Save Commission
+                  </Button>
                 </Box>
               </Paper>
 

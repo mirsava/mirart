@@ -379,7 +379,11 @@ app.listen(PORT, async () => {
 
   try {
     const trackingCols = [
+      { name: 'shipping_cost', sql: "ADD COLUMN shipping_cost DECIMAL(10, 2) DEFAULT 0" },
       { name: 'shipping_carrier', sql: "ADD COLUMN shipping_carrier VARCHAR(50) NULL" },
+      { name: 'tracking_number', sql: "ADD COLUMN tracking_number VARCHAR(100) NULL" },
+      { name: 'tracking_url', sql: "ADD COLUMN tracking_url VARCHAR(500) NULL" },
+      { name: 'label_url', sql: "ADD COLUMN label_url VARCHAR(500) NULL" },
       { name: 'tracking_status', sql: "ADD COLUMN tracking_status VARCHAR(50) NULL" },
       { name: 'tracking_last_updated', sql: "ADD COLUMN tracking_last_updated TIMESTAMP NULL" },
       { name: 'shipped_at', sql: "ADD COLUMN shipped_at TIMESTAMP NULL" },
@@ -399,6 +403,28 @@ app.listen(PORT, async () => {
     }
   } catch (err) {
     console.warn('[Startup] Tracking columns migration:', err?.message || err);
+  }
+
+  try {
+    const payoutCols = [
+      { name: 'payout_amount', sql: "ADD COLUMN payout_amount DECIMAL(10, 2) NULL" },
+      { name: 'payout_stripe_fee', sql: "ADD COLUMN payout_stripe_fee DECIMAL(10, 2) NULL" },
+      { name: 'payout_label_cost', sql: "ADD COLUMN payout_label_cost DECIMAL(10, 2) NULL" },
+      { name: 'payout_commission_percent', sql: "ADD COLUMN payout_commission_percent DECIMAL(5, 2) NULL" },
+      { name: 'payout_commission_amount', sql: "ADD COLUMN payout_commission_amount DECIMAL(10, 2) NULL" },
+    ];
+    for (const { name, sql } of payoutCols) {
+      const [pc] = await pool.execute(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'orders' AND COLUMN_NAME = ?",
+        [process.env.DB_NAME || 'mirart', name]
+      );
+      if (pc.length === 0) {
+        await pool.execute(`ALTER TABLE orders ${sql}`);
+        console.log(`[Startup] Added ${name} column to orders`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Startup] Payout columns migration:', err?.message || err);
   }
 
   try {

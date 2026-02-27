@@ -60,8 +60,8 @@ import { useSnackbar } from 'notistack';
 import apiService, { DashboardData, Listing, Order, User, UserSubscription } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import OrderCardComponent from '../components/OrderCard';
-import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButtonGroup, ToggleButton, useTheme, LinearProgress } from '@mui/material';
-import { Lock as LockIcon, AttachMoney as AttachMoneyIcon, CalendarMonth as CalendarMonthIcon, ShowChart as ShowChartIcon } from '@mui/icons-material';
+import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButtonGroup, ToggleButton, useTheme, LinearProgress, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
+import { Lock as LockIcon, AttachMoney as AttachMoneyIcon, CalendarMonth as CalendarMonthIcon, ShowChart as ShowChartIcon, ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
 import ImagePlaceholder from '../components/ImagePlaceholder';
@@ -205,12 +205,76 @@ const ArtistDashboard: React.FC = () => {
   const [labelPurchasing, setLabelPurchasing] = useState(false);
   const [orderActionLoading, setOrderActionLoading] = useState<number | null>(null);
   const [analyticsData, setAnalyticsData] = useState<{
-    summary: { totalEarnings: number; totalOrders: number; avgOrderValue: number; thisMonth: number; lastMonth: number; ytd: number };
-    revenueOverTime: { month: string; earnings: number; orders: number }[];
+    summary: {
+      totalEarnings: number;
+      totalGrossEarnings: number;
+      totalNetEarnings: number;
+      totalStripeFees: number;
+      totalLabelCosts: number;
+      totalCommission: number;
+      totalDeductions: number;
+      netMarginPercent: number;
+      totalOrders: number;
+      avgOrderValue: number;
+      thisMonth: number;
+      lastMonth: number;
+      ytd: number;
+    };
+    revenueOverTime: {
+      month: string;
+      earnings: number;
+      grossEarnings: number;
+      netEarnings: number;
+      stripeFees: number;
+      labelCosts: number;
+      commissionCosts: number;
+      orders: number;
+    }[];
     topListings: { id: number; title: string; primaryImageUrl: string; category: string; totalRevenue: number; orderCount: number }[];
     revenueByCategory: { category: string; earnings: number; orders: number }[];
+    conversionFunnel: {
+      views: number;
+      likes: number;
+      inquiries: number;
+      orders: number;
+      viewToLikeRate: number;
+      likeToInquiryRate: number;
+      inquiryToOrderRate: number;
+      viewToOrderRate: number;
+    };
+    missedRevenueOpportunities: Array<{
+      id: number;
+      title: string;
+      status: string;
+      views: number;
+      currentOrders: number;
+      estimatedExtraOrders: number;
+      estimatedExtraRevenue: number;
+    }>;
+    pricingIntelligence: Array<{
+      id: number;
+      title: string;
+      category: string;
+      medium: string;
+      listingPrice: number;
+      marketAvgPrice: number | null;
+      suggestedMin: number | null;
+      suggestedMax: number | null;
+      priceDeltaPercent: number | null;
+      listingConversionRate: number;
+      soldOrders: number;
+      views: number;
+      marketSales: number;
+    }>;
   } | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [monthlyNetGoal, setMonthlyNetGoal] = useState<number>(0);
+  const [analyticsPanelsOpen, setAnalyticsPanelsOpen] = useState({
+    funnel: true,
+    opportunities: true,
+    goal: true,
+    pricing: true,
+  });
 
   const filterDashboardOrders = (orders: Order[]) => {
     return orders.filter((order) => {
@@ -235,6 +299,15 @@ const ArtistDashboard: React.FC = () => {
   const safeSalesPage = Math.min(ordersSalesPage, salesTotalPages || 1);
   const paginatedPurchases = filteredPurchasesOrders.slice((safePurchasePage - 1) * ordersPerPage, safePurchasePage * ordersPerPage);
   const paginatedSales = filteredSalesOrders.slice((safeSalesPage - 1) * ordersPerPage, safeSalesPage * ordersPerPage);
+  const isShippingAddressComplete = Boolean(
+    profileFormData.addressLine1.trim() &&
+    profileFormData.addressCity.trim() &&
+    profileFormData.addressState.trim() &&
+    profileFormData.addressZip.trim() &&
+    profileFormData.addressCountry.trim()
+  );
+  const shippingProfileComplete = profileData ? isShippingAddressComplete : undefined;
+  const needsShippingProfile = shippingProfileComplete === false;
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [returnOrder, setReturnOrder] = useState<Order | null>(null);
   const [returnReason, setReturnReason] = useState('');
@@ -253,6 +326,38 @@ const ArtistDashboard: React.FC = () => {
       setLoadingAnalytics(false);
     }
   };
+  const handleToggleAnalyticsPanel = (panel: 'funnel' | 'opportunities' | 'goal' | 'pricing') =>
+    (_event: React.SyntheticEvent, expanded: boolean) => {
+      setAnalyticsPanelsOpen((prev) => ({ ...prev, [panel]: expanded }));
+    };
+
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const storedGoal = localStorage.getItem(`artistMonthlyNetGoal:${user.id}`);
+      if (storedGoal) {
+        const parsed = Number(storedGoal);
+        if (Number.isFinite(parsed) && parsed > 0) setMonthlyNetGoal(parsed);
+      }
+    } catch {}
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !Number.isFinite(monthlyNetGoal) || monthlyNetGoal <= 0) return;
+    try {
+      localStorage.setItem(`artistMonthlyNetGoal:${user.id}`, String(monthlyNetGoal));
+    } catch {}
+  }, [user?.id, monthlyNetGoal]);
+
+  useEffect(() => {
+    if (!analyticsData || monthlyNetGoal > 0) return;
+    const suggested = Math.max(
+      Math.ceil(analyticsData.summary.lastMonth || 0),
+      Math.ceil(analyticsData.summary.thisMonth || 0),
+      1000
+    );
+    setMonthlyNetGoal(suggested);
+  }, [analyticsData, monthlyNetGoal]);
 
   useEffect(() => {
     if (user?.id) {
@@ -394,8 +499,8 @@ const ArtistDashboard: React.FC = () => {
     try {
       const { rates } = await apiService.getShippingRatesForOrder(order.id, user!.id);
       setLabelRates(rates || []);
-    } catch {
-      enqueueSnackbar('Failed to get shipping rates', { variant: 'error' });
+    } catch (err: any) {
+      enqueueSnackbar(err?.message || 'Failed to get shipping rates', { variant: 'error' });
     } finally {
       setLabelLoading(false);
     }
@@ -419,11 +524,15 @@ const ArtistDashboard: React.FC = () => {
     }
   };
 
-  const handleMarkShipped = async (orderId: number) => {
+  const handleMarkShipped = async (orderId: number, trackingNumber?: string, trackingUrl?: string) => {
     if (!user?.id) return;
     setOrderActionLoading(orderId);
     try {
-      await apiService.markOrderShipped(orderId, user.id);
+      await apiService.markOrderShipped(orderId, user.id, {
+        shipping_carrier: 'own',
+        tracking_number: trackingNumber,
+        tracking_url: trackingUrl,
+      });
       await refreshOrders();
       enqueueSnackbar('Order marked as shipped', { variant: 'success' });
     } catch (err: any) {
@@ -1356,6 +1465,19 @@ const ArtistDashboard: React.FC = () => {
                 </Box>
               </Box>
             </Box>
+            {needsShippingProfile && (
+              <Alert
+                severity="warning"
+                sx={{ mb: 2 }}
+                action={
+                  <Button color="inherit" size="small" onClick={() => setTabValue(4)}>
+                    Complete profile
+                  </Button>
+                }
+              >
+                Your shipping address is incomplete. Complete it in Profile so you can buy labels and fulfill orders without issues.
+              </Alert>
+            )}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1, alignItems: 'center' }}>
               <TextField
                 size="small"
@@ -1431,6 +1553,8 @@ const ArtistDashboard: React.FC = () => {
                           type="purchase"
                           actionLoading={orderActionLoading}
                           shippingConfigured={shippingConfigured}
+                        shippingCarrierPreference={settings.default_shipping_carrier}
+                        shippingProfileComplete={shippingProfileComplete}
                           onConfirmDelivery={handleConfirmDelivery}
                           onOpenLabelDialog={handleOpenLabelDialog}
                           onMarkShipped={handleMarkShipped}
@@ -1482,6 +1606,8 @@ const ArtistDashboard: React.FC = () => {
                         type="sale"
                         actionLoading={orderActionLoading}
                         shippingConfigured={shippingConfigured}
+                        shippingCarrierPreference={settings.default_shipping_carrier}
+                        shippingProfileComplete={shippingProfileComplete}
                         onMarkShipped={handleMarkShipped}
                         onOpenLabelDialog={handleOpenLabelDialog}
                         onRespondReturn={handleRespondReturn}
@@ -1530,14 +1656,17 @@ const ArtistDashboard: React.FC = () => {
 
                 <Grid container spacing={2} sx={{ mb: 4 }}>
                   {[
-                    { label: 'Total Earnings', value: `$${analyticsData.summary.totalEarnings.toFixed(2)}`, icon: <AttachMoneyIcon /> },
+                    { label: 'Total Net Payout', value: `$${analyticsData.summary.totalNetEarnings.toFixed(2)}`, icon: <AttachMoneyIcon /> },
+                    { label: 'Total Gross Earnings', value: `$${analyticsData.summary.totalGrossEarnings.toFixed(2)}`, icon: <BarChartIcon /> },
+                    { label: 'Total Deductions', value: `$${analyticsData.summary.totalDeductions.toFixed(2)}`, icon: <ReceiptIcon /> },
+                    { label: 'Net Margin', value: `${analyticsData.summary.netMarginPercent.toFixed(1)}%`, icon: <TrendingUpIcon /> },
                     { label: 'This Month', value: `$${analyticsData.summary.thisMonth.toFixed(2)}`, icon: <CalendarMonthIcon /> },
                     { label: 'Last Month', value: `$${analyticsData.summary.lastMonth.toFixed(2)}`, icon: <CalendarMonthIcon /> },
                     { label: 'Year to Date', value: `$${analyticsData.summary.ytd.toFixed(2)}`, icon: <TrendingUpIcon /> },
                     { label: 'Avg Order Value', value: `$${analyticsData.summary.avgOrderValue.toFixed(2)}`, icon: <ReceiptIcon /> },
                     { label: 'Total Orders', value: String(analyticsData.summary.totalOrders), icon: <ShoppingBagIcon /> },
                   ].map((stat) => (
-                    <Grid item xs={6} sm={4} md={2} key={stat.label}>
+                    <Grid item xs={6} sm={4} md={3} key={stat.label}>
                       <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2, textAlign: 'center' }}>
                         <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32, mx: 'auto', mb: 1 }}>
                           {React.cloneElement(stat.icon, { sx: { fontSize: 18 } })}
@@ -1549,8 +1678,25 @@ const ArtistDashboard: React.FC = () => {
                   ))}
                 </Grid>
 
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                  {[
+                    { label: 'Stripe Fees', value: analyticsData.summary.totalStripeFees },
+                    { label: 'Label Costs', value: analyticsData.summary.totalLabelCosts },
+                    { label: 'Commission', value: analyticsData.summary.totalCommission },
+                  ].map((deduction) => (
+                    <Grid item xs={12} sm={4} key={deduction.label}>
+                      <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                        <Typography variant="caption" color="text.secondary">{deduction.label}</Typography>
+                        <Typography variant="h6" fontWeight={700} color="error.main">
+                          -${deduction.value.toFixed(2)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+
                 <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 4 }}>
-                  <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>Monthly Earnings (Last 12 Months)</Typography>
+                  <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>Monthly Gross vs Net (Last 12 Months)</Typography>
                   {analyticsData.revenueOverTime.length === 0 ? (
                     <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>No revenue data yet</Typography>
                   ) : (
@@ -1570,14 +1716,21 @@ const ArtistDashboard: React.FC = () => {
                           tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
                         />
                         <RechartsTooltip
-                          formatter={(value: number) => [`$${value.toFixed(2)}`, 'Earnings']}
+                          formatter={(value: number, name: string) => {
+                            const labels: Record<string, string> = {
+                              grossEarnings: 'Gross',
+                              netEarnings: 'Net',
+                            };
+                            return [`$${value.toFixed(2)}`, labels[name] || name];
+                          }}
                           labelFormatter={(label: string) => {
                             const [y, m] = label.split('-');
                             return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
                           }}
                           contentStyle={{ backgroundColor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: 8 }}
                         />
-                        <Bar dataKey="earnings" radius={[4, 4, 0, 0]} fill={theme.palette.primary.main} />
+                        <Bar dataKey="grossEarnings" name="grossEarnings" radius={[4, 4, 0, 0]} fill={theme.palette.grey[500]} />
+                        <Bar dataKey="netEarnings" name="netEarnings" radius={[4, 4, 0, 0]} fill={theme.palette.primary.main} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -1659,6 +1812,192 @@ const ArtistDashboard: React.FC = () => {
                     </Paper>
                   </Grid>
                 </Grid>
+
+                <Box sx={{ mt: 4 }}>
+                  <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+                    Growth Insights
+                  </Typography>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={4}>
+                      <Accordion
+                        disableGutters
+                        expanded={analyticsPanelsOpen.funnel}
+                        onChange={handleToggleAnalyticsPanel('funnel')}
+                        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, boxShadow: 'none', '&:before': { display: 'none' } }}
+                      >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                          <Typography variant="subtitle1" fontWeight={600}>Conversion Funnel</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          {[
+                            { label: 'Views', value: analyticsData.conversionFunnel.views },
+                            { label: 'Likes', value: analyticsData.conversionFunnel.likes },
+                            { label: 'Inquiries', value: analyticsData.conversionFunnel.inquiries },
+                            { label: 'Orders', value: analyticsData.conversionFunnel.orders },
+                          ].map((stage) => (
+                            <Box key={stage.label} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.75 }}>
+                              <Typography variant="body2" color="text.secondary">{stage.label}</Typography>
+                              <Typography variant="body2" fontWeight={600}>{stage.value}</Typography>
+                            </Box>
+                          ))}
+                          <Divider sx={{ my: 1.5 }} />
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            View to Like: {analyticsData.conversionFunnel.viewToLikeRate.toFixed(1)}%
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Like to Inquiry: {analyticsData.conversionFunnel.likeToInquiryRate.toFixed(1)}%
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Inquiry to Order: {analyticsData.conversionFunnel.inquiryToOrderRate.toFixed(1)}%
+                          </Typography>
+                          <Typography variant="caption" color="primary.main" display="block" sx={{ mt: 0.5, fontWeight: 600 }}>
+                            View to Order: {analyticsData.conversionFunnel.viewToOrderRate.toFixed(2)}%
+                          </Typography>
+                        </AccordionDetails>
+                      </Accordion>
+                    </Grid>
+
+                    <Grid item xs={12} md={4}>
+                      <Accordion
+                        disableGutters
+                        expanded={analyticsPanelsOpen.opportunities}
+                        onChange={handleToggleAnalyticsPanel('opportunities')}
+                        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, boxShadow: 'none', '&:before': { display: 'none' } }}
+                      >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                          <Typography variant="subtitle1" fontWeight={600}>Missed Revenue</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          {analyticsData.missedRevenueOpportunities.length === 0 ? (
+                            <Typography variant="body2" color="text.secondary">Not enough listing traffic yet.</Typography>
+                          ) : (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                              {analyticsData.missedRevenueOpportunities.slice(0, 4).map((item) => (
+                                <Box key={item.id} sx={{ p: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+                                  <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>{item.title}</Typography>
+                                  <Typography variant="caption" color="text.secondary" display="block">
+                                    {item.views} views, {item.currentOrders} orders
+                                  </Typography>
+                                  <Typography variant="caption" color="warning.main" sx={{ fontWeight: 600 }}>
+                                    Est. +${item.estimatedExtraRevenue.toFixed(2)}
+                                  </Typography>
+                                </Box>
+                              ))}
+                            </Box>
+                          )}
+                        </AccordionDetails>
+                      </Accordion>
+                    </Grid>
+
+                    <Grid item xs={12} md={4}>
+                      <Accordion
+                        disableGutters
+                        expanded={analyticsPanelsOpen.goal}
+                        onChange={handleToggleAnalyticsPanel('goal')}
+                        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, boxShadow: 'none', '&:before': { display: 'none' } }}
+                      >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                          <Typography variant="subtitle1" fontWeight={600}>Goal Forecast</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          {(() => {
+                            const now = new Date();
+                            const dayOfMonth = now.getDate();
+                            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                            const monthProjected = dayOfMonth > 0 ? (analyticsData.summary.thisMonth / dayOfMonth) * daysInMonth : 0;
+                            const goal = monthlyNetGoal > 0 ? monthlyNetGoal : 0;
+                            const progress = goal > 0 ? Math.min(100, (analyticsData.summary.thisMonth / goal) * 100) : 0;
+                            const remaining = Math.max(0, goal - analyticsData.summary.thisMonth);
+                            const remainingDays = Math.max(1, daysInMonth - dayOfMonth);
+                            const neededPerDay = remaining / remainingDays;
+                            return (
+                              <Box>
+                                <TextField
+                                  label="Monthly Net Goal ($)"
+                                  size="small"
+                                  type="number"
+                                  value={monthlyNetGoal}
+                                  onChange={(e) => setMonthlyNetGoal(Number(e.target.value) || 0)}
+                                  sx={{ mb: 2, width: '100%' }}
+                                />
+                                <Typography variant="body2" color="text.secondary">Current month net</Typography>
+                                <Typography variant="h6" fontWeight={700}>${analyticsData.summary.thisMonth.toFixed(2)}</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Projected month end</Typography>
+                                <Typography variant="h6" fontWeight={700} color="primary.main">${monthProjected.toFixed(2)}</Typography>
+                                <LinearProgress variant="determinate" value={progress} sx={{ mt: 1.5, height: 8, borderRadius: 4 }} />
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
+                                  Goal progress: {progress.toFixed(1)}%
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Needed per day: ${neededPerDay.toFixed(2)} for next {remainingDays} day{remainingDays !== 1 ? 's' : ''}
+                                </Typography>
+                              </Box>
+                            );
+                          })()}
+                        </AccordionDetails>
+                      </Accordion>
+                    </Grid>
+                  </Grid>
+                </Box>
+
+                <Accordion
+                  disableGutters
+                  expanded={analyticsPanelsOpen.pricing}
+                  onChange={handleToggleAnalyticsPanel('pricing')}
+                  sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mt: 3, boxShadow: 'none', '&:before': { display: 'none' } }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="subtitle1" fontWeight={600}>Pricing Intelligence</Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    {analyticsData.pricingIntelligence.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">Not enough pricing data yet.</Typography>
+                    ) : (
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600 }}>Listing</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Your Price</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Market Avg</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Suggested Range</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Price Delta</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600 }}>Conv.</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {analyticsData.pricingIntelligence.slice(0, 8).map((item) => (
+                              <TableRow key={item.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(getPaintingDetailPath(item.id, item.title))}>
+                                <TableCell>
+                                  <Typography variant="body2" noWrap sx={{ maxWidth: 220, fontWeight: 600 }}>{item.title}</Typography>
+                                  <Typography variant="caption" color="text.secondary">{item.category}</Typography>
+                                </TableCell>
+                                <TableCell>${item.listingPrice.toFixed(2)}</TableCell>
+                                <TableCell>{item.marketAvgPrice != null ? `$${item.marketAvgPrice.toFixed(2)}` : 'N/A'}</TableCell>
+                                <TableCell>
+                                  {item.suggestedMin != null && item.suggestedMax != null
+                                    ? `$${item.suggestedMin.toFixed(0)} - $${item.suggestedMax.toFixed(0)}`
+                                    : 'N/A'}
+                                </TableCell>
+                                <TableCell>
+                                  {item.priceDeltaPercent != null ? (
+                                    <Typography
+                                      variant="body2"
+                                      color={item.priceDeltaPercent > 10 ? 'warning.main' : item.priceDeltaPercent < -10 ? 'success.main' : 'text.primary'}
+                                    >
+                                      {item.priceDeltaPercent > 0 ? '+' : ''}{item.priceDeltaPercent.toFixed(1)}%
+                                    </Typography>
+                                  ) : 'N/A'}
+                                </TableCell>
+                                <TableCell align="right">{item.listingConversionRate.toFixed(2)}%</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    )}
+                  </AccordionDetails>
+                </Accordion>
               </Box>
             )}
           </TabPanel>
@@ -1733,83 +2072,6 @@ const ArtistDashboard: React.FC = () => {
                     </Button>
                   )}
                 </Box>
-                <Dialog open={labelDialogOpen} onClose={() => !labelPurchasing && setLabelDialogOpen(false)} maxWidth="sm" fullWidth>
-                  <DialogTitle>Buy shipping label</DialogTitle>
-                  <DialogContent>
-                    {labelOrder && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        {labelOrder.listing_title} → {labelOrder.buyer_email}
-                      </Typography>
-                    )}
-                    {labelLoading ? (
-                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                        <CircularProgress />
-                      </Box>
-                    ) : labelRates.length === 0 ? (
-                      <Alert severity="info">
-                        No shipping rates available. Set your address in Profile Settings and ensure the listing has dimensions.
-                      </Alert>
-                    ) : (
-                      <List>
-                        {labelRates.map((rate) => (
-                          <ListItemButton
-                            key={rate.object_id}
-                            onClick={() => handlePurchaseLabel(rate.object_id)}
-                            disabled={labelPurchasing}
-                          >
-                            <ListItemText
-                              primary={`${rate.provider} - ${rate.servicelevel}`}
-                              secondary={`$${rate.amount}${rate.estimated_days ? ` • ${rate.estimated_days} days` : ''}`}
-                            />
-                          </ListItemButton>
-                        ))}
-                      </List>
-                    )}
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={() => setLabelDialogOpen(false)} disabled={labelPurchasing}>Cancel</Button>
-                  </DialogActions>
-                </Dialog>
-
-                <Dialog open={returnDialogOpen} onClose={() => !returnLoading && setReturnDialogOpen(false)} maxWidth="sm" fullWidth>
-                  <DialogTitle>Request return</DialogTitle>
-                  <DialogContent>
-                    {returnOrder && (
-                      <>
-                        <DialogContentText sx={{ mb: 2 }}>
-                          {returnOrder.listing_title} — Order {returnOrder.order_number}
-                        </DialogContentText>
-                        {returnOrder.returns_info && (
-                          <Alert severity="info" sx={{ mb: 2 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>Seller's return policy</Typography>
-                            {returnOrder.returns_info}
-                          </Alert>
-                        )}
-                        {returnOrder.return_days && (
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Return window: {returnOrder.return_days} days from delivery
-                          </Typography>
-                        )}
-                      </>
-                    )}
-                    <TextField
-                      fullWidth
-                      multiline
-                      minRows={3}
-                      label="Reason for return"
-                      value={returnReason}
-                      onChange={(e) => setReturnReason(e.target.value)}
-                      placeholder="Please describe why you'd like to return this item..."
-                    />
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={() => setReturnDialogOpen(false)} disabled={returnLoading}>Cancel</Button>
-                    <Button onClick={handleSubmitReturn} variant="contained" color="warning" disabled={returnLoading}>
-                      {returnLoading ? 'Submitting...' : 'Submit return request'}
-                    </Button>
-                  </DialogActions>
-                </Dialog>
-
                 <Dialog open={cancelSubscriptionDialogOpen} onClose={() => !cancellingSubscription && setCancelSubscriptionDialogOpen(false)}>
                   <DialogTitle>Cancel subscription?</DialogTitle>
                   <DialogContent>
@@ -1874,6 +2136,11 @@ const ArtistDashboard: React.FC = () => {
             {profileSuccess && (
               <Alert severity="success" sx={{ mb: 3 }} onClose={() => setProfileSuccess(false)}>
                 Profile updated successfully!
+              </Alert>
+            )}
+            {needsShippingProfile && (
+              <Alert severity="warning" sx={{ mb: 3 }}>
+                Shipping address is incomplete. Fill Street, City, State/Province, ZIP/Postal code, and Country to enable shipping workflows.
               </Alert>
             )}
 
@@ -2637,6 +2904,83 @@ const ArtistDashboard: React.FC = () => {
           </>
         )}
       </Box>
+
+        <Dialog open={labelDialogOpen} onClose={() => !labelPurchasing && setLabelDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Buy shipping label</DialogTitle>
+          <DialogContent>
+            {labelOrder && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {labelOrder.listing_title} → {labelOrder.buyer_email}
+              </Typography>
+            )}
+            {labelLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : labelRates.length === 0 ? (
+              <Alert severity="info">
+                No shipping rates available. Set your address in Profile Settings and ensure the listing has dimensions.
+              </Alert>
+            ) : (
+              <List>
+                {labelRates.map((rate) => (
+                  <ListItemButton
+                    key={rate.object_id}
+                    onClick={() => handlePurchaseLabel(rate.object_id)}
+                    disabled={labelPurchasing}
+                  >
+                    <ListItemText
+                      primary={`${rate.provider} - ${rate.servicelevel}`}
+                      secondary={`$${rate.amount}${rate.estimated_days ? ` • ${rate.estimated_days} days` : ''}`}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setLabelDialogOpen(false)} disabled={labelPurchasing}>Cancel</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={returnDialogOpen} onClose={() => !returnLoading && setReturnDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Request return</DialogTitle>
+          <DialogContent>
+            {returnOrder && (
+              <>
+                <DialogContentText sx={{ mb: 2 }}>
+                  {returnOrder.listing_title} — Order {returnOrder.order_number}
+                </DialogContentText>
+                {returnOrder.returns_info && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>Seller's return policy</Typography>
+                    {returnOrder.returns_info}
+                  </Alert>
+                )}
+                {returnOrder.return_days && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Return window: {returnOrder.return_days} days from delivery
+                  </Typography>
+                )}
+              </>
+            )}
+            <TextField
+              fullWidth
+              multiline
+              minRows={3}
+              label="Reason for return"
+              value={returnReason}
+              onChange={(e) => setReturnReason(e.target.value)}
+              placeholder="Please describe why you'd like to return this item..."
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setReturnDialogOpen(false)} disabled={returnLoading}>Cancel</Button>
+            <Button onClick={handleSubmitReturn} variant="contained" color="warning" disabled={returnLoading}>
+              {returnLoading ? 'Submitting...' : 'Submit return request'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Dialog
           open={deleteDialogOpen}

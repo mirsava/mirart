@@ -13,12 +13,14 @@ import {
   DialogContentText,
   DialogActions,
   Divider,
+  TextField,
 } from '@mui/material';
 import {
   LocalShipping as ShippingIcon,
   CheckCircle as CheckCircleIcon,
   Replay as ReturnIcon,
   TrackChanges as TrackIcon,
+  Download as DownloadIcon,
   ThumbUp as ApproveIcon,
   ThumbDown as DenyIcon,
   Receipt as ReceiptIcon,
@@ -65,7 +67,9 @@ export interface OrderCardProps {
   highlighted?: boolean;
   actionLoading?: number | null;
   shippingConfigured?: boolean;
-  onMarkShipped?: (orderId: number) => void;
+  shippingCarrierPreference?: 'shippo' | 'own';
+  shippingProfileComplete?: boolean;
+  onMarkShipped?: (orderId: number, trackingNumber?: string, trackingUrl?: string) => void;
   onOpenLabelDialog?: (order: Order) => void;
   onConfirmDelivery?: (orderId: number) => void;
   onOpenReturnDialog?: (order: Order) => void;
@@ -78,6 +82,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
   highlighted = false,
   actionLoading,
   shippingConfigured,
+  shippingCarrierPreference,
+  shippingProfileComplete,
   onMarkShipped,
   onOpenLabelDialog,
   onConfirmDelivery,
@@ -87,6 +93,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
   const navigate = useNavigate();
   const cardRef = useRef<HTMLDivElement>(null);
   const [confirmDeliveryOpen, setConfirmDeliveryOpen] = useState(false);
+  const [manualShipDialogOpen, setManualShipDialogOpen] = useState(false);
+  const [manualTrackingNumber, setManualTrackingNumber] = useState('');
+  const [manualTrackingUrl, setManualTrackingUrl] = useState('');
   const [imageLoadError, setImageLoadError] = useState(false);
   const orderImage = getImageUrl(order.primary_image_url);
   const hasOrderImage = Boolean(orderImage) && !imageLoadError;
@@ -100,6 +109,10 @@ const OrderCard: React.FC<OrderCardProps> = ({
   const ret = type === 'purchase' && order.status === 'delivered' && !order.return_status
     ? getReturnEligibility(order)
     : null;
+  const carrierLabel = (order.shipping_carrier || '').trim();
+  const hasCarrierLabel = Boolean(carrierLabel) && carrierLabel.toLowerCase() !== 'unknown';
+  const trackingStatusLabel = (order.tracking_status || '').trim();
+  const hasTrackingStatusLabel = Boolean(trackingStatusLabel) && trackingStatusLabel.toUpperCase() !== 'UNKNOWN';
 
   const hasActions =
     (type === 'sale' && order.status === 'paid') ||
@@ -107,6 +120,23 @@ const OrderCard: React.FC<OrderCardProps> = ({
     (type === 'purchase' && order.status === 'shipped' && onConfirmDelivery) ||
     ret ||
     (type === 'sale' && order.return_status === 'requested' && onRespondReturn);
+  const shouldUseShippo = shippingCarrierPreference !== 'own';
+  const labelActionDisabled = Boolean(
+    shouldUseShippo && (
+      shippingConfigured === false ||
+      shippingProfileComplete === false
+    )
+  );
+  const labelActionText = shippingConfigured === false
+    ? 'Shipping unavailable'
+    : shippingProfileComplete === false
+      ? 'Complete shipping profile'
+      : 'Buy label';
+  const labelActionTooltip = shippingConfigured === false
+    ? 'Shippo is not configured on this environment'
+    : shippingProfileComplete === false
+      ? 'Complete your shipping address in Profile to enable label purchase'
+      : 'Buy and print a shipping label';
 
   return (
     <Card
@@ -204,14 +234,14 @@ const OrderCard: React.FC<OrderCardProps> = ({
           )}
           {order.tracking_number && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
-              {order.shipping_carrier && (
-                <Chip label={order.shipping_carrier.toUpperCase()} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+              {hasCarrierLabel && (
+                <Chip label={carrierLabel.toUpperCase()} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
               )}
-              {order.tracking_status && (
+              {hasTrackingStatusLabel && (
                 <Chip
-                  label={order.tracking_status.replace(/_/g, ' ')}
+                  label={trackingStatusLabel.replace(/_/g, ' ')}
                   size="small"
-                  color={order.tracking_status === 'DELIVERED' ? 'success' : order.tracking_status === 'TRANSIT' ? 'info' : 'default'}
+                  color={trackingStatusLabel === 'DELIVERED' ? 'success' : trackingStatusLabel === 'TRANSIT' ? 'info' : 'default'}
                   sx={{ height: 20, fontSize: '0.65rem' }}
                 />
               )}
@@ -275,21 +305,29 @@ const OrderCard: React.FC<OrderCardProps> = ({
 
           <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
             {type === 'sale' && order.status === 'paid' && (
-              shippingConfigured && onOpenLabelDialog ? (
-                <Button
-                  size="small"
-                  variant="contained"
-                  startIcon={<ShippingIcon />}
-                  onClick={(e) => { e.stopPropagation(); onOpenLabelDialog(order); }}
-                >
-                  Buy label
-                </Button>
+              shouldUseShippo && onOpenLabelDialog ? (
+                <Tooltip title={labelActionTooltip}>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={<ShippingIcon />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!labelActionDisabled) onOpenLabelDialog(order);
+                      }}
+                      disabled={labelActionDisabled}
+                    >
+                      {labelActionText}
+                    </Button>
+                  </span>
+                </Tooltip>
               ) : onMarkShipped ? (
                 <Button
                   size="small"
                   variant="outlined"
                   startIcon={<ShippingIcon />}
-                  onClick={(e) => { e.stopPropagation(); onMarkShipped(order.id); }}
+                  onClick={(e) => { e.stopPropagation(); setManualShipDialogOpen(true); }}
                   disabled={actionLoading === order.id}
                 >
                   {actionLoading === order.id ? '...' : 'Mark shipped'}
@@ -307,6 +345,19 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 onClick={(e) => e.stopPropagation()}
               >
                 Track
+              </Button>
+            )}
+            {order.label_url && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                href={order.label_url}
+                target="_blank"
+                rel="noopener"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Label
               </Button>
             )}
             {type === 'purchase' && order.status === 'shipped' && onConfirmDelivery && (
@@ -390,6 +441,62 @@ const OrderCard: React.FC<OrderCardProps> = ({
             onClick={() => {
               setConfirmDeliveryOpen(false);
               onConfirmDelivery?.(order.id);
+            }}
+          >
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={manualShipDialogOpen}
+        onClose={() => setManualShipDialogOpen(false)}
+        onClick={(e) => e.stopPropagation()}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Mark As Shipped</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Add tracking details before marking this order as shipped.
+          </DialogContentText>
+          <TextField
+            fullWidth
+            required
+            label="Tracking number"
+            value={manualTrackingNumber}
+            onChange={(e) => setManualTrackingNumber(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            label="Tracking URL (optional)"
+            value={manualTrackingUrl}
+            onChange={(e) => setManualTrackingUrl(e.target.value)}
+            placeholder="https://"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setManualShipDialogOpen(false);
+              setManualTrackingNumber('');
+              setManualTrackingUrl('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!manualTrackingNumber.trim() || actionLoading === order.id}
+            onClick={() => {
+              onMarkShipped?.(
+                order.id,
+                manualTrackingNumber.trim(),
+                manualTrackingUrl.trim() || undefined
+              );
+              setManualShipDialogOpen(false);
+              setManualTrackingNumber('');
+              setManualTrackingUrl('');
             }}
           >
             Confirm

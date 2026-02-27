@@ -5,6 +5,24 @@ import { createNotification } from '../services/notificationService.js';
 
 const router = express.Router();
 
+const DEFAULT_COMMISSION_PERCENT = 10;
+
+async function getPayoutCommissionPercent() {
+  try {
+    const [rows] = await pool.execute(
+      "SELECT setting_value FROM site_settings WHERE setting_key = 'payout_config' LIMIT 1"
+    );
+    if (!rows.length) return DEFAULT_COMMISSION_PERCENT;
+    const raw = rows[0].setting_value;
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const value = Number(parsed?.commission_percent);
+    if (!Number.isFinite(value)) return DEFAULT_COMMISSION_PERCENT;
+    return Math.min(100, Math.max(0, value));
+  } catch {
+    return DEFAULT_COMMISSION_PERCENT;
+  }
+}
+
 // Create new order
 router.post('/', async (req, res) => {
   try {
@@ -278,6 +296,11 @@ router.get('/:orderId', async (req, res) => {
       platform_fee: parseFloat(order.platform_fee),
       artist_earnings: parseFloat(order.artist_earnings),
       shipping_cost: order.shipping_cost ? parseFloat(order.shipping_cost) : 0,
+      payout_amount: order.payout_amount != null ? parseFloat(order.payout_amount) : null,
+      payout_stripe_fee: order.payout_stripe_fee != null ? parseFloat(order.payout_stripe_fee) : null,
+      payout_label_cost: order.payout_label_cost != null ? parseFloat(order.payout_label_cost) : null,
+      payout_commission_percent: order.payout_commission_percent != null ? parseFloat(order.payout_commission_percent) : null,
+      payout_commission_amount: order.payout_commission_amount != null ? parseFloat(order.payout_commission_amount) : null,
     });
   } catch (error) {
     console.error('Error fetching order:', error);
@@ -289,8 +312,14 @@ router.get('/:orderId', async (req, res) => {
 router.put('/:orderId/mark-shipped', async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cognito_username } = req.body;
+    const { cognito_username, tracking_number, tracking_url, shipping_carrier } = req.body;
     if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+    const normalizedCarrier = (shipping_carrier || '').toString().trim().toLowerCase();
+    const normalizedTrackingNumber = (tracking_number || '').toString().trim();
+    const normalizedTrackingUrl = (tracking_url || '').toString().trim();
+    if (normalizedCarrier === 'own' && !normalizedTrackingNumber) {
+      return res.status(400).json({ error: 'Tracking number is required for manual shipping' });
+    }
 
     const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
     if (users.length === 0) return res.status(404).json({ error: 'User not found' });
@@ -306,7 +335,15 @@ router.put('/:orderId/mark-shipped', async (req, res) => {
     }
     const order = orders[0];
 
-    await pool.execute("UPDATE orders SET status = 'shipped' WHERE id = ?", [orderId]);
+    await pool.execute(
+      `UPDATE orders
+       SET status = 'shipped',
+           shipping_carrier = COALESCE(NULLIF(?, ''), shipping_carrier),
+           tracking_number = COALESCE(NULLIF(?, ''), tracking_number),
+           tracking_url = COALESCE(NULLIF(?, ''), tracking_url)
+       WHERE id = ?`,
+      [normalizedCarrier, normalizedTrackingNumber, normalizedTrackingUrl, orderId]
+    );
 
     if (order.buyer_id) {
       try {
@@ -365,32 +402,81 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
       pi = await stripe.paymentIntents.retrieve(payment_intent_id);
     }
 
-    // With destination charges (transfer_data), Stripe creates the transfer on capture.
-    // With separate charges and transfers, we create the transfer ourselves.
-    const artist_earnings_cents = Math.round(parseFloat(order.artist_earnings) * 100);
+    const artistEarnings = parseFloat(order.artist_earnings || 0) || 0;
+    const artist_earnings_cents = Math.round(artistEarnings * 100);
+    const shippingCost = parseFloat(order.shipping_cost || 0) || 0;
+    const labelCostCents = Math.round(shippingCost * 100);
+    const commissionPercent = await getPayoutCommissionPercent();
+    const commissionCents = Math.round((artist_earnings_cents * commissionPercent) / 100);
+
+    let stripeFeeCents = 0;
+    const chargeId = pi.latest_charge;
+    const charge = chargeId
+      ? await stripe.charges.retrieve(typeof chargeId === 'string' ? chargeId : chargeId.id, { expand: ['balance_transaction'] })
+      : null;
+    const balanceTransaction = charge?.balance_transaction && typeof charge.balance_transaction !== 'string'
+      ? charge.balance_transaction
+      : null;
+    stripeFeeCents = Number(balanceTransaction?.fee || 0);
+
+    const payoutCents = Math.max(0, artist_earnings_cents - stripeFeeCents - labelCostCents - commissionCents);
+    const payoutAmount = payoutCents / 100;
+
     if (artist_earnings_cents > 0 && order.seller_stripe_account_id && !order.stripe_transfer_id) {
-      const chargeId = pi.latest_charge;
-      const charge = chargeId ? await stripe.charges.retrieve(typeof chargeId === 'string' ? chargeId : chargeId.id) : null;
-      const existingTransferId = charge?.transfer;
+      const existingTransferId = charge?.transfer
+        ? (typeof charge.transfer === 'string' ? charge.transfer : charge.transfer.id)
+        : null;
 
       if (existingTransferId) {
-        // Destination charge: transfer already created on capture
         await pool.execute('UPDATE orders SET stripe_transfer_id = ? WHERE payment_intent_id = ?', [existingTransferId, payment_intent_id]);
+        if (payoutCents < artist_earnings_cents) {
+          const reversalAmount = artist_earnings_cents - payoutCents;
+          await stripe.transfers.createReversal(existingTransferId, {
+            amount: reversalAmount,
+            metadata: {
+              order_id: String(orderId),
+              stripe_fee_cents: String(stripeFeeCents),
+              label_cost_cents: String(labelCostCents),
+              commission_percent: String(commissionPercent),
+              commission_cents: String(commissionCents),
+            },
+          });
+        }
       } else {
-        // Separate charges and transfers: create transfer
         const sourceTransaction = typeof chargeId === 'string' ? chargeId : chargeId?.id;
-        const transfer = await stripe.transfers.create({
-          amount: artist_earnings_cents,
-          currency: 'usd',
-          destination: order.seller_stripe_account_id,
-          transfer_group: `order-${order.order_number}`,
-          ...(sourceTransaction && { source_transaction: sourceTransaction }),
-        });
-        await pool.execute('UPDATE orders SET stripe_transfer_id = ? WHERE id = ?', [transfer.id, orderId]);
+        if (payoutCents > 0) {
+          const transfer = await stripe.transfers.create({
+            amount: payoutCents,
+            currency: 'usd',
+            destination: order.seller_stripe_account_id,
+            transfer_group: `order-${order.order_number}`,
+            ...(sourceTransaction && { source_transaction: sourceTransaction }),
+          });
+          await pool.execute('UPDATE orders SET stripe_transfer_id = ? WHERE id = ?', [transfer.id, orderId]);
+        }
       }
     }
 
-    await pool.execute("UPDATE orders SET status = 'delivered' WHERE id = ?", [orderId]);
+    await pool.execute(
+      `UPDATE orders
+       SET status = 'delivered',
+           artist_earnings = ?,
+           payout_amount = ?,
+           payout_stripe_fee = ?,
+           payout_label_cost = ?,
+           payout_commission_percent = ?,
+           payout_commission_amount = ?
+       WHERE id = ?`,
+      [
+        payoutAmount,
+        payoutAmount,
+        stripeFeeCents / 100,
+        labelCostCents / 100,
+        commissionPercent,
+        commissionCents / 100,
+        orderId,
+      ]
+    );
 
     if (order.seller_id) {
       try {
@@ -411,7 +497,7 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
     try {
       await pool.execute(
         `UPDATE dashboard_stats SET total_revenue = total_revenue + ? WHERE user_id = ?`,
-        [order.artist_earnings, order.seller_id]
+        [payoutAmount, order.seller_id]
       );
     } catch (e) {
       console.error('Dashboard stats update:', e);

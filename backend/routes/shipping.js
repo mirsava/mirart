@@ -12,6 +12,29 @@ import { createNotification } from '../services/notificationService.js';
 
 const router = express.Router();
 
+const hasCarrierRegistrationIssue = (rate) => {
+  const messages = Array.isArray(rate?.messages) ? rate.messages : [];
+  return messages.some((msg) => {
+    const code = String(msg?.code || '').toLowerCase();
+    const text = String(msg?.text || msg?.message || '').toLowerCase();
+    return code.includes('registration_error') || text.includes('activate account') || text.includes('not yet registered');
+  });
+};
+
+const normalizeRatesForFrontend = (rates) => {
+  const sourceRates = Array.isArray(rates) ? rates : [];
+  const filtered = sourceRates.filter((rate) => !hasCarrierRegistrationIssue(rate));
+  const usableRates = filtered.length > 0 ? filtered : sourceRates;
+  return usableRates.map((r) => ({
+    object_id: r.object_id,
+    provider: r.provider,
+    servicelevel: r.servicelevel?.name || r.provider,
+    amount: r.amount_local,
+    currency: r.currency_local || 'USD',
+    estimated_days: r.estimated_days,
+  }));
+};
+
 /**
  * POST /shipping/rates
  * Get shipping rates for a destination address and cart items
@@ -50,7 +73,7 @@ router.post('/rates', async (req, res) => {
     const listingIds = [...new Set(items.map((i) => i.listing_id))];
     const placeholders = listingIds.map(() => '?').join(',');
     const [listings] = await pool.execute(
-      `SELECT l.*, u.address_line1, u.address_line2, u.address_city, u.address_state, u.address_zip, u.address_country, u.first_name, u.last_name, u.business_name
+      `SELECT l.*, u.address_line1, u.address_line2, u.address_city, u.address_state, u.address_zip, u.address_country, u.first_name, u.last_name, u.business_name, u.email, u.phone
        FROM listings l
        JOIN users u ON l.user_id = u.id
        WHERE l.id IN (${placeholders})`,
@@ -71,6 +94,8 @@ router.post('/rates', async (req, res) => {
       state: firstListing.address_state || 'CA',
       zip: firstListing.address_zip || '94102',
       country: firstListing.address_country || 'US',
+      email: firstListing.email || undefined,
+      phone: firstListing.phone || undefined,
     };
 
     // If seller has no address set, return empty rates with message
@@ -109,15 +134,7 @@ router.post('/rates', async (req, res) => {
 
     const { rates } = await shippoService.createShipmentAndGetRates(addressFrom, addressTo, parcels);
 
-    // Format rates for frontend
-    const formattedRates = (rates || []).map((r) => ({
-      object_id: r.object_id,
-      provider: r.provider,
-      servicelevel: r.servicelevel?.name || r.provider,
-      amount: r.amount_local,
-      currency: r.currency_local || 'USD',
-      estimated_days: r.estimated_days,
-    }));
+    const formattedRates = normalizeRatesForFrontend(rates);
 
     res.json({ rates: formattedRates });
   } catch (error) {
@@ -154,10 +171,12 @@ router.post('/rates-for-order', async (req, res) => {
     const [orders] = await pool.execute(
       `SELECT o.*, l.weight_oz, l.length_in, l.width_in, l.height_in,
               u.address_line1, u.address_line2, u.address_city, u.address_state, u.address_zip, u.address_country,
-              u.business_name, u.first_name, u.last_name
+              u.business_name, u.first_name, u.last_name, u.email, u.phone,
+              b.email as buyer_email
        FROM orders o
        JOIN listings l ON o.listing_id = l.id
        JOIN users u ON o.seller_id = u.id
+       LEFT JOIN users b ON o.buyer_id = b.id
        WHERE o.id = ? AND o.seller_id = ?`,
       [order_id, userId]
     );
@@ -189,17 +208,31 @@ router.post('/rates-for-order', async (req, res) => {
       state: '',
       zip: '',
       country: 'US',
+      email: order.buyer_email || undefined,
     };
     const cityStateZip = addrLines[2] || '';
-    const match = cityStateZip.match(/^(.+),\s*([A-Za-z]{2})\s+(\d{5}(-\d{4})?)$/);
-    if (match) {
-      addressTo.city = match[1].trim();
-      addressTo.state = match[2];
-      addressTo.zip = match[3];
+    const usMatch = cityStateZip.match(/^(.+),\s*([A-Za-z]{2})\s+([A-Za-z0-9\- ]+)$/);
+    if (usMatch) {
+      addressTo.city = usMatch[1].trim();
+      addressTo.state = usMatch[2].trim();
+      addressTo.zip = usMatch[3].trim();
+    } else {
+      const parts = cityStateZip.split(',').map((s) => s.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        addressTo.city = parts[0];
+        const regionAndPostal = parts.slice(1).join(' ');
+        const tokens = regionAndPostal.split(/\s+/).filter(Boolean);
+        if (tokens.length >= 2) {
+          addressTo.zip = tokens[tokens.length - 1];
+          addressTo.state = tokens.slice(0, -1).join(' ');
+        } else if (tokens.length === 1) {
+          addressTo.state = tokens[0];
+        }
+      }
     }
     addressTo.country = addrLines[3] || 'US';
 
-    if (!addressTo.street1 || !addressTo.zip) {
+    if (!addressTo.street1 || !addressTo.city || !addressTo.zip) {
       return res.status(400).json({ error: 'Invalid shipping address on order' });
     }
 
@@ -211,6 +244,8 @@ router.post('/rates-for-order', async (req, res) => {
       state: order.address_state,
       zip: order.address_zip,
       country: order.address_country || 'US',
+      email: order.email || undefined,
+      phone: order.phone || undefined,
     };
 
     const parcels = [{
@@ -223,19 +258,12 @@ router.post('/rates-for-order', async (req, res) => {
     }];
 
     const { rates } = await shippoService.createShipmentAndGetRates(addressFrom, addressTo, parcels);
-    const formattedRates = (rates || []).map((r) => ({
-      object_id: r.object_id,
-      provider: r.provider,
-      servicelevel: r.servicelevel?.name || r.provider,
-      amount: r.amount_local,
-      currency: r.currency_local || 'USD',
-      estimated_days: r.estimated_days,
-    }));
+    const formattedRates = normalizeRatesForFrontend(rates);
 
     res.json({ rates: formattedRates });
   } catch (error) {
     console.error('Rates for order error:', error);
-    res.status(500).json({ error: 'Failed to get rates', message: error.message });
+    res.status(500).json({ error: error.message || 'Failed to get rates', message: error.message });
   }
 });
 
@@ -320,7 +348,7 @@ router.post('/label', async (req, res) => {
   } catch (error) {
     console.error('Purchase label error:', error);
     res.status(500).json({
-      error: 'Failed to purchase label',
+      error: error.message || 'Failed to purchase label',
       message: error.message,
     });
   }

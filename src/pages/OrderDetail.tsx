@@ -68,10 +68,7 @@ const OrderDetail: React.FC = () => {
     window.print();
   };
 
-  const isBuyer = order && user?.id && order.buyer_id === order._resolvedBuyerId;
-  const viewerIsBuyer = order?.buyer_email && order?.seller_email
-    ? order.buyer_email !== order.seller_email
-    : true;
+  const viewerIsSeller = Boolean(order && user?.id && Number(order.seller_id) === Number(user.id));
 
   if (loading) {
     return (
@@ -95,6 +92,11 @@ const OrderDetail: React.FC = () => {
   const shippingCost = order.shipping_cost || 0;
   const subtotal = order.unit_price * order.quantity;
   const tax = subtotal * 0.08;
+  const payoutAmount = order.payout_amount ?? order.artist_earnings;
+  const payoutStripeFee = order.payout_stripe_fee ?? 0;
+  const payoutLabelCost = order.payout_label_cost ?? shippingCost;
+  const payoutCommissionAmount = order.payout_commission_amount ?? 0;
+  const payoutCommissionPercent = order.payout_commission_percent ?? null;
 
   return (
     <Box>
@@ -250,6 +252,44 @@ const OrderDetail: React.FC = () => {
               </Box>
             </Box>
           </Box>
+
+          {viewerIsSeller && (
+            <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: 'action.hover' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
+                Seller Payout Breakdown
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">Earnings Base</Typography>
+                <Typography variant="body2">${(order.total_price - order.platform_fee).toFixed(2)}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">Stripe Fee</Typography>
+                <Typography variant="body2">-${payoutStripeFee.toFixed(2)}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">Label Cost</Typography>
+                <Typography variant="body2">-${payoutLabelCost.toFixed(2)}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Commission{payoutCommissionPercent != null ? ` (${Number(payoutCommissionPercent).toFixed(2)}%)` : ''}
+                </Typography>
+                <Typography variant="body2">-${payoutCommissionAmount.toFixed(2)}</Typography>
+              </Box>
+              <Divider sx={{ my: 1 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>You Receive</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }} color="success.main">
+                  ${Number(payoutAmount || 0).toFixed(2)}
+                </Typography>
+              </Box>
+              {order.status !== 'delivered' && (
+                <Typography variant="caption" color="text.secondary">
+                  Final payout is confirmed when buyer confirms delivery.
+                </Typography>
+              )}
+            </Paper>
+          )}
 
           {(order.tracking_number || order.return_status || order.returns_info) && (
             <>
