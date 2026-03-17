@@ -115,7 +115,7 @@ function TabPanel(props: TabPanelProps) {
 
 const CATEGORY_COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
 
-const ArtistDashboard: React.FC = () => {
+const AccountDashboard: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -358,6 +358,7 @@ const ArtistDashboard: React.FC = () => {
   };
   const shippingProfileComplete = profileData ? isShippingAddressComplete : undefined;
   const needsShippingProfile = shippingProfileComplete === false;
+  const isBuyerDashboard = profileData?.user_type === 'buyer';
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [returnOrder, setReturnOrder] = useState<Order | null>(null);
   const [returnReason, setReturnReason] = useState('');
@@ -426,6 +427,12 @@ const ArtistDashboard: React.FC = () => {
       }
     }
   }, [user?.id, tabValue]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchProfile();
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (tabValue !== 3 || !user?.id) return;
@@ -502,6 +509,18 @@ const ArtistDashboard: React.FC = () => {
       setListingsPage(1);
     }
   }, [listingsStatusFilter, tabValue]);
+
+  useEffect(() => {
+    if (isBuyerDashboard && ![1, 4].includes(tabValue)) {
+      setTabValue(1);
+    }
+  }, [isBuyerDashboard, tabValue]);
+
+  useEffect(() => {
+    if (isBuyerDashboard && ordersSubTab !== 0) {
+      setOrdersSubTab(0);
+    }
+  }, [isBuyerDashboard, ordersSubTab]);
 
   // Open Subscription tab when navigating from Subscription Plans
   useEffect(() => {
@@ -878,7 +897,7 @@ const ArtistDashboard: React.FC = () => {
     setProfileSuccess(false);
 
     try {
-      let signatureUrl = profileFormData.signatureUrl || null;
+      let signatureUrl = isBuyerDashboard ? null : (profileFormData.signatureUrl || null);
       
       if (signatureUrl && signatureUrl.startsWith('data:')) {
         try {
@@ -909,14 +928,14 @@ const ArtistDashboard: React.FC = () => {
       await apiService.updateUser(user.id, {
         first_name: profileFormData.firstName,
         last_name: profileFormData.lastName,
-        business_name: profileFormData.businessName,
+        business_name: isBuyerDashboard ? null : (profileFormData.businessName || null),
         phone: profileFormData.phone || null,
         country: profileFormData.country,
-        website: profileFormData.website || null,
-        social_instagram: profileFormData.socialInstagram || null,
-        social_tiktok: profileFormData.socialTikTok || null,
-        social_behance: profileFormData.socialBehance || null,
-        social_youtube: profileFormData.socialYouTube || null,
+        website: isBuyerDashboard ? null : (profileFormData.website || null),
+        social_instagram: isBuyerDashboard ? null : (profileFormData.socialInstagram || null),
+        social_tiktok: isBuyerDashboard ? null : (profileFormData.socialTikTok || null),
+        social_behance: isBuyerDashboard ? null : (profileFormData.socialBehance || null),
+        social_youtube: isBuyerDashboard ? null : (profileFormData.socialYouTube || null),
         address_line1: profileFormData.addressLine1 || null,
         address_line2: profileFormData.addressLine2 || null,
         address_city: profileFormData.addressCity || null,
@@ -929,9 +948,9 @@ const ArtistDashboard: React.FC = () => {
         billing_state: (profileFormData.billingSameAsShipping ? profileFormData.addressState : profileFormData.billingState) || null,
         billing_zip: (profileFormData.billingSameAsShipping ? profileFormData.addressZip : profileFormData.billingZip) || null,
         billing_country: (profileFormData.billingSameAsShipping ? profileFormData.addressCountry : profileFormData.billingCountry) || 'US',
-        specialties: profileFormData.specialties,
-        experience_level: profileFormData.experience,
-        bio: profileFormData.bio || null,
+        specialties: isBuyerDashboard ? [] : profileFormData.specialties,
+        experience_level: isBuyerDashboard ? null : (profileFormData.experience || null),
+        bio: isBuyerDashboard ? null : (profileFormData.bio || null),
         signature_url: signatureUrl,
       });
 
@@ -1180,7 +1199,11 @@ const ArtistDashboard: React.FC = () => {
             </Avatar>
             <Box>
               <Typography variant="h5" fontWeight={700}>Welcome back, {user?.name || 'Artist'}!</Typography>
-              <Typography variant="body2" color="text.secondary">Manage your listings, track engagement, and grow your art business.</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {isBuyerDashboard
+                  ? 'Track purchases, manage your profile, and stay connected with artists.'
+                  : 'Manage your listings, track engagement, and grow your art business.'}
+              </Typography>
             </Box>
           </Box>
         </Box>
@@ -1197,7 +1220,7 @@ const ArtistDashboard: React.FC = () => {
         ) : (
           <>
             {/* Listing limit reached banner */}
-            {subscription && subscription.status === 'active' && subscription.max_listings < 999999 && (subscription.current_listings ?? artistStats.activeListings) >= (subscription.max_listings ?? 0) && (
+            {!isBuyerDashboard && subscription && subscription.status === 'active' && subscription.max_listings < 999999 && (subscription.current_listings ?? artistStats.activeListings) >= (subscription.max_listings ?? 0) && (
               <Alert
                 severity="warning"
                 sx={{ mb: 3 }}
@@ -1221,6 +1244,7 @@ const ArtistDashboard: React.FC = () => {
               </Alert>
             )}
 
+            {!isBuyerDashboard && (
             <Grid container spacing={2} sx={{ mb: 3 }}>
               {[
                 { label: 'Total Listings', value: artistStats.totalListings, icon: <ArtTrackIcon />, color: '#6366f1' },
@@ -1250,8 +1274,9 @@ const ArtistDashboard: React.FC = () => {
                 </Grid>
               ))}
             </Grid>
+            )}
 
-            {subscription ? (
+            {!isBuyerDashboard && (subscription ? (
               <Paper
                 elevation={0}
                 sx={{ p: 2, mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}
@@ -1292,18 +1317,27 @@ const ArtistDashboard: React.FC = () => {
                   View Plans
                 </Button>
               </Paper>
-            )}
+            ))}
 
         {/* Main Content Tabs */}
         <Paper elevation={0} sx={{ width: '100%', mb: 4, border: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={handleTabChange} variant="scrollable" scrollButtons="auto">
-              <Tab label="My Listings" />
-              <Tab label="Orders" />
-              <Tab label="Analytics" />
-              <Tab label="Subscription" />
-              <Tab label="Profile" />
-              <Tab label="Settings" />
+              {isBuyerDashboard ? (
+                [
+                  <Tab key="orders" value={1} label="Orders" />,
+                  <Tab key="profile" value={4} label="Profile" />,
+                ]
+              ) : (
+                [
+                  <Tab key="listings" label="My Listings" />,
+                  <Tab key="orders" label="Orders" />,
+                  <Tab key="analytics" label="Analytics" />,
+                  <Tab key="subscription" label="Subscription" />,
+                  <Tab key="profile" label="Profile" />,
+                  <Tab key="settings" label="Settings" />,
+                ]
+              )}
             </Tabs>
           </Box>
 
@@ -1582,13 +1616,13 @@ const ArtistDashboard: React.FC = () => {
                       Orders
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      View your purchases and sales
+                      {isBuyerDashboard ? 'View your purchases' : 'View your purchases and sales'}
                     </Typography>
                   </Box>
                 </Box>
               </Box>
             </Box>
-            {needsShippingProfile && (
+            {!isBuyerDashboard && needsShippingProfile && (
               <Alert
                 severity="warning"
                 sx={{ mb: 2 }}
@@ -1639,7 +1673,7 @@ const ArtistDashboard: React.FC = () => {
             </Box>
             <Tabs value={ordersSubTab} onChange={(_, v) => setOrdersSubTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
               <Tab icon={<ShoppingBagIcon />} iconPosition="start" label={`Purchases (${purchasesOrders.length})`} />
-              <Tab icon={<StoreIcon />} iconPosition="start" label={`Sales (${salesOrders.length})`} />
+              {!isBuyerDashboard && <Tab icon={<StoreIcon />} iconPosition="start" label={`Sales (${salesOrders.length})`} />}
             </Tabs>
             {loadingOrders ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -2420,11 +2454,13 @@ const ArtistDashboard: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <PersonIcon sx={{ fontSize: 28, color: 'primary.main' }} />
                 <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                  Artist Profile
+                  {isBuyerDashboard ? 'Buyer Profile' : 'Artist Profile'}
                 </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary">
-                Manage your profile information and showcase your artistic identity
+                {isBuyerDashboard
+                  ? 'Manage your personal, contact, and delivery details.'
+                  : 'Manage your profile information and showcase your artistic identity'}
               </Typography>
             </Box>
 
@@ -2444,6 +2480,7 @@ const ArtistDashboard: React.FC = () => {
                 Shipping address is incomplete. Fill Street, City, State/Province, ZIP/Postal code, and Country to enable shipping workflows.
               </Alert>
             )}
+            {!isBuyerDashboard && (
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid item xs={12} md={6}>
                 <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
@@ -2497,6 +2534,7 @@ const ArtistDashboard: React.FC = () => {
                 </Paper>
               </Grid>
             </Grid>
+            )}
 
             <form onSubmit={handleProfileSubmit} noValidate>
               <Grid container spacing={2}>
@@ -2566,6 +2604,7 @@ const ArtistDashboard: React.FC = () => {
                         />
                       </Grid>
 
+                      {!isBuyerDashboard && (
                       <Grid item xs={12}>
                         <TextField
                           fullWidth
@@ -2576,6 +2615,7 @@ const ArtistDashboard: React.FC = () => {
                           sx={{ bgcolor: 'background.paper' }}
                         />
                       </Grid>
+                      )}
                     </Grid>
                   </Paper>
                 </Grid>
@@ -2709,7 +2749,9 @@ const ArtistDashboard: React.FC = () => {
                           Shipping Address
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          Used as your origin for shipping labels and for receiving items.
+                          {isBuyerDashboard
+                            ? 'Used for deliveries and order updates.'
+                            : 'Used as your origin for shipping labels and for receiving items.'}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} sm={6}>
@@ -2834,61 +2876,66 @@ const ArtistDashboard: React.FC = () => {
                         </>
                       )}
 
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Website"
-                          value={profileFormData.website}
-                          onChange={handleProfileInputChange('website')}
-                          placeholder="https://yourwebsite.com"
-                          sx={{ bgcolor: 'background.paper' }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Instagram"
-                          value={profileFormData.socialInstagram}
-                          onChange={handleProfileInputChange('socialInstagram')}
-                          placeholder="https://instagram.com/yourhandle"
-                          sx={{ bgcolor: 'background.paper' }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="TikTok"
-                          value={profileFormData.socialTikTok}
-                          onChange={handleProfileInputChange('socialTikTok')}
-                          placeholder="https://tiktok.com/@yourhandle"
-                          sx={{ bgcolor: 'background.paper' }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Behance"
-                          value={profileFormData.socialBehance}
-                          onChange={handleProfileInputChange('socialBehance')}
-                          placeholder="https://behance.net/yourprofile"
-                          sx={{ bgcolor: 'background.paper' }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="YouTube"
-                          value={profileFormData.socialYouTube}
-                          onChange={handleProfileInputChange('socialYouTube')}
-                          placeholder="https://youtube.com/@yourchannel"
-                          sx={{ bgcolor: 'background.paper' }}
-                        />
-                      </Grid>
+                      {!isBuyerDashboard && (
+                        <>
+                          <Grid item xs={12}>
+                            <TextField
+                              fullWidth
+                              label="Website"
+                              value={profileFormData.website}
+                              onChange={handleProfileInputChange('website')}
+                              placeholder="https://yourwebsite.com"
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="Instagram"
+                              value={profileFormData.socialInstagram}
+                              onChange={handleProfileInputChange('socialInstagram')}
+                              placeholder="https://instagram.com/yourhandle"
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="TikTok"
+                              value={profileFormData.socialTikTok}
+                              onChange={handleProfileInputChange('socialTikTok')}
+                              placeholder="https://tiktok.com/@yourhandle"
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="Behance"
+                              value={profileFormData.socialBehance}
+                              onChange={handleProfileInputChange('socialBehance')}
+                              placeholder="https://behance.net/yourprofile"
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="YouTube"
+                              value={profileFormData.socialYouTube}
+                              onChange={handleProfileInputChange('socialYouTube')}
+                              placeholder="https://youtube.com/@yourchannel"
+                              sx={{ bgcolor: 'background.paper' }}
+                            />
+                          </Grid>
+                        </>
+                      )}
                     </Grid>
                   </Paper>
                 </Grid>
 
                 {/* Professional Information Section */}
+                {!isBuyerDashboard && (
                 <Grid item xs={12} md={6} sx={{ order: { xs: 2, md: 2 } }}>
                   <Paper
                     elevation={0}
@@ -2982,8 +3029,10 @@ const ArtistDashboard: React.FC = () => {
                     </Grid>
                   </Paper>
                 </Grid>
+                )}
 
                 {/* Signature Section */}
+                {!isBuyerDashboard && (
                 <Grid item xs={12} md={6} sx={{ order: { xs: 4, md: 4 } }}>
                   <Paper
                     elevation={0}
@@ -3032,6 +3081,7 @@ const ArtistDashboard: React.FC = () => {
                     </Box>
                   </Paper>
                 </Grid>
+                )}
 
                 {/* Submit Button */}
                 <Grid item xs={12} sx={{ order: { xs: 5, md: 5 } }}>
@@ -3409,4 +3459,4 @@ const ArtistDashboard: React.FC = () => {
     );
   };
   
-  export default ArtistDashboard;
+export default AccountDashboard;

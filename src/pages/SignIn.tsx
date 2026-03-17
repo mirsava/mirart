@@ -22,7 +22,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import apiService from '../services/api';
 
-const ArtistSignin: React.FC = () => {
+const SignIn: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn } = useAuth();
@@ -317,4 +317,4 @@ const ArtistSignin: React.FC = () => {
   );
 };
 
-export default ArtistSignin;
+export default SignIn;

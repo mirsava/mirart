@@ -42,7 +42,7 @@ import {
   getDigitsWithoutCountryCode,
 } from '../utils/signupLookups';
 
-const ArtistSignup: React.FC = () => {
+const SignUp: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -134,11 +134,10 @@ const ArtistSignup: React.FC = () => {
     const mask = selectedPhoneTemplate.mask;
     const maxDigits = countMaskSlots(mask);
     const strippedDigits = getDigitsWithoutCountryCode(event.target.value, selectedPhoneTemplate.code).slice(0, maxDigits);
-    const maskedValue = applyPhoneMask(mask, strippedDigits);
 
     setFormData((prev) => ({
       ...prev,
-      phone: maskedValue,
+      phone: strippedDigits.length > 0 ? applyPhoneMask(mask, strippedDigits) : '',
     }));
 
     if (errors.phone) {
@@ -209,7 +208,10 @@ const ArtistSignup: React.FC = () => {
       if (!formData.email.trim()) newErrors.email = 'Email is required';
       else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
     }
-    if (formData.phone && formData.phone.includes('_')) newErrors.phone = 'Please complete the phone number in the required format';
+    const localPhoneDigits = getDigitsWithoutCountryCode(formData.phone || '', selectedPhoneTemplate.code);
+    if (localPhoneDigits.length > 0 && localPhoneDigits.length < 8) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
     if (formData.userType === 'artist' && !formData.businessName.trim()) newErrors.businessName = 'Business/Studio name is required';
     if (!formData.country.trim()) newErrors.country = 'Country is required';
     if (formData.userType === 'artist' && formData.specialties.length === 0) newErrors.specialties = 'Please select at least one specialty';
@@ -238,7 +240,10 @@ const ArtistSignup: React.FC = () => {
       return;
     }
 
-    const normalizedPhone = formData.phone && !formData.phone.includes('_') ? formData.phone : undefined;
+    const normalizedPhoneDigits = getDigitsWithoutCountryCode(formData.phone || '', selectedPhoneTemplate.code);
+    const normalizedPhone = normalizedPhoneDigits.length > 0
+      ? `${selectedPhoneTemplate.code}${normalizedPhoneDigits}`
+      : undefined;
     const normalizedSpecialties = formData.userType === 'artist' ? formData.specialties.join(', ') : undefined;
     const normalizedBusinessName = formData.userType === 'artist' ? (formData.businessName || undefined) : undefined;
     const normalizedExperience = formData.userType === 'artist' ? (formData.experience || undefined) : undefined;
@@ -290,11 +295,7 @@ const ArtistSignup: React.FC = () => {
         family_name: formData.lastName,
       };
       if (normalizedPhone?.trim()) {
-        let formattedPhone = normalizedPhone.trim();
-        if (!formattedPhone.startsWith('+')) {
-          formattedPhone = '+1' + formattedPhone.replace(/\D/g, '');
-        }
-        attributes.phone_number = formattedPhone;
+        attributes.phone_number = normalizedPhone;
       }
       await signUp(formData.email, formData.password, attributes, formData.username);
       await apiService.createOrUpdateUser({
@@ -1310,4 +1311,4 @@ const ArtistSignup: React.FC = () => {
   );
 };
 
-export default ArtistSignup;
+export default SignUp;

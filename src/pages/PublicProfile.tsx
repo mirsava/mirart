@@ -21,7 +21,7 @@ import apiService, { User, Listing } from '../services/api';
 import SEO from '../components/SEO';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
-const ArtistProfile: React.FC = () => {
+const PublicProfile: React.FC = () => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -308,5 +308,5 @@ const ArtistProfile: React.FC = () => {
   );
 };
 
-export default ArtistProfile;
+export default PublicProfile;
 

@@ -21,10 +21,10 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import FAQ from './pages/FAQ';
 import Privacy from './pages/Privacy';
-import ArtistSignup from './pages/ArtistSignup';
-import ArtistSignin from './pages/ArtistSignin';
-import ArtistDashboard from './pages/ArtistDashboard';
-import ArtistProfile from './pages/ArtistProfile';
+import SignUp from './pages/SignUp';
+import SignIn from './pages/SignIn';
+import AccountDashboard from './pages/AccountDashboard';
+import PublicProfile from './pages/PublicProfile';
 import CreateListing from './pages/CreateListing';
 import EditListing from './pages/EditListing';
 import ForgotPassword from './pages/ForgotPassword';
@@ -106,16 +106,16 @@ function AppContent(): JSX.Element {
             <Route path="/contact" element={<Contact />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/privacy" element={<Privacy />} />
-                    <Route path="/artist-signup" element={<ArtistSignup />} />
-                    <Route path="/artist-signin" element={<ArtistSignin />} />
-                    <Route path="/artist/:username" element={<ArtistProfile />} />
+                    <Route path="/artist-signup" element={<SignUp />} />
+                    <Route path="/artist-signin" element={<SignIn />} />
+                    <Route path="/artist/:username" element={<PublicProfile />} />
                     <Route path="/confirm-signup" element={<ConfirmSignup />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route 
               path="/artist-dashboard" 
               element={
                 <ProtectedRoute requiredUserType={UserRole.ARTIST}>
-                  <ArtistDashboard />
+                  <AccountDashboard />
                 </ProtectedRoute>
               } 
             />
