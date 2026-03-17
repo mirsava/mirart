@@ -38,11 +38,12 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
+    const [users] = await pool.execute('SELECT id, created_at FROM users WHERE cognito_username = ?', [cognitoUsername]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     const userId = users[0].id;
+    const userCreatedAt = users[0].created_at || new Date(0);
 
     let selectCols = 'id, type, title, body, link, reference_id, read_at, created_at';
     try {
@@ -50,8 +51,8 @@ router.get('/', async (req, res) => {
       selectCols = 'id, type, severity, title, body, link, reference_id, read_at, created_at';
     } catch {}
     const [rows] = await pool.execute(
-      `SELECT ${selectCols} FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
-      [userId]
+      `SELECT ${selectCols} FROM notifications WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 50`,
+      [userId, userCreatedAt]
     );
 
     const unreadCount = rows.filter((r) => !r.read_at).length;

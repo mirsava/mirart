@@ -106,7 +106,7 @@ const ConfirmSignup: React.FC = () => {
       
       setSuccess(true);
       setTimeout(() => {
-        navigate('/artist-signin', { 
+        navigate('/signin', {
           state: { message: 'Account confirmed successfully! Please sign in.' } 
         });
       }, 2000);
@@ -265,7 +265,7 @@ const ConfirmSignup: React.FC = () => {
               <Link
                 component="button"
                 variant="body2"
-                onClick={() => navigate('/artist-signin')}
+                onClick={() => navigate('/signin')}
                 sx={{ textDecoration: 'none' }}
               >
                 Back to Sign In

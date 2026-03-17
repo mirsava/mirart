@@ -115,7 +115,7 @@ const ForgotPassword: React.FC = () => {
       await resetPassword(formData.email, formData.code, formData.newPassword);
       setSuccessMessage('Password reset successfully! Redirecting to sign in...');
       setTimeout(() => {
-        navigate('/artist-signin');
+        navigate('/signin');
       }, 2000);
     } catch (error: any) {
       setErrors({ general: error.message || 'Password reset failed' });
@@ -270,7 +270,7 @@ const ForgotPassword: React.FC = () => {
             <Link
               component="button"
               variant="body2"
-              onClick={() => navigate('/artist-signin')}
+              onClick={() => navigate('/signin')}
               sx={{ textDecoration: 'none' }}
             >
               Back to Sign In

@@ -71,13 +71,13 @@ const OrderSuccess: React.FC = () => {
                 sessionId
               );
             }
-            navigate('/artist-dashboard', { replace: true });
+            navigate('/dashboard', { replace: true });
             return;
           }
           if (result.subscription) {
             const listingId = sessionStorage.getItem('listingIdToActivate');
             sessionStorage.removeItem('listingIdToActivate');
-            navigate('/artist-dashboard', { replace: true, state: listingId ? { listingIdToActivate: parseInt(listingId, 10) } : undefined });
+            navigate('/dashboard', { replace: true, state: listingId ? { listingIdToActivate: parseInt(listingId, 10) } : undefined });
             return;
           }
         }

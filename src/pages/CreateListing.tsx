@@ -446,7 +446,7 @@ const CreateListing: React.FC = () => {
 
       await apiService.createListing(listingData);
       enqueueSnackbar('Listing created successfully!', { variant: 'success' });
-      navigate('/artist-dashboard');
+      navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to create listing. Please try again.');
     } finally {
@@ -1134,7 +1134,7 @@ const CreateListing: React.FC = () => {
                   <Button
                     variant="outlined"
                     size="large"
-                    onClick={() => navigate('/artist-dashboard')}
+                    onClick={() => navigate('/dashboard')}
                     disabled={loading || uploadingImages}
                     sx={{ minWidth: 120 }}
                   >

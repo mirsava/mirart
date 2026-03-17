@@ -351,7 +351,7 @@ const PaintingDetail: React.FC = () => {
 
   const handleStartChat = async (): Promise<void> => {
     if (!isAuthenticated || !user?.id) {
-      navigate('/artist-signin');
+      navigate('/signin');
       return;
     }
 
@@ -389,7 +389,7 @@ const PaintingDetail: React.FC = () => {
 
   const handleLike = async (): Promise<void> => {
     if (!isAuthenticated || !user?.id) {
-      navigate('/artist-signin');
+      navigate('/signin');
       return;
     }
 

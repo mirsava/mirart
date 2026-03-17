@@ -75,7 +75,7 @@ const PublicProfile: React.FC = () => {
 
   const handleStartChat = async (): Promise<void> => {
     if (!isAuthenticated || !user?.id) {
-      navigate('/artist-signin');
+      navigate('/signin');
       return;
     }
 

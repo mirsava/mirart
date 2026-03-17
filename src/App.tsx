@@ -106,18 +106,29 @@ function AppContent(): JSX.Element {
             <Route path="/contact" element={<Contact />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/privacy" element={<Privacy />} />
+                    <Route path="/signup" element={<SignUp />} />
+                    <Route path="/signin" element={<SignIn />} />
+                    <Route path="/profile/:username" element={<PublicProfile />} />
                     <Route path="/artist-signup" element={<SignUp />} />
                     <Route path="/artist-signin" element={<SignIn />} />
                     <Route path="/artist/:username" element={<PublicProfile />} />
                     <Route path="/confirm-signup" element={<ConfirmSignup />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route 
-              path="/artist-dashboard" 
+              path="/dashboard" 
               element={
                 <ProtectedRoute requiredUserType={UserRole.ARTIST}>
                   <AccountDashboard />
                 </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/artist-dashboard"
+              element={
+                <ProtectedRoute requiredUserType={UserRole.ARTIST}>
+                  <AccountDashboard />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/create-listing" 

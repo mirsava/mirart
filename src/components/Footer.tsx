@@ -78,7 +78,7 @@ const Footer: React.FC = () => {
               For Artists
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              <Link href="/artist-signup" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
+              <Link href="/signup" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 Sell Your Art
               </Link>
               <Link href="/about" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>

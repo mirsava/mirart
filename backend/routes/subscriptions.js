@@ -424,7 +424,7 @@ router.get('/user/:cognitoUsername', async (req, res) => {
     const { cognitoUsername } = req.params;
 
     const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
+      'SELECT id, user_type, created_at FROM users WHERE cognito_username = ?',
       [cognitoUsername]
     );
 
@@ -433,15 +433,21 @@ router.get('/user/:cognitoUsername', async (req, res) => {
     }
 
     const userId = users[0].id;
+    const userType = users[0].user_type;
+    const userCreatedAt = users[0].created_at || new Date(0);
+
+    if (userType === 'buyer') {
+      return res.json({ subscription: null });
+    }
 
     const [subscriptions] = await pool.execute(
       `SELECT us.*, sp.name as plan_name, sp.tier, sp.max_listings, sp.price_monthly, sp.price_yearly
        FROM user_subscriptions us
        JOIN subscription_plans sp ON us.plan_id = sp.id
-       WHERE us.user_id = ? AND us.status = 'active' AND us.end_date >= CURDATE()
+       WHERE us.user_id = ? AND us.status = 'active' AND us.end_date >= CURDATE() AND us.created_at >= ?
        ORDER BY us.created_at DESC
        LIMIT 1`,
-      [userId]
+      [userId, userCreatedAt]
     );
 
     if (subscriptions.length === 0) {

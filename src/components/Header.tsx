@@ -191,14 +191,14 @@ const Header: React.FC = () => {
 
   const artistMenuItems = isAuthenticated
     ? [
-        { label: 'My Dashboard', path: '/artist-dashboard' },
+        { label: 'My Dashboard', path: '/dashboard' },
         { label: 'Create Listing', path: '/create-listing' },
         { label: 'Messages', path: '/messages' },
         ...(chatEnabled ? [{ label: 'Chat', path: null, onClick: () => openChat() }] : []),
       ]
     : [
-        { label: 'Create Account', path: '/artist-signup' },
-        { label: 'Sign In', path: '/artist-signin' },
+        { label: 'Create Account', path: '/signup' },
+        { label: 'Sign In', path: '/signin' },
       ];
 
   useEffect(() => {
@@ -396,17 +396,17 @@ const Header: React.FC = () => {
             </Box>
             <ListItem 
               onClick={() => {
-                handleNavigation('/artist-dashboard');
+                handleNavigation('/dashboard');
                 handleDrawerToggle();
               }}
               sx={{
                 borderRadius: 2,
                 mb: 1,
                 cursor: 'pointer',
-                bgcolor: location.pathname === '/artist-dashboard' ? 'primary.main' : 'transparent',
-                color: location.pathname === '/artist-dashboard' ? 'white' : 'inherit',
+                bgcolor: location.pathname === '/dashboard' ? 'primary.main' : 'transparent',
+                color: location.pathname === '/dashboard' ? 'white' : 'inherit',
                 '&:hover': {
-                  bgcolor: location.pathname === '/artist-dashboard' ? 'primary.dark' : 'action.hover',
+                  bgcolor: location.pathname === '/dashboard' ? 'primary.dark' : 'action.hover',
                 },
               }}
             >
@@ -416,7 +416,7 @@ const Header: React.FC = () => {
               <ListItemText 
                 primary="My Dashboard"
                 primaryTypographyProps={{
-                  fontWeight: location.pathname === '/artist-dashboard' ? 600 : 400,
+                  fontWeight: location.pathname === '/dashboard' ? 600 : 400,
                 }}
               />
             </ListItem>
@@ -1441,7 +1441,7 @@ const Header: React.FC = () => {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
         <MenuItem 
-          onClick={() => handleArtistMenuClick('/artist-signup')}
+          onClick={() => handleArtistMenuClick('/signup')}
           sx={{ 
             py: 1.5,
             px: 2,
@@ -1452,7 +1452,7 @@ const Header: React.FC = () => {
           Create Account
         </MenuItem>
         <MenuItem 
-          onClick={() => handleArtistMenuClick('/artist-signin')}
+          onClick={() => handleArtistMenuClick('/signin')}
           sx={{ 
             py: 1.5,
             px: 2,
@@ -1492,7 +1492,7 @@ const Header: React.FC = () => {
         <MenuItem 
           onClick={() => {
             handleUserMenuClose();
-            navigate('/artist-dashboard');
+            navigate('/dashboard');
           }}
           sx={{ 
             py: 1.5,

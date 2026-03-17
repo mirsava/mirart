@@ -101,10 +101,10 @@ const SignIn: React.FC = () => {
           } else if (state?.from?.pathname) {
             navigate(state.from.pathname);
           } else {
-            navigate('/artist-dashboard');
+            navigate('/dashboard');
           }
         } catch (dbError: any) {
-          navigate('/artist-signup', {
+          navigate('/signup', {
             state: {
               message: 'Please complete your artist profile to continue.',
               email: formData.usernameOrEmail.includes('@') ? formData.usernameOrEmail : undefined,
@@ -114,7 +114,7 @@ const SignIn: React.FC = () => {
         }
       } else {
         const state = location.state as { from?: { pathname?: string } } | undefined;
-        navigate(state?.from?.pathname || '/artist-dashboard');
+        navigate(state?.from?.pathname || '/dashboard');
       }
     } catch (error: any) {
       const errorCode = String(error?.code || error?.name || '');
@@ -210,7 +210,7 @@ const SignIn: React.FC = () => {
                   <Button
                     size="small"
                     variant="outlined"
-                    onClick={() => navigate('/artist-signup')}
+                    onClick={() => navigate('/signup')}
                   >
                     Create Account
                   </Button>
@@ -298,7 +298,7 @@ const SignIn: React.FC = () => {
                 variant="outlined"
                 fullWidth
                 size="large"
-                onClick={() => navigate('/artist-signup')}
+                onClick={() => navigate('/signup')}
                 sx={{ py: 1.5 }}
               >
                 Join as Artist

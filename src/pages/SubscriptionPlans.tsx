@@ -22,7 +22,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import apiService, { SubscriptionPlan, UserSubscription } from '../services/api';
+import apiService, { SubscriptionPlan, UserSubscription, User } from '../services/api';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../components/PageHeader';
 import SEO from '../components/SEO';
@@ -38,6 +38,7 @@ const SubscriptionPlans: React.FC = () => {
   const listingIdToActivate = locationState?.listingIdToActivate;
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [currentSubscription, setCurrentSubscription] = useState<UserSubscription | null>(null);
+  const [userType, setUserType] = useState<User['user_type'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +49,14 @@ const SubscriptionPlans: React.FC = () => {
       try {
         await fetchPlans();
         if (user?.id) {
-          await fetchCurrentSubscription();
+          const profile = await apiService.getUser(user.id);
+          const type = (profile?.user_type as User['user_type']) || 'artist';
+          setUserType(type);
+          if (type !== 'buyer') {
+            await fetchCurrentSubscription();
+          } else {
+            setCurrentSubscription(null);
+          }
         }
       } catch (err: any) {
         console.error('Error loading subscription plans page:', err);
@@ -102,7 +110,7 @@ const SubscriptionPlans: React.FC = () => {
   const handleSubscribeClick = (plan: SubscriptionPlan, billingPeriod: 'monthly' | 'yearly'): void => {
     if (!user?.id) {
       enqueueSnackbar('Please sign in to subscribe', { variant: 'error' });
-      navigate('/artist-signin');
+      navigate('/signin');
       return;
     }
     setPaymentPlan({ plan, billingPeriod });
@@ -184,6 +192,17 @@ const SubscriptionPlans: React.FC = () => {
         align="left"
       />
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: 6 }}>
+        {isAuthenticated && userType === 'buyer' && (
+          <Alert severity="info" sx={{ mb: 4 }}>
+            <Typography variant="body1" fontWeight={600} gutterBottom>
+              Ready to start selling?
+            </Typography>
+            <Typography variant="body2">
+              You are currently using a buyer account. Switch to a seller account and choose a subscription plan to list artwork and start selling on ArtZyla.
+            </Typography>
+          </Alert>
+        )}
+
         {listingIdToActivate && (
           <Alert severity="info" sx={{ mb: 4 }}>
             <Typography variant="body1">
@@ -225,7 +244,7 @@ const SubscriptionPlans: React.FC = () => {
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 Manage or cancel your subscription from your{' '}
-                <Button variant="text" size="small" onClick={() => navigate('/artist-dashboard', { state: { tab: 'subscription' } })} sx={{ p: 0, minWidth: 0 }}>
+                <Button variant="text" size="small" onClick={() => navigate('/dashboard', { state: { tab: 'subscription' } })} sx={{ p: 0, minWidth: 0 }}>
                   Artist Dashboard
                 </Button>
                 .
@@ -445,7 +464,7 @@ const SubscriptionPlans: React.FC = () => {
             <Button
               variant="contained"
               size="large"
-              onClick={() => navigate('/artist-signup')}
+              onClick={() => navigate('/signup')}
               sx={{ mt: 2 }}
             >
               Sign Up Now

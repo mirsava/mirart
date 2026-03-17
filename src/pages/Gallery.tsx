@@ -788,7 +788,7 @@ const Gallery: React.FC = () => {
                       <Button
                         variant="contained"
                         startIcon={<AddIcon />}
-                        onClick={() => navigate(user ? '/create-listing' : '/artist-signup')}
+                        onClick={() => navigate(user ? '/create-listing' : '/signup')}
                         sx={{
                           textTransform: 'none',
                         }}

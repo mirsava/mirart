@@ -270,7 +270,7 @@ const SignUp: React.FC = () => {
           specialties: normalizedSpecialties,
           experience_level: normalizedExperience,
         });
-        navigate('/artist-dashboard');
+        navigate('/dashboard');
       } catch (dbError) {
         console.error('Error saving user data to database:', dbError);
         setErrors({ general: 'Failed to save profile. Please try again.' });
@@ -350,7 +350,7 @@ const SignUp: React.FC = () => {
           plan_id: String(formData.selectedPlanId),
           billing_period: formData.billingPeriod,
           cognito_username: formData.username,
-          cancel_url: '/artist-signup',
+          cancel_url: '/signup',
         },
       });
       if (result?.url) {
@@ -533,7 +533,7 @@ const SignUp: React.FC = () => {
               <Box sx={{ mt: 2 }}>
                 <Button
                   variant="text"
-                  onClick={() => navigate('/artist-signin')}
+                  onClick={() => navigate('/signin')}
                   sx={{ textTransform: 'none' }}
                 >
                   Go to Sign In
@@ -1296,7 +1296,7 @@ const SignUp: React.FC = () => {
                     variant="text" 
                     size="small" 
                     sx={{ p: 0, minWidth: 'auto' }}
-                    onClick={() => navigate('/artist-signin')}
+                    onClick={() => navigate('/signin')}
                   >
                     Sign in here
                   </Button>

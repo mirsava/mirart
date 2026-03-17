@@ -65,7 +65,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
     e.stopPropagation();
     e.preventDefault();
     if (!isAuthenticated || !user?.id) {
-      navigate('/artist-signin', { state: { returnTo: 'checkout', pendingAdd: painting } });
+      navigate('/signin', { state: { returnTo: 'checkout', pendingAdd: painting } });
       return;
     }
     try {
@@ -81,7 +81,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
     e.stopPropagation();
     
     if (!isAuthenticated || !user?.id) {
-      navigate('/artist-signin');
+      navigate('/signin');
       return;
     }
 

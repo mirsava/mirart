@@ -218,7 +218,7 @@ const Checkout: React.FC = () => {
   const handleStripeCheckout = async (): Promise<void> => {
     if (!user?.id) {
       enqueueSnackbar('Please sign in to complete your purchase', { variant: 'error' });
-      navigate('/artist-signin');
+      navigate('/signin');
       return;
     }
 
@@ -318,7 +318,7 @@ const Checkout: React.FC = () => {
 
     if (!user?.id) {
       enqueueSnackbar('Please sign in to complete your purchase', { variant: 'error' });
-      navigate('/artist-signin');
+      navigate('/signin');
       return;
     }
 
@@ -340,7 +340,7 @@ const Checkout: React.FC = () => {
         }
         enqueueSnackbar('Listings activated successfully!', { variant: 'success' });
         clearCart();
-        navigate('/artist-dashboard');
+        navigate('/dashboard');
       } catch (error: any) {
         enqueueSnackbar(error.message || 'Failed to activate listings.', { variant: 'error' });
       } finally {

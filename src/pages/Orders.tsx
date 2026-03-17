@@ -35,7 +35,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
-import apiService, { Order } from '../services/api';
+import apiService, { Order, User } from '../services/api';
 import PageHeader from '../components/PageHeader';
 import OrderCardComponent, { getReturnEligibility } from '../components/OrderCard';
 
@@ -45,6 +45,7 @@ const Orders: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const [tabValue, setTabValue] = useState(0);
+  const [userType, setUserType] = useState<User['user_type'] | null>(null);
   const [purchases, setPurchases] = useState<Order[]>([]);
   const [sales, setSales] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +68,7 @@ const Orders: React.FC = () => {
   const [returnReason, setReturnReason] = useState('');
   const [returnLoading, setReturnLoading] = useState(false);
   const [highlightedOrderId, setHighlightedOrderId] = useState<number | null>(null);
+  const isBuyerOnly = userType === 'buyer';
 
   const filterOrders = (orders: Order[]) => {
     return orders.filter((order) => {
@@ -93,18 +95,33 @@ const Orders: React.FC = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) {
+      setUserType(null);
+      return;
+    }
+    const fetchUserType = async () => {
+      try {
+        const profile = await apiService.getUser(user.id);
+        setUserType((profile?.user_type as User['user_type']) || 'artist');
+      } catch {
+        setUserType('artist');
+      }
+    };
+    fetchUserType();
+  }, [isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
       setLoading(false);
       return;
     }
+    if (!userType) return;
 
     const fetchOrders = async () => {
       setLoading(true);
       setError(null);
       try {
-        const [purchasesData, salesData] = await Promise.all([
-          apiService.getUserOrders(user.id, 'buyer'),
-          apiService.getUserOrders(user.id, 'seller'),
-        ]);
+        const purchasesData = await apiService.getUserOrders(user.id, 'buyer');
+        const salesData = userType === 'buyer' ? [] : await apiService.getUserOrders(user.id, 'seller');
         setPurchases(purchasesData || []);
         setSales(salesData || []);
       } catch (err: unknown) {
@@ -117,7 +134,13 @@ const Orders: React.FC = () => {
     };
 
     fetchOrders();
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, userType]);
+
+  useEffect(() => {
+    if (isBuyerOnly && tabValue !== 0) {
+      setTabValue(0);
+    }
+  }, [isBuyerOnly, tabValue]);
 
   useEffect(() => {
     apiService.isShippingConfigured().then((r) => setShippingConfigured(r.configured)).catch(() => setShippingConfigured(false));
@@ -129,7 +152,7 @@ const Orders: React.FC = () => {
     const oid = parseInt(orderIdParam, 10);
     if (isNaN(oid)) return;
     const purchaseIndex = purchases.findIndex((o) => o.id === oid);
-    const salesIndex = sales.findIndex((o) => o.id === oid);
+    const salesIndex = isBuyerOnly ? -1 : sales.findIndex((o) => o.id === oid);
 
     setStatusFilter('all');
     setSearchTerm('');
@@ -151,19 +174,18 @@ const Orders: React.FC = () => {
       next.delete('order');
       return next;
     }, { replace: true });
-  }, [orderIdParam, loading, purchases, sales, setSearchParams, ordersPerPage]);
+  }, [orderIdParam, loading, purchases, sales, setSearchParams, ordersPerPage, isBuyerOnly]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    if (isBuyerOnly && newValue !== 0) return;
     setTabValue(newValue);
   };
 
   const refreshOrders = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !userType) return;
     try {
-      const [purchasesData, salesData] = await Promise.all([
-        apiService.getUserOrders(user.id, 'buyer'),
-        apiService.getUserOrders(user.id, 'seller'),
-      ]);
+      const purchasesData = await apiService.getUserOrders(user.id, 'buyer');
+      const salesData = userType === 'buyer' ? [] : await apiService.getUserOrders(user.id, 'seller');
       setPurchases(purchasesData || []);
       setSales(salesData || []);
     } catch {
@@ -296,7 +318,7 @@ const Orders: React.FC = () => {
         <Box sx={{ mt: 2 }}>
           <Typography
             component="button"
-            onClick={() => navigate('/artist-signin')}
+            onClick={() => navigate('/signin')}
             sx={{
               color: 'primary.main',
               cursor: 'pointer',
@@ -327,7 +349,7 @@ const Orders: React.FC = () => {
     <Box sx={{ bgcolor: 'background.default' }}>
         <PageHeader
           title="Orders"
-          subtitle="View and manage your purchases and sales"
+          subtitle={isBuyerOnly ? 'View and manage your purchases' : 'View and manage your purchases and sales'}
           align="left"
         />
 
@@ -392,11 +414,13 @@ const Orders: React.FC = () => {
               iconPosition="start"
               label={`Purchases (${purchases.length})`}
             />
-            <Tab
-              icon={<StoreIcon />}
-              iconPosition="start"
-              label={`Sales (${sales.length})`}
-            />
+            {!isBuyerOnly && (
+              <Tab
+                icon={<StoreIcon />}
+                iconPosition="start"
+                label={`Sales (${sales.length})`}
+              />
+            )}
           </Tabs>
 
           <Box sx={{ p: 3 }}>

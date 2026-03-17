@@ -23,7 +23,7 @@ const renderWithRouter = (authState: { user?: any; loading?: boolean; isAuthenti
     <MemoryRouter>
       <Routes>
         <Route path="/" element={<ProtectedRoute><div data-testid="protected-content">Protected</div></ProtectedRoute>} />
-        <Route path="/artist-signin" element={<div>Sign In</div>} />
+        <Route path="/signin" element={<div>Sign In</div>} />
       </Routes>
     </MemoryRouter>
   );

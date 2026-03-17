@@ -934,7 +934,7 @@ const EditListing: React.FC = () => {
                 <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                   <Button
                     variant="outlined"
-                    onClick={() => navigate('/artist-dashboard')}
+                    onClick={() => navigate('/dashboard')}
                     disabled={loading}
                   >
                     Cancel

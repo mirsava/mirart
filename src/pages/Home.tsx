@@ -464,7 +464,7 @@ const Home: React.FC = () => {
                           color: 'white',
                         },
                       }}
-                      onClick={() => navigate('/artist-signup')}
+                      onClick={() => navigate('/signup')}
                     >
                       Sell Your Art
                     </Button>
@@ -612,7 +612,7 @@ const Home: React.FC = () => {
                     <Button
                       variant="contained"
                       startIcon={<AddIcon />}
-                      onClick={() => navigate('/artist-signup')}
+                      onClick={() => navigate('/signup')}
                       sx={{
                         textTransform: 'none',
                       }}
@@ -726,7 +726,7 @@ const Home: React.FC = () => {
                     <Button
                       variant="contained"
                       startIcon={<AddIcon />}
-                      onClick={() => navigate('/artist-signup')}
+                      onClick={() => navigate('/signup')}
                       sx={{
                         textTransform: 'none',
                       }}
