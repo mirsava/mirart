@@ -33,7 +33,9 @@ router.post('/', async (req, res) => {
       shipping_address,
       payment_intent_id,
       shippo_rate_id,
-      shipping_cost
+      shipping_cost,
+      shipping_fee_charged,
+      shipping_label_cost
     } = req.body;
 
     if (!cognito_username) {
@@ -86,6 +88,13 @@ router.post('/', async (req, res) => {
 
     // Generate order number
     const order_number = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const requestedShippingFee = Number.parseFloat(String(shipping_fee_charged ?? shipping_cost ?? 0));
+    const requestedLabelCost = Number.parseFloat(String(shipping_label_cost ?? 0));
+    const listingFixedShippingFee = (parseFloat(String(listing.fixed_shipping_fee || 0)) || 0) * quantity;
+    const shippingFeeCharged = listing.shipping_preference === 'buyer'
+      ? (Number.isFinite(requestedShippingFee) && requestedShippingFee >= 0 ? requestedShippingFee : listingFixedShippingFee)
+      : 0;
+    const shippingLabelCost = Number.isFinite(requestedLabelCost) && requestedLabelCost > 0 ? requestedLabelCost : 0;
 
     // Create order
     const [result] = await pool.execute(
@@ -93,8 +102,8 @@ router.post('/', async (req, res) => {
         order_number, buyer_id, seller_id, listing_id, quantity,
         unit_price, total_price, platform_fee, artist_earnings,
         status, shipping_address, payment_intent_id,
-        shippo_rate_id, shipping_cost
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?)`,
+        shippo_rate_id, shipping_cost, shipping_fee_charged, shipping_label_cost
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?, ?, ?)`,
       [
         order_number,
         buyer_id,
@@ -108,7 +117,9 @@ router.post('/', async (req, res) => {
         shipping_address || null,
         payment_intent_id || null,
         shippo_rate_id || null,
-        shipping_cost ? parseFloat(shipping_cost) : 0
+        shippingLabelCost,
+        shippingFeeCharged,
+        shippingLabelCost
       ]
     );
 
@@ -185,7 +196,10 @@ router.post('/', async (req, res) => {
       unit_price: parseFloat(newOrder[0].unit_price),
       total_price: parseFloat(newOrder[0].total_price),
       platform_fee: parseFloat(newOrder[0].platform_fee),
-      artist_earnings: parseFloat(newOrder[0].artist_earnings)
+      artist_earnings: parseFloat(newOrder[0].artist_earnings),
+      shipping_cost: newOrder[0].shipping_cost ? parseFloat(newOrder[0].shipping_cost) : 0,
+      shipping_fee_charged: newOrder[0].shipping_fee_charged ? parseFloat(newOrder[0].shipping_fee_charged) : 0,
+      shipping_label_cost: newOrder[0].shipping_label_cost ? parseFloat(newOrder[0].shipping_label_cost) : 0
     });
   } catch (error) {
     console.error('Error creating order:', error);
@@ -216,6 +230,7 @@ router.get('/user/:cognitoUsername', async (req, res) => {
         l.primary_image_url,
         l.return_days,
         l.returns_info,
+        l.shipping_preference,
         u.email as buyer_email
        FROM orders o
        JOIN listings l ON o.listing_id = l.id
@@ -228,6 +243,7 @@ router.get('/user/:cognitoUsername', async (req, res) => {
         l.primary_image_url,
         l.return_days,
         l.returns_info,
+        l.shipping_preference,
         u.email as seller_email
        FROM orders o
        JOIN listings l ON o.listing_id = l.id
@@ -244,7 +260,9 @@ router.get('/user/:cognitoUsername', async (req, res) => {
       total_price: parseFloat(order.total_price),
       platform_fee: parseFloat(order.platform_fee),
       artist_earnings: parseFloat(order.artist_earnings),
-      shipping_cost: order.shipping_cost ? parseFloat(order.shipping_cost) : 0
+      shipping_cost: order.shipping_cost ? parseFloat(order.shipping_cost) : 0,
+      shipping_fee_charged: order.shipping_fee_charged ? parseFloat(order.shipping_fee_charged) : 0,
+      shipping_label_cost: order.shipping_label_cost ? parseFloat(order.shipping_label_cost) : 0
     })));
   } catch (error) {
     console.error('Error fetching orders:', error);
@@ -296,6 +314,8 @@ router.get('/:orderId', async (req, res) => {
       platform_fee: parseFloat(order.platform_fee),
       artist_earnings: parseFloat(order.artist_earnings),
       shipping_cost: order.shipping_cost ? parseFloat(order.shipping_cost) : 0,
+      shipping_fee_charged: order.shipping_fee_charged ? parseFloat(order.shipping_fee_charged) : 0,
+      shipping_label_cost: order.shipping_label_cost ? parseFloat(order.shipping_label_cost) : 0,
       payout_amount: order.payout_amount != null ? parseFloat(order.payout_amount) : null,
       payout_stripe_fee: order.payout_stripe_fee != null ? parseFloat(order.payout_stripe_fee) : null,
       payout_label_cost: order.payout_label_cost != null ? parseFloat(order.payout_label_cost) : null,
@@ -403,11 +423,13 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
     }
 
     const artistEarnings = parseFloat(order.artist_earnings || 0) || 0;
-    const artist_earnings_cents = Math.round(artistEarnings * 100);
-    const shippingCost = parseFloat(order.shipping_cost || 0) || 0;
-    const labelCostCents = Math.round(shippingCost * 100);
+    const artistEarningsCents = Math.round(artistEarnings * 100);
+    const shippingFeeCharged = parseFloat(order.shipping_fee_charged || 0) || 0;
+    const shippingFeeChargedCents = Math.round(shippingFeeCharged * 100);
+    const shippingLabelCost = parseFloat(order.shipping_label_cost || order.shipping_cost || 0) || 0;
+    const labelCostCents = Math.round(shippingLabelCost * 100);
     const commissionPercent = await getPayoutCommissionPercent();
-    const commissionCents = Math.round((artist_earnings_cents * commissionPercent) / 100);
+    const commissionCents = Math.round((artistEarningsCents * commissionPercent) / 100);
 
     let stripeFeeCents = 0;
     const chargeId = pi.latest_charge;
@@ -419,18 +441,19 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
       : null;
     stripeFeeCents = Number(balanceTransaction?.fee || 0);
 
-    const payoutCents = Math.max(0, artist_earnings_cents - stripeFeeCents - labelCostCents - commissionCents);
+    const payoutBaseCents = artistEarningsCents + shippingFeeChargedCents;
+    const payoutCents = Math.max(0, payoutBaseCents - stripeFeeCents - labelCostCents - commissionCents);
     const payoutAmount = payoutCents / 100;
 
-    if (artist_earnings_cents > 0 && order.seller_stripe_account_id && !order.stripe_transfer_id) {
+    if (payoutBaseCents > 0 && order.seller_stripe_account_id && !order.stripe_transfer_id) {
       const existingTransferId = charge?.transfer
         ? (typeof charge.transfer === 'string' ? charge.transfer : charge.transfer.id)
         : null;
 
       if (existingTransferId) {
         await pool.execute('UPDATE orders SET stripe_transfer_id = ? WHERE payment_intent_id = ?', [existingTransferId, payment_intent_id]);
-        if (payoutCents < artist_earnings_cents) {
-          const reversalAmount = artist_earnings_cents - payoutCents;
+        if (payoutCents < payoutBaseCents) {
+          const reversalAmount = payoutBaseCents - payoutCents;
           await stripe.transfers.createReversal(existingTransferId, {
             amount: reversalAmount,
             metadata: {
@@ -463,12 +486,12 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
            artist_earnings = ?,
            payout_amount = ?,
            payout_stripe_fee = ?,
-           payout_label_cost = ?,
+          payout_label_cost = ?,
            payout_commission_percent = ?,
            payout_commission_amount = ?
        WHERE id = ?`,
       [
-        payoutAmount,
+        artistEarnings + shippingFeeCharged,
         payoutAmount,
         stripeFeeCents / 100,
         labelCostCents / 100,

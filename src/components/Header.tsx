@@ -197,8 +197,8 @@ const Header: React.FC = () => {
         ...(chatEnabled ? [{ label: 'Chat', path: null, onClick: () => openChat() }] : []),
       ]
     : [
-        { label: 'Sell Art', path: '/artist-signup' },
-        { label: 'Artist Sign In', path: '/artist-signin' },
+        { label: 'Create Account', path: '/artist-signup' },
+        { label: 'Sign In', path: '/artist-signin' },
       ];
 
   useEffect(() => {
@@ -937,7 +937,7 @@ const Header: React.FC = () => {
                       }}
                     >
                       <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
-                      Artists
+                      Account
                     </Button>
                   )}
                 </Box>
@@ -1449,7 +1449,7 @@ const Header: React.FC = () => {
           }}
         >
           <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
-          Sell Art
+          Create Account
         </MenuItem>
         <MenuItem 
           onClick={() => handleArtistMenuClick('/artist-signin')}
@@ -1460,7 +1460,7 @@ const Header: React.FC = () => {
           }}
         >
           <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
-          Artist Sign In
+          Sign In
         </MenuItem>
       </Menu>
 

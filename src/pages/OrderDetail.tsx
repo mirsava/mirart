@@ -89,12 +89,16 @@ const OrderDetail: React.FC = () => {
 
   const shippingLines = order.shipping_address?.split('\n').filter(Boolean) || [];
   const orderDate = new Date(order.created_at);
-  const shippingCost = order.shipping_cost || 0;
+  const shippingCost = Number(order.shipping_fee_charged ?? order.shipping_cost ?? 0) || 0;
+  const shippingLabelCost = Number(order.shipping_label_cost ?? 0) || 0;
+  const sellerPaysShipping = order.shipping_preference === 'free';
+  const shippingDisplay = shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : sellerPaysShipping ? 'Paid by seller' : 'FREE';
+  const shippingColor = shippingCost > 0 ? undefined : sellerPaysShipping ? 'primary.main' : 'success.main';
   const subtotal = order.unit_price * order.quantity;
   const tax = subtotal * 0.08;
   const payoutAmount = order.payout_amount ?? order.artist_earnings;
   const payoutStripeFee = order.payout_stripe_fee ?? 0;
-  const payoutLabelCost = order.payout_label_cost ?? shippingCost;
+  const payoutLabelCost = order.payout_label_cost ?? shippingLabelCost ?? order.shipping_cost ?? 0;
   const payoutCommissionAmount = order.payout_commission_amount ?? 0;
   const payoutCommissionPercent = order.payout_commission_percent ?? null;
 
@@ -235,10 +239,16 @@ const OrderDetail: React.FC = () => {
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.75 }}>
                 <Typography variant="body2" color="text.secondary">Shipping</Typography>
-                <Typography variant="body2" color={shippingCost === 0 ? 'success.main' : undefined}>
-                  {shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}
+                <Typography variant="body2" color={shippingColor}>
+                  {shippingDisplay}
                 </Typography>
               </Box>
+              {shippingLabelCost > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.75 }}>
+                  <Typography variant="body2" color="text.secondary">Shipping Label Cost</Typography>
+                  <Typography variant="body2">${shippingLabelCost.toFixed(2)}</Typography>
+                </Box>
+              )}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.75 }}>
                 <Typography variant="body2" color="text.secondary">Tax (est.)</Typography>
                 <Typography variant="body2">${tax.toFixed(2)}</Typography>

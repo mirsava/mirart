@@ -632,7 +632,7 @@ router.post('/', async (req, res) => {
       }
     }
     
-    const { shipping_info, returns_info, special_instructions, shipping_preference, shipping_carrier, return_days } = req.body;
+    const { shipping_info, returns_info, special_instructions, shipping_preference, shipping_carrier, return_days, fixed_shipping_fee } = req.body;
     
     const qty = quantity_available !== undefined && quantity_available !== null && quantity_available !== ''
       ? Math.max(0, parseInt(quantity_available))
@@ -643,6 +643,13 @@ router.post('/', async (req, res) => {
     const shipCarrier = (shipping_carrier === 'shippo' || shipping_carrier === 'own') ? shipping_carrier : null;
     const retDaysNum = return_days != null ? parseInt(String(return_days), 10) : null;
     const retDays = retDaysNum != null && !isNaN(retDaysNum) && retDaysNum > 0 && retDaysNum <= 365 ? retDaysNum : null;
+    const rawShippingFee = Number.parseFloat(String(fixed_shipping_fee ?? '0'));
+    const normalizedShippingFee = Number.isFinite(rawShippingFee) && rawShippingFee >= 0 ? rawShippingFee : 0;
+    const fixedShippingFee = shipPref === 'buyer' ? normalizedShippingFee : 0;
+
+    if (shipPref === 'buyer' && !(Number.isFinite(rawShippingFee) && rawShippingFee >= 0)) {
+      return res.status(400).json({ error: 'Buyer-paid listings require a valid shipping cost' });
+    }
 
     let result;
     try {
@@ -652,8 +659,8 @@ router.post('/', async (req, res) => {
           price, primary_image_url, image_urls, dimensions, medium, year,
           weight_oz, length_in, width_in, height_in,
           in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments,
-          shipping_preference, shipping_carrier, return_days
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          shipping_preference, shipping_carrier, return_days, fixed_shipping_fee
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           user_id,
           title,
@@ -679,14 +686,15 @@ router.post('/', async (req, res) => {
           allow_comments !== undefined ? Boolean(allow_comments) : true,
           shipPref,
           shipCarrier,
-          retDays
+          retDays,
+          fixedShippingFee
         ]
       );
     } catch (insertError) {
       console.error('Create listing INSERT error:', insertError.code, insertError.sqlMessage || insertError.message);
       const isBadField = insertError.code === 'ER_BAD_FIELD_ERROR';
       const msg = insertError.message || '';
-      const missingShipping = isBadField && (msg.includes('return_days') || msg.includes('shipping_preference') || msg.includes('shipping_carrier'));
+      const missingShipping = isBadField && (msg.includes('return_days') || msg.includes('shipping_preference') || msg.includes('shipping_carrier') || msg.includes('fixed_shipping_fee'));
       const missingParcel = isBadField && (msg.includes('weight_oz') || msg.includes('length_in') || msg.includes('width_in') || msg.includes('height_in'));
       if (missingShipping) {
         [result] = await pool.execute(
@@ -727,8 +735,8 @@ router.post('/', async (req, res) => {
             user_id, title, description, category, subcategory,
             price, primary_image_url, image_urls, dimensions, medium, year,
             in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments,
-            shipping_preference, shipping_carrier, return_days
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            shipping_preference, shipping_carrier, return_days, fixed_shipping_fee
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             user_id,
             title,
@@ -750,7 +758,8 @@ router.post('/', async (req, res) => {
             allow_comments !== undefined ? Boolean(allow_comments) : true,
             shipPref,
             shipCarrier,
-            retDays
+            retDays,
+            fixedShippingFee
           ]
         );
       } else {
@@ -970,7 +979,7 @@ router.put('/:id', async (req, res) => {
     
     // Get current listing to check status change
     const [current] = await pool.execute(
-      'SELECT user_id, status FROM listings WHERE id = ?',
+      'SELECT user_id, status, shipping_preference, fixed_shipping_fee FROM listings WHERE id = ?',
       [id]
     );
     
@@ -981,7 +990,7 @@ router.put('/:id', async (req, res) => {
     const updateFields = [];
     const updateValues = [];
     
-    const { shipping_info, returns_info, special_instructions, shipping_preference, shipping_carrier, return_days } = req.body;
+    const { shipping_info, returns_info, special_instructions, shipping_preference, shipping_carrier, return_days, fixed_shipping_fee } = req.body;
     
     if (title !== undefined) { updateFields.push('title = ?'); updateValues.push(title); }
     if (description !== undefined) { updateFields.push('description = ?'); updateValues.push(description); }
@@ -1013,10 +1022,32 @@ router.put('/:id', async (req, res) => {
     if (allow_comments !== undefined) { updateFields.push('allow_comments = ?'); updateValues.push(Boolean(allow_comments)); }
     if (shipping_preference !== undefined) { updateFields.push('shipping_preference = ?'); updateValues.push((shipping_preference === 'free' || shipping_preference === 'buyer') ? shipping_preference : null); }
     if (shipping_carrier !== undefined) { updateFields.push('shipping_carrier = ?'); updateValues.push((shipping_carrier === 'shippo' || shipping_carrier === 'own') ? shipping_carrier : null); }
+    if (fixed_shipping_fee !== undefined) {
+      const parsedFee = Number.parseFloat(String(fixed_shipping_fee));
+      if (!Number.isFinite(parsedFee) || parsedFee < 0) {
+        return res.status(400).json({ error: 'Shipping cost must be a non-negative number' });
+      }
+      updateFields.push('fixed_shipping_fee = ?');
+      updateValues.push(parsedFee);
+    }
     if (return_days !== undefined) {
       const rd = return_days == null || return_days === 'none' ? null : (parseInt(String(return_days), 10) || null);
       updateFields.push('return_days = ?');
       updateValues.push(rd != null && rd > 0 && rd <= 365 ? rd : null);
+    }
+
+    const effectiveShippingPreference = shipping_preference !== undefined
+      ? ((shipping_preference === 'free' || shipping_preference === 'buyer') ? shipping_preference : null)
+      : current[0].shipping_preference;
+    const effectiveShippingFee = fixed_shipping_fee !== undefined
+      ? Number.parseFloat(String(fixed_shipping_fee))
+      : Number.parseFloat(String(current[0].fixed_shipping_fee ?? 0));
+    if (effectiveShippingPreference === 'buyer' && (!Number.isFinite(effectiveShippingFee) || effectiveShippingFee < 0)) {
+      return res.status(400).json({ error: 'Buyer-paid listings require a valid shipping cost' });
+    }
+    if (effectiveShippingPreference !== 'buyer') {
+      updateFields.push('fixed_shipping_fee = ?');
+      updateValues.push(0);
     }
     
     updateValues.push(id);

@@ -58,6 +58,7 @@ const EditListing: React.FC = () => {
     allow_comments: true,
     shipping_preference: 'buyer' as 'free' | 'buyer',
     shipping_carrier: 'shippo' as 'shippo' | 'own',
+    fixed_shipping_fee: '',
     return_days: 30 as number | null,
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -151,6 +152,7 @@ const EditListing: React.FC = () => {
         allow_comments: listing.allow_comments === true || listing.allow_comments === 1 || (listing.allow_comments !== false && listing.allow_comments !== 0),
         shipping_preference: (listing.shipping_preference === 'free' || listing.shipping_preference === 'buyer') ? listing.shipping_preference : 'buyer',
         shipping_carrier: (listing.shipping_carrier === 'shippo' || listing.shipping_carrier === 'own') ? listing.shipping_carrier : 'shippo',
+        fixed_shipping_fee: ((listing as any).fixed_shipping_fee != null ? String((listing as any).fixed_shipping_fee) : ''),
         return_days: (listing.return_days != null && Number(listing.return_days) > 0 && Number(listing.return_days) <= 365) ? Number(listing.return_days) : (listing.return_days === null ? null : 30),
       });
 
@@ -377,6 +379,13 @@ const EditListing: React.FC = () => {
       setError('You must be logged in to edit a listing');
       return;
     }
+    if (formData.shipping_preference === 'buyer') {
+      const shippingFee = parseFloat(formData.fixed_shipping_fee);
+      if (!formData.fixed_shipping_fee.toString().trim() || isNaN(shippingFee) || shippingFee < 0) {
+        setError('Buyer-paid listings require a valid non-negative shipping cost');
+        return;
+      }
+    }
 
     setLoading(true);
     setError(null);
@@ -430,6 +439,9 @@ const EditListing: React.FC = () => {
         allow_comments: Boolean(formData.allow_comments),
         shipping_preference: formData.shipping_preference,
         shipping_carrier: formData.shipping_carrier,
+        fixed_shipping_fee: formData.shipping_preference === 'buyer'
+          ? (parseFloat(formData.fixed_shipping_fee) || 0)
+          : 0,
         return_days: formData.return_days,
         cognito_username: user.id,
         groups: user.groups || [],
@@ -760,7 +772,14 @@ const EditListing: React.FC = () => {
                   <RadioGroup
                     row
                     value={formData.shipping_preference}
-                    onChange={(e) => setFormData(prev => ({ ...prev, shipping_preference: e.target.value as 'free' | 'buyer' }))}
+                    onChange={(e) => {
+                      const nextPreference = e.target.value as 'free' | 'buyer';
+                      setFormData(prev => ({
+                        ...prev,
+                        shipping_preference: nextPreference,
+                        fixed_shipping_fee: nextPreference === 'buyer' ? prev.fixed_shipping_fee : '0',
+                      }));
+                    }}
                   >
                     <FormControlLabel value="free" control={<Radio color="primary" />} label="Free shipping" />
                     <FormControlLabel value="buyer" control={<Radio color="primary" />} label="Buyer pays" />
@@ -782,6 +801,20 @@ const EditListing: React.FC = () => {
                   </RadioGroup>
                 </FormControl>
               </Grid>
+              {formData.shipping_preference === 'buyer' && (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Shipping Cost"
+                    name="fixed_shipping_fee"
+                    value={formData.fixed_shipping_fee}
+                    onChange={handleChange}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    helperText="Shown to buyer at checkout"
+                  />
+                </Grid>
+              )}
               <Grid item xs={12}>
                 <TextField
                   fullWidth

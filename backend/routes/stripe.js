@@ -231,9 +231,49 @@ router.post('/create-checkout-session', async (req, res) => {
           quantity: 1,
         });
       }
-      const shippingCostStr = metadata?.shipping_cost;
-      if (shippingCostStr && parseFloat(shippingCostStr) > 0) {
-        const shippingCents = Math.round(parseFloat(shippingCostStr) * 100);
+      let shippingCents = 0;
+      try {
+        const rawOrderData = metadata?.order_data;
+        const orderData = typeof rawOrderData === 'string' ? JSON.parse(rawOrderData) : rawOrderData;
+        const orderItems = Array.isArray(orderData?.items) ? orderData.items : [];
+        if (orderItems.length > 0) {
+          const listingIds = [...new Set(orderItems.map((item) => Number(item.listing_id)).filter((id) => Number.isInteger(id) && id > 0))];
+          if (listingIds.length > 0) {
+            const placeholders = listingIds.map(() => '?').join(', ');
+            const [shippingListings] = await pool.execute(
+              `SELECT id, shipping_preference, shipping_carrier, fixed_shipping_fee FROM listings WHERE id IN (${placeholders})`,
+              listingIds
+            );
+            const listingMap = new Map(shippingListings.map((row) => [Number(row.id), row]));
+            const requestedShippingCents = Math.round((parseFloat(String(metadata?.shipping_cost || 0)) || 0) * 100);
+            const hasShippoOverride = Boolean(metadata?.shippo_rate_id) && requestedShippingCents > 0;
+            let fixedShippingCents = 0;
+            for (const item of orderItems) {
+              const listing = listingMap.get(Number(item.listing_id));
+              if (!listing || listing.shipping_preference !== 'buyer') continue;
+              const qty = Math.max(1, parseInt(String(item.quantity || 1), 10) || 1);
+              const listingFee = parseFloat(String(listing.fixed_shipping_fee || 0)) || 0;
+              const shouldUseOverride = hasShippoOverride && listing.shipping_carrier === 'shippo';
+              if (!shouldUseOverride) {
+                fixedShippingCents += Math.round(listingFee * 100) * qty;
+              }
+            }
+            shippingCents = fixedShippingCents + (hasShippoOverride ? requestedShippingCents : 0);
+          }
+        } else if (metadata?.shipping_cost && parseFloat(metadata.shipping_cost) > 0) {
+          shippingCents = Math.round(parseFloat(metadata.shipping_cost) * 100);
+        }
+      } catch {
+        if (metadata?.shipping_cost && parseFloat(metadata.shipping_cost) > 0) {
+          shippingCents = Math.round(parseFloat(metadata.shipping_cost) * 100);
+        }
+      }
+
+      if (metadata) {
+        metadata.shipping_cost = (shippingCents / 100).toFixed(2);
+      }
+
+      if (shippingCents > 0) {
         lineItems.push({
           price_data: {
             currency: 'usd',
@@ -439,6 +479,8 @@ router.get('/confirm-session', async (req, res) => {
       }
       const buyer_id = buyers[0].id;
       const createdOrders = [];
+      const requestedShippingCents = Math.round((parseFloat(String(metadata.shipping_cost || 0)) || 0) * 100);
+      let remainingShippoOverrideCents = requestedShippingCents;
 
       for (const item of orderItems || []) {
         const [listings] = await pool.execute(
@@ -454,12 +496,27 @@ router.get('/confirm-session', async (req, res) => {
         const total_price = unit_price * item.quantity;
         const platform_fee = 10.0;
         const artist_earnings = total_price - platform_fee;
+        let shipping_fee_charged = 0;
+        const requestedItemShippingFee = parseFloat(String(item.shipping_fee_charged ?? ''));
+        if (listing.shipping_preference === 'buyer') {
+          if (Number.isFinite(requestedItemShippingFee) && requestedItemShippingFee >= 0) {
+            shipping_fee_charged = requestedItemShippingFee;
+          } else
+          if (listing.shipping_carrier === 'shippo' && remainingShippoOverrideCents > 0) {
+            shipping_fee_charged = remainingShippoOverrideCents / 100;
+            remainingShippoOverrideCents = 0;
+          } else {
+            const fixedFee = parseFloat(String(listing.fixed_shipping_fee || 0)) || 0;
+            const qty = Math.max(1, parseInt(String(item.quantity || 1), 10) || 1);
+            shipping_fee_charged = fixedFee * qty;
+          }
+        }
         const order_number = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
         const [result] = await pool.execute(
-          `INSERT INTO orders (order_number, buyer_id, seller_id, listing_id, quantity, unit_price, total_price, platform_fee, artist_earnings, status, shipping_address, payment_intent_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?)`,
-          [order_number, buyer_id, listing.user_id, item.listing_id, item.quantity, unit_price, total_price, platform_fee, artist_earnings, shipping_address || '', transactionId]
+          `INSERT INTO orders (order_number, buyer_id, seller_id, listing_id, quantity, unit_price, total_price, platform_fee, artist_earnings, status, shipping_address, payment_intent_id, shippo_rate_id, shipping_cost, shipping_fee_charged, shipping_label_cost)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?, ?, ?)`,
+          [order_number, buyer_id, listing.user_id, item.listing_id, item.quantity, unit_price, total_price, platform_fee, artist_earnings, shipping_address || '', transactionId, metadata.shippo_rate_id || null, 0, shipping_fee_charged, 0]
         );
 
         await pool.execute('UPDATE listings SET status = ?, in_stock = ? WHERE id = ?', ['sold', false, item.listing_id]);

@@ -188,7 +188,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const cognitoUser = await getCurrentUser();
       return cognitoUser;
     } catch (error: any) {
-      throw new Error(error.message || 'Sign in failed');
+      const authError: any = new Error(error?.message || 'Sign in failed');
+      authError.name = error?.name || error?.code || 'SignInError';
+      authError.code = error?.code || error?.name;
+      throw authError;
     }
   };
 

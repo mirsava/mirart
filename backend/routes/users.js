@@ -131,6 +131,7 @@ router.post('/', async (req, res) => {
       bio,
       profile_image_url,
       signature_url,
+      user_type,
       address_line1,
       address_line2,
       address_city,
@@ -144,6 +145,7 @@ router.post('/', async (req, res) => {
       billing_zip,
       billing_country
     } = req.body;
+    const normalizedUserType = (user_type === 'artist' || user_type === 'buyer') ? user_type : null;
     
     // Check if user exists
     const [existing] = await pool.execute(
@@ -158,6 +160,7 @@ router.post('/', async (req, res) => {
           email = ?, first_name = ?, last_name = ?, business_name = ?, 
           phone = ?, country = ?, website = ?, social_instagram = ?, social_tiktok = ?, social_behance = ?, social_youtube = ?, specialties = ?, 
           experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?,
+          user_type = COALESCE(?, user_type),
           address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?,
           billing_line1 = ?, billing_line2 = ?, billing_city = ?, billing_state = ?, billing_zip = ?, billing_country = ?
         WHERE cognito_username = ?`,
@@ -178,6 +181,7 @@ router.post('/', async (req, res) => {
           (bio && bio.trim()) || null, 
           (profile_image_url && profile_image_url.trim()) || null,
           (signature_url && signature_url.trim()) || null,
+          normalizedUserType,
           (address_line1 && address_line1.trim()) || null,
           (address_line2 && address_line2.trim()) || null,
           (address_city && address_city.trim()) || null,
@@ -205,8 +209,10 @@ router.post('/', async (req, res) => {
       const [result] = await pool.execute(
         `INSERT INTO users (
           cognito_username, email, first_name, last_name, business_name,
-          phone, country, website, social_instagram, social_tiktok, social_behance, social_youtube, specialties, experience_level, bio, profile_image_url, signature_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          phone, country, website, social_instagram, social_tiktok, social_behance, social_youtube, specialties, experience_level, bio, profile_image_url, signature_url, user_type,
+          address_line1, address_line2, address_city, address_state, address_zip, address_country,
+          billing_line1, billing_line2, billing_city, billing_state, billing_zip, billing_country
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           cognito_username, 
           (email && email.trim()) || null, 
@@ -224,7 +230,20 @@ router.post('/', async (req, res) => {
           (experience_level && experience_level.trim()) || null, 
           (bio && bio.trim()) || null, 
           (profile_image_url && profile_image_url.trim()) || null,
-          (signature_url && signature_url.trim()) || null
+          (signature_url && signature_url.trim()) || null,
+          normalizedUserType || 'artist',
+          (address_line1 && address_line1.trim()) || null,
+          (address_line2 && address_line2.trim()) || null,
+          (address_city && address_city.trim()) || null,
+          (address_state && address_state.trim()) || null,
+          (address_zip && address_zip.trim()) || null,
+          (address_country && address_country.trim()) || 'US',
+          (billing_line1 && billing_line1.trim()) || null,
+          (billing_line2 && billing_line2.trim()) || null,
+          (billing_city && billing_city.trim()) || null,
+          (billing_state && billing_state.trim()) || null,
+          (billing_zip && billing_zip.trim()) || null,
+          (billing_country && billing_country.trim()) || 'US'
         ]
       );
       

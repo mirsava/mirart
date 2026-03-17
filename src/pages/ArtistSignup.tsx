@@ -16,16 +16,13 @@ import {
   Checkbox,
   Divider,
   CircularProgress,
-  Card,
-  CardContent,
   Radio,
-  RadioGroup,
   Chip,
+  SelectChangeEvent,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
   Person as PersonIcon,
-  Email as EmailIcon,
-  Lock as LockIcon,
   Business as BusinessIcon,
   Check as CheckIcon,
   Star as StarIcon,
@@ -34,11 +31,24 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
 import apiService, { SubscriptionPlan } from '../services/api';
+import {
+  SPECIALTIES,
+  EXPERIENCE_LEVELS,
+  COUNTRIES,
+  getPhoneTemplate,
+  buildPhoneTemplateValue,
+  applyPhoneMask,
+  countMaskSlots,
+  getDigitsWithoutCountryCode,
+} from '../utils/signupLookups';
 
 const ArtistSignup: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
   const { signUp, user, isAuthenticated } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
   
   // Get pre-filled data from location state (if redirected from sign-in)
   const locationState = location.state as { message?: string; email?: string; username?: string } | null;
@@ -53,9 +63,16 @@ const ArtistSignup: React.FC = () => {
     email: locationState?.email || '',
     password: '',
     confirmPassword: '',
+    userType: 'artist' as 'artist' | 'buyer',
     businessName: '',
     phone: '',
     country: '',
+    addressLine1: '',
+    addressLine2: '',
+    addressCity: '',
+    addressState: '',
+    addressZip: '',
+    addressCountry: 'US',
     specialties: [] as string[],
     experience: '',
     website: '',
@@ -111,22 +128,45 @@ const ArtistSignup: React.FC = () => {
     fetchPlans();
   }, [isCompletingProfile]);
 
-  const specialties = [
-    'Painting',
-    'Woodworking',
-    'Other',
-  ];
+  const selectedPhoneTemplate = getPhoneTemplate(formData.country);
 
-  const experienceLevels = [
-    'Just starting out',
-    '1-2 years',
-    '3-5 years',
-    '6-10 years',
-    '10+ years',
-    'Professional',
-  ];
+  const handlePhoneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const mask = selectedPhoneTemplate.mask;
+    const maxDigits = countMaskSlots(mask);
+    const strippedDigits = getDigitsWithoutCountryCode(event.target.value, selectedPhoneTemplate.code).slice(0, maxDigits);
+    const maskedValue = applyPhoneMask(mask, strippedDigits);
 
-  const handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      phone: maskedValue,
+    }));
+
+    if (errors.phone) {
+      setErrors((prev) => ({
+        ...prev,
+        phone: '',
+      }));
+    }
+  };
+
+  const handleCountryChange = (event: SelectChangeEvent<string>) => {
+    const nextCountry = event.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      country: nextCountry,
+      phone: '',
+    }));
+
+    if (errors.country || errors.phone) {
+      setErrors((prev) => ({
+        ...prev,
+        country: '',
+        phone: '',
+      }));
+    }
+  };
+
+  const handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
     setFormData(prev => ({
       ...prev,
       [field]: event.target.value,
@@ -169,11 +209,12 @@ const ArtistSignup: React.FC = () => {
       if (!formData.email.trim()) newErrors.email = 'Email is required';
       else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
     }
-    if (!formData.businessName.trim()) newErrors.businessName = 'Business/Studio name is required';
+    if (formData.phone && formData.phone.includes('_')) newErrors.phone = 'Please complete the phone number in the required format';
+    if (formData.userType === 'artist' && !formData.businessName.trim()) newErrors.businessName = 'Business/Studio name is required';
     if (!formData.country.trim()) newErrors.country = 'Country is required';
-    if (formData.specialties.length === 0) newErrors.specialties = 'Please select at least one specialty';
+    if (formData.userType === 'artist' && formData.specialties.length === 0) newErrors.specialties = 'Please select at least one specialty';
     if (!isCompletingProfile && !formData.agreeToTerms) newErrors.agreeToTerms = 'You must agree to the terms and conditions';
-    if (!isCompletingProfile && formData.paymentOption === 'payNow' && !formData.selectedPlanId) {
+    if (!isCompletingProfile && formData.userType === 'artist' && formData.paymentOption === 'payNow' && !formData.selectedPlanId) {
       newErrors.selectedPlanId = 'Please select a subscription plan';
     }
 
@@ -197,6 +238,11 @@ const ArtistSignup: React.FC = () => {
       return;
     }
 
+    const normalizedPhone = formData.phone && !formData.phone.includes('_') ? formData.phone : undefined;
+    const normalizedSpecialties = formData.userType === 'artist' ? formData.specialties.join(', ') : undefined;
+    const normalizedBusinessName = formData.userType === 'artist' ? (formData.businessName || undefined) : undefined;
+    const normalizedExperience = formData.userType === 'artist' ? (formData.experience || undefined) : undefined;
+
     if (isCompletingProfile && user?.id) {
       setIsLoading(true);
       try {
@@ -205,12 +251,19 @@ const ArtistSignup: React.FC = () => {
           email: user.email || formData.email || '',
           first_name: formData.firstName,
           last_name: formData.lastName,
-          business_name: formData.businessName,
-          phone: formData.phone || null,
+          business_name: normalizedBusinessName,
+          user_type: formData.userType,
+          phone: normalizedPhone,
           country: formData.country,
-          website: formData.website || null,
-          specialties: formData.specialties,
-          experience_level: formData.experience,
+          address_line1: formData.addressLine1 || undefined,
+          address_line2: formData.addressLine2 || undefined,
+          address_city: formData.addressCity || undefined,
+          address_state: formData.addressState || undefined,
+          address_zip: formData.addressZip || undefined,
+          address_country: formData.addressCountry || 'US',
+          website: formData.website || undefined,
+          specialties: normalizedSpecialties,
+          experience_level: normalizedExperience,
         });
         navigate('/artist-dashboard');
       } catch (dbError) {
@@ -223,7 +276,7 @@ const ArtistSignup: React.FC = () => {
     }
 
     // If Pay Now with plan selected, go to payment; otherwise sign up directly (Pay Later)
-    if (formData.paymentOption === 'payNow' && formData.selectedPlanId) {
+    if (formData.userType === 'artist' && formData.paymentOption === 'payNow' && formData.selectedPlanId) {
       setPaymentStep(true);
       return;
     }
@@ -236,8 +289,8 @@ const ArtistSignup: React.FC = () => {
         given_name: formData.firstName,
         family_name: formData.lastName,
       };
-      if (formData.phone?.trim()) {
-        let formattedPhone = formData.phone.trim();
+      if (normalizedPhone?.trim()) {
+        let formattedPhone = normalizedPhone.trim();
         if (!formattedPhone.startsWith('+')) {
           formattedPhone = '+1' + formattedPhone.replace(/\D/g, '');
         }
@@ -249,12 +302,19 @@ const ArtistSignup: React.FC = () => {
         email: formData.email,
         first_name: formData.firstName,
         last_name: formData.lastName,
-        business_name: formData.businessName,
-        phone: formData.phone || null,
+        business_name: normalizedBusinessName,
+        user_type: formData.userType,
+        phone: normalizedPhone,
         country: formData.country,
-        website: formData.website || null,
-        specialties: formData.specialties,
-        experience_level: formData.experience,
+        address_line1: formData.addressLine1 || undefined,
+        address_line2: formData.addressLine2 || undefined,
+        address_city: formData.addressCity || undefined,
+        address_state: formData.addressState || undefined,
+        address_zip: formData.addressZip || undefined,
+        address_country: formData.addressCountry || 'US',
+        website: formData.website || undefined,
+        specialties: normalizedSpecialties,
+        experience_level: normalizedExperience,
       });
       setSignupSuccess(true);
       enqueueSnackbar('Account created! Please check your email to verify your account.', { variant: 'success' });
@@ -306,7 +366,9 @@ const ArtistSignup: React.FC = () => {
   return (
     <Box
       sx={{
-        background: 'radial-gradient(1200px 500px at 10% 0%, rgba(74, 58, 154, 0.12), transparent 68%), radial-gradient(900px 520px at 95% 12%, rgba(74, 58, 154, 0.1), transparent 72%), linear-gradient(180deg, #faf9ff 0%, #f5f3ff 100%)',
+        background: isDarkMode
+          ? `radial-gradient(1200px 500px at 10% 0%, ${alpha(theme.palette.primary.main, 0.22)}, transparent 68%), radial-gradient(900px 520px at 95% 12%, ${alpha(theme.palette.primary.main, 0.16)}, transparent 72%), linear-gradient(180deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`
+          : 'radial-gradient(1200px 500px at 10% 0%, rgba(74, 58, 154, 0.12), transparent 68%), radial-gradient(900px 520px at 95% 12%, rgba(74, 58, 154, 0.1), transparent 72%), linear-gradient(180deg, #faf9ff 0%, #f5f3ff 100%)',
         minHeight: '100vh',
       }}
     >
@@ -407,9 +469,9 @@ const ArtistSignup: React.FC = () => {
           p: { xs: 2.5, sm: 4, md: 5 }, 
           borderRadius: 3,
           border: '1px solid',
-          borderColor: 'rgba(74, 58, 154, 0.2)',
-          boxShadow: '0 14px 40px rgba(31, 24, 71, 0.08)',
-          bgcolor: 'rgba(255, 255, 255, 0.9)',
+          borderColor: isDarkMode ? alpha(theme.palette.primary.main, 0.35) : 'rgba(74, 58, 154, 0.2)',
+          boxShadow: isDarkMode ? `0 14px 40px ${alpha('#000', 0.4)}` : '0 14px 40px rgba(31, 24, 71, 0.08)',
+          bgcolor: isDarkMode ? alpha(theme.palette.background.paper, 0.92) : 'rgba(255, 255, 255, 0.9)',
           backdropFilter: 'blur(8px)',
           '& .MuiTextField-root .MuiOutlinedInput-root': {
             borderRadius: 2,
@@ -447,12 +509,19 @@ const ArtistSignup: React.FC = () => {
                       email: formData.email,
                       first_name: formData.firstName,
                       last_name: formData.lastName,
-                      business_name: formData.businessName,
+                      business_name: formData.userType === 'artist' ? (formData.businessName || null) : null,
+                      user_type: formData.userType,
                       phone: formData.phone || null,
                       country: formData.country,
+                      address_line1: formData.addressLine1 || null,
+                      address_line2: formData.addressLine2 || null,
+                      address_city: formData.addressCity || null,
+                      address_state: formData.addressState || null,
+                      address_zip: formData.addressZip || null,
+                      address_country: formData.addressCountry || 'US',
                       website: formData.website || null,
-                      specialties: formData.specialties,
-                      experience_level: formData.experience,
+                      specialties: formData.userType === 'artist' ? formData.specialties : [],
+                      experience_level: formData.userType === 'artist' ? formData.experience : null,
                     },
                   } 
                 })}
@@ -494,6 +563,107 @@ const ArtistSignup: React.FC = () => {
                 </Alert>
               )}
               <Grid container spacing={2.5}>
+              <Grid item xs={12} id="field-userType">
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  Account Type
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.75 }}>
+                  Choose how you want to use ArtZyla.
+                </Typography>
+                <Grid container spacing={1.5}>
+                  {[
+                    {
+                      value: 'buyer' as const,
+                      title: 'Buyer',
+                      description: 'Discover and collect artwork from artists.',
+                      icon: <PersonIcon fontSize="small" />,
+                    },
+                    {
+                      value: 'artist' as const,
+                      title: 'Seller (Artist)',
+                      description: 'List, manage, and sell your work directly.',
+                      icon: <BusinessIcon fontSize="small" />,
+                    },
+                  ].map((option) => {
+                    const selected = formData.userType === option.value;
+                    const handleSelect = () => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        userType: option.value,
+                        paymentOption: option.value === 'artist' ? prev.paymentOption : 'payLater',
+                        selectedPlanId: option.value === 'artist' ? prev.selectedPlanId : null,
+                      }));
+                    };
+
+                    return (
+                      <Grid item xs={12} sm={6} key={option.value}>
+                        <Paper
+                          elevation={0}
+                          role="button"
+                          tabIndex={0}
+                          onClick={handleSelect}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleSelect();
+                            }
+                          }}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            border: '2px solid',
+                            borderColor: selected ? 'primary.main' : 'divider',
+                            bgcolor: selected ? alpha(theme.palette.primary.main, isDarkMode ? 0.28 : 0.08) : 'background.paper',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              borderColor: 'primary.main',
+                              bgcolor: selected
+                                ? alpha(theme.palette.primary.main, isDarkMode ? 0.32 : 0.1)
+                                : alpha(theme.palette.primary.main, isDarkMode ? 0.2 : 0.04),
+                            },
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                            <Box
+                              sx={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: '10px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: selected ? 'primary.main' : 'action.hover',
+                                color: selected ? 'primary.contrastText' : 'text.primary',
+                                mt: 0.25,
+                              }}
+                            >
+                              {option.icon}
+                            </Box>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                                  {option.title}
+                                </Typography>
+                                <Radio
+                                  checked={selected}
+                                  onChange={handleSelect}
+                                  onClick={(e) => e.stopPropagation()}
+                                  value={option.value}
+                                  inputProps={{ 'aria-label': option.title }}
+                                />
+                              </Box>
+                              <Typography variant="body2" color="text.secondary">
+                                {option.description}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Grid>
               <Grid item xs={12} sm={6} id="field-firstName">
                 <TextField
                   fullWidth
@@ -574,34 +744,98 @@ const ArtistSignup: React.FC = () => {
               <Grid item xs={12} id="field-businessName">
                 <TextField
                   fullWidth
-                  label="Business/Studio Name"
+                  label={formData.userType === 'artist' ? 'Business/Studio Name' : 'Display Name (optional)'}
                   value={formData.businessName}
                   onChange={handleInputChange('businessName')}
                   error={!!errors.businessName}
                   helperText={errors.businessName}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Phone Number (optional)"
-                  value={formData.phone}
-                  onChange={handleInputChange('phone')}
-                  placeholder="+1 (555) 123-4567"
-                  helperText="Include country code (e.g., +1 for US)"
+                  required={formData.userType === 'artist'}
                 />
               </Grid>
               <Grid item xs={12} sm={6} id="field-country">
+                <FormControl fullWidth error={!!errors.country} required>
+                  <InputLabel>Country</InputLabel>
+                  <Select
+                    value={formData.country}
+                    onChange={handleCountryChange}
+                    label="Country"
+                  >
+                    {COUNTRIES.map((country) => (
+                      <MenuItem key={country} value={country}>
+                        {country}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <FormHelperText>{errors.country}</FormHelperText>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6} id="field-phone">
                 <TextField
                   fullWidth
-                  label="Country"
-                  value={formData.country}
-                  onChange={handleInputChange('country')}
-                  error={!!errors.country}
-                  helperText={errors.country}
-                  required
+                  label="Phone Number (optional)"
+                  value={formData.phone || buildPhoneTemplateValue(selectedPhoneTemplate.mask)}
+                  onChange={handlePhoneChange}
+                  error={!!errors.phone}
+                  helperText={errors.phone || `Use ${selectedPhoneTemplate.code} format for ${formData.country || 'your country'}`}
                 />
+              </Grid>
+              <Grid item xs={12} id="field-addressLine1">
+                <TextField
+                  fullWidth
+                  label="Shipping Address Line 1 (optional)"
+                  value={formData.addressLine1}
+                  onChange={handleInputChange('addressLine1')}
+                  placeholder="Street address"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Shipping Address Line 2 (optional)"
+                  value={formData.addressLine2}
+                  onChange={handleInputChange('addressLine2')}
+                  placeholder="Apartment, suite, etc."
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  label="Shipping City (optional)"
+                  value={formData.addressCity}
+                  onChange={handleInputChange('addressCity')}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  label="Shipping State/Province (optional)"
+                  value={formData.addressState}
+                  onChange={handleInputChange('addressState')}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  label="Shipping ZIP/Postal (optional)"
+                  value={formData.addressZip}
+                  onChange={handleInputChange('addressZip')}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Shipping Country</InputLabel>
+                  <Select
+                    value={formData.addressCountry}
+                    onChange={(e) => setFormData(prev => ({ ...prev, addressCountry: e.target.value as string }))}
+                    label="Shipping Country"
+                  >
+                    <MenuItem value="US">United States</MenuItem>
+                    <MenuItem value="CA">Canada</MenuItem>
+                    <MenuItem value="GB">United Kingdom</MenuItem>
+                    <MenuItem value="AU">Australia</MenuItem>
+                    <MenuItem value="OTHER">Other</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12}>
                 <TextField
@@ -612,53 +846,57 @@ const ArtistSignup: React.FC = () => {
                   placeholder="https://yourwebsite.com"
                 />
               </Grid>
-              <Grid item xs={12} id="field-specialties">
-                <FormControl error={!!errors.specialties} fullWidth>
-                  <Typography variant="h6" gutterBottom>
-                    Art Specialties *
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Select all that apply to your work
-                  </Typography>
-                  <Box sx={{ p: 2 }}>
-                    <Grid container spacing={1}>
-                      {specialties.map((specialty) => (
-                        <Grid item xs={6} sm={4} md={3} key={specialty}>
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={formData.specialties.includes(specialty)}
-                                onChange={() => handleSpecialtyChange(specialty)}
-                                color={errors.specialties ? 'error' : 'primary'}
-                              />
-                            }
-                            label={specialty}
-                          />
-                        </Grid>
+              {formData.userType === 'artist' && (
+                <Grid item xs={12} id="field-specialties">
+                  <FormControl error={!!errors.specialties} fullWidth>
+                    <Typography variant="h6" gutterBottom>
+                      Art Specialties *
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Select all that apply to your work
+                    </Typography>
+                    <Box sx={{ p: 2 }}>
+                      <Grid container spacing={1}>
+                        {SPECIALTIES.map((specialty) => (
+                          <Grid item xs={6} sm={4} md={3} key={specialty}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={formData.specialties.includes(specialty)}
+                                  onChange={() => handleSpecialtyChange(specialty)}
+                                  color={errors.specialties ? 'error' : 'primary'}
+                                />
+                              }
+                              label={specialty}
+                            />
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Box>
+                    <FormHelperText error={!!errors.specialties} sx={{ mt: 1 }}>
+                      {errors.specialties}
+                    </FormHelperText>
+                  </FormControl>
+                </Grid>
+              )}
+              {formData.userType === 'artist' && (
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>Experience Level</InputLabel>
+                    <Select
+                      value={formData.experience}
+                      onChange={handleInputChange('experience')}
+                      label="Experience Level"
+                    >
+                      {EXPERIENCE_LEVELS.map((level) => (
+                        <MenuItem key={level} value={level}>
+                          {level}
+                        </MenuItem>
                       ))}
-                    </Grid>
-                  </Box>
-                  <FormHelperText error={!!errors.specialties} sx={{ mt: 1 }}>
-                    {errors.specialties}
-                  </FormHelperText>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <InputLabel>Experience Level</InputLabel>
-                  <Select
-                    value={formData.experience}
-                    onChange={handleInputChange('experience')}
-                    label="Experience Level"
-                  >
-                    {experienceLevels.map((level) => (
-                      <MenuItem key={level} value={level}>
-                        {level}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
               {!isCompletingProfile && (
                 <Grid item xs={12} id="field-agreeToTerms">
                   <Divider sx={{ my: 2 }} />
@@ -693,16 +931,16 @@ const ArtistSignup: React.FC = () => {
             </Grid>
 
             {/* Payment Option: Pay Now vs Pay Later */}
-            {!isCompletingProfile && (
+            {!isCompletingProfile && formData.userType === 'artist' && (
               <Box 
                 sx={{ 
                   mt: 4, 
                   mb: 4,
                   p: { xs: 2.5, sm: 3.5 },
                   borderRadius: 2.5,
-                  bgcolor: 'rgba(74, 58, 154, 0.04)',
+                  bgcolor: alpha(theme.palette.primary.main, isDarkMode ? 0.18 : 0.04),
                   border: '1px solid',
-                  borderColor: 'rgba(74, 58, 154, 0.16)',
+                  borderColor: alpha(theme.palette.primary.main, isDarkMode ? 0.36 : 0.16),
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
@@ -736,10 +974,16 @@ const ArtistSignup: React.FC = () => {
                       cursor: 'pointer',
                       border: '2px solid',
                       borderColor: formData.paymentOption === 'payLater' ? 'primary.main' : 'divider',
-                      bgcolor: formData.paymentOption === 'payLater' ? 'rgba(74, 58, 154, 0.09)' : 'background.paper',
+                      bgcolor: formData.paymentOption === 'payLater'
+                        ? alpha(theme.palette.primary.main, isDarkMode ? 0.3 : 0.09)
+                        : 'background.paper',
                       borderRadius: 2,
                       transition: 'all 0.2s ease',
-                      '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(74, 58, 154, 0.05)', transform: 'translateY(-2px)' },
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: alpha(theme.palette.primary.main, isDarkMode ? 0.2 : 0.05),
+                        transform: 'translateY(-2px)',
+                      },
                     }}
                   >
                     <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -759,10 +1003,16 @@ const ArtistSignup: React.FC = () => {
                       cursor: 'pointer',
                       border: '2px solid',
                       borderColor: formData.paymentOption === 'payNow' ? 'primary.main' : 'divider',
-                      bgcolor: formData.paymentOption === 'payNow' ? 'rgba(74, 58, 154, 0.09)' : 'background.paper',
+                      bgcolor: formData.paymentOption === 'payNow'
+                        ? alpha(theme.palette.primary.main, isDarkMode ? 0.3 : 0.09)
+                        : 'background.paper',
                       borderRadius: 2,
                       transition: 'all 0.2s ease',
-                      '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(74, 58, 154, 0.05)', transform: 'translateY(-2px)' },
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: alpha(theme.palette.primary.main, isDarkMode ? 0.2 : 0.05),
+                        transform: 'translateY(-2px)',
+                      },
                     }}
                   >
                     <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -884,7 +1134,7 @@ const ArtistSignup: React.FC = () => {
                                 cursor: 'pointer',
                                 border: isSelected ? '2px solid' : '1px solid',
                                 borderColor: isSelected ? 'primary.main' : 'divider',
-                                bgcolor: isSelected ? 'rgba(74, 58, 154, 0.05)' : 'background.paper',
+                                bgcolor: isSelected ? alpha(theme.palette.primary.main, isDarkMode ? 0.24 : 0.05) : 'background.paper',
                                 position: 'relative',
                                 borderRadius: 2,
                                 transition: 'all 0.2s ease',

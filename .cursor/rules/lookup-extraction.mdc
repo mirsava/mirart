@@ -1,0 +1,27 @@
+---
+description: Keep static form options and templates in shared lookup files
+alwaysApply: true
+---
+
+# Lookup Extraction Rule
+
+- Do not keep long static option lists or template maps inline in page/component files.
+- Extract constants such as countries, experience levels, categories, enum-like labels, masks, and templates into shared lookup/util modules.
+- Prefer colocated domain files like `src/utils/*Lookups.ts` or `src/data/*.ts` with named exports.
+- Components should import lookups and helper functions instead of redefining arrays/maps.
+- Keep lookup files framework-agnostic (pure TypeScript data + pure helpers).
+- When one field depends on another (for example, phone format based on country), update dependent state deterministically (reset or remap) in the component handler.
+- Use clear names for exports (`COUNTRIES`, `EXPERIENCE_LEVELS`, `PHONE_TEMPLATES`, `getPhoneTemplate`).
+
+## Example
+
+```ts
+// lookup file
+export const COUNTRIES = ['United States', 'Canada'] as const;
+export const EXPERIENCE_LEVELS = ['1-2 years', '3-5 years'] as const;
+```
+
+```ts
+// component file
+import { COUNTRIES, EXPERIENCE_LEVELS } from '../utils/signupLookups';
+```

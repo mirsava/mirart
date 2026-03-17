@@ -62,6 +62,7 @@ const TEST_DATA = {
   allow_comments: true,
   shipping_preference: 'buyer' as 'free' | 'buyer',
   shipping_carrier: 'shippo' as 'shippo' | 'own',
+  fixed_shipping_fee: '18',
   return_days: 14 as number | null,
 };
 
@@ -75,6 +76,7 @@ const CreateListing: React.FC = () => {
     title: '',
     category: '',
     price: '',
+    fixed_shipping_fee: '',
   });
   const [testDataEnabled, setTestDataEnabled] = useState(false);
   const [formData, setFormData] = useState({
@@ -101,6 +103,7 @@ const CreateListing: React.FC = () => {
     allow_comments: true,
     shipping_preference: 'buyer' as 'free' | 'buyer',
     shipping_carrier: 'shippo' as 'shippo' | 'own',
+    fixed_shipping_fee: '',
     return_days: 30 as number | null,
   });
 
@@ -189,7 +192,7 @@ const CreateListing: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    if (name === 'title' || name === 'category' || name === 'price') {
+    if (name === 'title' || name === 'category' || name === 'price' || name === 'fixed_shipping_fee') {
       setFieldErrors((prev) => ({ ...prev, [name]: '' }));
     }
     setFormData((prev) => {
@@ -211,7 +214,7 @@ const CreateListing: React.FC = () => {
 
   const handleSelectChange = (e: any) => {
     const { name, value } = e.target;
-    if (name === 'title' || name === 'category' || name === 'price') {
+    if (name === 'title' || name === 'category' || name === 'price' || name === 'fixed_shipping_fee') {
       setFieldErrors((prev) => ({ ...prev, [name]: '' }));
     }
     setFormData((prev) => ({
@@ -225,6 +228,7 @@ const CreateListing: React.FC = () => {
       title: '',
       category: '',
       price: '',
+      fixed_shipping_fee: '',
     };
 
     if (!formData.title.trim()) nextErrors.title = 'Title is required';
@@ -237,11 +241,22 @@ const CreateListing: React.FC = () => {
         nextErrors.price = 'Enter a valid non-negative price';
       }
     }
+    if (formData.shipping_preference === 'buyer') {
+      if (!formData.fixed_shipping_fee.toString().trim()) {
+        nextErrors.fixed_shipping_fee = 'Shipping cost is required when buyer pays';
+      } else {
+        const shippingFeeNum = parseFloat(formData.fixed_shipping_fee);
+        if (isNaN(shippingFeeNum) || shippingFeeNum < 0) {
+          nextErrors.fixed_shipping_fee = 'Enter a valid non-negative shipping cost';
+        }
+      }
+    }
 
     setFieldErrors(nextErrors);
     const hasErrors = Object.values(nextErrors).some(Boolean);
     if (hasErrors) {
       if (nextErrors.title || nextErrors.category) setActiveStep(0);
+      else if (nextErrors.fixed_shipping_fee) setActiveStep(2);
       else if (nextErrors.price) setActiveStep(3);
     }
     return !hasErrors;
@@ -421,6 +436,9 @@ const CreateListing: React.FC = () => {
         allow_comments: formData.allow_comments,
         shipping_preference: formData.shipping_preference,
         shipping_carrier: formData.shipping_carrier,
+        fixed_shipping_fee: formData.shipping_preference === 'buyer'
+          ? (parseFloat(formData.fixed_shipping_fee) || 0)
+          : 0,
         return_days: formData.return_days,
       };
 
@@ -875,7 +893,14 @@ const CreateListing: React.FC = () => {
                         <RadioGroup
                           row
                           value={formData.shipping_preference}
-                          onChange={(e) => setFormData(prev => ({ ...prev, shipping_preference: e.target.value as 'free' | 'buyer' }))}
+                          onChange={(e) => {
+                            const nextPreference = e.target.value as 'free' | 'buyer';
+                            setFormData(prev => ({
+                              ...prev,
+                              shipping_preference: nextPreference,
+                              fixed_shipping_fee: nextPreference === 'buyer' ? prev.fixed_shipping_fee : '0',
+                            }));
+                          }}
                         >
                           <FormControlLabel value="free" control={<Radio color="primary" />} label="Free shipping" />
                           <FormControlLabel value="buyer" control={<Radio color="primary" />} label="Buyer pays" />
@@ -897,6 +922,21 @@ const CreateListing: React.FC = () => {
                         </RadioGroup>
                       </FormControl>
                     </Grid>
+                    {formData.shipping_preference === 'buyer' && (
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          type="number"
+                          label="Shipping Cost"
+                          name="fixed_shipping_fee"
+                          value={formData.fixed_shipping_fee}
+                          onChange={handleChange}
+                          inputProps={{ min: 0, step: 0.01 }}
+                          error={!!fieldErrors.fixed_shipping_fee}
+                          helperText={fieldErrors.fixed_shipping_fee || 'Shown to buyer at checkout'}
+                        />
+                      </Grid>
+                    )}
                     <Grid item xs={12}>
                       <TextField
                         fullWidth

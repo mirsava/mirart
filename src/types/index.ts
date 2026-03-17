@@ -18,6 +18,9 @@ export interface Artwork {
   isLiked?: boolean;
   imageCount?: number;
   shippingInfo?: string;
+  shipping_preference?: 'free' | 'buyer';
+  shipping_carrier?: 'shippo' | 'own';
+  fixed_shipping_fee?: number;
   avgRating?: number | null;
   reviewCount?: number;
 }

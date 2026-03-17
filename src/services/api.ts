@@ -32,6 +32,7 @@ export interface User {
   billing_zip?: string;
   billing_country?: string;
   active?: boolean;
+  user_type?: 'artist' | 'buyer' | 'admin';
   created_at?: string;
   updated_at?: string;
 }
@@ -68,6 +69,7 @@ export interface Listing {
   review_count?: number;
   shipping_preference?: 'free' | 'buyer';
   shipping_carrier?: 'shippo' | 'own';
+  fixed_shipping_fee?: number;
   return_days?: number | null;
 }
 
@@ -88,6 +90,8 @@ export interface Order {
   return_requested_at?: string;
   shipping_address?: string;
   shipping_cost?: number;
+  shipping_fee_charged?: number;
+  shipping_label_cost?: number;
   payout_amount?: number | null;
   payout_stripe_fee?: number | null;
   payout_label_cost?: number | null;
@@ -105,6 +109,7 @@ export interface Order {
   payment_intent_id?: string;
   return_days?: number | null;
   returns_info?: string | null;
+  shipping_preference?: 'free' | 'buyer';
   created_at: string;
   updated_at: string;
   listing_title?: string;

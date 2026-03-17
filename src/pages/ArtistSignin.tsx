@@ -27,6 +27,7 @@ const ArtistSignin: React.FC = () => {
   const location = useLocation();
   const { signIn } = useAuth();
   const { addToCart } = useCart();
+  const stateMessage = (location.state as { message?: string } | null)?.message || '';
   const [formData, setFormData] = useState({
     usernameOrEmail: '',
     password: '',
@@ -35,6 +36,8 @@ const ArtistSignin: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [requiresEmailVerification, setRequiresEmailVerification] = useState(false);
+  const [requiresSignup, setRequiresSignup] = useState(false);
 
   const handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -49,6 +52,12 @@ const ArtistSignin: React.FC = () => {
     }
     if (loginError) {
       setLoginError('');
+    }
+    if (requiresEmailVerification) {
+      setRequiresEmailVerification(false);
+    }
+    if (requiresSignup) {
+      setRequiresSignup(false);
     }
   };
 
@@ -74,6 +83,8 @@ const ArtistSignin: React.FC = () => {
 
     setIsLoading(true);
     setLoginError('');
+    setRequiresEmailVerification(false);
+    setRequiresSignup(false);
     
     try {
       const cognitoUser = await signIn(formData.usernameOrEmail, formData.password);
@@ -106,7 +117,35 @@ const ArtistSignin: React.FC = () => {
         navigate(state?.from?.pathname || '/artist-dashboard');
       }
     } catch (error: any) {
-      setLoginError(error.message || 'Invalid username/email or password. Please try again.');
+      const errorCode = String(error?.code || error?.name || '');
+      const errorMessage = String(error?.message || '');
+      const normalizedMessage = errorMessage.toLowerCase();
+      const isUnverified =
+        errorCode.includes('UserNotConfirmedException') ||
+        normalizedMessage.includes('not confirmed');
+      const isUserNotFound =
+        errorCode.includes('UserNotFoundException') ||
+        normalizedMessage.includes('user does not exist') ||
+        normalizedMessage.includes('user not found') ||
+        normalizedMessage.includes('account does not exist');
+      const isGenericInvalidCredentials =
+        normalizedMessage.includes('incorrect username or password') ||
+        normalizedMessage.includes('incorrect username/email or password') ||
+        normalizedMessage.includes('incorrect username or email');
+
+      if (isUnverified) {
+        setRequiresEmailVerification(true);
+        setLoginError('Please verify your email before logging in.');
+      } else if (isUserNotFound) {
+        setRequiresSignup(true);
+        setLoginError('We could not find an account with that username/email. Please create an account first.');
+      } else if (isGenericInvalidCredentials) {
+        setRequiresEmailVerification(true);
+        setRequiresSignup(true);
+        setLoginError('Incorrect username/email or password. If you do not have an account yet, create one. If you recently signed up, verify your email first.');
+      } else {
+        setLoginError(errorMessage || 'Invalid username/email or password. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -141,9 +180,42 @@ const ArtistSignin: React.FC = () => {
             </Typography>
           </Box>
 
+          {stateMessage && (
+            <Alert severity="success" sx={{ mb: 3 }}>
+              {stateMessage}
+            </Alert>
+          )}
+
           {loginError && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {loginError}
+            <Alert severity={requiresEmailVerification ? 'warning' : 'error'} sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Typography variant="body2">{loginError}</Typography>
+                {requiresEmailVerification && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() =>
+                      navigate('/confirm-signup', {
+                        state: {
+                          email: formData.usernameOrEmail.includes('@') ? formData.usernameOrEmail : '',
+                          username: formData.usernameOrEmail.includes('@') ? '' : formData.usernameOrEmail,
+                        },
+                      })
+                    }
+                  >
+                    Verify Email
+                  </Button>
+                )}
+                {requiresSignup && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => navigate('/artist-signup')}
+                  >
+                    Create Account
+                  </Button>
+                )}
+              </Box>
             </Alert>
           )}
 

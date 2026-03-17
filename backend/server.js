@@ -357,7 +357,8 @@ app.listen(PORT, async () => {
       { name: 'returns_info', sql: 'ADD COLUMN returns_info TEXT DEFAULT NULL' },
       { name: 'special_instructions', sql: 'ADD COLUMN special_instructions TEXT DEFAULT NULL' },
       { name: 'allow_comments', sql: 'ADD COLUMN allow_comments BOOLEAN DEFAULT TRUE' },
-      { name: 'quantity_available', sql: 'ADD COLUMN quantity_available INT DEFAULT 1' }
+      { name: 'quantity_available', sql: 'ADD COLUMN quantity_available INT DEFAULT 1' },
+      { name: 'fixed_shipping_fee', sql: 'ADD COLUMN fixed_shipping_fee DECIMAL(10, 2) DEFAULT 0' }
     ];
     for (const { name, sql } of listingCols) {
       const [lc] = await pool.execute(
@@ -396,6 +397,8 @@ app.listen(PORT, async () => {
   try {
     const trackingCols = [
       { name: 'shipping_cost', sql: "ADD COLUMN shipping_cost DECIMAL(10, 2) DEFAULT 0" },
+      { name: 'shipping_fee_charged', sql: "ADD COLUMN shipping_fee_charged DECIMAL(10, 2) DEFAULT 0" },
+      { name: 'shipping_label_cost', sql: "ADD COLUMN shipping_label_cost DECIMAL(10, 2) DEFAULT 0" },
       { name: 'shipping_carrier', sql: "ADD COLUMN shipping_carrier VARCHAR(50) NULL" },
       { name: 'tracking_number', sql: "ADD COLUMN tracking_number VARCHAR(100) NULL" },
       { name: 'tracking_url', sql: "ADD COLUMN tracking_url VARCHAR(500) NULL" },

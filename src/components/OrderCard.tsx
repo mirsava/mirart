@@ -113,6 +113,15 @@ const OrderCard: React.FC<OrderCardProps> = ({
   const hasCarrierLabel = Boolean(carrierLabel) && carrierLabel.toLowerCase() !== 'unknown';
   const trackingStatusLabel = (order.tracking_status || '').trim();
   const hasTrackingStatusLabel = Boolean(trackingStatusLabel) && trackingStatusLabel.toUpperCase() !== 'UNKNOWN';
+  const shippingCost = Number(order.shipping_fee_charged ?? order.shipping_cost ?? 0);
+  const shippingLabelCost = Number(order.shipping_label_cost ?? 0);
+  const sellerPaysShipping = order.shipping_preference === 'free';
+  const shippingDisplay = shippingCost > 0
+    ? `Shipping: $${shippingCost.toFixed(2)}`
+    : sellerPaysShipping
+      ? 'Shipping: Paid by seller'
+      : 'Shipping: FREE';
+  const shippingColor = shippingCost > 0 ? 'text.secondary' : sellerPaysShipping ? 'primary.main' : 'success.main';
 
   const hasActions =
     (type === 'sale' && order.status === 'paid') ||
@@ -216,11 +225,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
               <ShippingIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
               <Typography
                 variant="caption"
-                color={Number(order.shipping_cost || 0) > 0 ? 'text.secondary' : 'success.main'}
+                color={shippingColor}
               >
-                {Number(order.shipping_cost || 0) > 0
-                  ? `Shipping: $${Number(order.shipping_cost).toFixed(2)}`
-                  : 'Shipping: FREE'}
+                {shippingDisplay}
               </Typography>
               {order.shipping_carrier && !order.tracking_number && (
                 <Chip
@@ -229,6 +236,11 @@ const OrderCard: React.FC<OrderCardProps> = ({
                   variant="outlined"
                   sx={{ height: 20, fontSize: '0.65rem' }}
                 />
+              )}
+              {type === 'sale' && shippingLabelCost > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  Label cost: ${shippingLabelCost.toFixed(2)}
+                </Typography>
               )}
             </Box>
           )}

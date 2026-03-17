@@ -1,0 +1,32 @@
+---
+description: Keep source files small and modular
+alwaysApply: true
+---
+
+# Keep Files Small
+
+- Prefer small, focused files with one primary responsibility.
+- Target size: keep files at or under 300 lines.
+- Soft warning at 220+ lines: look for extraction opportunities before adding more.
+- Hard limit at 350+ lines: split before adding new features unless explicitly requested.
+- Extract repeated literals/config into lookup or util files.
+- Extract reusable UI blocks into components and shared hooks.
+- Avoid adding unrelated logic to an already large file.
+- New features in large files should be implemented by creating adjacent modules first.
+
+## Split Strategy
+
+- Move pure helpers to `src/utils/*`.
+- Move constants/lookups to `src/data/*` or `src/utils/*Lookups.ts`.
+- Move view sections to `src/components/*`.
+- Move stateful reusable logic to hooks.
+
+## Example
+
+```ts
+// ❌ BAD: huge page file with helpers/constants/UI mixed together
+```
+
+```ts
+// ✅ GOOD: page composes smaller modules from utils/components/hooks
+```

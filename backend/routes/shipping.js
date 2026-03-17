@@ -315,10 +315,11 @@ router.post('/label', async (req, res) => {
         label_url = ?,
         shippo_transaction_id = ?,
         shipping_cost = COALESCE(?, shipping_cost),
+        shipping_label_cost = COALESCE(?, shipping_label_cost, shipping_cost),
         shipping_carrier = ?,
         shipped_at = NOW()
        WHERE id = ?`,
-      [result.trackingNumber, result.trackingUrl, result.labelUrl, result.transactionId, rate_amount || null, carrier || null, order_id]
+      [result.trackingNumber, result.trackingUrl, result.labelUrl, result.transactionId, rate_amount || null, rate_amount || null, carrier || null, order_id]
     );
 
     if (order.buyer_id) {

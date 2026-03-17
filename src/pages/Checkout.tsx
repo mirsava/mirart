@@ -78,7 +78,23 @@ const Checkout: React.FC = () => {
 
   const artworkItems = cartItems.filter(item => item.type !== 'activation');
   const artworkTotal = artworkItems.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
-  const shippingCost = selectedRate ? parseFloat(selectedRate.amount) : 0;
+  const hasBuyerPaidShippoItems = artworkItems.some((item: any) => item.shipping_preference === 'buyer' && (item.shipping_carrier || 'shippo') === 'shippo');
+  const hasBuyerPaidOwnCarrierItems = artworkItems.some((item: any) => item.shipping_preference === 'buyer' && item.shipping_carrier === 'own');
+  const hasBuyerPaidShippingItems = artworkItems.some((item: any) => item.shipping_preference === 'buyer');
+  const hasSellerPaidShippingItems = artworkItems.some((item: any) => item.shipping_preference === 'free');
+  const fixedBuyerShippingCost = artworkItems.reduce((sum, item: any) => {
+    if (item.shipping_preference !== 'buyer') return sum;
+    const fee = parseFloat(String(item.fixed_shipping_fee || 0)) || 0;
+    return sum + (fee * item.quantity);
+  }, 0);
+  const fixedShippoShippingCost = artworkItems.reduce((sum, item: any) => {
+    if (item.shipping_preference !== 'buyer' || (item.shipping_carrier || 'shippo') !== 'shippo') return sum;
+    const fee = parseFloat(String(item.fixed_shipping_fee || 0)) || 0;
+    return sum + (fee * item.quantity);
+  }, 0);
+  const fixedOwnCarrierShippingCost = Math.max(0, fixedBuyerShippingCost - fixedShippoShippingCost);
+  const shippoOverrideCost = selectedRate ? parseFloat(selectedRate.amount) : null;
+  const shippingCost = fixedOwnCarrierShippingCost + (shippoOverrideCost != null ? shippoOverrideCost : fixedShippoShippingCost);
   const taxAmount = artworkTotal * 0.08;
   const orderTotal = getTotalPrice() + taxAmount + shippingCost;
 
@@ -88,10 +104,15 @@ const Checkout: React.FC = () => {
 
   useEffect(() => {
     if (shippingConfigured && artworkItems.length > 0) {
-      const hasBuyerPays = artworkItems.some((item: any) => item.shipping_preference === 'buyer');
-      setNeedsShippingRates(hasBuyerPays);
+      setNeedsShippingRates(hasBuyerPaidShippoItems);
+    } else if (!shippingConfigured) {
+      setNeedsShippingRates(false);
     }
-  }, [shippingConfigured, cartItems]);
+    if (!hasBuyerPaidShippoItems) {
+      setSelectedRate(null);
+      setShippingRates([]);
+    }
+  }, [shippingConfigured, cartItems, hasBuyerPaidShippoItems]);
 
   const fetchUserProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -130,7 +151,7 @@ const Checkout: React.FC = () => {
         name: `${formData.firstName} ${formData.lastName}`,
       };
       const items = artworkItems
-        .filter((item: any) => item.shipping_preference === 'buyer')
+        .filter((item: any) => item.shipping_preference === 'buyer' && (item.shipping_carrier || 'shippo') === 'shippo')
         .map(item => ({ listing_id: item.id, quantity: item.quantity }));
       if (items.length === 0) {
         setShippingRates([]);
@@ -139,9 +160,6 @@ const Checkout: React.FC = () => {
       }
       const result = await apiService.getShippingRates(address, items);
       setShippingRates(result.rates || []);
-      if (result.rates?.length > 0 && !selectedRate) {
-        setSelectedRate(result.rates[0]);
-      }
     } catch (err: any) {
       console.error('Failed to fetch shipping rates:', err);
       setShippingRates([]);
@@ -221,19 +239,35 @@ const Checkout: React.FC = () => {
         zipCode: formData.zipCode,
         country: formData.country,
       };
+      const shippoBuyerItems = artworkItems.filter((item: any) => item.shipping_preference === 'buyer' && (item.shipping_carrier || 'shippo') === 'shippo');
+      const shippoItemsSubtotal = shippoBuyerItems.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0);
+      const roundMoney = (value: number) => Math.round(value * 100) / 100;
       const orderData = {
-        items: artworkItems.map(item => ({ listing_id: item.id, quantity: item.quantity })),
+        items: artworkItems.map((item: any) => {
+          if (item.shipping_preference !== 'buyer') {
+            return { listing_id: item.id, quantity: item.quantity, shipping_fee_charged: 0 };
+          }
+          const itemFixedFee = (parseFloat(String(item.fixed_shipping_fee || 0)) || 0) * item.quantity;
+          const usesShippo = (item.shipping_carrier || 'shippo') === 'shippo';
+          if (!usesShippo || shippoOverrideCost == null || shippoItemsSubtotal <= 0) {
+            return { listing_id: item.id, quantity: item.quantity, shipping_fee_charged: roundMoney(itemFixedFee) };
+          }
+          const itemSubtotal = (item.price || 0) * item.quantity;
+          const proportionalFee = roundMoney((itemSubtotal / shippoItemsSubtotal) * shippoOverrideCost);
+          return { listing_id: item.id, quantity: item.quantity, shipping_fee_charged: proportionalFee };
+        }),
         shipping_address: `${formData.firstName} ${formData.lastName}\n${formData.address}\n${formData.city}, ${formData.state} ${formData.zipCode}\n${formData.country}`,
         cognito_username: user.id,
         shippo_rate_id: selectedRate?.object_id || null,
-        shipping_cost: shippingCost,
+        shipping_cost: roundMoney(shippingCost),
       };
       const result = await apiService.createStripeCheckoutSession(items, {
         shippingAddress,
         metadata: {
           order_data: orderData,
-          shipping_cost: shippingCost.toString(),
+          shipping_cost: roundMoney(shippingCost).toString(),
           shippo_rate_id: selectedRate?.object_id || '',
+          shipping_source: selectedRate?.object_id ? 'shippo_rate' : 'listing_fixed',
         },
       });
       if (result?.url) {
@@ -382,71 +416,86 @@ const Checkout: React.FC = () => {
   };
 
   const renderShippingRateSelection = () => {
-    if (!needsShippingRates) return null;
+    if (!needsShippingRates && !hasBuyerPaidOwnCarrierItems) return null;
 
     return (
       <Box sx={{ mt: 3 }}>
-        <Divider sx={{ mb: 3 }} />
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <ShippingIcon sx={{ mr: 1, color: 'primary.main' }} />
-          <Typography variant="subtitle1" fontWeight={600}>Shipping Method</Typography>
-        </Box>
-        {loadingRates ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
-            <CircularProgress size={24} />
-            <Typography variant="body2" color="text.secondary">Fetching shipping rates...</Typography>
-          </Box>
-        ) : shippingRates.length === 0 ? (
-          <Alert severity="info">
-            No shipping rates available. Rates will be calculated after you enter your shipping address and proceed.
+        {hasBuyerPaidOwnCarrierItems && (
+          <Alert severity="info" sx={{ mb: needsShippingRates ? 2 : 0 }}>
+            Some items use seller&apos;s own carrier with buyer-paid shipping. Their listing shipping cost is included at checkout.
           </Alert>
-        ) : (
-          <RadioGroup
-            value={selectedRate?.object_id || ''}
-            onChange={(e) => {
-              const rate = shippingRates.find(r => r.object_id === e.target.value);
-              setSelectedRate(rate || null);
-            }}
-          >
-            {shippingRates.map((rate) => (
-              <Paper
-                key={rate.object_id}
-                elevation={0}
-                sx={{
-                  mb: 1,
-                  p: 2,
-                  border: '1px solid',
-                  borderColor: selectedRate?.object_id === rate.object_id ? 'primary.main' : 'divider',
-                  borderRadius: 1,
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s',
-                  '&:hover': { borderColor: 'primary.light' },
+        )}
+        {needsShippingRates && (
+          <>
+            <Divider sx={{ mb: 3 }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <ShippingIcon sx={{ mr: 1, color: 'primary.main' }} />
+              <Typography variant="subtitle1" fontWeight={600}>Shippo Rate Override (Optional)</Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Default checkout uses listing shipping cost. You can optionally select a live Shippo rate to override Shippo items.
+            </Typography>
+            <Button variant="outlined" size="small" sx={{ mb: 2 }} onClick={() => setSelectedRate(null)}>
+              Use listing shipping cost
+            </Button>
+            {loadingRates ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
+                <CircularProgress size={24} />
+                <Typography variant="body2" color="text.secondary">Fetching shipping rates...</Typography>
+              </Box>
+            ) : shippingRates.length === 0 ? (
+              <Alert severity="info">
+                No live Shippo rates available. Listing shipping cost will be used.
+              </Alert>
+            ) : (
+              <RadioGroup
+                value={selectedRate?.object_id || ''}
+                onChange={(e) => {
+                  const rate = shippingRates.find(r => r.object_id === e.target.value);
+                  setSelectedRate(rate || null);
                 }}
-                onClick={() => setSelectedRate(rate)}
               >
-                <FormControlLabel
-                  value={rate.object_id}
-                  control={<Radio size="small" />}
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', ml: 1 }}>
-                      <Box>
-                        <Typography variant="body2" fontWeight={600}>
-                          {rate.provider} — {rate.servicelevel}
-                        </Typography>
-                        {rate.estimated_days && (
-                          <Typography variant="caption" color="text.secondary">
-                            Estimated {rate.estimated_days} business day{rate.estimated_days !== 1 ? 's' : ''}
-                          </Typography>
-                        )}
-                      </Box>
-                      <Chip label={`$${parseFloat(rate.amount).toFixed(2)}`} color="primary" variant="outlined" size="small" />
-                    </Box>
-                  }
-                  sx={{ width: '100%', m: 0 }}
-                />
-              </Paper>
-            ))}
-          </RadioGroup>
+                {shippingRates.map((rate) => (
+                  <Paper
+                    key={rate.object_id}
+                    elevation={0}
+                    sx={{
+                      mb: 1,
+                      p: 2,
+                      border: '1px solid',
+                      borderColor: selectedRate?.object_id === rate.object_id ? 'primary.main' : 'divider',
+                      borderRadius: 1,
+                      cursor: 'pointer',
+                      transition: 'border-color 0.2s',
+                      '&:hover': { borderColor: 'primary.light' },
+                    }}
+                    onClick={() => setSelectedRate(rate)}
+                  >
+                    <FormControlLabel
+                      value={rate.object_id}
+                      control={<Radio size="small" />}
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', ml: 1 }}>
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>
+                              {rate.provider} — {rate.servicelevel}
+                            </Typography>
+                            {rate.estimated_days && (
+                              <Typography variant="caption" color="text.secondary">
+                                Estimated {rate.estimated_days} business day{rate.estimated_days !== 1 ? 's' : ''}
+                              </Typography>
+                            )}
+                          </Box>
+                          <Chip label={`$${parseFloat(rate.amount).toFixed(2)}`} color="primary" variant="outlined" size="small" />
+                        </Box>
+                      }
+                      sx={{ width: '100%', m: 0 }}
+                    />
+                  </Paper>
+                ))}
+              </RadioGroup>
+            )}
+          </>
         )}
       </Box>
     );
@@ -487,11 +536,13 @@ const Checkout: React.FC = () => {
         <Alert severity="info" sx={{ mb: 3 }}>
           Complete your payment securely with Stripe. You will be redirected to the payment page.
         </Alert>
-        {needsShippingRates && shippingRates.length > 0 && selectedRate && (
+        {hasBuyerPaidShippingItems && (
           <Paper elevation={0} sx={{ p: 2, mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              Shipping: <strong>{selectedRate.provider} — {selectedRate.servicelevel}</strong> (${parseFloat(selectedRate.amount).toFixed(2)})
-              {selectedRate.estimated_days && ` • ${selectedRate.estimated_days} day${selectedRate.estimated_days !== 1 ? 's' : ''}`}
+              {selectedRate
+                ? `Shipping override: ${selectedRate.provider} — ${selectedRate.servicelevel} ($${parseFloat(selectedRate.amount).toFixed(2)})`
+                : `Shipping from listing: $${shippingCost.toFixed(2)}`}
+              {selectedRate?.estimated_days && ` • ${selectedRate.estimated_days} day${selectedRate.estimated_days !== 1 ? 's' : ''}`}
             </Typography>
           </Paper>
         )}
@@ -500,7 +551,7 @@ const Checkout: React.FC = () => {
           size="large"
           fullWidth
           onClick={handleStripeCheckout}
-          disabled={loading || (needsShippingRates && shippingRates.length > 0 && !selectedRate)}
+          disabled={loading}
           sx={{ py: 1.5 }}
         >
           {loading ? 'Redirecting...' : `Pay $${orderTotal.toFixed(2)} with Stripe`}
@@ -512,6 +563,22 @@ const Checkout: React.FC = () => {
   const renderOrderSummary = () => {
     const activationItems = cartItems.filter(item => item.type === 'activation');
     const activationTotal = activationItems.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+    const shippingDisplay = shippingCost > 0
+      ? `$${shippingCost.toFixed(2)}`
+      : hasBuyerPaidOwnCarrierItems
+        ? 'Buyer pays (arranged with seller)'
+      : hasBuyerPaidShippoItems
+        ? 'Pending shipping rate'
+      : hasSellerPaidShippingItems && !hasBuyerPaidShippingItems
+        ? 'Paid by seller'
+        : 'FREE';
+    const shippingColor = shippingCost > 0
+      ? undefined
+      : hasBuyerPaidOwnCarrierItems || hasBuyerPaidShippoItems
+        ? 'warning.main'
+      : hasSellerPaidShippingItems && !hasBuyerPaidShippingItems
+        ? 'primary.main'
+        : 'success.main';
     
     return (
     <Box>
@@ -547,11 +614,7 @@ const Checkout: React.FC = () => {
         <>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography variant="body2">Shipping</Typography>
-            {shippingCost > 0 ? (
-              <Typography variant="body2">${shippingCost.toFixed(2)}</Typography>
-            ) : (
-              <Typography variant="body2" color="success.main">FREE</Typography>
-            )}
+            <Typography variant="body2" color={shippingColor}>{shippingDisplay}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="body2">Tax</Typography>

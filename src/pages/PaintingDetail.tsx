@@ -101,7 +101,7 @@ const PaintingDetail: React.FC = () => {
     return baseUrl + url;
   };
 
-  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; special_instructions?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean } => {
+  const convertListingToPainting = (listing: Listing): Painting & { shipping_info?: string; returns_info?: string; special_instructions?: string; likeCount?: number; isLiked?: boolean; userId?: number; allow_comments?: boolean; shipping_preference?: 'free' | 'buyer'; shipping_carrier?: 'shippo' | 'own' } => {
     return {
       id: listing.id,
       title: listing.title,
@@ -120,6 +120,9 @@ const PaintingDetail: React.FC = () => {
       inStock: listing.in_stock,
       quantityAvailable: listing.quantity_available ?? 1,
       shipping_info: listing.shipping_info,
+      shipping_preference: listing.shipping_preference,
+      shipping_carrier: listing.shipping_carrier,
+      fixed_shipping_fee: listing.fixed_shipping_fee,
       returns_info: listing.returns_info,
       special_instructions: listing.special_instructions,
       likeCount: listing.like_count || 0,
