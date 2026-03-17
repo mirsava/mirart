@@ -86,8 +86,10 @@ const Header: React.FC = () => {
   const [galleryMenuAnchor, setGalleryMenuAnchor] = useState<null | HTMLElement>(null);
   const galleryCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [artists, setArtists] = useState<Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }>>([]);
+  const [headerUserType, setHeaderUserType] = useState<'artist' | 'buyer' | 'admin' | null>(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isMediumScreen = useMediaQuery(theme.breakpoints.between('md', 'lg'));
+  const showSellerMessages = headerUserType !== 'buyer';
 
   const gallerySubcategories = {
     'Painting': ['Abstract', 'Figurative', 'Impressionism', 'Realism', 'Pop Art'],
@@ -193,13 +195,29 @@ const Header: React.FC = () => {
     ? [
         { label: 'My Dashboard', path: '/dashboard' },
         { label: 'Create Listing', path: '/create-listing' },
-        { label: 'Messages', path: '/messages' },
+        ...(showSellerMessages ? [{ label: 'Messages', path: '/messages' }] : []),
         ...(chatEnabled ? [{ label: 'Chat', path: null, onClick: () => openChat() }] : []),
       ]
     : [
         { label: 'Create Account', path: '/signup' },
         { label: 'Sign In', path: '/signin' },
       ];
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setHeaderUserType(null);
+      return;
+    }
+    const fetchUserType = async () => {
+      try {
+        const profile = await apiService.getUser(user.id);
+        setHeaderUserType((profile?.user_type as 'artist' | 'buyer' | 'admin') || 'artist');
+      } catch {
+        setHeaderUserType('artist');
+      }
+    };
+    fetchUserType();
+  }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -210,14 +228,14 @@ const Header: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) { setUnreadMessages(0); return; }
+    if (!isAuthenticated || !user?.id || !showSellerMessages) { setUnreadMessages(0); return; }
     const fetchCount = () => apiService.getUnreadMessageCount(user.id).then(r => setUnreadMessages(r.count)).catch(() => {});
     fetchCount();
     const interval = setInterval(fetchCount, 30000);
     const onMessagesRead = () => fetchCount();
     window.addEventListener('messagesRead', onMessagesRead);
     return () => { clearInterval(interval); window.removeEventListener('messagesRead', onMessagesRead); };
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, showSellerMessages]);
 
   const closeAllDrawers = () => {
     setCartDrawerOpen(false);
@@ -420,32 +438,34 @@ const Header: React.FC = () => {
                 }}
               />
             </ListItem>
-            <ListItem 
-              onClick={() => {
-                handleNavigation('/messages');
-                handleDrawerToggle();
-              }}
-              sx={{
-                borderRadius: 2,
-                mb: 1,
-                cursor: 'pointer',
-                bgcolor: location.pathname === '/messages' ? 'primary.main' : 'transparent',
-                color: location.pathname === '/messages' ? 'white' : 'inherit',
-                '&:hover': {
-                  bgcolor: location.pathname === '/messages' ? 'primary.dark' : 'action.hover',
-                },
-              }}
-            >
-              <ListItemIcon>
-                <Badge badgeContent={unreadMessages} color="error"><EmailIcon /></Badge>
-              </ListItemIcon>
-              <ListItemText 
-                primary="Messages"
-                primaryTypographyProps={{
-                  fontWeight: location.pathname === '/messages' ? 600 : 400,
+            {showSellerMessages && (
+              <ListItem
+                onClick={() => {
+                  handleNavigation('/messages');
+                  handleDrawerToggle();
                 }}
-              />
-            </ListItem>
+                sx={{
+                  borderRadius: 2,
+                  mb: 1,
+                  cursor: 'pointer',
+                  bgcolor: location.pathname === '/messages' ? 'primary.main' : 'transparent',
+                  color: location.pathname === '/messages' ? 'white' : 'inherit',
+                  '&:hover': {
+                    bgcolor: location.pathname === '/messages' ? 'primary.dark' : 'action.hover',
+                  },
+                }}
+              >
+                <ListItemIcon>
+                  <Badge badgeContent={unreadMessages} color="error"><EmailIcon /></Badge>
+                </ListItemIcon>
+                <ListItemText
+                  primary="Messages"
+                  primaryTypographyProps={{
+                    fontWeight: location.pathname === '/messages' ? 600 : 400,
+                  }}
+                />
+              </ListItem>
+            )}
             <ListItem 
               onClick={() => {
                 handleDrawerToggle();
@@ -966,17 +986,19 @@ const Header: React.FC = () => {
                       >
                         Create Listing
                       </Button>
-                      <Tooltip title={unreadMessages > 0 ? `${unreadMessages} unread` : 'Messages'}>
-                        <IconButton
-                          size="small"
-                          onClick={() => navigate('/messages')}
-                          sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-                        >
-                          <Badge badgeContent={unreadMessages} color="error" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
-                            <EmailIcon sx={{ fontSize: 20 }} />
-                          </Badge>
-                        </IconButton>
-                      </Tooltip>
+                      {showSellerMessages && (
+                        <Tooltip title={unreadMessages > 0 ? `${unreadMessages} unread` : 'Messages'}>
+                          <IconButton
+                            size="small"
+                            onClick={() => navigate('/messages')}
+                            sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                          >
+                            <Badge badgeContent={unreadMessages} color="error" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
+                              <EmailIcon sx={{ fontSize: 20 }} />
+                            </Badge>
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       <Tooltip title="Favorites">
                         <IconButton
                           size="small"
@@ -1503,20 +1525,22 @@ const Header: React.FC = () => {
           <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
           My Dashboard
         </MenuItem>
-        <MenuItem 
-          onClick={() => {
-            handleUserMenuClose();
-            navigate('/messages');
-          }}
-          sx={{ 
-            py: 1.5,
-            px: 2,
-            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
-          }}
-        >
-          <Badge badgeContent={unreadMessages} color="error" sx={{ mr: 2 }}><EmailIcon sx={{ fontSize: 20 }} /></Badge>
-          Messages
-        </MenuItem>
+        {showSellerMessages && (
+          <MenuItem
+            onClick={() => {
+              handleUserMenuClose();
+              navigate('/messages');
+            }}
+            sx={{
+              py: 1.5,
+              px: 2,
+              '&:hover': { bgcolor: 'secondary.main', color: 'white' },
+            }}
+          >
+            <Badge badgeContent={unreadMessages} color="error" sx={{ mr: 2 }}><EmailIcon sx={{ fontSize: 20 }} /></Badge>
+            Messages
+          </MenuItem>
+        )}
         <MenuItem 
           onClick={() => {
             handleUserMenuClose();
