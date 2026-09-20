@@ -10,6 +10,7 @@ const makeTypography = (headingColor?: string) => {
     fontFamily: headingFont,
     fontWeight: 500,
     fontSize: size,
+    fontVariantNumeric: 'lining-nums',
     ...(headingColor ? { color: headingColor } : {}),
     ...extra,
   });

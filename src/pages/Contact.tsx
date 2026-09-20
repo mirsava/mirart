@@ -106,8 +106,8 @@ const Contact: React.FC = () => {
       />
       <PageHeader
         title="Contact Us"
+        eyebrow="Get in touch"
         subtitle="Have questions about our paintings or need assistance? We're here to help! Reach out to us through any of the channels below."
-        icon={<EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
         align="left"
       />

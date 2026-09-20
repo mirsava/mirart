@@ -106,6 +106,7 @@ const OrderDetail: React.FC = () => {
     <Box>
       <PageHeader
         title="Invoice / Order Details"
+        eyebrow="Your orders"
         subtitle={`Order ${order.order_number}`}
       />
 

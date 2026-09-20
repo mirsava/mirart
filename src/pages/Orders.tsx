@@ -349,6 +349,7 @@ const Orders: React.FC = () => {
     <Box sx={{ bgcolor: 'background.default' }}>
         <PageHeader
           title="Orders"
+          eyebrow="Your account"
           subtitle={isBuyerOnly ? 'View and manage your purchases' : 'View and manage your purchases and sales'}
           align="left"
         />

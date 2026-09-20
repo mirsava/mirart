@@ -1,11 +1,11 @@
 import React from 'react';
 import { Box, Typography, Divider } from '@mui/material';
-import { SxProps, Theme } from '@mui/material/styles';
+import { SxProps, Theme, alpha } from '@mui/material/styles';
 
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
-  icon?: React.ReactNode;
+  eyebrow?: string;
   backgroundGradient?: string;
   titleGradient?: string;
   disablePattern?: boolean;
@@ -17,16 +17,13 @@ interface PageHeaderProps {
 const PageHeader: React.FC<PageHeaderProps> = ({
   title,
   subtitle,
-  icon,
-  backgroundGradient,
+  eyebrow,
   titleGradient,
-  disablePattern = false,
   align = 'left',
-  subtitleLines = 1,
+  subtitleLines = 2,
   sx,
 }) => {
   const isCenter = align === 'center';
-  const titleColor = titleGradient || 'text.primary';
 
   return (
     <Box 
@@ -48,34 +45,32 @@ const PageHeader: React.FC<PageHeaderProps> = ({
             py: { xs: 0.5, md: 0.75 },
           }}
         >
-          {icon && (
-            <Box
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: { xs: 44, md: 50 },
-                height: { xs: 44, md: 50 },
-                flexShrink: 0,
-                '& .MuiSvgIcon-root': {
-                  color: 'primary.main',
-                  fontSize: { xs: 34, md: 38 },
-                  opacity: 0.9,
-                },
-              }}
-            >
-              {icon}
-            </Box>
-          )}
           <Box sx={{ minWidth: 0, textAlign: isCenter ? 'center' : 'left' }}>
+            {eyebrow && (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: isCenter ? 'center' : 'flex-start', gap: 1.25, mb: 1 }}>
+                <Box sx={{ width: 28, height: 2, bgcolor: 'primary.main' }} />
+                <Typography
+                  component="p"
+                  sx={{
+                    color: 'primary.main',
+                    fontWeight: 600,
+                    fontSize: '0.72rem',
+                    letterSpacing: '0.2em',
+                    textTransform: 'uppercase',
+                    lineHeight: 1,
+                  }}
+                >
+                  {eyebrow}
+                </Typography>
+              </Box>
+            )}
             <Typography
+              variant="h4"
               component="h1"
               sx={{
-                fontWeight: 700,
-                color: titleColor,
-                fontSize: { xs: '1.35rem', sm: '1.45rem', md: '1.55rem' },
-                lineHeight: 1.25,
-                letterSpacing: '-0.01em',
+                ...(titleGradient ? { color: titleGradient } : {}),
+                fontSize: { xs: '1.6rem', sm: '1.8rem', md: '2rem' },
+                lineHeight: 1.2,
                 m: 0,
               }}
             >
@@ -88,11 +83,28 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                 border: 0,
                 height: 3,
                 borderRadius: 999,
-                background: 'linear-gradient(90deg, rgba(28, 28, 28, 0.88) 0%, rgba(28, 28, 28, 0.55) 65%, rgba(28, 28, 28, 0.15) 100%)',
+                background: (theme: Theme) => `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.45)} 65%, ${alpha(theme.palette.primary.main, 0)} 100%)`,
                 width: isCenter ? { xs: 150, md: 210 } : { xs: 140, md: 190 },
                 mx: isCenter ? 'auto' : 0,
               }}
             />
+            {subtitle && (
+              <Typography
+                variant="body1"
+                color="text.secondary"
+                sx={{
+                  mt: 1.5,
+                  maxWidth: 760,
+                  mx: isCenter ? 'auto' : 0,
+                  display: '-webkit-box',
+                  WebkitBoxOrient: 'vertical',
+                  WebkitLineClamp: subtitleLines,
+                  overflow: 'hidden',
+                }}
+              >
+                {subtitle}
+              </Typography>
+            )}
           </Box>
         </Box>
       </Box>

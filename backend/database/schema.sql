@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS listings (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   description TEXT,
-  category VARCHAR(50) NOT NULL CHECK (category IN ('Painting','Woodworking','Sculpture','Photography','Digital Art','Ceramics','Textiles','Jewelry','Mixed Media','Other')),
+  category VARCHAR(50) NOT NULL CHECK (category IN ('Painting','Woodworking','Prints','Sculpture','Photography','Digital Art','Ceramics','Textiles','Jewelry','Mixed Media','Other')),
   subcategory VARCHAR(100),
   price NUMERIC(10,2),
   listing_type VARCHAR(20) DEFAULT 'fixed_price' CHECK (listing_type IN ('fixed_price','auction')),
@@ -103,6 +103,16 @@ CREATE TABLE IF NOT EXISTS listings (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'listings'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) LIKE '%Prints%'
+  ) THEN
+    ALTER TABLE listings DROP CONSTRAINT IF EXISTS listings_category_check;
+    ALTER TABLE listings ADD CONSTRAINT listings_category_check
+      CHECK (category IN ('Painting','Woodworking','Prints','Sculpture','Photography','Digital Art','Ceramics','Textiles','Jewelry','Mixed Media','Other'));
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_listings_user_id ON listings (user_id);
 CREATE INDEX IF NOT EXISTS idx_listings_category ON listings (category);
 CREATE INDEX IF NOT EXISTS idx_listings_status ON listings (status);
@@ -302,6 +312,14 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Default subscription plans (edit prices in the admin dashboard, or use "Sync from Stripe").
+-- stripe_product_id links each plan to its Stripe product; checkout needs it.
+INSERT INTO subscription_plans (name, tier, max_listings, price_monthly, price_yearly, features, display_order, stripe_product_id) VALUES
+  ('Starter', 'starter', 5, 9.99, 99.99, E'Up to 5 active listings\nBasic analytics\nEmail support', 1, 'prod_TzSm42oBUO77ax'),
+  ('Professional', 'professional', 25, 24.99, 249.99, E'Up to 25 active listings\nAdvanced analytics\nPriority support\nFeatured listings', 2, 'prod_TzSmufdMNiztkM'),
+  ('Enterprise', 'enterprise', 100, 49.99, 499.99, E'Up to 100 active listings\nFull analytics suite\n24/7 priority support\nFeatured listings\nCustom branding', 3, 'prod_TzSnMMYvDF4ajU')
+ON CONFLICT (tier) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS user_subscriptions (
   id SERIAL PRIMARY KEY,

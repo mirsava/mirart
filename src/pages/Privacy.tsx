@@ -33,8 +33,8 @@ const Privacy: React.FC = () => {
       />
       <PageHeader
         title="Privacy Policy"
+        eyebrow="Legal"
         subtitle="Learn how ArtZyla collects, uses, shares, and protects your information when you use our marketplace."
-        icon={<ShieldIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         align="left"
       />
       <Container maxWidth="lg">

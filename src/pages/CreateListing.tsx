@@ -459,8 +459,8 @@ const CreateListing: React.FC = () => {
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <PageHeader
         title="Create New Listing"
+        eyebrow="Artist studio"
         subtitle="Add a new artwork listing to your portfolio. Fill in the details below to get started."
-        icon={<AddIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
       />
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 4 }}>

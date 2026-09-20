@@ -476,6 +476,7 @@ const EditListing: React.FC = () => {
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <PageHeader
         title="Edit Listing"
+        eyebrow="Artist studio"
         subtitle="Update your artwork listing"
         align="left"
       />

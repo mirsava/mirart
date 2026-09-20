@@ -261,8 +261,8 @@ const Messages: React.FC = () => {
     <Box sx={{ bgcolor: 'background.default' }}>
       <PageHeader
         title="Messages"
+        eyebrow="Inbox"
         subtitle="View and manage your communication with buyers and sellers"
-        icon={<EmailIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
       />
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Paper elevation={0} sx={{ mb: 3, border: '1px solid', borderColor: 'divider' }}>

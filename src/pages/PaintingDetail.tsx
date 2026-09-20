@@ -543,6 +543,7 @@ const PaintingDetail: React.FC = () => {
         structuredData={structuredData}
       />
       <PageHeader
+        eyebrow={painting.category}
         title={painting.title}
         subtitle={`By ${painting.artist}`}
         disablePattern={true}

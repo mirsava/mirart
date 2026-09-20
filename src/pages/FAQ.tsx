@@ -1,6 +1,5 @@
 import React from 'react';
 import { Box, Grid } from '@mui/material';
-import { HelpOutline as HelpOutlineIcon } from '@mui/icons-material';
 import PageHeader from '../components/PageHeader';
 import SEO from '../components/SEO';
 import FAQSection from '../components/FAQSection';
@@ -17,8 +16,8 @@ const FAQ: React.FC = () => {
       />
       <PageHeader
         title="Frequently Asked Questions"
+        eyebrow="Help center"
         subtitle="Answers for buyers and artists about listings, orders, shipping, returns, and marketplace workflow."
-        icon={<HelpOutlineIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
         align="left"
       />

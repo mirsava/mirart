@@ -570,8 +570,8 @@ const Gallery: React.FC = () => {
       />
       <PageHeader
         title="Art Gallery"
+        eyebrow="The collection"
         subtitle="Explore our curated collection of original paintings and handcrafted woodworking pieces from talented artists around the world."
-        icon={<CategoryIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
       />
 
@@ -707,7 +707,6 @@ const Gallery: React.FC = () => {
               size="small"
               variant="outlined"
               color="error"
-              icon={<ClearIcon sx={{ fontSize: 14 }} />}
             />
           </Stack>
         )}

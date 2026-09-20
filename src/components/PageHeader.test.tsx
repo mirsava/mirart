@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import PageHeader from './PageHeader';
 
 const theme = createTheme({
-  palette: { primary: { main: '#4a3a9a' } },
+  palette: { primary: { main: '#b5573a' } },
 });
 
 const renderWithTheme = (ui: React.ReactElement) =>

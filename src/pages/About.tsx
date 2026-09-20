@@ -6,6 +6,7 @@ import {
   Paper,
   Card,
   CardContent,
+  useTheme,
 } from '@mui/material';
 import {
   Palette as PaletteIcon,
@@ -15,7 +16,15 @@ import {
 import PageHeader from '../components/PageHeader';
 import SEO from '../components/SEO';
 
+const wallFrames = [
+  { left: '7%', top: '13%', width: '35%', height: '64%', art: 'radial-gradient(circle at 66% 30%, #e6a888 0 15%, transparent 16%), linear-gradient(180deg, #1f2a44 0 64%, #b5573a 64% 100%)' },
+  { left: '48%', top: '13%', width: '22%', height: '30%', art: 'linear-gradient(90deg, #eadfce 0 52%, #b5573a 52% 76%, #1f2a44 76% 100%)' },
+  { left: '48%', top: '49%', width: '22%', height: '28%', art: 'radial-gradient(ellipse at 50% 100%, #d9825f 0 46%, transparent 47%), linear-gradient(180deg, #efe6d8 0 100%)' },
+  { left: '76%', top: '13%', width: '17%', height: '64%', art: 'radial-gradient(circle at 50% 70%, #eadfce 0 16%, transparent 17%), linear-gradient(180deg, #b5573a 0 100%)' },
+];
+
 const About: React.FC = () => {
+  const isDarkMode = useTheme().palette.mode === 'dark';
 
   const features = [
     {
@@ -44,8 +53,8 @@ const About: React.FC = () => {
       />
       <PageHeader
         title="About Our Marketplace"
+        eyebrow="Our story"
         subtitle="ArtZyla is a vibrant marketplace connecting talented artists with art lovers worldwide. We empower artists to sell their work through flexible pricing options while providing buyers with access to authentic, handmade art from independent creators."
-        icon={<PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
         disablePattern={true}
         align="left"
         subtitleLines={2}
@@ -54,17 +63,37 @@ const About: React.FC = () => {
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Grid container spacing={6} sx={{ mb: 8 }}>
           <Grid item xs={12} md={6}>
-            <Paper
+            <Box
+              aria-hidden
               sx={{
-                height: 400,
-                backgroundImage: 'url(https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=800&h=600&fit=crop&q=80)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                borderRadius: 1,
                 position: 'relative',
+                height: { xs: 300, md: 400 },
+                borderRadius: 1,
                 overflow: 'hidden',
+                bgcolor: isDarkMode ? '#211e1b' : '#efe6d8',
+                border: '1px solid',
+                borderColor: 'divider',
               }}
-            />
+            >
+              {wallFrames.map((frame, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    position: 'absolute',
+                    left: frame.left,
+                    top: frame.top,
+                    width: frame.width,
+                    height: frame.height,
+                    p: { xs: 0.5, md: 1 },
+                    bgcolor: isDarkMode ? '#2a2622' : '#ffffff',
+                    boxShadow: isDarkMode ? '0 18px 30px -18px rgba(0,0,0,0.7)' : '0 18px 30px -18px rgba(31,42,68,0.4)',
+                  }}
+                >
+                  <Box sx={{ width: '100%', height: '100%', background: frame.art }} />
+                </Box>
+              ))}
+              <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '12%', bgcolor: isDarkMode ? 'rgba(243,239,233,0.05)' : 'rgba(31,42,68,0.07)' }} />
+            </Box>
           </Grid>
           <Grid item xs={12} md={6}>
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

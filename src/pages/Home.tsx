@@ -6,7 +6,6 @@ import {
   Grid,
   Paper,
   useTheme,
-  useMediaQuery,
   Fade,
   Slide,
   Chip,
@@ -33,16 +32,15 @@ import apiService, { Listing, SubscriptionPlan } from '../services/api';
 import { getListingImageCount } from '../utils/listingUtils';
 import { Painting } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import joinCommunityBg from '../assets/images/bg/join_our_community.png';
 import { Check as CheckIcon, Star as StarIcon } from '@mui/icons-material';
 import SEO from '../components/SEO';
+import { brandNavy } from '../theme';
 import { FAQ_ITEMS } from '../data/faqs';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [featuredPaintings, setFeaturedPaintings] = useState<Painting[]>([]);
   const [featuredWoodworking, setFeaturedWoodworking] = useState<Painting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +48,25 @@ const Home: React.FC = () => {
   const [woodworkingPlaceholders, setWoodworkingPlaceholders] = useState(0);
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
+
+  const isDarkMode = theme.palette.mode === 'dark';
+  const heroFrames = [
+    {
+      gridRow: '1 / span 2',
+      gridColumn: '1',
+      art: 'radial-gradient(circle at 66% 30%, #e6a888 0 15%, transparent 16%), linear-gradient(180deg, #1f2a44 0 64%, #b5573a 64% 100%)',
+    },
+    {
+      gridRow: '1',
+      gridColumn: '2',
+      art: 'linear-gradient(90deg, #eadfce 0 52%, #b5573a 52% 76%, #1f2a44 76% 100%)',
+    },
+    {
+      gridRow: '2',
+      gridColumn: '2',
+      art: 'radial-gradient(ellipse at 50% 100%, #d9825f 0 46%, transparent 47%), linear-gradient(180deg, #efe6d8 0 100%)',
+    },
+  ];
 
   const getImageUrl = (url?: string): string => {
     if (!url) return '';
@@ -191,6 +208,8 @@ const Home: React.FC = () => {
     ],
   };
 
+  const heroPieces = [...featuredPaintings, ...featuredWoodworking].filter((piece) => piece.image).slice(0, 3);
+
   return (
     <Box>
       <SEO
@@ -201,283 +220,150 @@ const Home: React.FC = () => {
       <Box
         sx={{
           position: 'relative',
-          height: { xs: 'calc(72vh - 45px)', md: 'calc(78vh - 45px)' },
-          minHeight: { xs: 460, md: 520 },
           overflow: 'hidden',
-          display: 'flex',
-          alignItems: 'center',
-          borderRadius: { xs: 3, md: 4 },
-          border: '2px solid',
-          borderColor: 'rgba(16,12,30,0.9)',
+          bgcolor: 'background.default',
+          backgroundImage: `radial-gradient(900px 520px at 88% 8%, ${alpha(theme.palette.primary.main, isDarkMode ? 0.16 : 0.1)}, transparent 62%), radial-gradient(700px 420px at 0% 100%, ${alpha(theme.palette.primary.main, isDarkMode ? 0.08 : 0.05)}, transparent 65%)`,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
         }}
       >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            bgcolor: '#4f5f7f',
-            overflow: 'hidden',
-          }}
-        >
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              background: `linear-gradient(138deg, ${theme.palette.primary.dark} 0%, ${alpha(theme.palette.primary.main, 0.92)} 52%, ${alpha(theme.palette.primary.light, 0.86)} 100%)`,
-              pointerEvents: 'none',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              backgroundColor: alpha(theme.palette.primary.dark, 0.22),
-              backgroundImage: `
-                linear-gradient(33deg, ${alpha(theme.palette.primary.light, 0.5)} 14%, transparent 14.5%, transparent 84%, ${alpha(theme.palette.primary.light, 0.5)} 84.5%, ${alpha(theme.palette.primary.light, 0.5)}),
-                linear-gradient(147deg, ${alpha(theme.palette.primary.main, 0.44)} 12%, transparent 12.4%, transparent 88%, ${alpha(theme.palette.primary.main, 0.44)} 88.4%, ${alpha(theme.palette.primary.main, 0.44)}),
-                linear-gradient(27deg, ${alpha(theme.palette.primary.dark, 0.56)} 16%, transparent 16.3%, transparent 82%, ${alpha(theme.palette.primary.dark, 0.56)} 82.3%, ${alpha(theme.palette.primary.dark, 0.56)}),
-                linear-gradient(153deg, ${alpha(theme.palette.primary.light, 0.34)} 10%, transparent 10.4%, transparent 90%, ${alpha(theme.palette.primary.light, 0.34)} 90.4%, ${alpha(theme.palette.primary.light, 0.34)}),
-                linear-gradient(64deg, ${alpha(theme.palette.primary.main, 0.46)} 24%, transparent 24.5%, transparent 76%, ${alpha(theme.palette.primary.main, 0.46)} 76.5%, ${alpha(theme.palette.primary.main, 0.46)}),
-                linear-gradient(118deg, ${alpha(theme.palette.primary.dark, 0.5)} 18%, transparent 18.4%, transparent 82%, ${alpha(theme.palette.primary.dark, 0.5)} 82.4%, ${alpha(theme.palette.primary.dark, 0.5)}),
-                linear-gradient(92deg, ${alpha(theme.palette.primary.light, 0.3)} 22%, transparent 22.4%, transparent 78%, ${alpha(theme.palette.primary.light, 0.3)} 78.4%, ${alpha(theme.palette.primary.light, 0.3)})
-              `,
-              backgroundSize: { xs: '138px 228px, 124px 210px, 164px 256px, 112px 186px, 144px 232px, 172px 268px, 130px 214px', md: '188px 304px, 172px 280px, 226px 352px, 158px 250px, 194px 314px, 238px 372px, 182px 292px' },
-              backgroundPosition: '0 0, 42px 26px, 84px 132px, 18px 154px, 102px 44px, 136px 186px, 56px 96px',
-              backgroundRepeat: 'repeat',
-              opacity: 0.74,
-              mixBlendMode: 'normal',
-              pointerEvents: 'none',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: { xs: -300, md: -390 },
-              left: { xs: '-4%', md: '4%' },
-              width: { xs: 500, md: 740 },
-              height: { xs: 760, md: 1100 },
-              clipPath: 'polygon(48% 0%, 100% 100%, 8% 94%)',
-              backgroundImage: `
-                linear-gradient(96deg, ${alpha('#ffffff', 0.22)} 0%, transparent 46%),
-                conic-gradient(from 212deg at 50% 24%, ${alpha(theme.palette.primary.light, 0.44)}, ${alpha(theme.palette.primary.main, 0.68)}, ${alpha(theme.palette.primary.dark, 0.86)}, ${alpha(theme.palette.primary.light, 0.44)}),
-                linear-gradient(182deg, ${alpha(theme.palette.primary.light, 0.52)} 0%, ${alpha(theme.palette.primary.main, 0.7)} 52%, ${alpha(theme.palette.primary.dark, 0.86)} 100%)
-              `,
-              backgroundBlendMode: 'screen, normal, normal',
-              transform: 'rotate(39deg) scaleX(0.93)',
-              filter: 'drop-shadow(0 14px 30px rgba(6, 14, 40, 0.44))',
-              opacity: 0.78,
-              pointerEvents: 'none',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              top: { xs: -330, md: -450 },
-              left: { xs: '-10%', md: '6%' },
-              width: { xs: 560, md: 820 },
-              height: { xs: 860, md: 1240 },
-              clipPath: 'polygon(54% 0%, 96% 100%, 2% 90%)',
-              backgroundImage: `
-                linear-gradient(92deg, ${alpha('#ffffff', 0.2)} 0%, transparent 48%),
-                conic-gradient(from 36deg at 50% 22%, ${alpha(theme.palette.primary.light, 0.46)}, ${alpha(theme.palette.primary.main, 0.66)}, ${alpha(theme.palette.primary.dark, 0.88)}, ${alpha(theme.palette.primary.light, 0.46)}),
-                linear-gradient(186deg, ${alpha(theme.palette.primary.light, 0.44)} 0%, ${alpha(theme.palette.primary.main, 0.62)} 52%, ${alpha(theme.palette.primary.dark, 0.88)} 100%)
-              `,
-              backgroundBlendMode: 'screen, normal, normal',
-              transform: 'rotate(34deg) scaleX(1.02)',
-              filter: 'drop-shadow(0 16px 34px rgba(6, 14, 40, 0.46))',
-              opacity: 0.72,
-              pointerEvents: 'none',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: { xs: -420, md: -560 },
-              right: { xs: '-16%', md: '-8%' },
-              width: { xs: 700, md: 1040 },
-              height: { xs: 1040, md: 1500 },
-              clipPath: 'polygon(44% 0%, 92% 100%, 0% 96%)',
-              backgroundImage: `
-                linear-gradient(94deg, ${alpha('#ffffff', 0.18)} 0%, transparent 46%),
-                conic-gradient(from 204deg at 50% 24%, ${alpha(theme.palette.primary.light, 0.38)}, ${alpha(theme.palette.primary.main, 0.62)}, ${alpha(theme.palette.primary.dark, 0.9)}, ${alpha(theme.palette.primary.light, 0.38)}),
-                linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.54)} 0%, ${alpha(theme.palette.primary.dark, 0.74)} 54%, ${alpha('#0b1a43', 0.9)} 100%)
-              `,
-              backgroundBlendMode: 'screen, normal, normal',
-              transform: 'rotate(-6deg) scaleX(1.12)',
-              filter: 'drop-shadow(0 18px 38px rgba(6, 14, 40, 0.5))',
-              opacity: 0.84,
-              pointerEvents: 'none',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: `
-                linear-gradient(128deg, ${alpha(theme.palette.primary.light, 0.62)} 0%, ${alpha(theme.palette.primary.main, 0.38)} 36%, transparent 74%),
-                linear-gradient(308deg, ${alpha(theme.palette.primary.dark, 0.62)} 0%, ${alpha(theme.palette.primary.main, 0.32)} 44%, transparent 80%),
-                radial-gradient(760px 460px at 20% 24%, ${alpha(theme.palette.primary.light, 0.46)}, transparent 70%)
-              `,
-              backgroundRepeat: 'no-repeat, no-repeat, no-repeat',
-              opacity: 0.72,
-              mixBlendMode: 'screen',
-              pointerEvents: 'none',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: `
-                radial-gradient(980px 520px at 100% 0%, ${alpha(theme.palette.primary.light, 0.3)}, transparent 62%),
-                radial-gradient(760px 460px at 0% 100%, ${alpha(theme.palette.primary.main, 0.24)}, transparent 68%)
-              `,
-              backgroundSize: 'auto, auto',
-              backgroundRepeat: 'no-repeat, no-repeat',
-              opacity: 0.72,
-              pointerEvents: 'none',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to top, rgba(9,18,46,0.36) 0%, rgba(14,32,78,0.16) 46%, rgba(8,18,42,0.12) 100%)',
-              pointerEvents: 'none',
-            }}
-          />
-        </Box>
-        
-        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, position: 'relative', zIndex: 2 }}>
-          <Grid container spacing={6} alignItems="center" justifyContent="center">
-            <Grid item xs={12} md={12}>
-              <Fade in={true} timeout={1000}>
-                <Box sx={{ textAlign: 'center', maxWidth: 760, mx: 'auto' }}>
-                  <Box sx={{ mb: 3 }}>
-                    <Chip
-                      label="Curated Art Marketplace"
-                      sx={{ 
-                        mb: 2.5, 
-                        bgcolor: 'rgba(255, 106, 142, 0.2)',
-                        color: '#ffeaf1',
-                        border: '1px solid rgba(255, 106, 142, 0.5)',
-                        backdropFilter: 'blur(12px)',
+        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: { xs: 5, md: 9 } }}>
+          <Grid container spacing={{ xs: 5, md: 8 }} alignItems="center">
+            <Grid item xs={12} md={6}>
+              <Fade in timeout={900}>
+                <Box sx={{ maxWidth: 600 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                    <Box sx={{ width: 36, height: 2, bgcolor: 'primary.main' }} />
+                    <Typography
+                      component="p"
+                      sx={{
+                        color: 'primary.main',
                         fontWeight: 600,
-                        fontSize: '0.85rem',
-                        px: 2,
-                        py: 0.35,
-                        letterSpacing: '0.4px',
+                        fontSize: '0.78rem',
+                        letterSpacing: '0.2em',
+                        textTransform: 'uppercase',
                       }}
-                    />
+                    >
+                      Curated art marketplace
+                    </Typography>
                   </Box>
                   <Typography
-                    variant={isMobile ? 'h2' : 'h1'}
+                    variant="h1"
                     component="h1"
-                    gutterBottom
                     sx={{
-                      fontWeight: 300,
-                      mb: 3,
-                      color: 'white',
-                      fontSize: { xs: '2.7rem', md: '4.3rem' },
-                      lineHeight: 1.05,
+                      fontSize: { xs: '2.75rem', sm: '3.4rem', md: '4.4rem' },
+                      lineHeight: 1.04,
                       letterSpacing: '-0.02em',
-                      textShadow: '0 3px 12px rgba(0,0,0,0.35)',
+                      mb: 3,
                     }}
                   >
-                    Collect
+                    Collect art
                     <br />
-                    <Box component="span" sx={{ 
-                      fontWeight: 700,
-                      color: '#fff6ea',
-                      textShadow: '0 6px 18px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35)',
-                      position: 'relative',
-                    }}>
-                      Art With Character
+                    <Box component="span" sx={{ fontStyle: 'italic', color: 'primary.main' }}>
+                      with character
                     </Box>
                   </Typography>
                   <Typography
-                    variant={isMobile ? 'body1' : 'h6'}
+                    variant="body1"
                     component="p"
-                    sx={{ 
-                      mb: 3.5,
-                      maxWidth: '620px',
-                      color: 'rgba(255,255,255,0.95)',
-                      fontWeight: 300,
-                      lineHeight: 1.65,
-                      fontSize: { xs: '1rem', md: '1.18rem' },
-                      textShadow: '0 1px 4px rgba(0,0,0,0.3)',
-                      mx: 'auto',
-                    }}
+                    color="text.secondary"
+                    sx={{ fontSize: { xs: '1rem', md: '1.125rem' }, lineHeight: 1.75, maxWidth: 520, mb: 4.5 }}
                   >
-                    Original paintings and handcrafted pieces from independent artists.
-                    Shop thoughtfully, connect directly, and bring home work that feels personal.
+                    Original paintings and handcrafted pieces from independent artists. Shop
+                    thoughtfully, connect directly with the maker, and bring home work that feels personal.
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 2.5, flexWrap: 'wrap', mb: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 5 }}>
                     <Button
                       variant="contained"
                       size="large"
-                      sx={{
-                        background: 'linear-gradient(135deg, #ffd27a 0%, #ffb347 48%, #ff9548 100%)',
-                        color: '#3a2208',
-                        px: 5,
-                        py: 2,
-                        borderRadius: 3,
-                        textTransform: 'none',
-                        fontWeight: 700,
-                        fontSize: '1rem',
-                        letterSpacing: '0.2px',
-                        boxShadow: '0 8px 24px rgba(255, 149, 72, 0.45), 0 3px 10px rgba(0, 0, 0, 0.25)',
-                        border: '1px solid rgba(255, 232, 188, 0.8)',
-                        '&:hover': {
-                          background: 'linear-gradient(135deg, #ffd98f 0%, #ffbd5e 48%, #ffa15d 100%)',
-                          color: '#2f1b06',
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 12px 32px rgba(255, 149, 72, 0.58), 0 5px 14px rgba(0, 0, 0, 0.32)',
-                        },
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      }}
+                      endIcon={<ArrowForwardIcon />}
                       onClick={() => navigate('/gallery?category=Painting')}
+                      sx={{ px: 4, py: 1.6, fontWeight: 600, fontSize: '1rem', borderRadius: 1.5, boxShadow: 'none', '&:hover': { boxShadow: `0 10px 24px -10px ${alpha(theme.palette.primary.main, 0.7)}` } }}
                     >
-                      Browse Artwork
+                      Browse artwork
                     </Button>
                     <Button
                       variant="outlined"
                       size="large"
+                      onClick={() => navigate('/signup')}
                       sx={{
-                        color: '#fff1f7',
-                        borderColor: 'rgba(255, 122, 154, 0.65)',
-                        px: 5,
-                        py: 2,
-                        borderRadius: 3,
-                        textTransform: 'none',
+                        px: 4,
+                        py: 1.6,
                         fontWeight: 600,
                         fontSize: '1rem',
-                        letterSpacing: '0.2px',
-                        backdropFilter: 'blur(10px)',
-                        bgcolor: 'rgba(255, 122, 154, 0.16)',
-                        '&:hover': {
-                          borderColor: 'rgba(255, 180, 198, 0.9)',
-                          bgcolor: 'rgba(255, 122, 154, 0.24)',
-                          color: 'white',
-                        },
+                        borderRadius: 1.5,
+                        color: isDarkMode ? 'text.primary' : brandNavy,
+                        borderColor: isDarkMode ? 'divider' : alpha(brandNavy, 0.4),
+                        '&:hover': { borderColor: isDarkMode ? 'text.primary' : brandNavy, bgcolor: alpha(isDarkMode ? '#f3efe9' : brandNavy, 0.06) },
                       }}
-                      onClick={() => navigate('/signup')}
                     >
-                      Sell Your Art
+                      Sell your art
                     </Button>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 3, rowGap: 1 }}>
+                    {['Original works', 'Independent artists', 'Direct from the maker'].map((label) => (
+                      <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                          {label}
+                        </Typography>
+                      </Box>
+                    ))}
                   </Box>
                 </Box>
               </Fade>
             </Grid>
-            
+
+            <Grid item xs={12} md={6}>
+              <Fade in timeout={1300}>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gridTemplateRows: '1fr 1fr',
+                    gap: { xs: 1.5, md: 2.5 },
+                    height: { xs: 300, sm: 400, md: 500 },
+                  }}
+                >
+                  {heroFrames.map((frame, index) => {
+                    const piece = heroPieces[index];
+                    return (
+                      <Box
+                        key={index}
+                        onClick={piece ? () => navigate(`/painting/${piece.id}`) : undefined}
+                        sx={{
+                          gridRow: frame.gridRow,
+                          gridColumn: frame.gridColumn,
+                          p: { xs: 0.75, md: 1.25 },
+                          bgcolor: isDarkMode ? '#2a2622' : '#ffffff',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          boxShadow: isDarkMode ? '0 24px 40px -22px rgba(0,0,0,0.7)' : '0 24px 40px -22px rgba(31,42,68,0.35)',
+                          cursor: piece ? 'pointer' : 'default',
+                          transition: 'transform 0.3s ease',
+                          '&:hover': piece ? { transform: 'translateY(-4px)' } : undefined,
+                          minHeight: 0,
+                        }}
+                      >
+                        {piece ? (
+                          <Box
+                            component="img"
+                            src={getImageUrl(piece.image)}
+                            alt={piece.title}
+                            sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          />
+                        ) : (
+                          <Box sx={{ width: '100%', height: '100%', background: frame.art }} />
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Fade>
+            </Grid>
           </Grid>
         </Box>
-
       </Box>
-
 
       <Box sx={{ bgcolor: 'background.paper', py: { xs: 6, md: 7 } }}>
         <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
@@ -955,15 +841,50 @@ const Home: React.FC = () => {
               </Box>
             </Grid>
             <Grid item xs={12} md={6}>
-              <Paper
+              <Box
+                aria-hidden
                 sx={{
-                  height: 400,
-                  backgroundImage: `url(${joinCommunityBg})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
+                  position: 'relative',
+                  height: { xs: 320, md: 400 },
                   borderRadius: 1,
+                  overflow: 'hidden',
+                  bgcolor: brandNavy,
+                  backgroundImage: 'radial-gradient(520px 320px at 85% 10%, rgba(217,130,95,0.28), transparent 65%), radial-gradient(420px 300px at 0% 100%, rgba(234,223,206,0.10), transparent 70%)',
                 }}
-              />
+              >
+                <Box sx={{ position: 'absolute', top: { xs: -40, md: -50 }, right: { xs: -30, md: -40 }, width: { xs: 170, md: 230 }, height: { xs: 170, md: 230 }, borderRadius: '50%', bgcolor: '#e6a888' }} />
+                <Box sx={{ position: 'absolute', left: { xs: 24, md: 40 }, bottom: 0, width: { xs: 150, md: 200 }, height: { xs: 190, md: 250 }, borderRadius: '999px 999px 0 0', bgcolor: '#b5573a' }} />
+                <Box sx={{ position: 'absolute', left: { xs: 150, md: 230 }, bottom: { xs: 70, md: 90 }, width: { xs: 64, md: 84 }, height: { xs: 64, md: 84 }, borderRadius: '50%', bgcolor: '#eadfce' }} />
+                <Box sx={{ position: 'absolute', right: { xs: 20, md: 36 }, bottom: { xs: 22, md: 32 }, textAlign: 'right' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
+                    {[
+                      'linear-gradient(135deg, #e6a888, #b5573a)',
+                      'linear-gradient(135deg, #eadfce, #c9b89e)',
+                      'linear-gradient(135deg, #d9825f, #94432b)',
+                      'linear-gradient(135deg, #8896b8, #4a5b85)',
+                      'linear-gradient(135deg, #f3efe9, #eadfce)',
+                    ].map((background, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          width: { xs: 44, md: 56 },
+                          height: { xs: 44, md: 56 },
+                          borderRadius: '50%',
+                          background,
+                          border: `3px solid ${brandNavy}`,
+                          ml: index === 0 ? 0 : -1.5,
+                        }}
+                      />
+                    ))}
+                  </Box>
+                  <Typography
+                    component="p"
+                    sx={{ fontFamily: '"Playfair Display", Georgia, serif', fontStyle: 'italic', color: '#f3efe9', fontSize: { xs: '1.05rem', md: '1.25rem' } }}
+                  >
+                    Artists, makers &amp; collectors
+                  </Typography>
+                </Box>
+              </Box>
             </Grid>
           </Grid>
         </Box>
