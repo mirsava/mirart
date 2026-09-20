@@ -206,9 +206,21 @@ class ApiService {
         throw error;
       }
       
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      const text = await response.text();
+      if (!contentType.includes('application/json')) {
+        const error = new Error(`Unexpected API response format from ${endpoint}. Expected JSON.`);
+        console.error('Non-JSON API response:', {
+          endpoint,
+          status: response.status,
+          contentType,
+          preview: text.slice(0, 120),
+        });
+        throw error;
+      }
+      const data = text ? JSON.parse(text) : null;
       console.log('API Response data:', data);
-      return data;
+      return data as T;
     } catch (error: any) {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         throw new Error('Failed to connect to server. Please check if the backend is running.');

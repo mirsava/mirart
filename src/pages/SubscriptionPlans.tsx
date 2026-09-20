@@ -49,18 +49,27 @@ const SubscriptionPlans: React.FC = () => {
       try {
         await fetchPlans();
         if (user?.id) {
-          const profile = await apiService.getUser(user.id);
-          const type = (profile?.user_type as User['user_type']) || 'artist';
+          let type: User['user_type'] = 'artist';
+          try {
+            const profile = await apiService.getUser(user.id);
+            type = (profile?.user_type as User['user_type']) || 'artist';
+          } catch (profileErr) {
+            console.warn('Could not load user type in subscription plans:', profileErr);
+          }
           setUserType(type);
           if (type !== 'buyer') {
-            await fetchCurrentSubscription();
+            try {
+              await fetchCurrentSubscription();
+            } catch (subscriptionErr) {
+              console.warn('Could not load current subscription:', subscriptionErr);
+            }
           } else {
             setCurrentSubscription(null);
           }
         }
       } catch (err: any) {
         console.error('Error loading subscription plans page:', err);
-        setError(err.message || 'Failed to load subscription plans');
+        setError('Failed to load subscription plans');
       }
     };
     loadData();

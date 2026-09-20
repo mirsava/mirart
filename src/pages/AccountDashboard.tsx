@@ -522,14 +522,13 @@ const AccountDashboard: React.FC = () => {
     }
   }, [isBuyerDashboard, ordersSubTab]);
 
-  // Open Subscription tab when navigating from Subscription Plans
   useEffect(() => {
     const state = location.state as { tab?: string } | null;
-    if (state?.tab === 'subscription') {
+    if (state?.tab === 'subscription' && !isBuyerDashboard) {
       setTabValue(3);
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state]);
+  }, [location.state, isBuyerDashboard]);
 
   useEffect(() => {
     if (user?.id && tabValue === 1) {

@@ -44,7 +44,7 @@ router.get('/admin/subscriptions', async (req, res) => {
       FROM user_subscriptions us
       JOIN subscription_plans sp ON us.plan_id = sp.id
       JOIN users u ON us.user_id = u.id
-      WHERE 1=1
+      WHERE u.user_type != 'buyer'
     `;
     const params = [];
     const countParams = [];
@@ -72,7 +72,7 @@ router.get('/admin/subscriptions', async (req, res) => {
       SELECT COUNT(*) as total FROM user_subscriptions us
       JOIN subscription_plans sp ON us.plan_id = sp.id
       JOIN users u ON us.user_id = u.id
-      WHERE 1=1
+      WHERE u.user_type != 'buyer'
     `;
     if (status && status !== 'all') countQuery += ' AND us.status = ?';
     if (plan) countQuery += ' AND sp.name = ?';

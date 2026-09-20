@@ -553,6 +553,16 @@ app.listen(PORT, async () => {
   }
 
   try {
+    await pool.execute(
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('test_data_enabled', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
+      [JSON.stringify(false)]
+    );
+    console.log('[Startup] Enforced test_data_enabled setting (off)');
+  } catch (err) {
+    console.warn('[Startup] Test data setting migration:', err?.message || err);
+  }
+
+  try {
     const [scTables] = await pool.execute(
       "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'support_chat_messages'",
       [process.env.DB_NAME || 'mirart']
