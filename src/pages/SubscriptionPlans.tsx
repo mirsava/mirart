@@ -28,9 +28,10 @@ import { useSnackbar } from 'notistack';
 import PageHeader from '../components/PageHeader';
 import SEO from '../components/SEO';
 import FAQSection from '../components/FAQSection';
-import { FAQ_ITEMS } from '../data/faqs';
+import { useFaqItems } from '../hooks/useFaqItems';
 
 const SubscriptionPlans: React.FC = () => {
+  const faqItems = useFaqItems();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -200,7 +201,7 @@ const SubscriptionPlans: React.FC = () => {
       <PageHeader
         title={freeLaunch ? 'Pricing' : 'Subscription Plans'}
         eyebrow="For artists"
-        subtitle="Choose the perfect plan for your art business"
+        subtitle={freeLaunch ? 'Free to list, with no subscription and no card needed' : 'Choose the perfect plan for your art business'}
         align="left"
       />
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: 6 }}>
@@ -491,7 +492,7 @@ const SubscriptionPlans: React.FC = () => {
 </>
 )}
 
-        <FAQSection id="subscription-faq" items={FAQ_ITEMS} />
+        <FAQSection id="subscription-faq" items={faqItems} />
 
         <Box sx={{ mt: 6, p: 4, bgcolor: 'rgba(181, 87, 58, 0.04)', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="h5" fontWeight={600} gutterBottom>

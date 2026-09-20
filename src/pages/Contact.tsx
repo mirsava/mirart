@@ -18,9 +18,10 @@ import {
 import PageHeader from '../components/PageHeader';
 import SEO from '../components/SEO';
 import FAQSection from '../components/FAQSection';
-import { FAQ_ITEMS } from '../data/faqs';
+import { useFaqItems } from '../hooks/useFaqItems';
 
 const Contact: React.FC = () => {
+  const faqItems = useFaqItems();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -217,7 +218,7 @@ const Contact: React.FC = () => {
           </Grid>
         </Grid>
 
-        <FAQSection id="faq" items={FAQ_ITEMS} titleVariant="h5" />
+        <FAQSection id="faq" items={faqItems} titleVariant="h5" />
       </Box>
     </Box>
   );

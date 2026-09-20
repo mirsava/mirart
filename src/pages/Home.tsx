@@ -36,9 +36,10 @@ import { useBillingStatus } from '../hooks/useBillingStatus';
 import { Check as CheckIcon, Star as StarIcon } from '@mui/icons-material';
 import SEO from '../components/SEO';
 import { brandNavy } from '../theme';
-import { FAQ_ITEMS } from '../data/faqs';
+import { useFaqItems } from '../hooks/useFaqItems';
 
 const Home: React.FC = () => {
+  const faqItems = useFaqItems();
   const navigate = useNavigate();
   const { user } = useAuth();
   const billing = useBillingStatus();
@@ -199,7 +200,7 @@ const Home: React.FC = () => {
       },
       {
         '@type': 'FAQPage',
-        mainEntity: FAQ_ITEMS.slice(0, 3).map((item) => ({
+        mainEntity: faqItems.slice(0, 3).map((item) => ({
           '@type': 'Question',
           name: item.question,
           acceptedAnswer: {
