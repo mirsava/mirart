@@ -198,7 +198,7 @@ const SubscriptionPlans: React.FC = () => {
         url="/subscription-plans"
       />
       <PageHeader
-        title="Subscription Plans"
+        title={freeLaunch ? 'Pricing' : 'Subscription Plans'}
         eyebrow="For artists"
         subtitle="Choose the perfect plan for your art business"
         align="left"
@@ -210,7 +210,7 @@ const SubscriptionPlans: React.FC = () => {
               Ready to start selling?
             </Typography>
             <Typography variant="body2">
-              You are currently using a buyer account. Switch to a seller account and choose a subscription plan to list artwork and start selling on ArtZyla.
+              You are currently using a buyer account. {freeLaunch ? 'Switch to a seller account to list your artwork for free.' : 'Switch to a seller account and choose a subscription plan to list artwork and start selling on ArtZyla.'}
             </Typography>
           </Alert>
         )}
@@ -226,11 +226,10 @@ const SubscriptionPlans: React.FC = () => {
         {freeLaunch && billing && (
           <Alert severity="success" sx={{ mb: 4 }}>
             <Typography variant="body1" fontWeight={600} gutterBottom>
-              Free during launch
+              Free to list
             </Typography>
             <Typography variant="body2">
-              ArtZyla is free while we launch. List up to {billing.free_listing_limit} artworks at no cost, with no subscription needed.
-              The plans below apply when paid billing begins.
+              List up to {billing.free_listing_limit} artworks at no cost, with no subscription and no card needed.
             </Typography>
           </Alert>
         )}
@@ -365,6 +364,8 @@ const SubscriptionPlans: React.FC = () => {
           </Grid>
         </Box>
 
+        {!freeLaunch && (
+<>
         <Typography variant="h4" fontWeight={700} gutterBottom sx={{ mb: 4, color: 'primary.main' }}>
           Choose Your Plan
         </Typography>
@@ -457,7 +458,7 @@ const SubscriptionPlans: React.FC = () => {
                       </Button>
                     ) : freeLaunch ? (
                       <Button variant="outlined" fullWidth disabled sx={{ mt: 'auto' }}>
-                        Free during launch
+                        {billing && Number(plan.max_listings) <= billing.free_listing_limit ? 'Included free' : 'Available later'}
                       </Button>
                     ) : (
                       <Box sx={{ display: 'flex', gap: 1, mt: 'auto' }}>
@@ -487,6 +488,8 @@ const SubscriptionPlans: React.FC = () => {
             );
           })}
         </Grid>
+</>
+)}
 
         <FAQSection id="subscription-faq" items={FAQ_ITEMS} />
 
@@ -495,7 +498,7 @@ const SubscriptionPlans: React.FC = () => {
             Ready to Start Selling?
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph>
-            Join thousands of artists who are already selling their work on ArtZyla. Choose a plan that works for you and start listing your artwork today.
+            {freeLaunch ? 'Create your artist profile and start listing your artwork for free today.' : 'Choose a plan that works for you and start listing your artwork today.'}
           </Typography>
           {!isAuthenticated && (
             <Button

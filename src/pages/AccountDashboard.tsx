@@ -59,6 +59,7 @@ import { useCart } from '../contexts/CartContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import { useBillingStatus } from '../hooks/useBillingStatus';
+import DashboardMessagesCard from '../components/DashboardMessagesCard';
 import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import apiService, { DashboardData, Listing, Order, SubscriptionPlan, User, UserSubscription } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -418,7 +419,7 @@ const AccountDashboard: React.FC = () => {
     if (user?.id) {
       fetchDashboardData();
       fetchSubscription();
-      if (tabValue === 2 && subscription?.tier === 'enterprise') {
+      if (tabValue === 2 && (subscription?.tier === 'enterprise' || subscription?.is_free_access)) {
         fetchAnalytics();
       }
       if (tabValue === 4 || tabValue === 5) {
@@ -1291,7 +1292,7 @@ const AccountDashboard: React.FC = () => {
                   </Avatar>
                   <Box>
                     <Typography variant="body1" fontWeight={600}>
-                      {subscription.is_free_access ? 'Free launch access' : `${subscription.plan_name} Plan (${subscription.billing_period})`}
+                      {subscription.is_free_access ? 'Free artist plan' : `${subscription.plan_name} Plan (${subscription.billing_period})`}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {subscription.current_listings || 0} / {subscription.max_listings >= 999999 ? 'Unlimited' : subscription.max_listings} active listings
@@ -1322,6 +1323,8 @@ const AccountDashboard: React.FC = () => {
                 </Button>
               </Paper>
             ))}
+
+        {user?.id && <DashboardMessagesCard authUserId={user.id} isBuyer={isBuyerDashboard} />}
 
         {/* Main Content Tabs */}
         <Paper elevation={0} sx={{ width: '100%', mb: 4, border: '1px solid', borderColor: 'divider' }}>
@@ -1791,7 +1794,7 @@ const AccountDashboard: React.FC = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={2}>
-            {subscription?.tier !== 'enterprise' ? (
+            {subscription?.tier !== 'enterprise' && !subscription?.is_free_access ? (
               <Box sx={{ textAlign: 'center', py: 8 }}>
                 <LockIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
                 <Typography variant="h5" fontWeight={700} gutterBottom>
@@ -2221,12 +2224,12 @@ const AccountDashboard: React.FC = () => {
             {subscription && subscription.is_free_access ? (
               <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 1, mb: 3 }}>
                 <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Free launch access
+                  Free artist plan
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   {billing?.billing_enabled
                     ? `Paid plans are now available. You can keep up to ${subscription.max_listings} active listings for free until ${subscription.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'your grace period ends'}. Choose a plan before then to keep your listings live.`
-                    : `ArtZyla is free to use while we launch. You can keep up to ${subscription.max_listings} active listings at no cost. Paid plans will start at a later date.`}
+                    : `You can keep up to ${subscription.max_listings} active listings at no cost, with no subscription needed.`}
                 </Typography>
                 <Typography variant="body2">
                   Active listings: {subscription.current_listings || 0} / {subscription.max_listings}

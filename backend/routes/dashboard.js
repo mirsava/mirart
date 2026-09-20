@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { requireSelf } from '../middleware/auth.js';
+import { getBillingConfig, describeAccess } from '../services/billing.js';
 import { parseImageUrls } from '../utils/json.js';
 
 const router = express.Router();
@@ -172,7 +173,9 @@ router.get('/:authUserId/analytics', requireSelf(), async (req, res) => {
        ORDER BY us.created_at DESC LIMIT 1`,
       [userId]
     );
-    if (subRows.length === 0 || subRows[0].tier !== 'enterprise') {
+    // Analytics is an Enterprise feature, but it is open to everyone while free launch access applies.
+    const hasEnterprise = subRows.length > 0 && subRows[0].tier === 'enterprise';
+    if (!hasEnterprise && !describeAccess(await getBillingConfig()).free_access) {
       return res.status(403).json({ error: 'Enterprise subscription required' });
     }
 

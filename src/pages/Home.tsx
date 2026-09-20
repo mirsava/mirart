@@ -657,7 +657,7 @@ const Home: React.FC = () => {
         <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
           <Box sx={{ mb: 4, textAlign: 'center' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 1 }}>
-              <CreditCardIcon sx={{ color: 'primary.main', fontSize: { xs: 28, md: 36 } }} />
+              {!freeLaunch && <CreditCardIcon sx={{ color: 'primary.main', fontSize: { xs: 28, md: 36 } }} />}
               <Typography 
                 variant="h4" 
                 component="h2" 
@@ -667,7 +667,7 @@ const Home: React.FC = () => {
                   fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
                 }}
               >
-                Simple, Transparent Pricing
+                {freeLaunch ? 'Free to list' : 'Simple, Transparent Pricing'}
               </Typography>
               <ArrowForwardIcon sx={{ color: 'primary.main', fontSize: { xs: 20, md: 24 }, opacity: 0.7 }} />
             </Box>
@@ -681,12 +681,35 @@ const Home: React.FC = () => {
               }}
             >
               {freeLaunch && billing
-                ? `Free while we launch: list up to ${billing.free_listing_limit} artworks at no cost. These plans apply when paid billing begins.`
+                ? `List up to ${billing.free_listing_limit} artworks at no cost, with no subscription and no card needed.`
                 : 'Choose a subscription plan that fits your needs. No hidden fees, no per-listing charges.'}
             </Typography>
           </Box>
 
-          {loadingPlans ? (
+          {freeLaunch && billing ? (
+            <Paper
+              elevation={0}
+              sx={{ maxWidth: 900, mx: 'auto', mb: 6, p: { xs: 3, md: 4 }, border: '1px solid', borderColor: 'primary.main', borderRadius: 1 }}
+            >
+              <Grid container spacing={2.5}>
+                {[
+                  `List up to ${billing.free_listing_limit} artworks`,
+                  'No subscription, no card needed',
+                  'Buyers contact you directly',
+                  'Full sales analytics included',
+                ].map((benefit) => (
+                  <Grid item xs={12} sm={6} key={benefit}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <CheckIcon sx={{ color: 'primary.main' }} />
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {benefit}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          ) : loadingPlans ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <Typography variant="body2" color="text.secondary">
                 Loading pricing plans...
@@ -776,17 +799,29 @@ const Home: React.FC = () => {
           ) : null}
 
           <Box sx={{ textAlign: 'center', mb: 6 }}>
-            <Button
-              variant="outlined"
-              size="large"
-              onClick={() => navigate('/subscription-plans')}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-              }}
-            >
-              View All Plans
-            </Button>
+            {freeLaunch ? (
+              <Button
+                variant="contained"
+                size="large"
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => navigate(user ? '/dashboard' : '/signup')}
+                sx={{ textTransform: 'none', fontWeight: 600, px: 4 }}
+              >
+                Start listing for free
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={() => navigate('/subscription-plans')}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                View All Plans
+              </Button>
+            )}
           </Box>
         </Box>
       </Box>
@@ -814,7 +849,7 @@ const Home: React.FC = () => {
                     }}
                   />
                   <Typography variant="body2">
-                    {freeLaunch ? 'Free to list during launch, no subscription needed' : 'Simple pricing: Choose a subscription plan that fits your needs'}
+                    {freeLaunch ? 'No listing fees, no subscription needed' : 'Simple pricing: Choose a subscription plan that fits your needs'}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

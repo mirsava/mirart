@@ -1,5 +1,6 @@
 import express from 'express';
-import { sendContactEmail, verifySMTPConnection } from '../services/emailService.js';
+import { sendContactEmail, verifyEmailConfig } from '../services/emailService.js';
+import { requireAdmin } from '../middleware/auth.js';
 import { createNotification } from '../services/notificationService.js';
 import pool from '../config/database.js';
 
@@ -106,13 +107,13 @@ router.post('/contact-seller', async (req, res) => {
   }
 });
 
-router.get('/verify-smtp', async (req, res) => {
+router.get('/verify-config', requireAdmin, async (req, res) => {
   try {
-    const result = await verifySMTPConnection();
+    const result = await verifyEmailConfig();
     res.json(result);
   } catch (error) {
     res.status(500).json({ 
-      error: 'Failed to verify SMTP',
+      error: 'Failed to verify email configuration',
       message: error.message 
     });
   }

@@ -647,7 +647,7 @@ router.post('/:id/activate', requireAuth, async (req, res) => {
       return res.status(403).json({
         error: 'Listing limit reached',
         message: access.source === 'free'
-          ? `You have reached the launch limit of ${access.maxListings} active listings. Please deactivate an existing listing to activate another.`
+          ? `You have reached the free plan limit of ${access.maxListings} active listings. Please deactivate an existing listing to activate another.`
           : `You have reached your subscription limit of ${access.maxListings} active listings. Please upgrade your plan or deactivate existing listings.`
       });
     }

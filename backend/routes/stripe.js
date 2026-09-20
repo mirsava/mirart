@@ -105,7 +105,7 @@ router.post('/create-checkout-session', async (req, res) => {
       if (!(await getBillingConfig()).enabled) {
         return res.status(403).json({
           error: 'Subscriptions are not required yet',
-          details: 'ArtZyla is free to use during launch. Paid plans will start at a later date.',
+          details: 'Subscriptions are not required right now. ArtZyla is free to list.',
         });
       }
       // Stripe subscription mode: use Stripe Products

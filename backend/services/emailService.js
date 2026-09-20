@@ -1,4 +1,3 @@
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -65,29 +64,18 @@ export const buildTemplate = (template) => {
   return { html, text };
 };
 
-const createTransporter = () => {
-  const smtpConfig = {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER || '',
-      pass: process.env.SMTP_PASS || '',
-    },
-  };
+const RESEND_API_URL = 'https://api.resend.com';
+const REQUEST_TIMEOUT_MS = 10000;
 
-  if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
-    console.warn('SMTP credentials not configured. Email sending will be mocked.');
-    return null;
-  }
-
-  return nodemailer.createTransport(smtpConfig);
-};
-
-const transporter = createTransporter();
+// Read at call time so the key can be set (or changed) without re-importing this module.
+const getEmailConfig = () => ({
+  apiKey: process.env.RESEND_API_KEY || '',
+  from: process.env.EMAIL_FROM || `${SITE_NAME} <onboarding@resend.dev>`,
+});
 
 /**
- * Generic email sender. Use with any template.
+ * Generic email sender (Resend HTTPS API, so it also works on hosts that block SMTP). Use with any template.
+ * Without RESEND_API_KEY the email is logged instead of sent, which is handy in development.
  * @param {Object} options
  * @param {string} options.to - Recipient email
  * @param {string} options.subject - Email subject
@@ -100,44 +88,41 @@ const transporter = createTransporter();
  */
 export const sendEmail = async ({ to, subject, template, replyTo, replyToName, cc, bcc }) => {
   const { html, text } = buildTemplate(template);
+  const { apiKey, from } = getEmailConfig();
 
-  const mailOptions = {
-    from: `"${SITE_NAME}" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@artzyla.com'}>`,
-    to,
-    subject,
-    html,
-    text,
-  };
-
-  if (replyTo) {
-    mailOptions.replyTo = replyToName ? `"${replyToName}" <${replyTo}>` : replyTo;
-  }
-  if (cc) mailOptions.cc = cc;
-  if (bcc) mailOptions.bcc = bcc;
-
-  if (!transporter) {
-    console.log('=== MOCK EMAIL (SMTP not configured) ===');
+  if (!apiKey) {
+    console.log('=== MOCK EMAIL (RESEND_API_KEY not configured) ===');
     console.log('To:', to);
     console.log('Subject:', subject);
-    console.log('========================================');
-    return {
-      success: true,
-      messageId: `mock-${Date.now()}`,
-      mocked: true,
-    };
+    console.log('==================================================');
+    return { success: true, messageId: `mock-${Date.now()}`, mocked: true };
   }
 
+  const payload = { from, to: Array.isArray(to) ? to : [to], subject, html, text };
+  if (replyTo) payload.reply_to = replyToName ? `${replyToName} <${replyTo}>` : replyTo;
+  if (cc) payload.cc = Array.isArray(cc) ? cc : [cc];
+  if (bcc) payload.bcc = Array.isArray(bcc) ? bcc : [bcc];
+
+  let response;
   try {
-    const info = await transporter.sendMail(mailOptions);
-    return {
-      success: true,
-      messageId: info.messageId,
-      mocked: false,
-    };
+    response = await fetch(`${RESEND_API_URL}/emails`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
   } catch (error) {
     console.error('Error sending email:', error);
     throw new Error(`Failed to send email: ${error.message}`);
   }
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const reason = body.message || body.error || `HTTP ${response.status}`;
+    console.error('Email provider rejected the message:', reason);
+    throw new Error(`Failed to send email: ${reason}`);
+  }
+  return { success: true, messageId: body.id, mocked: false };
 };
 
 /**
@@ -274,6 +259,30 @@ If you made this change, you're all set. If not, please contact us immediately.`
   }),
 
   /** Message reply from ArtZyla Messages */
+  /** Someone sent a seller a new message through the site (no sender email is exposed) */
+  newMessage: ({ listingTitle, listingId, message, fromName }) => {
+    const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const link = `${SITE_URL}/messages`;
+    return {
+      headerSubtitle: 'You have a new message',
+      contentHtml: `
+        <p>Hello,</p>
+        <p><strong>${esc(fromName || 'Someone')}</strong> sent you a message about <strong>${esc(listingTitle)}</strong> on ${SITE_NAME}.</p>
+        <div class="message-box">
+          <p>${esc(message).replace(/\n/g, '<br>')}</p>
+        </div>
+        <p><a href="${link}">Read and reply on ${SITE_NAME}</a></p>
+      `,
+      contentText: `${fromName || 'Someone'} sent you a message about "${listingTitle}" on ${SITE_NAME}.
+
+${message}
+
+Read and reply: ${link}`,
+      source: 'Messages',
+      sourceDetail: `New message about ${listingTitle} (listing #${listingId})`,
+    };
+  },
+
   messageReply: ({ listingTitle, listingId, message, fromName, from }) => ({
     headerSubtitle: 'Someone replied to your message',
     contentHtml: `
@@ -357,24 +366,25 @@ export const sendContactEmail = async ({
   });
 };
 
-export const verifySMTPConnection = async () => {
-  if (!transporter) {
-    return {
-      configured: false,
-      message: 'SMTP not configured. Using mock mode.',
-    };
+export const verifyEmailConfig = async () => {
+  const { apiKey, from } = getEmailConfig();
+  if (!apiKey) {
+    return { configured: false, message: 'RESEND_API_KEY is not set. Emails are logged instead of sent.' };
   }
 
   try {
-    await transporter.verify();
-    return {
-      configured: true,
-      message: 'SMTP connection verified successfully.',
-    };
+    const response = await fetch(`${RESEND_API_URL}/domains`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (response.ok) return { configured: true, from, message: 'Email API key verified successfully.' };
+    const body = await response.json().catch(() => ({}));
+    // A send-only key cannot list domains but is still valid for sending.
+    if (response.status === 401 && body.name === 'restricted_api_key') {
+      return { configured: true, from, message: 'Send-only API key detected. Sending is enabled.' };
+    }
+    return { configured: false, message: `Email API rejected the key: ${body.message || `HTTP ${response.status}`}` };
   } catch (error) {
-    return {
-      configured: false,
-      message: `SMTP verification failed: ${error.message}`,
-    };
+    return { configured: false, message: `Email API check failed: ${error.message}` };
   }
 };

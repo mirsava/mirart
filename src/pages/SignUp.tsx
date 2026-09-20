@@ -443,7 +443,7 @@ const SignUp: React.FC = () => {
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               <Chip icon={<CheckIcon />} label="No activation fees" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
-              <Chip icon={<CheckIcon />} label={billingOff ? 'Free during launch' : 'Flexible subscription timing'} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
+              <Chip icon={<CheckIcon />} label={billingOff ? 'Free to list' : 'Flexible subscription timing'} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
               <Chip icon={<CheckIcon />} label="Direct buyer connection" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
             </Box>
           </Grid>
@@ -466,7 +466,7 @@ const SignUp: React.FC = () => {
                   Fast setup with guided onboarding
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
-                  {billingOff ? 'Free to list during launch, no card needed' : 'Transparent plans and clear listing limits'}
+                  {billingOff ? 'Free to list, no card needed' : 'Transparent plans and clear listing limits'}
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
                   Built for independent artists and makers
@@ -923,7 +923,7 @@ const SignUp: React.FC = () => {
 
             {!isCompletingProfile && formData.userType === 'artist' && billingOff && billing && (
               <Alert severity="success" sx={{ mt: 4, mb: 4 }}>
-                ArtZyla is free while we launch. List up to {billing.free_listing_limit} artworks at no cost, with no payment needed.
+                Free to list. Add up to {billing.free_listing_limit} artworks at no cost, with no card needed.
               </Alert>
             )}
 

@@ -214,6 +214,24 @@ router.post('/', requireAuth, async (req, res) => {
       });
     } catch {}
 
+    // Email the seller (unless they turned email notifications off). Not awaited: a slow mail server must not slow the request.
+    (async () => {
+      try {
+        const [recipients] = await pool.execute('SELECT email, email_notifications FROM users WHERE id = ?', [listing.user_id]);
+        if (!recipients[0]?.email || recipients[0].email_notifications === false) return;
+        const [titles] = await pool.execute('SELECT title FROM listings WHERE id = ?', [listingId]);
+        const listingTitle = titles[0]?.title || 'your artwork';
+        const { sendEmail, templates } = await import('../services/emailService.js');
+        await sendEmail({
+          to: recipients[0].email,
+          subject: `New message about "${listingTitle}"`,
+          template: templates.newMessage({ listingTitle, listingId, message, fromName: senderName }),
+        });
+      } catch (emailError) {
+        console.warn('Could not send new-message email:', emailError.message);
+      }
+    })();
+
     res.json({ success: true, messageId: result.insertId });
   } catch (error) {
     console.error('Error creating message:', error);

@@ -21,22 +21,19 @@ SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-# SMTP Configuration (for sending emails)
-# Leave empty to use mock mode (emails will be logged to console)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_app_password
-SMTP_FROM_EMAIL=noreply@artzyla.com
+# Email (Resend HTTPS API). Leave RESEND_API_KEY empty to log emails instead of sending them.
+RESEND_API_KEY=
+EMAIL_FROM=ArtZyla <noreply@yourdomain.com>
 ```
 
 Use the **Session pooler** connection string; the direct database host is IPv6-only.
 
+**Email:** the backend sends through the Resend API over HTTPS, so it works on hosts that block SMTP (for example Render's free tier). Create a Resend API key, verify your domain (SPF and DKIM records), and set `EMAIL_FROM` to an address on that domain. Until a domain is verified, Resend only delivers to your own account email when sending from `onboarding@resend.dev`. Admins can check the setup at `GET /api/email/verify-config`.
+
 ## Step 3: Configure Supabase Auth emails
 
 The app asks users to type the verification code from their email, so the **Confirm signup** and **Reset password** email templates (Authentication -> Email Templates) must include `{{ .Token }}`.
-For production, configure a custom SMTP provider (Authentication -> SMTP); Supabase's built-in mailer is heavily rate limited.
+For production, point Supabase at your email provider's SMTP settings (Authentication -> SMTP), since its built-in mailer is heavily rate limited. That is separate from the backend's own emails above.
 
 ## Step 4: Initialize the Database
 
