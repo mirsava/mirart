@@ -13,13 +13,18 @@ import {
   Twitter as TwitterIcon,
   Email as EmailIcon,
 } from '@mui/icons-material';
+import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
+import logoLight from '../assets/images/logo.svg';
+import logoDark from '../assets/images/logo-dark.svg';
 
 const Footer: React.FC = () => {
+  const { isDarkMode } = useCustomTheme();
+
   return (
     <Box
       component="footer"
       sx={{
-        bgcolor: 'rgba(74, 58, 154, 0.02)',
+        bgcolor: 'rgba(181, 87, 58, 0.02)',
         py: 6,
         mt: 'auto',
         width: '100%',
@@ -41,9 +46,14 @@ const Footer: React.FC = () => {
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
         <Grid container spacing={{ xs: 4, md: 3 }} justifyContent="space-between">
           <Grid item xs={12} sm={6} md={4} sx={{ display: 'flex', flexDirection: 'column', maxWidth: { md: '400px' } }}>
-            <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 2 }}>
-              ArtZyla
-            </Typography>
+            <Link href="/" aria-label="ArtZyla home" sx={{ display: 'inline-block', alignSelf: 'flex-start', mb: 2 }}>
+              <Box
+                component="img"
+                src={isDarkMode ? logoDark : logoLight}
+                alt="ArtZyla"
+                sx={{ height: 34, width: 'auto', display: 'block' }}
+              />
+            </Link>
             <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
               A marketplace connecting talented artists with art lovers worldwide. Discover 
               unique paintings, woodworking, and handmade art from independent creators.

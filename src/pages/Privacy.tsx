@@ -23,7 +23,7 @@ const Privacy: React.FC = () => {
         background: (theme) =>
           theme.palette.mode === 'dark'
             ? `radial-gradient(1000px 420px at 6% 0%, ${alpha(theme.palette.primary.main, 0.26)}, transparent 68%), radial-gradient(800px 360px at 96% 8%, ${alpha(theme.palette.primary.light, 0.18)}, transparent 72%), linear-gradient(180deg, ${alpha(theme.palette.background.default, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.96)} 100%)`
-            : `radial-gradient(1000px 420px at 6% 0%, ${alpha(theme.palette.primary.main, 0.1)}, transparent 68%), radial-gradient(800px 360px at 96% 8%, ${alpha(theme.palette.primary.main, 0.08)}, transparent 72%), linear-gradient(180deg, #faf9ff 0%, #f6f4ff 100%)`,
+            : `radial-gradient(1000px 420px at 6% 0%, ${alpha(theme.palette.primary.main, 0.1)}, transparent 68%), radial-gradient(800px 360px at 96% 8%, ${alpha(theme.palette.primary.main, 0.08)}, transparent 72%), linear-gradient(180deg, #faf8f5 0%, #f5f1ea 100%)`,
       }}
     >
       <SEO

@@ -8,17 +8,17 @@ describe('theme', () => {
     });
 
     it('has primary color', () => {
-      expect(lightTheme.palette.primary.main).toBe('#4a3a9a');
-      expect(lightTheme.palette.primary.light).toBe('#534bae');
-      expect(lightTheme.palette.primary.dark).toBe('#3d2d8a');
+      expect(lightTheme.palette.primary.main).toBe('#b5573a');
+      expect(lightTheme.palette.primary.light).toBe('#c97a5f');
+      expect(lightTheme.palette.primary.dark).toBe('#94432b');
     });
 
     it('has secondary color', () => {
-      expect(lightTheme.palette.secondary.main).toBe('#ff8f00');
+      expect(lightTheme.palette.secondary.main).toBe('#3a3632');
     });
 
     it('has typography', () => {
-      expect(lightTheme.typography.fontFamily).toContain('Roboto');
+      expect(lightTheme.typography.fontFamily).toContain('Inter');
       expect(lightTheme.typography.h1).toBeDefined();
       expect(lightTheme.typography.h6).toBeDefined();
     });
@@ -35,12 +35,12 @@ describe('theme', () => {
     });
 
     it('has primary color', () => {
-      expect(darkTheme.palette.primary.main).toBe('#7c6bc5');
+      expect(darkTheme.palette.primary.main).toBe('#d9825f');
     });
 
     it('has dark background', () => {
-      expect(darkTheme.palette.background.default).toBe('#121212');
-      expect(darkTheme.palette.background.paper).toBe('#1e1e1e');
+      expect(darkTheme.palette.background.default).toBe('#171513');
+      expect(darkTheme.palette.background.paper).toBe('#211e1b');
     });
   });
 });

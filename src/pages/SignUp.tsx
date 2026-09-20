@@ -379,7 +379,7 @@ const SignUp: React.FC = () => {
       sx={{
         background: isDarkMode
           ? `radial-gradient(1200px 500px at 10% 0%, ${alpha(theme.palette.primary.main, 0.22)}, transparent 68%), radial-gradient(900px 520px at 95% 12%, ${alpha(theme.palette.primary.main, 0.16)}, transparent 72%), linear-gradient(180deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`
-          : 'radial-gradient(1200px 500px at 10% 0%, rgba(74, 58, 154, 0.12), transparent 68%), radial-gradient(900px 520px at 95% 12%, rgba(74, 58, 154, 0.1), transparent 72%), linear-gradient(180deg, #faf9ff 0%, #f5f3ff 100%)',
+          : 'radial-gradient(1200px 500px at 10% 0%, rgba(181, 87, 58, 0.12), transparent 68%), radial-gradient(900px 520px at 95% 12%, rgba(181, 87, 58, 0.1), transparent 72%), linear-gradient(180deg, #faf8f5 0%, #f3eee6 100%)',
         minHeight: '100vh',
       }}
     >
@@ -389,7 +389,7 @@ const SignUp: React.FC = () => {
           position: 'relative',
           px: { xs: 3, md: 4.5 },
           py: { xs: 3.5, md: 4 },
-          background: 'linear-gradient(135deg, #1f1741 0%, #2f2370 52%, #4a3a9a 100%)',
+          background: 'linear-gradient(135deg, #1c1c1c 0%, #3a2a24 52%, #b5573a 100%)',
           borderRadius: 3,
           border: '1px solid',
           borderColor: 'rgba(180, 166, 255, 0.28)',
@@ -480,7 +480,7 @@ const SignUp: React.FC = () => {
           p: { xs: 2.5, sm: 4, md: 5 }, 
           borderRadius: 3,
           border: '1px solid',
-          borderColor: isDarkMode ? alpha(theme.palette.primary.main, 0.35) : 'rgba(74, 58, 154, 0.2)',
+          borderColor: isDarkMode ? alpha(theme.palette.primary.main, 0.35) : 'rgba(181, 87, 58, 0.2)',
           boxShadow: isDarkMode ? `0 14px 40px ${alpha('#000', 0.4)}` : '0 14px 40px rgba(31, 24, 71, 0.08)',
           bgcolor: isDarkMode ? alpha(theme.palette.background.paper, 0.92) : 'rgba(255, 255, 255, 0.9)',
           backdropFilter: 'blur(8px)',
@@ -1269,7 +1269,7 @@ const SignUp: React.FC = () => {
                   variant="contained"
                   size="large"
                   disabled={isLoading}
-                  sx={{ px: 6, py: 1.6, borderRadius: 2, fontWeight: 700, boxShadow: '0 10px 28px rgba(74, 58, 154, 0.35)' }}
+                  sx={{ px: 6, py: 1.6, borderRadius: 2, fontWeight: 700, boxShadow: '0 10px 28px rgba(181, 87, 58, 0.35)' }}
                 >
                   {isLoading
                     ? (isCompletingProfile ? 'Saving Profile...' : (formData.paymentOption === 'payNow' && formData.selectedPlanId ? 'Loading...' : 'Creating Account...'))

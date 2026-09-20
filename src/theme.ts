@@ -1,55 +1,55 @@
 import { createTheme, Theme } from '@mui/material/styles';
 
+export const brandNavy = '#1f2a44';
+
+const bodyFont = '"Inter", "Helvetica", "Arial", sans-serif';
+const headingFont = '"Playfair Display", Georgia, "Times New Roman", serif';
+
+const makeTypography = (headingColor?: string) => {
+  const heading = (size: string, extra: object = {}) => ({
+    fontFamily: headingFont,
+    fontWeight: 500,
+    fontSize: size,
+    ...(headingColor ? { color: headingColor } : {}),
+    ...extra,
+  });
+  return {
+    fontFamily: bodyFont,
+    h1: heading('2.5rem', { letterSpacing: '-0.01em' }),
+    h2: heading('2rem', { letterSpacing: '-0.01em' }),
+    h3: heading('1.75rem'),
+    h4: heading('1.5rem'),
+    h5: heading('1.25rem'),
+    h6: { fontFamily: bodyFont, fontWeight: 600, fontSize: '1rem', ...(headingColor ? { color: headingColor } : {}) },
+  };
+};
+
 export const lightTheme: Theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#4a3a9a',
-      light: '#534bae',
-      dark: '#3d2d8a',
+      main: '#b5573a',
+      light: '#c97a5f',
+      dark: '#94432b',
+      contrastText: '#ffffff',
     },
     secondary: {
-      main: '#ff8f00',
-      light: '#ffb300',
-      dark: '#ff6f00',
+      main: '#3a3632',
+      light: '#57524c',
+      dark: '#1c1c1c',
+      contrastText: '#ffffff',
     },
     background: {
-      default: '#fafafa',
+      default: '#faf8f5',
       paper: '#ffffff',
     },
     text: {
-      primary: '#212121',
-      secondary: '#757575',
+      primary: '#1c1c1c',
+      secondary: '#6b665f',
     },
-    divider: 'rgba(0, 0, 0, 0.15)',
+    divider: 'rgba(28, 28, 28, 0.14)',
   },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontWeight: 300,
-      fontSize: '2.5rem',
-    },
-    h2: {
-      fontWeight: 300,
-      fontSize: '2rem',
-    },
-    h3: {
-      fontWeight: 400,
-      fontSize: '1.75rem',
-    },
-    h4: {
-      fontWeight: 400,
-      fontSize: '1.5rem',
-    },
-    h5: {
-      fontWeight: 400,
-      fontSize: '1.25rem',
-    },
-    h6: {
-      fontWeight: 500,
-      fontSize: '1rem',
-    },
-  },
+  typography: makeTypography(brandNavy),
   shape: {
     borderRadius: 1,
   },
@@ -91,12 +91,12 @@ export const lightTheme: Theme = createTheme({
       styleOverrides: {
         root: {
           '&:hover': {
-            backgroundColor: 'rgba(255, 143, 0, 0.12)',
+            backgroundColor: 'rgba(181, 87, 58, 0.10)',
           },
           '&.Mui-selected': {
-            backgroundColor: 'rgba(255, 143, 0, 0.2)',
+            backgroundColor: 'rgba(181, 87, 58, 0.16)',
             '&:hover': {
-              backgroundColor: 'rgba(255, 143, 0, 0.28)',
+              backgroundColor: 'rgba(181, 87, 58, 0.24)',
             },
           },
         },
@@ -112,7 +112,7 @@ export const lightTheme: Theme = createTheme({
           borderColor: 'rgba(0, 0, 0, 0.12)',
           transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           '&:hover': {
-            borderColor: 'rgba(74, 58, 154, 0.5)',
+            borderColor: 'rgba(181, 87, 58, 0.5)',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           },
         },
@@ -128,7 +128,7 @@ export const lightTheme: Theme = createTheme({
           borderColor: 'rgba(0, 0, 0, 0.12)',
           transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           '&:hover': {
-            borderColor: 'rgba(74, 58, 154, 0.5)',
+            borderColor: 'rgba(181, 87, 58, 0.5)',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           },
         },
@@ -141,52 +141,28 @@ export const darkTheme: Theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#7c6bc5',
-      light: '#9e8fd9',
-      dark: '#5d4a9a',
+      main: '#d9825f',
+      light: '#e69f82',
+      dark: '#b5573a',
+      contrastText: '#1c1c1c',
     },
     secondary: {
-      main: '#ff8f00',
-      light: '#ffb300',
-      dark: '#ff6f00',
+      main: '#cfc7bc',
+      light: '#e2dcd3',
+      dark: '#a89f92',
+      contrastText: '#1c1c1c',
     },
     background: {
-      default: '#1a1a2e',
-      paper: '#252540',
+      default: '#171513',
+      paper: '#211e1b',
     },
     text: {
-      primary: '#f0f0f5',
-      secondary: '#b0b0c0',
+      primary: '#f3efe9',
+      secondary: '#b3aca2',
     },
-    divider: 'rgba(255, 255, 255, 0.12)',
+    divider: 'rgba(243, 239, 233, 0.12)',
   },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontWeight: 300,
-      fontSize: '2.5rem',
-    },
-    h2: {
-      fontWeight: 300,
-      fontSize: '2rem',
-    },
-    h3: {
-      fontWeight: 400,
-      fontSize: '1.75rem',
-    },
-    h4: {
-      fontWeight: 400,
-      fontSize: '1.5rem',
-    },
-    h5: {
-      fontWeight: 400,
-      fontSize: '1.25rem',
-    },
-    h6: {
-      fontWeight: 500,
-      fontSize: '1rem',
-    },
-  },
+  typography: makeTypography(),
   shape: {
     borderRadius: 1,
   },
@@ -248,7 +224,7 @@ export const darkTheme: Theme = createTheme({
           borderColor: 'rgba(255, 255, 255, 0.12)',
           transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           '&:hover': {
-            borderColor: 'rgba(124, 107, 197, 0.6)',
+            borderColor: 'rgba(217, 130, 95, 0.6)',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
           },
         },
@@ -264,7 +240,7 @@ export const darkTheme: Theme = createTheme({
           borderColor: 'rgba(255, 255, 255, 0.12)',
           transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           '&:hover': {
-            borderColor: 'rgba(124, 107, 197, 0.6)',
+            borderColor: 'rgba(217, 130, 95, 0.6)',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
           },
         },
@@ -286,7 +262,7 @@ export const darkTheme: Theme = createTheme({
     MuiTabs: {
       styleOverrides: {
         indicator: {
-          backgroundColor: '#ff8f00',
+          backgroundColor: '#d9825f',
         },
       },
     },
@@ -297,8 +273,8 @@ export const darkTheme: Theme = createTheme({
             borderColor: 'rgba(255, 255, 255, 0.5)',
             color: '#ffffff',
             '&.MuiChip-colorPrimary': {
-              borderColor: '#534bae',
-              color: '#7986cb',
+              borderColor: '#b5573a',
+              color: '#e69f82',
             },
           },
         },
@@ -308,12 +284,12 @@ export const darkTheme: Theme = createTheme({
       styleOverrides: {
         root: {
           '&:hover': {
-            backgroundColor: 'rgba(255, 143, 0, 0.2)',
+            backgroundColor: 'rgba(217, 130, 95, 0.16)',
           },
           '&.Mui-selected': {
-            backgroundColor: 'rgba(255, 143, 0, 0.3)',
+            backgroundColor: 'rgba(217, 130, 95, 0.22)',
             '&:hover': {
-              backgroundColor: 'rgba(255, 143, 0, 0.4)',
+              backgroundColor: 'rgba(217, 130, 95, 0.3)',
             },
           },
         },

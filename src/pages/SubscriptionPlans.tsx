@@ -237,7 +237,7 @@ const SubscriptionPlans: React.FC = () => {
               border: '1px solid',
               borderColor: 'divider',
               borderRadius: 1,
-              bgcolor: 'rgba(74, 58, 154, 0.04)',
+              bgcolor: 'rgba(181, 87, 58, 0.04)',
             }}
           >
             <Box>
@@ -462,7 +462,7 @@ const SubscriptionPlans: React.FC = () => {
 
         <FAQSection id="subscription-faq" items={FAQ_ITEMS} />
 
-        <Box sx={{ mt: 6, p: 4, bgcolor: 'rgba(74, 58, 154, 0.04)', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ mt: 6, p: 4, bgcolor: 'rgba(181, 87, 58, 0.04)', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="h5" fontWeight={600} gutterBottom>
             Ready to Start Selling?
           </Typography>

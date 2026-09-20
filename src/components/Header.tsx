@@ -52,6 +52,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
+import { brandNavy } from '../theme';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { useCart } from '../contexts/CartContext';
@@ -59,7 +60,8 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useFavorites } from '../contexts/FavoritesContext';
 import apiService from '../services/api';
 import { UserRole } from '../types/userRoles';
-import logo from '../assets/images/logo.png';
+import logoLight from '../assets/images/logo.svg';
+import logoDark from '../assets/images/logo-dark.svg';
 import ImagePlaceholder from './ImagePlaceholder';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
@@ -313,10 +315,10 @@ const Header: React.FC = () => {
             >
               <Box
                 component="img"
-                src={logo}
+                src={isDarkMode ? logoDark : logoLight}
                 alt="ArtZyla Logo"
                 sx={{
-                  height: 100,
+                  height: 64,
                   width: 'auto',
                   objectFit: 'contain',
                   py: 1,
@@ -642,7 +644,7 @@ const Header: React.FC = () => {
               sx={{ 
                 mr: 2, 
                 display: { md: 'none' },
-                color: isDarkMode ? 'white' : 'text.primary',
+                color: isDarkMode ? 'white' : brandNavy,
                 ml: 0,
               }}
             >
@@ -659,10 +661,10 @@ const Header: React.FC = () => {
             >
               <Box
                 component="img"
-                src={logo}
+                src={isDarkMode ? logoDark : logoLight}
                 alt="ArtZyla Logo"
                 sx={{
-                  height: { xs: 68, md: 64 },
+                  height: { xs: 44, md: 42 },
                   width: 'auto',
                   objectFit: 'contain',
                   display: 'block',
@@ -718,7 +720,7 @@ const Header: React.FC = () => {
                             bgcolor: 'transparent',
                             color: location.pathname === item.path 
                               ? 'primary.main'
-                              : (isDarkMode ? 'white' : 'text.primary'),
+                              : (isDarkMode ? 'white' : brandNavy),
                           },
                         }}
                       >
@@ -945,7 +947,7 @@ const Header: React.FC = () => {
                       onClick={handleArtistMenuOpen}
                       endIcon={<ExpandMoreIcon />}
                       sx={{
-                        color: isDarkMode ? 'white' : 'text.primary',
+                        color: isDarkMode ? 'white' : brandNavy,
                         fontWeight: 500,
                         bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
                         borderRadius: 2,
@@ -1053,7 +1055,7 @@ const Header: React.FC = () => {
                     </Avatar>}
                     endIcon={<ExpandMoreIcon sx={{ fontSize: 16 }} />}
                     sx={{
-                      color: isDarkMode ? 'white' : 'text.primary',
+                      color: isDarkMode ? 'white' : brandNavy,
                       fontWeight: 500,
                       borderRadius: 2,
                       px: 1.5,
@@ -1071,7 +1073,7 @@ const Header: React.FC = () => {
                     onClick={handleUserMenuOpen}
                     sx={{
                       display: { xs: 'flex', md: 'none' },
-                      color: isDarkMode ? 'white' : 'text.primary',
+                      color: isDarkMode ? 'white' : brandNavy,
                     }}
                     aria-label="User menu"
                   >

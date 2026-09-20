@@ -88,7 +88,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                 border: 0,
                 height: 3,
                 borderRadius: 999,
-                background: 'linear-gradient(90deg, rgba(74,58,154,0.95) 0%, rgba(74,58,154,0.6) 65%, rgba(74,58,154,0.2) 100%)',
+                background: 'linear-gradient(90deg, rgba(28, 28, 28, 0.88) 0%, rgba(28, 28, 28, 0.55) 65%, rgba(28, 28, 28, 0.15) 100%)',
                 width: isCenter ? { xs: 150, md: 210 } : { xs: 140, md: 190 },
                 mx: isCenter ? 'auto' : 0,
               }}

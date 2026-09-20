@@ -51,7 +51,7 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.scale(dpr, dpr);
-      ctx.strokeStyle = '#1a1a2e';
+      ctx.strokeStyle = '#171513';
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';

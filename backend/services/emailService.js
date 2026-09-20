@@ -27,17 +27,17 @@ export const buildTemplate = (template) => {
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #4a3a9a 0%, #534bae 100%); color: white; padding: 24px; text-align: center; border-radius: 8px 8px 0 0; }
+          .header { background: linear-gradient(135deg, #b5573a 0%, #c97a5f 100%); color: white; padding: 24px; text-align: center; border-radius: 8px 8px 0 0; }
           .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
           .header p { margin: 8px 0 0; font-size: 14px; opacity: 0.9; }
           .content { padding: 24px; background-color: #fafafa; border: 1px solid #eee; border-top: none; }
-          .message-box { background-color: white; padding: 16px; border-left: 4px solid #4a3a9a; margin: 20px 0; border-radius: 0 4px 4px 0; }
+          .message-box { background-color: white; padding: 16px; border-left: 4px solid #b5573a; margin: 20px 0; border-radius: 0 4px 4px 0; }
           .footer { padding: 24px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #eee; }
-          .footer-brand { font-weight: 600; color: #4a3a9a; margin-bottom: 8px; }
+          .footer-brand { font-weight: 600; color: #b5573a; margin-bottom: 8px; }
           .footer-source { background: #f5f5f5; padding: 12px; border-radius: 4px; margin: 16px 0; font-size: 11px; color: #555; }
-          .footer a { color: #4a3a9a; text-decoration: none; }
+          .footer a { color: #b5573a; text-decoration: none; }
           .info { margin: 10px 0; }
-          .label { font-weight: 600; color: #4a3a9a; }
+          .label { font-weight: 600; color: #b5573a; }
         </style>
       </head>
       <body>
@@ -187,7 +187,7 @@ Reply directly to this email to continue the conversation.`,
         <li>Connect with collectors and fellow artists</li>
       </ul>
       <p style="text-align: center; margin: 24px 0;">
-        <a href="${loginUrl || SITE_URL}" style="display: inline-block; background: linear-gradient(135deg, #4a3a9a 0%, #534bae 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">Get Started</a>
+        <a href="${loginUrl || SITE_URL}" style="display: inline-block; background: linear-gradient(135deg, #b5573a 0%, #c97a5f 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">Get Started</a>
       </p>
       <p>If you have any questions, feel free to reach out. We're here to help!</p>
       <p>Happy creating,<br>The ${SITE_NAME} Team</p>
@@ -234,7 +234,7 @@ If you didn't request this, you can safely ignore this email.`,
       <p>Hi ${userName || 'there'},</p>
       <p>We received a request to reset your password for your ${SITE_NAME} account.</p>
       ${resetLink
-        ? `<p style="text-align: center; margin: 24px 0;"><a href="${resetLink}" style="display: inline-block; background: linear-gradient(135deg, #4a3a9a 0%, #534bae 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">Reset Password</a></p><p>Or copy this link: ${resetLink}</p>`
+        ? `<p style="text-align: center; margin: 24px 0;"><a href="${resetLink}" style="display: inline-block; background: linear-gradient(135deg, #b5573a 0%, #c97a5f 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">Reset Password</a></p><p>Or copy this link: ${resetLink}</p>`
         : `<div class="message-box" style="text-align: center;"><p style="font-size: 28px; font-weight: 700; letter-spacing: 4px; margin: 0;">${code || '123456'}</p></div><p>Enter this code on the password reset page.</p>`
       }
       <p>This ${resetLink ? 'link' : 'code'} expires in ${expiresInMinutes || 60} minutes.</p>
@@ -261,7 +261,7 @@ If you didn't request this, please ignore this email.`,
       <p>Your ${SITE_NAME} account password was successfully changed.</p>
       <p>If you made this change, you're all set. If not, please contact us immediately — your account may have been compromised.</p>
       <p style="text-align: center; margin: 24px 0;">
-        <a href="${SITE_URL}" style="display: inline-block; background: linear-gradient(135deg, #4a3a9a 0%, #534bae 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">Sign In</a>
+        <a href="${SITE_URL}" style="display: inline-block; background: linear-gradient(135deg, #b5573a 0%, #c97a5f 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">Sign In</a>
       </p>
     `,
     contentText: `Hi ${userName || 'there'},
