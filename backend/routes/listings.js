@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { requireAuth, isUuid } from '../middleware/auth.js';
 import { parseImageUrls } from '../utils/json.js';
+import { getListingAccess } from '../services/billing.js';
 
 const router = express.Router();
 
@@ -627,38 +628,27 @@ router.post('/:id/activate', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Cannot activate a sold listing' });
     }
 
-    // Check subscription limits
-    const [subscriptions] = await pool.execute(
-      `SELECT us.*, sp.max_listings
-       FROM user_subscriptions us
-       JOIN subscription_plans sp ON us.plan_id = sp.id
-       WHERE us.user_id = ? AND us.status = 'active' AND us.end_date >= CURRENT_DATE
-       ORDER BY us.created_at DESC
-       LIMIT 1`,
-      [listing.user_id]
-    );
+    // Check plan limits (or the free-launch limit while billing is off / in its grace period)
+    const access = await getListingAccess(listing.user_id);
 
-    if (subscriptions.length === 0) {
-      return res.status(403).json({ 
+    if (!access.allowed) {
+      return res.status(403).json({
         error: 'No active subscription found',
         message: 'You need an active subscription to activate listings. Please subscribe to a plan first.'
       });
     }
 
-    const subscription = subscriptions[0];
-
-    // Count current active listings
     const [activeCount] = await pool.execute(
       "SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = 'active'",
       [listing.user_id]
     );
 
-    const currentActive = activeCount[0].count;
-
-    if (currentActive >= subscription.max_listings) {
-      return res.status(403).json({ 
+    if (activeCount[0].count >= access.maxListings) {
+      return res.status(403).json({
         error: 'Listing limit reached',
-        message: `You have reached your subscription limit of ${subscription.max_listings} active listings. Please upgrade your plan or deactivate existing listings.`
+        message: access.source === 'free'
+          ? `You have reached the launch limit of ${access.maxListings} active listings. Please deactivate an existing listing to activate another.`
+          : `You have reached your subscription limit of ${access.maxListings} active listings. Please upgrade your plan or deactivate existing listings.`
       });
     }
 

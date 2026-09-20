@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/userRoles';
 import { useCart } from '../contexts/CartContext';
+import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { useSnackbar } from 'notistack';
 import ContactSellerDialog from './ContactSellerDialog';
@@ -33,6 +34,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { addToCart } = useCart();
+  const { checkoutEnabled } = useMarketplaceSettings();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { enqueueSnackbar } = useSnackbar();
   const isLiked = isFavorite(painting.id);
@@ -49,6 +51,10 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
   const handleContactSeller = (e: React.MouseEvent): void => {
     e.stopPropagation();
     e.preventDefault();
+    if (!isAuthenticated) {
+      navigate('/signin', { state: { from: { pathname: getPaintingDetailPath(painting.id, painting.title) } } });
+      return;
+    }
     setContactDialogOpen(true);
   };
 
@@ -293,7 +299,7 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
           <>
             {!painting.inStock ? (
               <Chip label="Sold" color="default" size="small" sx={{ fontWeight: 600 }} />
-            ) : (
+            ) : checkoutEnabled ? (
               <Button
                 size="small"
                 variant="contained"
@@ -303,8 +309,8 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
               >
                 Buy Now
               </Button>
-            )}
-            {isAuthenticated && (
+            ) : null}
+            {(isAuthenticated || (!checkoutEnabled && painting.inStock)) && (
               <Button
                 size="small"
                 variant="contained"

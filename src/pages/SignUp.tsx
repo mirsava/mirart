@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, SignUpProfile } from '../contexts/AuthContext';
+import { useBillingStatus } from '../hooks/useBillingStatus';
 import { useSnackbar } from 'notistack';
 import apiService, { SubscriptionPlan } from '../services/api';
 import {
@@ -48,6 +49,8 @@ const SignUp: React.FC = () => {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
   const { signUp, user, isAuthenticated } = useAuth();
+  const billing = useBillingStatus();
+  const billingOff = billing ? !billing.billing_enabled : false;
   const { enqueueSnackbar } = useSnackbar();
   
   // Get pre-filled data from location state (if redirected from sign-in)
@@ -216,7 +219,7 @@ const SignUp: React.FC = () => {
     if (!formData.country.trim()) newErrors.country = 'Country is required';
     if (formData.userType === 'artist' && formData.specialties.length === 0) newErrors.specialties = 'Please select at least one specialty';
     if (!isCompletingProfile && !formData.agreeToTerms) newErrors.agreeToTerms = 'You must agree to the terms and conditions';
-    if (!isCompletingProfile && formData.userType === 'artist' && formData.paymentOption === 'payNow' && !formData.selectedPlanId) {
+    if (!isCompletingProfile && formData.userType === 'artist' && !billingOff && formData.paymentOption === 'payNow' && !formData.selectedPlanId) {
       newErrors.selectedPlanId = 'Please select a subscription plan';
     }
 
@@ -281,7 +284,7 @@ const SignUp: React.FC = () => {
     }
 
     // If Pay Now with plan selected, go to payment; otherwise sign up directly (Pay Later)
-    if (formData.userType === 'artist' && formData.paymentOption === 'payNow' && formData.selectedPlanId) {
+    if (formData.userType === 'artist' && !billingOff && formData.paymentOption === 'payNow' && formData.selectedPlanId) {
       setPaymentStep(true);
       return;
     }
@@ -435,12 +438,12 @@ const SignUp: React.FC = () => {
                 mb: 2.25,
               }}
             >
-              Create your artist profile, pick how you want to subscribe, and start preparing listings in minutes.
+              {billingOff ? 'Create your artist profile and start listing your work for free in minutes.' : 'Create your artist profile, pick how you want to subscribe, and start preparing listings in minutes.'}
               The setup keeps everything simple so you can focus on creating and selling.
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               <Chip icon={<CheckIcon />} label="No activation fees" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
-              <Chip icon={<CheckIcon />} label="Flexible subscription timing" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
+              <Chip icon={<CheckIcon />} label={billingOff ? 'Free during launch' : 'Flexible subscription timing'} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
               <Chip icon={<CheckIcon />} label="Direct buyer connection" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
             </Box>
           </Grid>
@@ -463,7 +466,7 @@ const SignUp: React.FC = () => {
                   Fast setup with guided onboarding
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
-                  Transparent plans and clear listing limits
+                  {billingOff ? 'Free to list during launch, no card needed' : 'Transparent plans and clear listing limits'}
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
                   Built for independent artists and makers
@@ -918,8 +921,14 @@ const SignUp: React.FC = () => {
               )}
             </Grid>
 
+            {!isCompletingProfile && formData.userType === 'artist' && billingOff && billing && (
+              <Alert severity="success" sx={{ mt: 4, mb: 4 }}>
+                ArtZyla is free while we launch. List up to {billing.free_listing_limit} artworks at no cost, with no payment needed.
+              </Alert>
+            )}
+
             {/* Payment Option: Pay Now vs Pay Later */}
-            {!isCompletingProfile && formData.userType === 'artist' && (
+            {!isCompletingProfile && formData.userType === 'artist' && !billingOff && (
               <Box 
                 sx={{ 
                   mt: 4, 

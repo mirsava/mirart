@@ -58,6 +58,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
+import { useBillingStatus } from '../hooks/useBillingStatus';
+import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import apiService, { DashboardData, Listing, Order, SubscriptionPlan, User, UserSubscription } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import OrderCardComponent from '../components/OrderCard';
@@ -189,6 +191,8 @@ const AccountDashboard: React.FC = () => {
   });
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+  const billing = useBillingStatus();
+  const { checkoutEnabled } = useMarketplaceSettings();
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [activatingListing, setActivatingListing] = useState<number | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -702,7 +706,7 @@ const AccountDashboard: React.FC = () => {
     if (!user?.id) return;
     
     try {
-      const subscriptionData = await apiService.getUserSubscription(user.id);
+      const subscriptionData = await apiService.getUserSubscription(user.id, { includeFreeAccess: true });
       setSubscription(subscriptionData.subscription);
     } catch (err: any) {
       setSubscription(null);
@@ -1287,16 +1291,16 @@ const AccountDashboard: React.FC = () => {
                   </Avatar>
                   <Box>
                     <Typography variant="body1" fontWeight={600}>
-                      {subscription.plan_name} Plan ({subscription.billing_period})
+                      {subscription.is_free_access ? 'Free launch access' : `${subscription.plan_name} Plan (${subscription.billing_period})`}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {subscription.current_listings || 0} / {subscription.max_listings >= 999999 ? 'Unlimited' : subscription.max_listings} active listings
-                      {subscription.end_date && ` · Expires: ${new Date(subscription.end_date).toLocaleDateString()}`}
+                      {subscription.end_date && ` · ${subscription.is_free_access ? 'Free until' : 'Expires'}: ${new Date(subscription.end_date).toLocaleDateString()}`}
                     </Typography>
                   </Box>
                 </Box>
                 <Button variant="outlined" size="small" onClick={() => navigate('/subscription-plans')} sx={{ textTransform: 'none' }}>
-                  Manage Subscription
+                  {subscription.is_free_access ? 'View Plans' : 'Manage Subscription'}
                 </Button>
               </Paper>
             ) : (
@@ -2214,7 +2218,24 @@ const AccountDashboard: React.FC = () => {
               </Typography>
             </Box>
 
-            {subscription && subscription.status === 'active' ? (
+            {subscription && subscription.is_free_access ? (
+              <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 1, mb: 3 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Free launch access
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {billing?.billing_enabled
+                    ? `Paid plans are now available. You can keep up to ${subscription.max_listings} active listings for free until ${subscription.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'your grace period ends'}. Choose a plan before then to keep your listings live.`
+                    : `ArtZyla is free to use while we launch. You can keep up to ${subscription.max_listings} active listings at no cost. Paid plans will start at a later date.`}
+                </Typography>
+                <Typography variant="body2">
+                  Active listings: {subscription.current_listings || 0} / {subscription.max_listings}
+                </Typography>
+                <Button variant="outlined" sx={{ mt: 2 }} onClick={() => navigate('/subscription-plans')}>
+                  View Plans
+                </Button>
+              </Paper>
+            ) : subscription && subscription.status === 'active' ? (
               <Paper
                 elevation={0}
                 sx={{
@@ -2475,14 +2496,15 @@ const AccountDashboard: React.FC = () => {
                 Profile updated successfully!
               </Alert>
             )}
-            {needsShippingProfile && (
+            {checkoutEnabled && needsShippingProfile && (
               <Alert severity="warning" sx={{ mb: 3 }}>
                 Shipping address is incomplete. Fill Street, City, State/Province, ZIP/Postal code, and Country to enable shipping workflows.
               </Alert>
             )}
             {!isBuyerDashboard && (
             <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid item xs={12} md={6}>
+              {checkoutEnabled && (
+<Grid item xs={12} md={6}>
                 <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.25 }}>Payout Readiness</Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
@@ -2516,7 +2538,8 @@ const AccountDashboard: React.FC = () => {
                   </Box>
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={6}>
+              )}
+<Grid item xs={12} md={6}>
                 <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.25 }}>Public Profile Completeness</Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -3167,7 +3190,8 @@ const AccountDashboard: React.FC = () => {
                       </Card>
                     </Grid>
 
-                    <Grid item xs={12} md={7}>
+                    {checkoutEnabled && (
+<Grid item xs={12} md={7}>
                       <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
                         <CardContent sx={{ p: 2.5 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
@@ -3246,7 +3270,8 @@ const AccountDashboard: React.FC = () => {
                       </Card>
                     </Grid>
 
-                    <Grid item xs={12} md={5}>
+                    )}
+<Grid item xs={12} md={checkoutEnabled ? 5 : 12}>
                       <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
                         <CardContent sx={{ p: 2.5 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>

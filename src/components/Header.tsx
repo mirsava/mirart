@@ -53,6 +53,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { brandNavy } from '../theme';
+import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { useCart } from '../contexts/CartContext';
@@ -73,6 +74,7 @@ const Header: React.FC = () => {
   const { user, signOut, isAuthenticated, refreshUser } = useAuth();
   const { openChat, chatEnabled } = useChat();
   const { cartItems, getTotalItems, getTotalPrice, removeFromCart } = useCart();
+  const { checkoutEnabled } = useMarketplaceSettings();
   const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead, dismissNotification } = useNotifications();
   const { favorites, favoritesLoading, fetchFavorites, removeFavorite } = useFavorites();
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -402,14 +404,14 @@ const Header: React.FC = () => {
             <Box sx={{ px: 2, py: 2, bgcolor: 'action.hover', borderRadius: 2, mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                 <Avatar sx={{ bgcolor: 'primary.main' }}>
-                  {user.name?.charAt(0).toUpperCase() || user.id?.charAt(0).toUpperCase() || 'U'}
+                  {(user.name || user.username || user.email)?.charAt(0).toUpperCase() || 'U'}
                 </Avatar>
                 <Box>
                   <Typography variant="subtitle2" fontWeight={600}>
                     {user.name || 'User'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" fontSize="0.75rem">
-                    @{user.id || 'username'}
+                    {user.username ? `@${user.username}` : user.email}
                   </Typography>
                 </Box>
               </Box>
@@ -1029,6 +1031,7 @@ const Header: React.FC = () => {
                       </Tooltip>
                     </>
                   )}
+                  {checkoutEnabled && (
                   <Tooltip title="Cart">
                     <IconButton
                       size="small"
@@ -1040,6 +1043,7 @@ const Header: React.FC = () => {
                       </Badge>
                     </IconButton>
                   </Tooltip>
+                  )}
                   <IconButton
                     size="small"
                     onClick={toggleTheme}
@@ -1051,7 +1055,7 @@ const Header: React.FC = () => {
                   <Button
                     onClick={handleUserMenuOpen}
                     startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
-                      {user.name?.charAt(0).toUpperCase() || user.id?.charAt(0).toUpperCase() || 'U'}
+                      {(user.name || user.username || user.email)?.charAt(0).toUpperCase() || 'U'}
                     </Avatar>}
                     endIcon={<ExpandMoreIcon sx={{ fontSize: 16 }} />}
                     sx={{
@@ -1067,7 +1071,7 @@ const Header: React.FC = () => {
                       '&:hover': { bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover' },
                     }}
                   >
-                    {user.name || user.id || 'User'}
+                    {user.name || user.username || user.email || 'User'}
                   </Button>
                   <IconButton
                     onClick={handleUserMenuOpen}
@@ -1078,12 +1082,13 @@ const Header: React.FC = () => {
                     aria-label="User menu"
                   >
                     <Avatar sx={{ width: 26, height: 26, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
-                      {user.name?.charAt(0).toUpperCase() || user.id?.charAt(0).toUpperCase() || 'U'}
+                      {(user.name || user.username || user.email)?.charAt(0).toUpperCase() || 'U'}
                     </Avatar>
                   </IconButton>
                 </>
               ) : (
                 <>
+                  {checkoutEnabled && (
                   <IconButton
                     size="small"
                     onClick={() => { closeAllDrawers(); setCartDrawerOpen(true); }}
@@ -1093,6 +1098,7 @@ const Header: React.FC = () => {
                       <ShoppingCartIcon sx={{ fontSize: 20 }} />
                     </Badge>
                   </IconButton>
+                  )}
                   <IconButton 
                     size="small"
                     onClick={toggleTheme}
@@ -1509,7 +1515,7 @@ const Header: React.FC = () => {
             {user?.name || 'User'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            @{user?.id || 'username'}
+            {user?.username ? `@${user.username}` : user?.email}
           </Typography>
         </Box>
         <Divider />

@@ -35,6 +35,7 @@ import SubscriptionPlans from './pages/SubscriptionPlans';
 import Orders from './pages/Orders';
 import OrderDetail from './pages/OrderDetail';
 import ProtectedRoute from './components/ProtectedRoute';
+import CheckoutGate from './components/CheckoutGate';
 import { UserRole } from './types/userRoles';
 
 function App(): JSX.Element {
@@ -82,7 +83,9 @@ function AppContent(): JSX.Element {
               path="/cart"
               element={
                 <ProtectedRoute>
-                  <Cart />
+                  <CheckoutGate>
+                    <Cart />
+                  </CheckoutGate>
                 </ProtectedRoute>
               }
             />
@@ -90,7 +93,9 @@ function AppContent(): JSX.Element {
               path="/checkout"
               element={
                 <ProtectedRoute>
-                  <Checkout />
+                  <CheckoutGate>
+                    <Checkout />
+                  </CheckoutGate>
                 </ProtectedRoute>
               }
             />

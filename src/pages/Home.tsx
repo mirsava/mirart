@@ -32,6 +32,7 @@ import apiService, { Listing, SubscriptionPlan } from '../services/api';
 import { getListingImageCount } from '../utils/listingUtils';
 import { Painting } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useBillingStatus } from '../hooks/useBillingStatus';
 import { Check as CheckIcon, Star as StarIcon } from '@mui/icons-material';
 import SEO from '../components/SEO';
 import { brandNavy } from '../theme';
@@ -40,6 +41,8 @@ import { FAQ_ITEMS } from '../data/faqs';
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const billing = useBillingStatus();
+  const freeLaunch = billing ? !billing.billing_enabled : false;
   const theme = useTheme();
   const [featuredPaintings, setFeaturedPaintings] = useState<Painting[]>([]);
   const [featuredWoodworking, setFeaturedWoodworking] = useState<Painting[]>([]);
@@ -677,7 +680,9 @@ const Home: React.FC = () => {
                 lineHeight: 1.6,
               }}
             >
-              Choose a subscription plan that fits your needs. No hidden fees, no per-listing charges.
+              {freeLaunch && billing
+                ? `Free while we launch: list up to ${billing.free_listing_limit} artworks at no cost. These plans apply when paid billing begins.`
+                : 'Choose a subscription plan that fits your needs. No hidden fees, no per-listing charges.'}
             </Typography>
           </Box>
 
@@ -809,7 +814,7 @@ const Home: React.FC = () => {
                     }}
                   />
                   <Typography variant="body2">
-                    Simple pricing: Choose a subscription plan that fits your needs
+                    {freeLaunch ? 'Free to list during launch, no subscription needed' : 'Simple pricing: Choose a subscription plan that fits your needs'}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

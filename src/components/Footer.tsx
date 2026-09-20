@@ -14,11 +14,13 @@ import {
   Email as EmailIcon,
 } from '@mui/icons-material';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
+import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import logoLight from '../assets/images/logo.svg';
 import logoDark from '../assets/images/logo-dark.svg';
 
 const Footer: React.FC = () => {
   const { isDarkMode } = useCustomTheme();
+  const { checkoutEnabled, loaded } = useMarketplaceSettings();
 
   return (
     <Box
@@ -131,6 +133,13 @@ const Footer: React.FC = () => {
         </Grid>
 
         <Divider sx={{ my: { xs: 4, md: 5 } }} />
+
+        {loaded && !checkoutEnabled && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2, maxWidth: 820, lineHeight: 1.7 }}>
+            ArtZyla is a marketplace that connects buyers and sellers. Payment, shipping and returns are arranged directly between
+            buyer and seller. ArtZyla does not process payments or ship items and is not a party to any sale.
+          </Typography>
+        )}
 
         <Box
           sx={{

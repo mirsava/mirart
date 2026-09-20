@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Container,
@@ -20,7 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 const ConfirmSignup: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { confirmSignUp, resendConfirmationCode, refreshUser } = useAuth();
+  const { confirmSignUp, resendConfirmationCode, refreshUser, isAuthenticated, loading: authLoading } = useAuth();
   
   const emailFromState = location.state?.email || '';
   const [email, setEmail] = useState(emailFromState);
@@ -29,6 +29,22 @@ const ConfirmSignup: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [success, setSuccess] = useState(false);
+  const wasSignedInOnArrival = useRef<boolean | null>(null);
+
+  // Clicking the link in the confirmation email signs the user in (in this tab or another one).
+  useEffect(() => {
+    if (authLoading) return;
+    if (wasSignedInOnArrival.current === null) {
+      wasSignedInOnArrival.current = isAuthenticated;
+      if (isAuthenticated) navigate('/dashboard', { replace: true });
+      return;
+    }
+    if (isAuthenticated && !wasSignedInOnArrival.current && !success) {
+      setSuccess(true);
+      const timer = setTimeout(() => navigate('/dashboard'), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [authLoading, isAuthenticated, success, navigate]);
 
   const handleCodeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setCode(event.target.value);
@@ -99,7 +115,7 @@ const ConfirmSignup: React.FC = () => {
     try {
       await resendConfirmationCode(email);
       setErrors({});
-      alert('Verification code has been resent to your email!');
+      alert('A new verification email has been sent!');
     } catch (error: any) {
       // Show helpful message instead of error
       alert('If you did not receive the code, please check your spam folder or try signing up again. The code is valid for 24 hours.');
@@ -152,7 +168,7 @@ const ConfirmSignup: React.FC = () => {
               Confirm Your Account
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              We've sent a verification code to your email address. Please enter it below to confirm your account.
+              We've sent a verification email. Click the link in it to confirm your account, or enter the code from the email below.
             </Typography>
           </Box>
 
@@ -185,7 +201,7 @@ const ConfirmSignup: React.FC = () => {
               value={code}
               onChange={handleCodeChange}
               error={!!errors.code}
-              helperText={errors.code || 'Enter the verification code from your email'}
+              helperText={errors.code || 'Only needed if your email includes a verification code'}
               required
               inputProps={{
                 maxLength: 10,
@@ -207,7 +223,7 @@ const ConfirmSignup: React.FC = () => {
 
             <Box sx={{ textAlign: 'center', mb: 3 }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Didn't receive the code?
+                Didn't receive the email?
               </Typography>
               <Button
                 variant="text"
@@ -215,7 +231,7 @@ const ConfirmSignup: React.FC = () => {
                 disabled={isResending || !email.trim()}
                 sx={{ textTransform: 'none' }}
               >
-                {isResending ? 'Resending...' : 'Resend Verification Code'}
+                {isResending ? 'Resending...' : 'Resend verification email'}
               </Button>
             </Box>
 

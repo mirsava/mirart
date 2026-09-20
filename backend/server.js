@@ -24,6 +24,7 @@ import announcementsRouter from './routes/announcements.js';
 import notificationsRouter from './routes/notifications.js';
 import supportChatRouter from './routes/supportChat.js';
 import authRouter from './routes/auth.js';
+import settingsRouter from './routes/settings.js';
 import { attachAuth } from './middleware/auth.js';
 
 dotenv.config();
@@ -224,6 +225,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRouter);
+app.use('/api/settings', settingsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/listings', listingsRouter);
 app.use('/api/dashboard', dashboardRouter);
@@ -307,6 +309,16 @@ app.listen(PORT, async () => {
   console.log(`\n`);
 
   // Tracking poll: check shipped orders every 30 minutes for delivery status
+  // Re-check subscriptions daily so an ended grace period (or expired plan) takes effect without a restart
+  setInterval(async () => {
+    try {
+      const { runSubscriptionExpirationJob } = await import('./services/subscriptionExpiration.js');
+      await runSubscriptionExpirationJob();
+    } catch (err) {
+      console.warn('[Daily] Subscription expiration job failed:', err?.message || err);
+    }
+  }, 24 * 60 * 60 * 1000);
+
   const TRACKING_POLL_INTERVAL = 30 * 60 * 1000;
   async function pollShippedOrders() {
     try {

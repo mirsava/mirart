@@ -3,6 +3,7 @@ import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
 import { createNotification } from '../services/notificationService.js';
 import { requireAuth, requireSelf } from '../middleware/auth.js';
+import { requireCheckoutEnabled } from '../services/marketplace.js';
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ async function getPayoutCommissionPercent() {
 }
 
 // Create new order
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireCheckoutEnabled, async (req, res) => {
   try {
     const {
       listing_id,

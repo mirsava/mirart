@@ -1,4 +1,6 @@
 import { authFetch } from '../lib/supabase';
+import MarketplaceNotice from '../components/MarketplaceNotice';
+import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -30,6 +32,7 @@ import PageHeader from '../components/PageHeader';
 const EditListing: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { checkoutEnabled } = useMarketplaceSettings();
   const { id } = useParams<{ id: string }>();
   const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(false);
@@ -380,7 +383,7 @@ const EditListing: React.FC = () => {
       setError('You must be logged in to edit a listing');
       return;
     }
-    if (formData.shipping_preference === 'buyer') {
+    if (checkoutEnabled && formData.shipping_preference === 'buyer') {
       const shippingFee = parseFloat(formData.fixed_shipping_fee);
       if (!formData.fixed_shipping_fee.toString().trim() || isNaN(shippingFee) || shippingFee < 0) {
         setError('Buyer-paid listings require a valid non-negative shipping cost');
@@ -594,7 +597,9 @@ const EditListing: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12}>
+              {checkoutEnabled && (
+<>
+<Grid item xs={12}>
                 <Typography variant="subtitle2" gutterBottom>
                   Shipping dimensions (for rate calculation)
                 </Typography>
@@ -610,7 +615,9 @@ const EditListing: React.FC = () => {
               </Grid>
               <Grid item xs={12} sm={3}>
                 <TextField fullWidth type="number" label="Height (in)" name="height_in" value={formData.height_in} onChange={handleChange} inputProps={{ min: 1, step: 0.1 }} />
-              </Grid>
+              </Grid></>
+)}
+
 
               <Grid item xs={12}>
                 <Typography variant="subtitle2" gutterBottom>
@@ -766,7 +773,14 @@ const EditListing: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12}>
+              {!checkoutEnabled && (
+<Grid item xs={12}>
+<MarketplaceNotice variant="seller" />
+</Grid>
+)}
+{checkoutEnabled && (
+<>
+<Grid item xs={12}>
                 <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
                   <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
                     Who pays for shipping?
@@ -817,12 +831,14 @@ const EditListing: React.FC = () => {
                   />
                 </Grid>
               )}
-              <Grid item xs={12}>
+              </>
+)}
+<Grid item xs={12}>
                 <TextField
                   fullWidth
                   multiline
                   rows={3}
-                  label="Shipping Information"
+                  label={checkoutEnabled ? 'Shipping Information' : 'Payment & shipping terms'}
                   name="shipping_info"
                   value={formData.shipping_info}
                   onChange={handleChange}
@@ -830,7 +846,9 @@ const EditListing: React.FC = () => {
                   helperText="Provide details about shipping options, costs, and delivery times"
                 />
               </Grid>
-              <Grid item xs={12}>
+              {checkoutEnabled && (
+<>
+<Grid item xs={12}>
                 <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
                   <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
                     Refund & Return
@@ -863,7 +881,9 @@ const EditListing: React.FC = () => {
                   )}
                 </FormControl>
               </Grid>
-              <Grid item xs={12}>
+              </>
+)}
+<Grid item xs={12}>
                 <TextField
                   fullWidth
                   multiline

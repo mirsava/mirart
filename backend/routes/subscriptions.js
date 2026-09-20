@@ -2,6 +2,7 @@ import express from 'express';
 import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
 import { requireAdmin, requireSelf } from '../middleware/auth.js';
+import { getBillingConfig, saveBillingConfig, describeAccess } from '../services/billing.js';
 
 const router = express.Router();
 
@@ -220,6 +221,32 @@ router.put('/admin/subscriptions/:userId/extend', requireAdmin, async (req, res)
   }
 });
 
+// Admin: billing switch (off = free launch access for everyone)
+router.get('/admin/billing-config', requireAdmin, async (req, res) => {
+  try {
+    const config = await getBillingConfig();
+    res.json({ config, status: describeAccess(config) });
+  } catch (error) {
+    console.error('Error fetching billing config:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/admin/billing-config', requireAdmin, async (req, res) => {
+  try {
+    const { enabled, free_listing_limit, grace_days } = req.body || {};
+    const patch = {};
+    if (enabled !== undefined) patch.enabled = enabled === true;
+    if (free_listing_limit !== undefined) patch.free_listing_limit = free_listing_limit;
+    if (grace_days !== undefined) patch.grace_days = grace_days;
+    const config = await saveBillingConfig(patch);
+    res.json({ config, status: describeAccess(config) });
+  } catch (error) {
+    console.error('Error saving billing config:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Admin: Get all subscription plans
 router.get('/admin/plans', requireAdmin, async (req, res) => {
   try {
@@ -243,6 +270,16 @@ router.get('/admin/plans', requireAdmin, async (req, res) => {
     console.error('Error fetching subscription plans:', error);
     console.error('Error stack:', error.stack);
     res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// Whether billing is on and what an artist without a paid plan can do right now (public)
+router.get('/billing-status', async (req, res) => {
+  try {
+    res.json(describeAccess(await getBillingConfig()));
+  } catch (error) {
+    console.error('Error fetching billing status:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -292,6 +329,36 @@ router.get('/user/:authUserId', requireSelf(), async (req, res) => {
     );
 
     if (subscriptions.length === 0) {
+      // With ?free_access=1 the dashboard gets a launch-access pseudo-subscription while billing is off or in grace
+      if (req.query.free_access === '1') {
+        const access = describeAccess(await getBillingConfig());
+        if (access.free_access) {
+          const [active] = await pool.execute(
+            "SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = 'active'",
+            [userId]
+          );
+          return res.json({
+            subscription: {
+              id: 0,
+              user_id: userId,
+              plan_id: 0,
+              billing_period: 'monthly',
+              status: 'active',
+              start_date: null,
+              end_date: access.in_grace ? access.grace_ends_at : null,
+              auto_renew: false,
+              plan_name: 'Launch Access',
+              tier: 'launch',
+              max_listings: access.free_listing_limit,
+              current_listings: active[0].count,
+              listings_remaining: Math.max(0, access.free_listing_limit - active[0].count),
+              price_monthly: 0,
+              price_yearly: 0,
+              is_free_access: true,
+            },
+          });
+        }
+      }
       return res.json({ subscription: null });
     }
 

@@ -3,12 +3,14 @@ import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
 import { createNotification } from '../services/notificationService.js';
 import { requireAuth, isUuid } from '../middleware/auth.js';
+import { getBillingConfig } from '../services/billing.js';
+import { isCheckoutEnabled, requireCheckoutEnabled } from '../services/marketplace.js';
 
 const router = express.Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // --- Stripe Connect onboarding (artists receive payouts when buyer confirms delivery) ---
-router.post('/connect/create-account', requireAuth, async (req, res) => {
+router.post('/connect/create-account', requireAuth, requireCheckoutEnabled, async (req, res) => {
   try {
     if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
     const { authUserId, email } = req.auth;
@@ -36,7 +38,7 @@ router.post('/connect/create-account', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/connect/create-account-link', requireAuth, async (req, res) => {
+router.post('/connect/create-account-link', requireAuth, requireCheckoutEnabled, async (req, res) => {
   try {
     if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
     const { return_url, refresh_url } = req.body;
@@ -100,6 +102,12 @@ router.post('/create-checkout-session', async (req, res) => {
     let artworkTransferData = null;
 
     if (isSubscription && metadata?.plan_id && metadata?.billing_period) {
+      if (!(await getBillingConfig()).enabled) {
+        return res.status(403).json({
+          error: 'Subscriptions are not required yet',
+          details: 'ArtZyla is free to use during launch. Paid plans will start at a later date.',
+        });
+      }
       // Stripe subscription mode: use Stripe Products
       const planId = parseInt(metadata.plan_id, 10);
       const [plans] = await pool.execute(
@@ -133,6 +141,13 @@ router.post('/create-checkout-session', async (req, res) => {
         quantity: 1,
       }];
     } else {
+      if (!(await isCheckoutEnabled())) {
+        return res.status(403).json({
+          error: 'Online checkout is turned off',
+          code: 'checkout_disabled',
+          details: 'Payment and shipping are arranged directly between buyers and sellers. Please contact the seller.',
+        });
+      }
       // One-time payment (artwork) - Stripe Connect: use destination charge with manual capture
       // (Stripe requires transfer_data for Connect - "card-payments without transfer" not supported)
       const orderDataJson = metadata?.order_data ?? metadata?.orderData;

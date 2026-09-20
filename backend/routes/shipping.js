@@ -10,6 +10,7 @@ import * as shippoService from '../services/shippoService.js';
 import { shippoConfig } from '../config/shippo.js';
 import { createNotification } from '../services/notificationService.js';
 import { requireAuth } from '../middleware/auth.js';
+import { requireCheckoutEnabled } from '../services/marketplace.js';
 
 const router = express.Router();
 
@@ -41,7 +42,7 @@ const normalizeRatesForFrontend = (rates) => {
  * Get shipping rates for a destination address and cart items
  * Body: { address: {...}, items: [{ listing_id, quantity }] }
  */
-router.post('/rates', async (req, res) => {
+router.post('/rates', requireCheckoutEnabled, async (req, res) => {
   try {
     if (!shippoConfig.isConfigured) {
       return res.status(503).json({

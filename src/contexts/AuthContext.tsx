@@ -9,6 +9,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 interface User {
   id: string;
   email: string;
+  username?: string;
   name?: string;
   userRole?: UserRoleType;
   groups?: string[];
@@ -101,6 +102,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser({
           id: authUser.id,
           email: authUser.email || dbUser.email || '',
+          username: dbUser.username || metadata.username || undefined,
           name: dbUser.first_name && dbUser.last_name ? `${dbUser.first_name} ${dbUser.last_name}` : metaName,
           userRole: role,
           groups,
@@ -110,6 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser({
           id: authUser.id,
           email: authUser.email || '',
+          username: metadata.username || undefined,
           name: metaName,
           userRole: undefined,
           groups: [],
@@ -183,7 +186,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       password,
       options: {
         data: profile,
-        emailRedirectTo: `${window.location.origin}/signin`,
+        emailRedirectTo: `${window.location.origin}/confirm-signup`,
       },
     });
     if (error) throw toAuthError(error, 'Sign up failed');

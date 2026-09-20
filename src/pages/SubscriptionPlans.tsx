@@ -22,6 +22,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useBillingStatus } from '../hooks/useBillingStatus';
 import apiService, { SubscriptionPlan, UserSubscription, User } from '../services/api';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../components/PageHeader';
@@ -40,6 +41,8 @@ const SubscriptionPlans: React.FC = () => {
   const [currentSubscription, setCurrentSubscription] = useState<UserSubscription | null>(null);
   const [userType, setUserType] = useState<User['user_type'] | null>(null);
   const [loading, setLoading] = useState(true);
+  const billing = useBillingStatus();
+  const freeLaunch = billing ? !billing.billing_enabled : false;
   const [subscribing, setSubscribing] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paymentPlan, setPaymentPlan] = useState<{ plan: SubscriptionPlan; billingPeriod: 'monthly' | 'yearly' } | null>(null);
@@ -212,10 +215,31 @@ const SubscriptionPlans: React.FC = () => {
           </Alert>
         )}
 
-        {listingIdToActivate && (
+        {listingIdToActivate && !billing?.free_access && (
           <Alert severity="info" sx={{ mb: 4 }}>
             <Typography variant="body1">
               Subscribe to a plan to activate your listing. After payment, your listing will be activated automatically.
+            </Typography>
+          </Alert>
+        )}
+
+        {freeLaunch && billing && (
+          <Alert severity="success" sx={{ mb: 4 }}>
+            <Typography variant="body1" fontWeight={600} gutterBottom>
+              Free during launch
+            </Typography>
+            <Typography variant="body2">
+              ArtZyla is free while we launch. List up to {billing.free_listing_limit} artworks at no cost, with no subscription needed.
+              The plans below apply when paid billing begins.
+            </Typography>
+          </Alert>
+        )}
+
+        {billing?.billing_enabled && billing.in_grace && !currentSubscription && (
+          <Alert severity="info" sx={{ mb: 4 }}>
+            <Typography variant="body2">
+              Paid plans are now available. You can keep listing for free until{' '}
+              {billing.grace_ends_at ? new Date(billing.grace_ends_at).toLocaleDateString() : 'the end of your grace period'}; choose a plan before then to keep your listings live.
             </Typography>
           </Alert>
         )}
@@ -430,6 +454,10 @@ const SubscriptionPlans: React.FC = () => {
                         sx={{ mt: 'auto' }}
                       >
                         Current Plan
+                      </Button>
+                    ) : freeLaunch ? (
+                      <Button variant="outlined" fullWidth disabled sx={{ mt: 'auto' }}>
+                        Free during launch
                       </Button>
                     ) : (
                       <Box sx={{ display: 'flex', gap: 1, mt: 'auto' }}>

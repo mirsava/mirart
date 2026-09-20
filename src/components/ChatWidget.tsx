@@ -234,7 +234,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
     if (user.first_name || user.last_name) {
       return `${user.first_name || ''} ${user.last_name || ''}`.trim();
     }
-    return user.email || user.auth_user_id;
+    return user.username || user.email || 'User';
   };
 
   const isUserOnline = (userId: number): boolean => {

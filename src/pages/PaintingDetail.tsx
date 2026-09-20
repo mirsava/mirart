@@ -48,6 +48,8 @@ import { useSnackbar } from 'notistack';
 import apiService, { Listing, Review } from '../services/api';
 import { Rating } from '@mui/material';
 import ContactSellerDialog from '../components/ContactSellerDialog';
+import MarketplaceNotice from '../components/MarketplaceNotice';
+import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import { UserRole } from '../types/userRoles';
 import { useFavorites } from '../contexts/FavoritesContext';
 import PageHeader from '../components/PageHeader';
@@ -73,6 +75,7 @@ const PaintingDetail: React.FC = () => {
   const isLiked = painting ? isFavorite(painting.id) : false;
   const [likeCount, setLikeCount] = useState(0);
   const [liking, setLiking] = useState(false);
+  const { checkoutEnabled } = useMarketplaceSettings();
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [averageRating, setAverageRating] = useState(0);
@@ -334,6 +337,10 @@ const PaintingDetail: React.FC = () => {
   }
 
   const handleContactSeller = (): void => {
+    if (!isAuthenticated) {
+      navigate('/signin', { state: { from: { pathname: window.location.pathname } } });
+      return;
+    }
     setContactDialogOpen(true);
   };
 
@@ -1024,6 +1031,8 @@ const PaintingDetail: React.FC = () => {
                 </Box>
               </Box>
 
+              {!checkoutEnabled && <MarketplaceNotice sx={{ mb: 2 }} />}
+
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <Button
                   variant="outlined"
@@ -1044,9 +1053,9 @@ const PaintingDetail: React.FC = () => {
                     Edit Listing
                   </Button>
                 )}
-                {isAuthenticated && (
+                {(isAuthenticated || !checkoutEnabled) && (
                   <Button
-                    variant="outlined"
+                    variant={checkoutEnabled ? 'outlined' : 'contained'}
                     size="large"
                     startIcon={<EmailIcon />}
                     onClick={handleContactSeller}

@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 export interface User {
   id?: number;
   auth_user_id: string;
+  username?: string;
   email: string;
   first_name?: string;
   last_name?: string;
@@ -147,6 +148,22 @@ export interface SubscriptionPlan {
   stripe_product_id?: string;
 }
 
+export interface BillingStatus {
+  billing_enabled: boolean;
+  in_grace: boolean;
+  grace_ends_at: string | null;
+  free_access: boolean;
+  free_listing_limit: number;
+  grace_days: number;
+}
+
+export interface BillingConfig {
+  enabled: boolean;
+  free_listing_limit: number;
+  grace_days: number;
+  billing_started_at: string | null;
+}
+
 export interface UserSubscription {
   id: number;
   user_id: number;
@@ -164,6 +181,7 @@ export interface UserSubscription {
   listings_remaining?: number;
   price_monthly?: number;
   price_yearly?: number;
+  is_free_access?: boolean;
 }
 
 class ApiService {
@@ -955,8 +973,35 @@ class ApiService {
     return this.request<SubscriptionPlan[]>('/subscriptions/plans');
   }
 
-  async getUserSubscription(authUserId: string): Promise<{ subscription: UserSubscription | null }> {
-    return this.request<{ subscription: UserSubscription | null }>(`/subscriptions/user/${authUserId}`);
+  async getUserSubscription(authUserId: string, options: { includeFreeAccess?: boolean } = {}): Promise<{ subscription: UserSubscription | null }> {
+    const query = options.includeFreeAccess ? '?free_access=1' : '';
+    return this.request<{ subscription: UserSubscription | null }>(`/subscriptions/user/${authUserId}${query}`);
+  }
+
+  async getMarketplaceSettings(): Promise<{ checkout_enabled: boolean }> {
+    return this.request<{ checkout_enabled: boolean }>('/settings/marketplace');
+  }
+
+  async updateMarketplaceSettings(checkout_enabled: boolean): Promise<{ checkout_enabled: boolean }> {
+    return this.request<{ checkout_enabled: boolean }>('/settings/marketplace', {
+      method: 'PUT',
+      body: JSON.stringify({ checkout_enabled }),
+    });
+  }
+
+  async getBillingStatus(): Promise<BillingStatus> {
+    return this.request<BillingStatus>('/subscriptions/billing-status');
+  }
+
+  async getBillingConfig(): Promise<{ config: BillingConfig; status: BillingStatus }> {
+    return this.request<{ config: BillingConfig; status: BillingStatus }>('/subscriptions/admin/billing-config');
+  }
+
+  async updateBillingConfig(patch: Partial<BillingConfig>): Promise<{ config: BillingConfig; status: BillingStatus }> {
+    return this.request<{ config: BillingConfig; status: BillingStatus }>('/subscriptions/admin/billing-config', {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    });
   }
 
   async createSubscription(authUserId: string, planId: number, billingPeriod: 'monthly' | 'yearly', sessionId: string): Promise<{ subscription: UserSubscription }> {

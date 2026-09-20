@@ -1,4 +1,6 @@
 import { authFetch } from '../lib/supabase';
+import MarketplaceNotice from '../components/MarketplaceNotice';
+import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -70,6 +72,7 @@ const TEST_DATA = {
 const CreateListing: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { checkoutEnabled } = useMarketplaceSettings();
   const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -242,7 +245,7 @@ const CreateListing: React.FC = () => {
         nextErrors.price = 'Enter a valid non-negative price';
       }
     }
-    if (formData.shipping_preference === 'buyer') {
+    if (checkoutEnabled && formData.shipping_preference === 'buyer') {
       if (!formData.fixed_shipping_fee.toString().trim()) {
         nextErrors.fixed_shipping_fee = 'Shipping cost is required when buyer pays';
       } else {
@@ -661,7 +664,9 @@ const CreateListing: React.FC = () => {
                         sx={{ bgcolor: 'background.default' }}
                       />
                     </Grid>
-                    <Grid item xs={12}>
+                    {checkoutEnabled && (
+<>
+<Grid item xs={12}>
                       <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                         Shipping dimensions (for rate calculation)
                       </Typography>
@@ -713,7 +718,9 @@ const CreateListing: React.FC = () => {
                         inputProps={{ min: 1, step: 0.1 }}
                         sx={{ bgcolor: 'background.default' }}
                       />
-                    </Grid>
+                    </Grid></>
+)}
+
                   </Grid>
                 </Paper>
               </Grid>
@@ -886,7 +893,14 @@ const CreateListing: React.FC = () => {
                   </Typography>
 
                   <Grid container spacing={3}>
-                    <Grid item xs={12}>
+                    {!checkoutEnabled && (
+<Grid item xs={12}>
+<MarketplaceNotice variant="seller" />
+</Grid>
+)}
+{checkoutEnabled && (
+<>
+<Grid item xs={12}>
                       <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
                         <FormLabel component="legend" sx={{ mb: 1, fontWeight: 500 }}>
                           Who pays for shipping?
@@ -938,12 +952,14 @@ const CreateListing: React.FC = () => {
                         />
                       </Grid>
                     )}
-                    <Grid item xs={12}>
+                    </>
+)}
+<Grid item xs={12}>
                       <TextField
                         fullWidth
                         multiline
                         rows={3}
-                        label="Shipping Information"
+                        label={checkoutEnabled ? 'Shipping Information' : 'Payment & shipping terms'}
                         name="shipping_info"
                         value={formData.shipping_info}
                         onChange={handleChange}
@@ -952,7 +968,9 @@ const CreateListing: React.FC = () => {
                         sx={{ bgcolor: 'background.default' }}
                       />
                     </Grid>
-                    <Grid item xs={12}>
+                    {checkoutEnabled && (
+<>
+<Grid item xs={12}>
                       <FormControl component="fieldset" sx={{ display: 'block', mb: 2 }}>
                         <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
                           Refund & Return
@@ -985,7 +1003,9 @@ const CreateListing: React.FC = () => {
                         )}
                       </FormControl>
                     </Grid>
-                    <Grid item xs={12}>
+                    </>
+)}
+<Grid item xs={12}>
                       <TextField
                         fullWidth
                         multiline

@@ -85,6 +85,8 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { invalidateBillingStatus } from '../hooks/useBillingStatus';
+import { invalidateMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import apiService, { SubscriptionPlan } from '../services/api';
 import { useSnackbar } from 'notistack';
 import { useChat } from '../contexts/ChatContext';
@@ -210,6 +212,11 @@ const AdminDashboard: React.FC = () => {
   const [testDataEnabled, setTestDataEnabled] = useState(false);
   const [testDataLoading, setTestDataLoading] = useState(false);
   const [payoutConfig, setPayoutConfig] = useState<{ commission_percent: number }>({ commission_percent: 10 });
+  const [billingConfig, setBillingConfig] = useState<{ enabled: boolean; free_listing_limit: number; grace_days: number }>({ enabled: false, free_listing_limit: 25, grace_days: 30 });
+  const [billingStatus, setBillingStatus] = useState<{ in_grace: boolean; grace_ends_at: string | null } | null>(null);
+  const [savingBilling, setSavingBilling] = useState(false);
+  const [checkoutEnabled, setCheckoutEnabled] = useState(false);
+  const [savingCheckout, setSavingCheckout] = useState(false);
   const [savingPayoutConfig, setSavingPayoutConfig] = useState(false);
   const [stripePlans, setStripePlans] = useState<any[]>([]);
   const [loadingStripePlans, setLoadingStripePlans] = useState(false);
@@ -237,6 +244,54 @@ const AdminDashboard: React.FC = () => {
       const config = await apiService.getSupportChatConfig();
       setSupportChatConfig(config);
     } catch {}
+  };
+
+  const fetchMarketplaceSettings = async () => {
+    try {
+      const settings = await apiService.getMarketplaceSettings();
+      setCheckoutEnabled(settings.checkout_enabled === true);
+    } catch {}
+  };
+
+  const saveCheckoutEnabled = async (enabled: boolean) => {
+    const message = enabled
+      ? 'Turn ON online checkout? Buyers will pay through ArtZyla, sellers must complete Stripe payout setup, and ArtZyla becomes involved in payments and shipping.'
+      : 'Turn OFF online checkout? Cart and checkout will be hidden and buyers will contact sellers directly. Existing orders stay available.';
+    if (!window.confirm(message)) return;
+    setSavingCheckout(true);
+    try {
+      const settings = await apiService.updateMarketplaceSettings(enabled);
+      setCheckoutEnabled(settings.checkout_enabled === true);
+      invalidateMarketplaceSettings();
+      enqueueSnackbar(`Online checkout ${settings.checkout_enabled ? 'enabled' : 'disabled'}`, { variant: 'success' });
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Failed to update setting', { variant: 'error' });
+    } finally {
+      setSavingCheckout(false);
+    }
+  };
+
+  const fetchBillingConfig = async () => {
+    try {
+      const { config, status } = await apiService.getBillingConfig();
+      setBillingConfig({ enabled: config.enabled, free_listing_limit: config.free_listing_limit, grace_days: config.grace_days });
+      setBillingStatus({ in_grace: status.in_grace, grace_ends_at: status.grace_ends_at });
+    } catch {}
+  };
+
+  const saveBilling = async (patch: Partial<{ enabled: boolean; free_listing_limit: number; grace_days: number }>) => {
+    setSavingBilling(true);
+    try {
+      const { config, status } = await apiService.updateBillingConfig(patch);
+      setBillingConfig({ enabled: config.enabled, free_listing_limit: config.free_listing_limit, grace_days: config.grace_days });
+      setBillingStatus({ in_grace: status.in_grace, grace_ends_at: status.grace_ends_at });
+      invalidateBillingStatus();
+      enqueueSnackbar('Billing settings saved', { variant: 'success' });
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Failed to save billing settings', { variant: 'error' });
+    } finally {
+      setSavingBilling(false);
+    }
   };
 
   const fetchPayoutConfig = async () => {
@@ -777,6 +832,8 @@ const AdminDashboard: React.FC = () => {
       fetchSupportConfig();
       fetchTestDataEnabled();
       fetchPayoutConfig();
+      fetchBillingConfig();
+      fetchMarketplaceSettings();
     }
     if (section === 'plans') {
       fetchStripePlans();
@@ -1426,10 +1483,10 @@ const AdminDashboard: React.FC = () => {
                               {userData.business_name || 
                                (userData.first_name && userData.last_name 
                                  ? `${userData.first_name} ${userData.last_name}`
-                                 : userData.auth_user_id)}
+                                 : (userData.username || userData.email))}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              @{userData.auth_user_id}
+                              {userData.username ? `@${userData.username}` : userData.email}
                             </Typography>
                           </Box>
                         </Box>
@@ -2215,7 +2272,7 @@ const AdminDashboard: React.FC = () => {
                           .then((r) => setNotificationUserOptions(r.users || []));
                       }
                     }}
-                    getOptionLabel={(o) => o?.email || o?.auth_user_id || o?.first_name || o?.last_name || String(o?.id || '')}
+                    getOptionLabel={(o) => o?.email || o?.username || o?.first_name || o?.last_name || String(o?.id || '')}
                     renderInput={(params) => (
                       <TextField {...params} label="Select user" placeholder="Search by email or name" />
                     )}
@@ -2538,6 +2595,74 @@ const AdminDashboard: React.FC = () => {
           {activeSection === 'settings' && (<Box sx={{ py: 3 }}>
             <Box sx={{ px: 3, maxWidth: 600 }}>
               <Typography variant="h6" sx={{ mb: 3 }}>Feature Settings</Typography>
+
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Online Checkout (payments &amp; shipping)</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {checkoutEnabled
+                        ? 'ON: buyers pay through ArtZyla (Stripe) and shipping labels are available.'
+                        : 'OFF: buyers contact sellers directly and arrange payment and shipping themselves. ArtZyla is not part of the transaction.'}
+                    </Typography>
+                  </Box>
+                  <Switch checked={checkoutEnabled} disabled={savingCheckout} onChange={(e) => saveCheckoutEnabled(e.target.checked)} />
+                </Box>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Paid Subscriptions (Billing)</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {billingConfig.enabled
+                        ? 'Billing is ON. Artists need a paid plan once their grace period ends.'
+                        : 'Billing is OFF. Every artist can list for free during launch.'}
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={billingConfig.enabled}
+                    disabled={savingBilling}
+                    onChange={(e) => {
+                      if (e.target.checked && !window.confirm(`Turn on billing? Artists without a subscription will keep free access for ${billingConfig.grace_days} days, then need a paid plan to keep listings active.`)) return;
+                      saveBilling({ enabled: e.target.checked });
+                    }}
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mt: 2 }}>
+                  <TextField
+                    label="Free listing limit"
+                    type="number"
+                    size="small"
+                    value={billingConfig.free_listing_limit}
+                    onChange={(e) => setBillingConfig((prev) => ({ ...prev, free_listing_limit: Number(e.target.value) }))}
+                    inputProps={{ min: 1, step: 1 }}
+                    sx={{ width: 170 }}
+                  />
+                  <TextField
+                    label="Grace period (days)"
+                    type="number"
+                    size="small"
+                    value={billingConfig.grace_days}
+                    onChange={(e) => setBillingConfig((prev) => ({ ...prev, grace_days: Number(e.target.value) }))}
+                    inputProps={{ min: 0, max: 365, step: 1 }}
+                    sx={{ width: 170 }}
+                  />
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disabled={savingBilling}
+                    onClick={() => saveBilling({ free_listing_limit: billingConfig.free_listing_limit, grace_days: billingConfig.grace_days })}
+                  >
+                    Save
+                  </Button>
+                </Box>
+                {billingConfig.enabled && billingStatus?.grace_ends_at && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+                    Grace period {billingStatus.in_grace ? 'ends' : 'ended'} {new Date(billingStatus.grace_ends_at).toLocaleDateString()}.
+                  </Typography>
+                )}
+              </Paper>
 
               <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -2871,7 +2996,7 @@ const AdminDashboard: React.FC = () => {
                         .finally(() => setAnnouncementUserLoading(false));
                     }
                   }}
-                  getOptionLabel={(o) => o?.email || o?.auth_user_id || o?.first_name || o?.last_name || String(o?.id || '')}
+                  getOptionLabel={(o) => o?.email || o?.username || o?.first_name || o?.last_name || String(o?.id || '')}
                   loading={announcementUserLoading}
                   renderInput={(params) => (
                     <TextField {...params} label="Select user" placeholder="Search by email or name" />

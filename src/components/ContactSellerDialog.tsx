@@ -1,3 +1,5 @@
+import MarketplaceNotice from './MarketplaceNotice';
+import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -30,6 +32,7 @@ const ContactSellerDialog: React.FC<ContactSellerDialogProps> = ({
   artistName,
   listingId,
 }) => {
+  const { checkoutEnabled } = useMarketplaceSettings();
   const { user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const [message, setMessage] = useState('');
@@ -88,6 +91,7 @@ const ContactSellerDialog: React.FC<ContactSellerDialogProps> = ({
         </Box>
       </DialogTitle>
       <DialogContent onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+        {!checkoutEnabled && <MarketplaceNotice sx={{ mb: 2 }} />}
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary" gutterBottom>
             Artwork: <strong>{listingTitle}</strong>
