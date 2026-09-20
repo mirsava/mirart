@@ -1,53 +1,18 @@
 import express from 'express';
 import pool from '../config/database.js';
-import UserRole from '../constants/userRoles.js';
+import { requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-const ensureAnnouncementsTable = async () => {
-  try {
-    await pool.execute('SELECT 1 FROM admin_announcements LIMIT 1');
-  } catch (err) {
-    if (err.code === 'ER_NO_SUCH_TABLE') {
-      await pool.execute(`
-        CREATE TABLE admin_announcements (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          message TEXT NOT NULL,
-          target_type ENUM('all', 'authenticated', 'artists', 'buyers', 'admins', 'specific') NOT NULL DEFAULT 'all',
-          target_user_ids JSON NULL,
-          severity ENUM('info', 'warning', 'success', 'error') DEFAULT 'info',
-          is_active BOOLEAN DEFAULT TRUE,
-          start_date DATETIME NULL,
-          end_date DATETIME NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          INDEX idx_active_dates (is_active, start_date, end_date)
-        )
-      `);
-    } else {
-      throw err;
-    }
-  }
-};
-
 router.get('/', async (req, res) => {
   try {
-    await ensureAnnouncementsTable();
-    const cognitoUsername = req.query.cognitoUsername;
-    const groupsParam = req.query.groups;
-    let userGroups = [];
-    if (groupsParam) {
-      try {
-        userGroups = typeof groupsParam === 'string' ? JSON.parse(groupsParam) : groupsParam;
-      } catch {
-        userGroups = Array.isArray(groupsParam) ? groupsParam : [groupsParam];
-      }
-    }
+    const authUserId = req.auth?.authUserId || null;
+    const userGroups = req.auth?.groups || [];
 
     const [rows] = await pool.execute(
       `SELECT id, message, target_type, target_user_ids, severity, is_active, start_date, end_date
        FROM admin_announcements
-       WHERE is_active = 1
+       WHERE is_active = TRUE
          AND (start_date IS NULL OR start_date <= NOW())
          AND (end_date IS NULL OR end_date >= NOW())
        ORDER BY created_at DESC`
@@ -61,17 +26,17 @@ router.get('/', async (req, res) => {
       const targetType = row.target_type || 'all';
       if (targetType === 'all') return true;
 
-      if (!cognitoUsername) return false;
+      if (!authUserId) return false;
 
       if (targetType === 'authenticated') return true;
       if (targetType === 'admins') {
         return userGroups.includes('site_admin') || userGroups.includes('admin');
       }
       if (targetType === 'artists') {
-        return userGroups.includes(UserRole.ARTIST) || userGroups.includes('artist');
+        return userGroups.includes('artist');
       }
       if (targetType === 'buyers') {
-        return userGroups.includes(UserRole.BUYER) || userGroups.includes('buyer');
+        return userGroups.includes('buyer');
       }
       if (targetType === 'specific') return true;
       return false;
@@ -82,13 +47,8 @@ router.get('/', async (req, res) => {
       if (a.target_type === 'specific' && a.target_user_ids) {
         try {
           const ids = typeof a.target_user_ids === 'string' ? JSON.parse(a.target_user_ids) : a.target_user_ids;
-          if (!Array.isArray(ids) || ids.length === 0 || !cognitoUsername) continue;
-          const placeholders = ids.map(() => '?').join(',');
-          const [users] = await pool.execute(
-            `SELECT id FROM users WHERE cognito_username = ? AND id IN (${placeholders})`,
-            [cognitoUsername, ...ids]
-          );
-          if (users.length === 0) continue;
+          if (!Array.isArray(ids) || ids.length === 0 || !authUserId) continue;
+          if (!ids.map(Number).includes(req.auth.userId)) continue;
         } catch {
           continue;
         }
@@ -109,26 +69,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-const checkAdmin = (req, res, next) => {
-  const { cognitoUsername, groups } = req.query;
-  if (!cognitoUsername) return res.status(401).json({ error: 'Authentication required' });
-  let userGroups = [];
-  if (groups) {
-    try {
-      userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
-    } catch {
-      userGroups = Array.isArray(groups) ? groups : [groups];
-    }
-  }
-  if (!userGroups.includes('site_admin') && !userGroups.includes('admin')) {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-  next();
-};
-
-router.get('/admin', checkAdmin, async (req, res) => {
+router.get('/admin', requireAdmin, async (req, res) => {
   try {
-    await ensureAnnouncementsTable();
     const [rows] = await pool.execute(
       'SELECT * FROM admin_announcements ORDER BY created_at DESC'
     );
@@ -143,9 +85,8 @@ router.get('/admin', checkAdmin, async (req, res) => {
   }
 });
 
-router.post('/admin', checkAdmin, async (req, res) => {
+router.post('/admin', requireAdmin, async (req, res) => {
   try {
-    await ensureAnnouncementsTable();
     const { message, target_type, target_user_ids, severity, is_active, start_date, end_date } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ error: 'Message is required' });
@@ -153,7 +94,7 @@ router.post('/admin', checkAdmin, async (req, res) => {
     const targetType = ['all', 'authenticated', 'artists', 'buyers', 'admins', 'specific'].includes(target_type) ? target_type : 'all';
     const targetIdsJson = target_user_ids && Array.isArray(target_user_ids) ? JSON.stringify(target_user_ids) : null;
     const sev = ['info', 'warning', 'success', 'error'].includes(severity) ? severity : 'info';
-    const isActive = is_active !== false ? 1 : 0;
+    const isActive = is_active !== false;
 
     await pool.execute(
       `INSERT INTO admin_announcements (message, target_type, target_user_ids, severity, is_active, start_date, end_date)
@@ -170,7 +111,7 @@ router.post('/admin', checkAdmin, async (req, res) => {
   }
 });
 
-router.put('/admin/:id', checkAdmin, async (req, res) => {
+router.put('/admin/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { message, target_type, target_user_ids, severity, is_active, start_date, end_date } = req.body;
@@ -209,7 +150,7 @@ router.put('/admin/:id', checkAdmin, async (req, res) => {
   }
 });
 
-router.delete('/admin/:id', checkAdmin, async (req, res) => {
+router.delete('/admin/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const [result] = await pool.execute('DELETE FROM admin_announcements WHERE id = ?', [id]);

@@ -2,19 +2,17 @@ import express from 'express';
 import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
 import { createNotification } from '../services/notificationService.js';
+import { requireAuth, isUuid } from '../middleware/auth.js';
 
 const router = express.Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // --- Stripe Connect onboarding (artists receive payouts when buyer confirms delivery) ---
-router.post('/connect/create-account', async (req, res) => {
+router.post('/connect/create-account', requireAuth, async (req, res) => {
   try {
     if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
-    const { cognito_username, email, business_name } = req.body;
-    if (!cognito_username || !email) {
-      return res.status(400).json({ error: 'cognito_username and email are required' });
-    }
-    const [users] = await pool.execute('SELECT id, stripe_account_id FROM users WHERE cognito_username = ?', [cognito_username]);
+    const { authUserId, email } = req.auth;
+    const [users] = await pool.execute('SELECT id, stripe_account_id FROM users WHERE auth_user_id = ?', [authUserId]);
     if (users.length === 0) return res.status(404).json({ error: 'User not found' });
     const user = users[0];
     if (user.stripe_account_id) {
@@ -38,12 +36,11 @@ router.post('/connect/create-account', async (req, res) => {
   }
 });
 
-router.post('/connect/create-account-link', async (req, res) => {
+router.post('/connect/create-account-link', requireAuth, async (req, res) => {
   try {
     if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
-    const { cognito_username, return_url, refresh_url } = req.body;
-    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
-    const [users] = await pool.execute('SELECT id, stripe_account_id FROM users WHERE cognito_username = ?', [cognito_username]);
+    const { return_url, refresh_url } = req.body;
+    const [users] = await pool.execute('SELECT id, stripe_account_id FROM users WHERE auth_user_id = ?', [req.auth.authUserId]);
     if (users.length === 0 || !users[0].stripe_account_id) {
       return res.status(400).json({ error: 'Connect account not created. Call create-account first.' });
     }
@@ -64,12 +61,10 @@ router.post('/connect/create-account-link', async (req, res) => {
   }
 });
 
-router.get('/connect/status', async (req, res) => {
+router.get('/connect/status', requireAuth, async (req, res) => {
   try {
     if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
-    const { cognito_username } = req.query;
-    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
-    const [users] = await pool.execute('SELECT stripe_account_id FROM users WHERE cognito_username = ?', [cognito_username]);
+    const [users] = await pool.execute('SELECT stripe_account_id FROM users WHERE auth_user_id = ?', [req.auth.authUserId]);
     if (users.length === 0) return res.status(404).json({ error: 'User not found' });
     const accountId = users[0].stripe_account_id;
     if (!accountId) return res.json({ connected: false, chargesEnabled: false });
@@ -119,7 +114,7 @@ router.post('/create-checkout-session', async (req, res) => {
       if (!stripeProductId) {
         return res.status(400).json({
           error: 'Stripe product not configured for this plan',
-          details: 'Run migration: node database/run-stripe-product-migration.js',
+          details: 'Sync plans from Stripe in the admin dashboard to link Stripe products.',
         });
       }
       const price = metadata.billing_period === 'yearly'
@@ -162,18 +157,18 @@ router.post('/create-checkout-session', async (req, res) => {
             [item.listing_id]
           );
           if (listings.length > 0 && !listings[0].stripe_account_id) {
-            const [seller] = await pool.execute('SELECT cognito_username, email, first_name, last_name, business_name FROM users WHERE id = ?', [listings[0].user_id]);
+            const [seller] = await pool.execute('SELECT auth_user_id, email, first_name, last_name, business_name FROM users WHERE id = ?', [listings[0].user_id]);
             const name = seller[0]?.business_name || [seller[0]?.first_name, seller[0]?.last_name].filter(Boolean).join(' ') || 'Artist';
-            const sellerCognito = seller[0]?.cognito_username;
-            const buyerCognito = orderData?.cognito_username;
-            const sellerIsCurrentUser = !!(buyerCognito && sellerCognito && buyerCognito === sellerCognito);
+            const sellerAuthId = seller[0]?.auth_user_id;
+            const buyerAuthId = orderData?.auth_user_id;
+            const sellerIsCurrentUser = !!(buyerAuthId && sellerAuthId && buyerAuthId === sellerAuthId);
             return res.status(400).json({
               error: 'Artist has not set up payouts',
               details: sellerIsCurrentUser
                 ? 'Complete your payout setup to receive this payment. You can set it up now and return to checkout.'
                 : `${name} must complete Stripe Connect onboarding before they can receive payments. Please ask them to set up their payout account in their dashboard.`,
               seller_is_current_user: sellerIsCurrentUser,
-              seller_cognito_username: sellerCognito || undefined,
+              seller_auth_user_id: sellerAuthId || undefined,
               artist_name: name,
               artist_email: seller[0]?.email,
             });
@@ -404,14 +399,14 @@ router.get('/confirm-session', async (req, res) => {
     const payerName = session.customer_details?.name || '';
 
     if (metadata.is_subscription === 'true' && metadata.plan_id && metadata.billing_period) {
-      const cognitoUsername = metadata.cognito_username;
+      const authUserId = metadata.auth_user_id;
       const plan_id = parseInt(metadata.plan_id, 10);
 
-      if (!cognitoUsername) {
+      if (!isUuid(authUserId)) {
         return res.status(400).json({ error: 'User information is required' });
       }
 
-      const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
+      const [users] = await pool.execute('SELECT id FROM users WHERE auth_user_id = ?', [authUserId]);
 
       if (users.length === 0) {
         return res.json({
@@ -467,13 +462,13 @@ router.get('/confirm-session', async (req, res) => {
     const orderDataJson = metadata.order_data;
     if (orderDataJson) {
       const orderData = JSON.parse(orderDataJson);
-      const { items: orderItems, cognito_username, shipping_address } = orderData;
+      const { items: orderItems, auth_user_id, shipping_address } = orderData;
 
-      if (!cognito_username) {
+      if (!isUuid(auth_user_id)) {
         return res.status(400).json({ error: 'User information is required' });
       }
 
-      const [buyers] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
+      const [buyers] = await pool.execute('SELECT id FROM users WHERE auth_user_id = ?', [auth_user_id]);
       if (buyers.length === 0) {
         return res.status(404).json({ error: 'Buyer not found' });
       }

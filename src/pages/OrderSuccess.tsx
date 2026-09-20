@@ -18,13 +18,12 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import apiService from '../services/api';
 import { useCart } from '../contexts/CartContext';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const OrderSuccess: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { clearCart } = useCart();
-  const { signUp } = useAuth();
   const sessionId = searchParams.get('session_id');
   const [confirming, setConfirming] = useState(!!sessionId);
   const [error, setError] = useState<string | null>(null);
@@ -36,45 +35,18 @@ const OrderSuccess: React.FC = () => {
         const result = await apiService.confirmStripeSession(sessionId);
         if (result.success) {
           clearCart();
-          if (result.requiresUserCreation && result.subscriptionData) {
-            const signupData = sessionStorage.getItem('signupFormData');
-            sessionStorage.removeItem('signupFormData');
-            if (signupData) {
-              const formData = JSON.parse(signupData);
-              const attributes: Record<string, string> = {
-                name: `${formData.firstName} ${formData.lastName}`,
-                given_name: formData.firstName,
-                family_name: formData.lastName,
-              };
-              if (formData.phone?.trim()) {
-                let phone = formData.phone.trim();
-                if (!phone.startsWith('+')) phone = '+1' + phone.replace(/\D/g, '');
-                attributes.phone_number = phone;
-              }
-              await signUp(formData.email, formData.password, attributes, formData.username);
-              await apiService.createOrUpdateUser({
-                cognito_username: formData.username,
-                email: formData.email,
-                first_name: formData.firstName,
-                last_name: formData.lastName,
-                business_name: formData.businessName,
-                phone: formData.phone || null,
-                country: formData.country,
-                website: formData.website || null,
-                specialties: formData.specialties,
-                experience_level: formData.experience,
-              });
-              await apiService.createSubscription(
-                formData.username,
-                result.subscriptionData.plan_id,
-                result.subscriptionData.billing_period,
-                sessionId
-              );
-            }
-            navigate('/dashboard', { replace: true });
-            return;
+          if (result.requiresUserCreation) {
+            throw new Error('We could not find the account for this payment. Please contact support with your receipt.');
           }
           if (result.subscription) {
+            // Sign-up payments happen before the email is verified, so there may be no session yet.
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (!sessionData.session) {
+              const pendingEmail = sessionStorage.getItem('pendingSignupEmail') || '';
+              sessionStorage.removeItem('pendingSignupEmail');
+              navigate('/confirm-signup', { replace: true, state: { email: pendingEmail } });
+              return;
+            }
             const listingId = sessionStorage.getItem('listingIdToActivate');
             sessionStorage.removeItem('listingIdToActivate');
             navigate('/dashboard', { replace: true, state: listingId ? { listingIdToActivate: parseInt(listingId, 10) } : undefined });
@@ -89,7 +61,7 @@ const OrderSuccess: React.FC = () => {
       }
     };
     confirm();
-  }, [sessionId, clearCart, navigate, signUp]);
+  }, [sessionId, clearCart, navigate]);
 
   if (confirming) {
     return (

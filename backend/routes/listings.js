@@ -3,61 +3,34 @@ import pool from '../config/database.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import UserRole from '../constants/userRoles.js';
+import { requireAuth, isUuid } from '../middleware/auth.js';
+import { parseImageUrls } from '../utils/json.js';
 
 const router = express.Router();
 
-// Check if requester can modify listing (owner or admin)
-const canModifyListing = async (listingId, cognitoUsername, groups) => {
-  if (!cognitoUsername) return { allowed: false, reason: 'Authentication required' };
+// Owner or admin may modify a listing (identity comes from the verified token)
+const canModifyListing = async (listingId, auth) => {
   const [listing] = await pool.execute('SELECT user_id FROM listings WHERE id = ?', [listingId]);
   if (listing.length === 0) return { allowed: false, reason: 'Listing not found' };
-  const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-  if (users.length === 0) return { allowed: false, reason: 'User not found' };
-  const userId = users[0].id;
-  if (listing[0].user_id === userId) return { allowed: true };
-  let userGroups = [];
-  if (groups) {
-    try {
-      userGroups = typeof groups === 'string' ? JSON.parse(groups) : (Array.isArray(groups) ? groups : [groups]);
-    } catch {
-      userGroups = Array.isArray(groups) ? groups : [groups];
-    }
-  }
-  const isAdmin = userGroups.includes(UserRole.SITE_ADMIN) || userGroups.includes('site_admin') || userGroups.includes('admin');
-  if (isAdmin) return { allowed: true };
+  if (auth.isAdmin || listing[0].user_id === auth.userId) return { allowed: true };
   return { allowed: false, reason: 'You do not have permission to modify this listing' };
 };
 
 // Get all listings (with optional filters and pagination)
 router.get('/', async (req, res) => {
   try {
-    try {
-      await pool.execute('SELECT business_name FROM users LIMIT 1');
-    } catch (colError) {
-      if (colError.code === 'ER_BAD_FIELD_ERROR' && colError.message && colError.message.includes('business_name')) {
-        try {
-          await pool.execute('ALTER TABLE users ADD COLUMN business_name VARCHAR(255) NULL');
-        } catch (alterError) {
-          if (alterError.code !== 'ER_DUP_FIELDNAME') {
-            console.error('Failed to add business_name column:', alterError.message);
-          }
-        }
-      } else if (colError.code !== 'ER_BAD_FIELD_ERROR') {
-        throw colError;
-      }
-    }
-    
-    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC', cognitoUsername, requestingUser, minPrice, maxPrice, minYear, maxYear, medium, inStock } = req.query;
+    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC', authUserId, minPrice, maxPrice, minYear, maxYear, medium, inStock } = req.query;
     
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 12;
     const offset = (pageNum - 1) * limitNum;
     
-    // Check if user is fetching their own listings (by cognitoUsername)
+    // Check if user is fetching their own listings (by authUserId)
     // Gallery page should always show all listings, regardless of login status
-    // Only treat as "own listings" if cognitoUsername is provided, no userId, AND explicitly requesting own listings
-    const hasUserId = userId && userId !== 'undefined' && userId !== 'null' && userId !== '';
+    // Only treat as "own listings" if authUserId is provided, no userId, AND explicitly requesting own listings
+    const hasUserId = Boolean(userId) && /^\d+$/.test(String(userId));
+    const artistFilter = isUuid(authUserId) ? authUserId : null;
+    const viewerAuthId = req.auth?.authUserId || null;
     
     // Check for filters - these indicate a public gallery search
     const hasCategoryOrStatus = (category && category !== '') || (status && status !== '');
@@ -67,26 +40,26 @@ router.get('/', async (req, res) => {
     const hasStockFilter = (inStock === 'true' || inStock === true || inStock === '1');
     const hasFilters = hasCategoryOrStatus || hasPriceFilter || hasYearFilter || hasMediumFilter || hasStockFilter;
     
-    // Only treat as "own listings" if cognitoUsername is provided, no userId, AND no filters
-    // If filters are present, it's a public gallery search - ignore cognitoUsername
-    const isFetchingOwnListings = Boolean(cognitoUsername && !hasUserId && !hasFilters);
+    // Only treat as "own listings" if authUserId is provided, no userId, AND no filters
+    // If filters are present, it's a public gallery search - ignore authUserId
+    const isFetchingOwnListings = Boolean(artistFilter && !hasUserId && !hasFilters && (artistFilter === viewerAuthId || req.auth?.isAdmin));
     
     let baseQuery = `
       SELECT l.*, 
         COALESCE(
           u.business_name,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
-          u.cognito_username,
-          u.cognito_username
+          u.username,
+          u.username
         ) as artist_name,
-        u.cognito_username,
+        u.auth_user_id,
         u.signature_url,
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count,
         (SELECT AVG(rating) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as avg_rating,
         (SELECT COUNT(*) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as review_count
       FROM listings l
       JOIN users u ON l.user_id = u.id
-      WHERE 1=1 AND (COALESCE(u.blocked, 0) = 0)
+      WHERE 1=1 AND (COALESCE(u.blocked, FALSE) = FALSE)
     `;
     const params = [];
     
@@ -130,16 +103,16 @@ router.get('/', async (req, res) => {
       params.push(String(userId));
     } else if (isFetchingOwnListings) {
       // Add filter to only show listings owned by this user
-      baseQuery += ' AND u.cognito_username = ?';
-      params.push(String(cognitoUsername));
-    } else if (cognitoUsername && !hasUserId) {
+      baseQuery += ' AND u.auth_user_id = ?';
+      params.push(artistFilter);
+    } else if (artistFilter) {
       // Filter by artist for public gallery search
-      baseQuery += ' AND u.cognito_username = ?';
-      params.push(String(cognitoUsername));
+      baseQuery += ' AND u.auth_user_id = ?';
+      params.push(artistFilter);
     }
     
     if (search) {
-      baseQuery += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)';
+      baseQuery += ' AND (l.title ILIKE ? OR l.description ILIKE ? OR u.business_name ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ?)';
       const searchTerm = `%${String(search)}%`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
@@ -182,7 +155,7 @@ router.get('/', async (req, res) => {
         baseQuery += ' AND l.medium IS NOT NULL AND (';
         mediums.forEach((m, index) => {
           if (index > 0) baseQuery += ' OR ';
-          baseQuery += 'LOWER(l.medium) LIKE LOWER(?)';
+          baseQuery += 'LOWER(l.medium) ILIKE LOWER(?)';
           params.push(`%${m}%`);
         });
         baseQuery += ')';
@@ -190,7 +163,7 @@ router.get('/', async (req, res) => {
     }
     
     if (inStock === 'true' || inStock === true || inStock === '1') {
-      baseQuery += ' AND l.in_stock = 1';
+      baseQuery += ' AND l.in_stock = TRUE';
     }
     
     // Get total count (before adding ORDER BY, LIMIT, OFFSET)
@@ -199,7 +172,7 @@ router.get('/', async (req, res) => {
       SELECT COUNT(*) as total
       FROM listings l
       JOIN users u ON l.user_id = u.id
-      WHERE 1=1 AND (COALESCE(u.blocked, 0) = 0)
+      WHERE 1=1 AND (COALESCE(u.blocked, FALSE) = FALSE)
     `;
     const countParams = [];
     
@@ -232,21 +205,20 @@ router.get('/', async (req, res) => {
       countParams.push(String(status));
     } else if (!isFetchingOwnListings) {
       // Default: only show active listings for public views
-      countQuery += ' AND l.status = "active"';
+      countQuery += " AND l.status = 'active'";
     }
     // If isFetchingOwnListings is true and status is not provided, no status filter is applied (shows all)
     
     if (hasUserId) {
       countQuery += ' AND l.user_id = ?';
       countParams.push(String(userId));
-    } else if (isFetchingOwnListings) {
-      // Add filter to only show listings owned by this user
-      countQuery += ' AND u.cognito_username = ?';
-      countParams.push(String(cognitoUsername));
+    } else if (isFetchingOwnListings || artistFilter) {
+      countQuery += ' AND u.auth_user_id = ?';
+      countParams.push(artistFilter);
     }
     
     if (search) {
-      countQuery += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)';
+      countQuery += ' AND (l.title ILIKE ? OR l.description ILIKE ? OR u.business_name ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ?)';
       const searchTerm = `%${String(search)}%`;
       countParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
@@ -289,7 +261,7 @@ router.get('/', async (req, res) => {
         countQuery += ' AND l.medium IS NOT NULL AND (';
         mediums.forEach((m, index) => {
           if (index > 0) countQuery += ' OR ';
-          countQuery += 'l.medium LIKE ?';
+          countQuery += 'l.medium ILIKE ?';
           countParams.push(`%${m}%`);
         });
         countQuery += ')';
@@ -297,7 +269,7 @@ router.get('/', async (req, res) => {
     }
     
     if (inStock === 'true' || inStock === true || inStock === '1') {
-      countQuery += ' AND l.in_stock = 1';
+      countQuery += ' AND l.in_stock = TRUE';
     }
     
     const [countResult] = await pool.execute(countQuery, countParams);
@@ -350,62 +322,25 @@ router.get('/', async (req, res) => {
     
     const [rows] = await pool.execute(finalQuery, queryParams);
     
-    // Use requestingUser (viewer) for is_liked - NOT cognitoUsername (artist filter)
+    // Use requestingUser (viewer) for is_liked - NOT authUserId (artist filter)
     let userLikedListings = [];
-    const viewerForLikes = requestingUser || (isFetchingOwnListings ? cognitoUsername : null);
-    if (viewerForLikes) {
-      const [users] = await pool.execute(
-        'SELECT id FROM users WHERE cognito_username = ?',
-        [viewerForLikes]
+    if (req.auth?.userId && rows.length > 0) {
+      const [likes] = await pool.execute(
+        'SELECT listing_id FROM likes WHERE user_id = ? AND listing_id = ANY(?::int[])',
+        [req.auth.userId, rows.map(r => r.id)]
       );
-      if (users.length > 0) {
-        const userId = users[0].id;
-        const listingIds = rows.map(r => r.id);
-        if (listingIds.length > 0) {
-          const placeholders = listingIds.map(() => '?').join(',');
-          const [likes] = await pool.execute(
-            `SELECT listing_id FROM likes WHERE user_id = ? AND listing_id IN (${placeholders})`,
-            [userId, ...listingIds]
-          );
-          userLikedListings = likes.map(like => like.listing_id);
-        }
-      }
+      userLikedListings = likes.map(like => like.listing_id);
     }
     
     // Parse JSON fields
-    const listings = rows.map(listing => {
-      let parsedImageUrls = null;
-      if (listing.image_urls && listing.image_urls !== 'null' && listing.image_urls !== '') {
-        try {
-          const imageUrlsStr = String(listing.image_urls).trim();
-          if (!imageUrlsStr || imageUrlsStr === 'null' || imageUrlsStr === '') {
-            parsedImageUrls = null;
-          } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
-            parsedImageUrls = JSON.parse(imageUrlsStr);
-          } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
-            parsedImageUrls = [imageUrlsStr];
-          } else {
-            parsedImageUrls = JSON.parse(imageUrlsStr);
-          }
-        } catch (parseError) {
-          const imageUrlsStr = String(listing.image_urls).trim();
-          if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
-            parsedImageUrls = [imageUrlsStr];
-          } else {
-            parsedImageUrls = null;
-          }
-        }
-      }
-      
-      return {
-        ...listing,
-        price: listing.price ? parseFloat(listing.price) : null,
-        image_urls: parsedImageUrls,
-        like_count: listing.like_count || 0,
-        is_liked: userLikedListings.includes(listing.id)
-      };
-    });
-    
+    const listings = rows.map(listing => ({
+      ...listing,
+      price: listing.price ? parseFloat(listing.price) : null,
+      image_urls: parseImageUrls(listing.image_urls),
+      like_count: listing.like_count || 0,
+      is_liked: userLikedListings.includes(listing.id)
+    }));
+
     const totalPages = Math.ceil(total / limitNum);
     
     res.json({
@@ -421,9 +356,7 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching listings:', error.message || error);
-    console.error('Error code:', error.code);
-    console.error('SQL:', error.sql);
-    res.status(500).json({ error: 'Internal server error', details: error.sqlMessage || error.message });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
@@ -431,24 +364,27 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { cognitoUsername } = req.query;
-    
+    if (!/^\d+$/.test(id)) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+
     const [rows] = await pool.execute(
-      `SELECT l.*, 
+      `SELECT l.*,  
         COALESCE(
           u.business_name,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
-          u.cognito_username,
-          u.cognito_username
+          u.username,
+          u.username
         ) as artist_name,
-        u.cognito_username,
+        u.auth_user_id,
         u.signature_url,
+        u.default_special_instructions as artist_default_special_instructions,
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count,
         (SELECT AVG(rating) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as avg_rating,
         (SELECT COUNT(*) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as review_count
       FROM listings l
       JOIN users u ON l.user_id = u.id
-      WHERE l.id = ? AND (COALESCE(u.blocked, 0) = 0)`,
+      WHERE l.id = ? AND (COALESCE(u.blocked, FALSE) = FALSE)`,
       [id]
     );
     
@@ -457,21 +393,14 @@ router.get('/:id', async (req, res) => {
     }
     
     let isLiked = false;
-    if (cognitoUsername) {
-      const [users] = await pool.execute(
-        'SELECT id FROM users WHERE cognito_username = ?',
-        [cognitoUsername]
+    if (req.auth?.userId) {
+      const [likes] = await pool.execute(
+        'SELECT id FROM likes WHERE user_id = ? AND listing_id = ?',
+        [req.auth.userId, id]
       );
-      if (users.length > 0) {
-        const userId = users[0].id;
-        const [likes] = await pool.execute(
-          'SELECT id FROM likes WHERE user_id = ? AND listing_id = ?',
-          [userId, id]
-        );
-        isLiked = likes.length > 0;
-      }
+      isLiked = likes.length > 0;
     }
-    
+
     // Increment views
     await pool.execute(
       'UPDATE listings SET views = views + 1 WHERE id = ?',
@@ -483,37 +412,7 @@ router.get('/:id', async (req, res) => {
       price: rows[0].price ? parseFloat(rows[0].price) : null,
       like_count: rows[0].like_count || 0,
       is_liked: isLiked,
-      image_urls: (() => {
-        if (!rows[0].image_urls || rows[0].image_urls === 'null' || rows[0].image_urls === '') return null;
-        try {
-          const imageUrlsStr = String(rows[0].image_urls).trim();
-          if (!imageUrlsStr || imageUrlsStr === 'null' || imageUrlsStr === '') {
-            return null;
-          } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
-            let parsed = JSON.parse(imageUrlsStr);
-            // Fix: If the parsed result is an array with a single comma-separated string, split it
-            if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string' && parsed[0].includes(',')) {
-              parsed = parsed[0].split(',').map(url => url.trim()).filter(url => url);
-            }
-            return parsed;
-          } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
-            return [imageUrlsStr];
-          } else {
-            let parsed = JSON.parse(imageUrlsStr);
-            // Fix: If the parsed result is an array with a single comma-separated string, split it
-            if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string' && parsed[0].includes(',')) {
-              parsed = parsed[0].split(',').map(url => url.trim()).filter(url => url);
-            }
-            return parsed;
-          }
-        } catch (parseError) {
-          const imageUrlsStr = String(rows[0].image_urls).trim();
-          if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
-            return [imageUrlsStr];
-          }
-          return null;
-        }
-      })()
+      image_urls: parseImageUrls(rows[0].image_urls)
     };
     
     // Ensure special_instructions is always included
@@ -532,10 +431,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new listing
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const {
-      cognito_username,
       title,
       description,
       category,
@@ -552,16 +450,15 @@ router.post('/', async (req, res) => {
       height_in,
       in_stock,
       quantity_available,
-      status,
       allow_comments
     } = req.body;
-    
+
     // Force status to 'draft' - listings must be activated after payment
     const listingStatus = 'draft';
     
     // Validate required fields
-    if (!cognito_username) {
-      return res.status(400).json({ error: 'cognito_username is required' });
+    if (!req.auth.userId) {
+      return res.status(400).json({ error: 'User profile not found' });
     }
     if (!title) {
       return res.status(400).json({ error: 'title is required' });
@@ -591,36 +488,7 @@ router.post('/', async (req, res) => {
       }
     }
     
-    // Get user_id from cognito_username, create user if doesn't exist
-    let [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognito_username]
-    );
-    
-    let user_id;
-    if (users.length === 0) {
-      // User doesn't exist in database, create a basic user record
-      // We'll use the cognito_username as email if email is not provided
-      // This allows users to create listings even if they haven't completed full signup
-      // Note: first_name and last_name will be NULL initially and can be updated later
-      try {
-        const [result] = await pool.execute(
-          'INSERT INTO users (cognito_username, email, first_name, last_name) VALUES (?, ?, NULL, NULL)',
-          [cognito_username, cognito_username] // Use username as email placeholder
-        );
-        user_id = result.insertId;
-        
-        // Initialize dashboard stats for new user
-        await pool.execute(
-          'INSERT INTO dashboard_stats (user_id) VALUES (?)',
-          [user_id]
-        );
-      } catch (createError) {
-        return res.status(500).json({ error: 'Failed to create user record' });
-      }
-    } else {
-      user_id = users[0].id;
-    }
+    const user_id = req.auth.userId;
     
     // Prepare image_urls for database (JSON string or null)
     let imageUrlsJson = null;
@@ -651,122 +519,44 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Buyer-paid listings require a valid shipping cost' });
     }
 
-    let result;
-    try {
-      [result] = await pool.execute(
-        `INSERT INTO listings (
-          user_id, title, description, category, subcategory,
-          price, primary_image_url, image_urls, dimensions, medium, year,
-          weight_oz, length_in, width_in, height_in,
-          in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments,
-          shipping_preference, shipping_carrier, return_days, fixed_shipping_fee
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          user_id,
-          title,
-          description || null,
-          category,
-          subcategory || null,
-          priceNum,
-          primary_image_url || null,
-          imageUrlsJson,
-          dimensions || null,
-          medium || null,
-          year && year.toString().trim() !== '' ? parseInt(year) : null,
-          weight_oz !== undefined && weight_oz !== null && weight_oz !== '' ? parseFloat(weight_oz) : 24,
-          length_in !== undefined && length_in !== null && length_in !== '' ? parseFloat(length_in) : 24,
-          width_in !== undefined && width_in !== null && width_in !== '' ? parseFloat(width_in) : 18,
-          height_in !== undefined && height_in !== null && height_in !== '' ? parseFloat(height_in) : 3,
-          stock,
-          qty,
-          listingStatus,
-          (shipping_info && shipping_info.trim()) || null,
-          (returns_info && returns_info.trim()) || null,
-          (special_instructions && special_instructions.trim()) || null,
-          allow_comments !== undefined ? Boolean(allow_comments) : true,
-          shipPref,
-          shipCarrier,
-          retDays,
-          fixedShippingFee
-        ]
-      );
-    } catch (insertError) {
-      console.error('Create listing INSERT error:', insertError.code, insertError.sqlMessage || insertError.message);
-      const isBadField = insertError.code === 'ER_BAD_FIELD_ERROR';
-      const msg = insertError.message || '';
-      const missingShipping = isBadField && (msg.includes('return_days') || msg.includes('shipping_preference') || msg.includes('shipping_carrier') || msg.includes('fixed_shipping_fee'));
-      const missingParcel = isBadField && (msg.includes('weight_oz') || msg.includes('length_in') || msg.includes('width_in') || msg.includes('height_in'));
-      if (missingShipping) {
-        [result] = await pool.execute(
-          `INSERT INTO listings (
-            user_id, title, description, category, subcategory,
-            price, primary_image_url, image_urls, dimensions, medium, year,
-            weight_oz, length_in, width_in, height_in,
-            in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            user_id,
-            title,
-            description || null,
-            category,
-            subcategory || null,
-            priceNum,
-            primary_image_url || null,
-            imageUrlsJson,
-            dimensions || null,
-            medium || null,
-            year && year.toString().trim() !== '' ? parseInt(year) : null,
-            weight_oz !== undefined && weight_oz !== null && weight_oz !== '' ? parseFloat(weight_oz) : 24,
-            length_in !== undefined && length_in !== null && length_in !== '' ? parseFloat(length_in) : 24,
-            width_in !== undefined && width_in !== null && width_in !== '' ? parseFloat(width_in) : 18,
-            height_in !== undefined && height_in !== null && height_in !== '' ? parseFloat(height_in) : 3,
-            stock,
-            qty,
-            listingStatus,
-            (shipping_info && shipping_info.trim()) || null,
-            (returns_info && returns_info.trim()) || null,
-            (special_instructions && special_instructions.trim()) || null,
-            allow_comments !== undefined ? Boolean(allow_comments) : true
-          ]
-        );
-      } else if (missingParcel) {
-        [result] = await pool.execute(
-          `INSERT INTO listings (
-            user_id, title, description, category, subcategory,
-            price, primary_image_url, image_urls, dimensions, medium, year,
-            in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments,
-            shipping_preference, shipping_carrier, return_days, fixed_shipping_fee
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            user_id,
-            title,
-            description || null,
-            category,
-            subcategory || null,
-            priceNum,
-            primary_image_url || null,
-            imageUrlsJson,
-            dimensions || null,
-            medium || null,
-            year && year.toString().trim() !== '' ? parseInt(year) : null,
-            stock,
-            qty,
-            listingStatus,
-            (shipping_info && shipping_info.trim()) || null,
-            (returns_info && returns_info.trim()) || null,
-            (special_instructions && special_instructions.trim()) || null,
-            allow_comments !== undefined ? Boolean(allow_comments) : true,
-            shipPref,
-            shipCarrier,
-            retDays,
-            fixedShippingFee
-          ]
-        );
-      } else {
-        throw insertError;
-      }
-    }
-      
+  const [result] = await pool.execute(
+      `INSERT INTO listings (
+        user_id, title, description, category, subcategory,
+        price, primary_image_url, image_urls, dimensions, medium, year,
+        weight_oz, length_in, width_in, height_in,
+        in_stock, quantity_available, status, shipping_info, returns_info, special_instructions, allow_comments,
+        shipping_preference, shipping_carrier, return_days, fixed_shipping_fee
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user_id,
+        title,
+        description || null,
+        category,
+        subcategory || null,
+        priceNum,
+        primary_image_url || null,
+        imageUrlsJson,
+        dimensions || null,
+        medium || null,
+        year && year.toString().trim() !== '' ? parseInt(year) : null,
+        weight_oz !== undefined && weight_oz !== null && weight_oz !== '' ? parseFloat(weight_oz) : 24,
+        length_in !== undefined && length_in !== null && length_in !== '' ? parseFloat(length_in) : 24,
+        width_in !== undefined && width_in !== null && width_in !== '' ? parseFloat(width_in) : 18,
+        height_in !== undefined && height_in !== null && height_in !== '' ? parseFloat(height_in) : 3,
+        stock,
+        qty,
+        listingStatus,
+        (shipping_info && shipping_info.trim()) || null,
+        (returns_info && returns_info.trim()) || null,
+        (special_instructions && special_instructions.trim()) || null,
+        allow_comments !== undefined ? Boolean(allow_comments) : true,
+        shipPref,
+        shipCarrier,
+        retDays,
+        fixedShippingFee
+      ]
+    );
+    
       // Update dashboard stats (ensure record exists first)
       try {
         const [statsCheck] = await pool.execute(
@@ -775,9 +565,8 @@ router.post('/', async (req, res) => {
         );
         
         if (statsCheck.length === 0) {
-          // Create dashboard stats record if it doesn't exist
           await pool.execute(
-            'INSERT INTO dashboard_stats (user_id, total_listings, active_listings) VALUES (?, 0, 0)',
+            'INSERT INTO dashboard_stats (user_id, total_listings, active_listings) VALUES (?, 0, 0) ON CONFLICT (user_id) DO NOTHING',
             [user_id]
           );
         }
@@ -794,27 +583,7 @@ router.post('/', async (req, res) => {
         [result.insertId]
       );
       
-      // Parse image_urls JSON safely
-      let parsedImageUrls = null;
-      if (newListing[0].image_urls) {
-        try {
-          const imageUrlsStr = String(newListing[0].image_urls).trim();
-          if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
-            parsedImageUrls = JSON.parse(imageUrlsStr);
-          } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
-            parsedImageUrls = [imageUrlsStr];
-          } else {
-            parsedImageUrls = JSON.parse(imageUrlsStr);
-          }
-        } catch (parseError) {
-          const imageUrlsStr = String(newListing[0].image_urls).trim();
-          if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
-            parsedImageUrls = [imageUrlsStr];
-          } else {
-            parsedImageUrls = null;
-          }
-        }
-      }
+      const parsedImageUrls = parseImageUrls(newListing[0].image_urls);
       
       res.status(201).json({
         ...newListing[0],
@@ -822,37 +591,26 @@ router.post('/', async (req, res) => {
         image_urls: parsedImageUrls
       });
   } catch (error) {
-    console.error('Create listing error:', error.code, error.sqlMessage || error.message);
-    if (error.code === 'ER_BAD_NULL_ERROR' || (error.sqlMessage && error.sqlMessage.includes('cannot be null'))) {
-      return res.status(400).json({
-        error: 'Database constraint error. Please ensure the price column allows NULL values. Run the migration: npm run migrate-price-nullable',
-        details: process.env.NODE_ENV === 'development' ? error.sqlMessage : undefined
-      });
-    }
+    console.error('Create listing error:', error.code, error.message);
     res.status(500).json({
       error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? (error.sqlMessage || error.message) : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
 // Activate listing (check subscription limits)
-router.post('/:id/activate', async (req, res) => {
+router.post('/:id/activate', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { cognito_username } = req.body;
-
-    if (!cognito_username) {
-      return res.status(400).json({ error: 'cognito_username is required' });
-    }
 
     // Get listing and verify ownership
     const [listings] = await pool.execute(
-      `SELECT l.*, u.id as user_id, u.cognito_username 
+      `SELECT l.*, u.auth_user_id
       FROM listings l
       JOIN users u ON l.user_id = u.id
-       WHERE l.id = ? AND u.cognito_username = ?`,
-      [id, cognito_username]
+       WHERE l.id = ? AND u.id = ?`,
+      [id, req.auth.userId]
     );
 
     if (listings.length === 0) {
@@ -874,7 +632,7 @@ router.post('/:id/activate', async (req, res) => {
       `SELECT us.*, sp.max_listings
        FROM user_subscriptions us
        JOIN subscription_plans sp ON us.plan_id = sp.id
-       WHERE us.user_id = ? AND us.status = 'active' AND us.end_date >= CURDATE()
+       WHERE us.user_id = ? AND us.status = 'active' AND us.end_date >= CURRENT_DATE
        ORDER BY us.created_at DESC
        LIMIT 1`,
       [listing.user_id]
@@ -891,7 +649,7 @@ router.post('/:id/activate', async (req, res) => {
 
     // Count current active listings
     const [activeCount] = await pool.execute(
-      'SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = "active"',
+      "SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = 'active'",
       [listing.user_id]
     );
 
@@ -934,11 +692,10 @@ router.post('/:id/activate', async (req, res) => {
 });
 
 // Update listing
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { cognito_username, groups } = req.body;
-    const check = await canModifyListing(id, cognito_username, groups);
+    const check = await canModifyListing(id, req.auth);
     if (!check.allowed) {
       return res.status(check.reason === 'Listing not found' ? 404 : 403).json({ error: check.reason });
     }
@@ -1077,36 +834,7 @@ router.put('/:id', async (req, res) => {
       [id]
     );
     
-    let parsedImageUrls = null;
-    if (updated[0].image_urls && updated[0].image_urls !== 'null' && updated[0].image_urls !== '') {
-      try {
-        const imageUrlsStr = String(updated[0].image_urls).trim();
-        if (!imageUrlsStr || imageUrlsStr === 'null' || imageUrlsStr === '') {
-          parsedImageUrls = null;
-        } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
-          parsedImageUrls = JSON.parse(imageUrlsStr);
-          // Fix: If the parsed result is an array with a single comma-separated string, split it
-          if (Array.isArray(parsedImageUrls) && parsedImageUrls.length === 1 && typeof parsedImageUrls[0] === 'string' && parsedImageUrls[0].includes(',')) {
-            parsedImageUrls = parsedImageUrls[0].split(',').map(url => url.trim()).filter(url => url);
-          }
-        } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
-          parsedImageUrls = [imageUrlsStr];
-        } else {
-          parsedImageUrls = JSON.parse(imageUrlsStr);
-          // Fix: If the parsed result is an array with a single comma-separated string, split it
-          if (Array.isArray(parsedImageUrls) && parsedImageUrls.length === 1 && typeof parsedImageUrls[0] === 'string' && parsedImageUrls[0].includes(',')) {
-            parsedImageUrls = parsedImageUrls[0].split(',').map(url => url.trim()).filter(url => url);
-          }
-        }
-      } catch (parseError) {
-        const imageUrlsStr = String(updated[0].image_urls).trim();
-        if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
-          parsedImageUrls = [imageUrlsStr];
-        } else {
-          parsedImageUrls = null;
-        }
-      }
-    }
+    const parsedImageUrls = parseImageUrls(updated[0].image_urls);
     
     res.json({
       ...updated[0],
@@ -1119,11 +847,10 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete listing
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { cognitoUsername, groups } = req.query;
-    const check = await canModifyListing(id, cognitoUsername, groups);
+    const check = await canModifyListing(id, req.auth);
     if (!check.allowed) {
       return res.status(check.reason === 'Listing not found' ? 404 : 403).json({ error: check.reason });
     }
@@ -1154,24 +881,13 @@ router.delete('/:id', async (req, res) => {
     }
     
     // Add additional images
-    if (listing[0].image_urls && listing[0].image_urls !== 'null' && listing[0].image_urls !== '') {
-      try {
-        const imageUrlsStr = String(listing[0].image_urls).trim();
-        if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '') {
-          const imageUrls = JSON.parse(imageUrlsStr);
-          if (Array.isArray(imageUrls)) {
-            imageUrls.forEach(url => {
-              const imagePath = extractFilePath(url, uploadsDir);
-              if (imagePath) {
-                filesToDelete.push(imagePath);
-              }
-            });
-          }
-        }
-      } catch (parseError) {
+    (parseImageUrls(listing[0].image_urls) || []).forEach(url => {
+      const imagePath = extractFilePath(url, uploadsDir);
+      if (imagePath) {
+        filesToDelete.push(imagePath);
       }
-    }
-    
+    });
+
     // Delete files from filesystem
     filesToDelete.forEach(filePath => {
       try {
@@ -1239,21 +955,24 @@ function extractFilePath(url, uploadsDir) {
 }
 
 // Get user's listings
-router.get('/user/:cognitoUsername', async (req, res) => {
+router.get('/user/:authUserId', async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
-    
+    const { authUserId } = req.params;
+    if (!isUuid(authUserId)) {
+      return res.json([]);
+    }
+
     const [listings] = await pool.execute(
       `SELECT l.* FROM listings l
       JOIN users u ON l.user_id = u.id
-      WHERE u.cognito_username = ? AND (COALESCE(u.blocked, 0) = 0)
+      WHERE u.auth_user_id = ? AND (COALESCE(u.blocked, FALSE) = FALSE)
       ORDER BY l.created_at DESC`,
-      [cognitoUsername]
+      [authUserId]
     );
     
     res.json(listings.map(listing => ({
       ...listing,
-      price: parseFloat(listing.price)
+      price: listing.price ? parseFloat(listing.price) : null
     })));
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });

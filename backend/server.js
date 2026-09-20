@@ -23,6 +23,8 @@ import pool from './config/database.js';
 import announcementsRouter from './routes/announcements.js';
 import notificationsRouter from './routes/notifications.js';
 import supportChatRouter from './routes/supportChat.js';
+import authRouter from './routes/auth.js';
+import { attachAuth } from './middleware/auth.js';
 
 dotenv.config();
 
@@ -57,6 +59,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(attachAuth);
 
 // Serve uploaded files statically
 const __filename = fileURLToPath(import.meta.url);
@@ -173,7 +176,7 @@ const sendListingsSitemap = async (_req, res) => {
       `SELECT l.id, l.title, l.created_at
        FROM listings l
        JOIN users u ON l.user_id = u.id
-       WHERE l.status = 'active' AND COALESCE(u.blocked, 0) = 0
+       WHERE l.status = 'active' AND COALESCE(u.blocked, FALSE) = FALSE
        ORDER BY l.created_at DESC`
     );
 
@@ -220,6 +223,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
+app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/listings', listingsRouter);
 app.use('/api/dashboard', dashboardRouter);
@@ -260,333 +264,21 @@ app.listen(PORT, async () => {
   console.log(`\n=== SERVER STARTED ===`);
   console.log(`Server is running on port ${PORT}`);
   try {
-    const [cols] = await pool.execute(
-      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'default_shipping_preference'",
-      [process.env.DB_NAME || 'mirart']
-    );
-    if (cols.length === 0) {
-      await pool.execute("ALTER TABLE users ADD COLUMN default_shipping_preference VARCHAR(20) DEFAULT 'buyer'");
-      console.log('[Startup] Added default_shipping_preference column to users');
-    }
-    const [carrierCols] = await pool.execute(
-      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'default_shipping_carrier'",
-      [process.env.DB_NAME || 'mirart']
-    );
-    if (carrierCols.length === 0) {
-      await pool.execute("ALTER TABLE users ADD COLUMN default_shipping_carrier VARCHAR(20) DEFAULT 'shippo'");
-      console.log('[Startup] Added default_shipping_carrier column to users');
-    }
-    const [listPrefCols] = await pool.execute(
-      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listings' AND COLUMN_NAME = 'shipping_preference'",
-      [process.env.DB_NAME || 'mirart']
-    );
-    if (listPrefCols.length === 0) {
-      await pool.execute("ALTER TABLE listings ADD COLUMN shipping_preference VARCHAR(20) DEFAULT NULL");
-      await pool.execute("ALTER TABLE listings ADD COLUMN shipping_carrier VARCHAR(20) DEFAULT NULL");
-      console.log('[Startup] Added shipping_preference and shipping_carrier columns to listings');
-    }
-    const [listReturnCols] = await pool.execute(
-      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listings' AND COLUMN_NAME = 'return_days'",
-      [process.env.DB_NAME || 'mirart']
-    );
-    if (listReturnCols.length === 0) {
-      await pool.execute("ALTER TABLE listings ADD COLUMN return_days INT DEFAULT NULL");
-      console.log('[Startup] Added return_days column to listings');
-    }
-    const [returnCols] = await pool.execute(
-      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'default_return_days'",
-      [process.env.DB_NAME || 'mirart']
-    );
-    if (returnCols.length === 0) {
-      await pool.execute("ALTER TABLE users ADD COLUMN default_return_days INT DEFAULT 30");
-      console.log('[Startup] Added default_return_days column to users');
-    }
-    const parcelDefaults = { weight_oz: 24, length_in: 24, width_in: 18, height_in: 3 };
-    for (const col of Object.keys(parcelDefaults)) {
-      const [pc] = await pool.execute(
-        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listings' AND COLUMN_NAME = ?",
-        [process.env.DB_NAME || 'mirart', col]
-      );
-      if (pc.length === 0) {
-        await pool.execute(`ALTER TABLE listings ADD COLUMN ${col} DECIMAL(10, 2) DEFAULT ${parcelDefaults[col]}`);
-        console.log(`[Startup] Added ${col} column to listings`);
-      }
-    }
-    const userAddressCols = [
-      { name: 'address_line1', sql: 'ADD COLUMN address_line1 VARCHAR(255) NULL' },
-      { name: 'address_line2', sql: 'ADD COLUMN address_line2 VARCHAR(255) NULL' },
-      { name: 'address_city', sql: 'ADD COLUMN address_city VARCHAR(100) NULL' },
-      { name: 'address_state', sql: 'ADD COLUMN address_state VARCHAR(100) NULL' },
-      { name: 'address_zip', sql: 'ADD COLUMN address_zip VARCHAR(20) NULL' },
-      { name: 'address_country', sql: "ADD COLUMN address_country VARCHAR(10) DEFAULT 'US'" },
-      { name: 'billing_line1', sql: 'ADD COLUMN billing_line1 VARCHAR(255) NULL' },
-      { name: 'billing_line2', sql: 'ADD COLUMN billing_line2 VARCHAR(255) NULL' },
-      { name: 'billing_city', sql: 'ADD COLUMN billing_city VARCHAR(100) NULL' },
-      { name: 'billing_state', sql: 'ADD COLUMN billing_state VARCHAR(100) NULL' },
-      { name: 'billing_zip', sql: 'ADD COLUMN billing_zip VARCHAR(20) NULL' },
-      { name: 'billing_country', sql: "ADD COLUMN billing_country VARCHAR(10) DEFAULT 'US'" },
-    ];
-    for (const { name, sql } of userAddressCols) {
-      const [ac] = await pool.execute(
-        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = ?",
-        [process.env.DB_NAME || 'mirart', name]
-      );
-      if (ac.length === 0) {
-        await pool.execute(`ALTER TABLE users ${sql}`);
-        console.log(`[Startup] Added ${name} column to users`);
-      }
-    }
-    const userSocialCols = [
-      { name: 'social_instagram', sql: 'ADD COLUMN social_instagram VARCHAR(255) NULL' },
-      { name: 'social_tiktok', sql: 'ADD COLUMN social_tiktok VARCHAR(255) NULL' },
-      { name: 'social_behance', sql: 'ADD COLUMN social_behance VARCHAR(255) NULL' },
-      { name: 'social_youtube', sql: 'ADD COLUMN social_youtube VARCHAR(255) NULL' },
-    ];
-    for (const { name, sql } of userSocialCols) {
-      const [sc] = await pool.execute(
-        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = ?",
-        [process.env.DB_NAME || 'mirart', name]
-      );
-      if (sc.length === 0) {
-        await pool.execute(`ALTER TABLE users ${sql}`);
-        console.log(`[Startup] Added ${name} column to users`);
-      }
-    }
-    const listingCols = [
-      { name: 'shipping_info', sql: 'ADD COLUMN shipping_info TEXT DEFAULT NULL' },
-      { name: 'returns_info', sql: 'ADD COLUMN returns_info TEXT DEFAULT NULL' },
-      { name: 'special_instructions', sql: 'ADD COLUMN special_instructions TEXT DEFAULT NULL' },
-      { name: 'allow_comments', sql: 'ADD COLUMN allow_comments BOOLEAN DEFAULT TRUE' },
-      { name: 'quantity_available', sql: 'ADD COLUMN quantity_available INT DEFAULT 1' },
-      { name: 'fixed_shipping_fee', sql: 'ADD COLUMN fixed_shipping_fee DECIMAL(10, 2) DEFAULT 0' }
-    ];
-    for (const { name, sql } of listingCols) {
-      const [lc] = await pool.execute(
-        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listings' AND COLUMN_NAME = ?",
-        [process.env.DB_NAME || 'mirart', name]
-      );
-      if (lc.length === 0) {
-        await pool.execute(`ALTER TABLE listings ${sql}`);
-        console.log(`[Startup] Added ${name} column to listings`);
-      }
-    }
-  } catch (err) {
-    console.warn('[Startup] Shipping migration:', err?.message || err);
-  }
-
-  try {
-    const orderReturnCols = [
-      { name: 'return_status', sql: "ADD COLUMN return_status VARCHAR(30) DEFAULT NULL AFTER status" },
-      { name: 'return_reason', sql: "ADD COLUMN return_reason TEXT DEFAULT NULL AFTER return_status" },
-      { name: 'return_requested_at', sql: "ADD COLUMN return_requested_at TIMESTAMP NULL DEFAULT NULL AFTER return_reason" },
-    ];
-    for (const { name, sql } of orderReturnCols) {
-      const [oc] = await pool.execute(
-        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'orders' AND COLUMN_NAME = ?",
-        [process.env.DB_NAME || 'mirart', name]
-      );
-      if (oc.length === 0) {
-        await pool.execute(`ALTER TABLE orders ${sql}`);
-        console.log(`[Startup] Added ${name} column to orders`);
-      }
-    }
-  } catch (err) {
-    console.warn('[Startup] Order return columns migration:', err?.message || err);
-  }
-
-  try {
-    const trackingCols = [
-      { name: 'shipping_cost', sql: "ADD COLUMN shipping_cost DECIMAL(10, 2) DEFAULT 0" },
-      { name: 'shipping_fee_charged', sql: "ADD COLUMN shipping_fee_charged DECIMAL(10, 2) DEFAULT 0" },
-      { name: 'shipping_label_cost', sql: "ADD COLUMN shipping_label_cost DECIMAL(10, 2) DEFAULT 0" },
-      { name: 'shipping_carrier', sql: "ADD COLUMN shipping_carrier VARCHAR(50) NULL" },
-      { name: 'tracking_number', sql: "ADD COLUMN tracking_number VARCHAR(100) NULL" },
-      { name: 'tracking_url', sql: "ADD COLUMN tracking_url VARCHAR(500) NULL" },
-      { name: 'label_url', sql: "ADD COLUMN label_url VARCHAR(500) NULL" },
-      { name: 'tracking_status', sql: "ADD COLUMN tracking_status VARCHAR(50) NULL" },
-      { name: 'tracking_last_updated', sql: "ADD COLUMN tracking_last_updated TIMESTAMP NULL" },
-      { name: 'shipped_at', sql: "ADD COLUMN shipped_at TIMESTAMP NULL" },
-      { name: 'delivered_at', sql: "ADD COLUMN delivered_at TIMESTAMP NULL" },
-      { name: 'shippo_transaction_id', sql: "ADD COLUMN shippo_transaction_id VARCHAR(100) NULL" },
-      { name: 'shippo_rate_id', sql: "ADD COLUMN shippo_rate_id VARCHAR(100) NULL" },
-    ];
-    for (const { name, sql } of trackingCols) {
-      const [tc] = await pool.execute(
-        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'orders' AND COLUMN_NAME = ?",
-        [process.env.DB_NAME || 'mirart', name]
-      );
-      if (tc.length === 0) {
-        await pool.execute(`ALTER TABLE orders ${sql}`);
-        console.log(`[Startup] Added ${name} column to orders`);
-      }
-    }
-  } catch (err) {
-    console.warn('[Startup] Tracking columns migration:', err?.message || err);
-  }
-
-  try {
-    const payoutCols = [
-      { name: 'payout_amount', sql: "ADD COLUMN payout_amount DECIMAL(10, 2) NULL" },
-      { name: 'payout_stripe_fee', sql: "ADD COLUMN payout_stripe_fee DECIMAL(10, 2) NULL" },
-      { name: 'payout_label_cost', sql: "ADD COLUMN payout_label_cost DECIMAL(10, 2) NULL" },
-      { name: 'payout_commission_percent', sql: "ADD COLUMN payout_commission_percent DECIMAL(5, 2) NULL" },
-      { name: 'payout_commission_amount', sql: "ADD COLUMN payout_commission_amount DECIMAL(10, 2) NULL" },
-    ];
-    for (const { name, sql } of payoutCols) {
-      const [pc] = await pool.execute(
-        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'orders' AND COLUMN_NAME = ?",
-        [process.env.DB_NAME || 'mirart', name]
-      );
-      if (pc.length === 0) {
-        await pool.execute(`ALTER TABLE orders ${sql}`);
-        console.log(`[Startup] Added ${name} column to orders`);
-      }
-    }
-  } catch (err) {
-    console.warn('[Startup] Payout columns migration:', err?.message || err);
-  }
-
-  try {
-    const [ratingCol] = await pool.execute(
-      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'listing_comments' AND COLUMN_NAME = 'rating'",
-      [process.env.DB_NAME || 'mirart']
-    );
-    if (ratingCol.length === 0) {
-      await pool.execute("ALTER TABLE listing_comments ADD COLUMN rating TINYINT NULL AFTER comment");
-      console.log('[Startup] Added rating column to listing_comments');
-    }
-  } catch (err) {
-    console.warn('[Startup] Rating column migration:', err?.message || err);
-  }
-
-  try {
-    const [tables] = await pool.execute(
-      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'admin_announcements'",
-      [process.env.DB_NAME || 'mirart']
-    );
-    if (tables.length === 0) {
-      await pool.execute(`
-        CREATE TABLE admin_announcements (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          message TEXT NOT NULL,
-          target_type ENUM('all', 'authenticated', 'artists', 'buyers', 'admins', 'specific') NOT NULL DEFAULT 'all',
-          target_user_ids JSON NULL,
-          severity ENUM('info', 'warning', 'success', 'error') DEFAULT 'info',
-          is_active BOOLEAN DEFAULT TRUE,
-          start_date DATETIME NULL,
-          end_date DATETIME NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          INDEX idx_active_dates (is_active, start_date, end_date)
-        )
-      `);
-      console.log('[Startup] Created admin_announcements table');
-    }
-  } catch (err) {
-    console.warn('[Startup] Announcements migration:', err?.message || err);
-  }
-
-  try {
-    const [tables] = await pool.execute(
-      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'notifications'",
-      [process.env.DB_NAME || 'mirart']
-    );
-    if (tables.length === 0) {
-      await pool.execute(`
-        CREATE TABLE notifications (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          user_id INT NOT NULL,
-          type VARCHAR(50) NOT NULL,
-          title VARCHAR(255) NOT NULL,
-          body TEXT,
-          link VARCHAR(500),
-          reference_id INT,
-          read_at TIMESTAMP NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-          INDEX idx_user_read (user_id, read_at),
-          INDEX idx_created (created_at)
-        )
-      `);
-      console.log('[Startup] Created notifications table');
-    }
-  } catch (err) {
-    console.warn('[Startup] Notifications migration:', err?.message || err);
-  }
-
-  try {
-    const [ssTables] = await pool.execute(
-      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'site_settings'",
-      [process.env.DB_NAME || 'mirart']
-    );
-    if (ssTables.length === 0) {
-      await pool.execute(`
-        CREATE TABLE site_settings (
-          setting_key VARCHAR(100) PRIMARY KEY,
-          setting_value JSON NOT NULL,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        )
-      `);
-      await pool.execute(
-        "INSERT INTO site_settings (setting_key, setting_value) VALUES ('support_chat_config', ?)",
-        [JSON.stringify({ enabled: true, hours_start: 9, hours_end: 17, timezone: 'America/Los_Angeles', offline_message: 'Support is currently offline. Please leave a message and we will get back to you.', welcome_message: 'Hi! How can we help you today?' })]
-      );
-      console.log('[Startup] Created site_settings table with support chat defaults');
-    }
-  } catch (err) {
-    console.warn('[Startup] Site settings migration:', err?.message || err);
-  }
-
-  try {
-    const [ucRow] = await pool.execute(
-      "SELECT setting_key FROM site_settings WHERE setting_key = 'user_chat_enabled'"
-    );
-    if (ucRow.length === 0) {
-      await pool.execute(
-        "INSERT INTO site_settings (setting_key, setting_value) VALUES ('user_chat_enabled', ?)",
-        [JSON.stringify(false)]
-      );
-      console.log('[Startup] Added user_chat_enabled setting (default: off)');
-    }
-  } catch (err) {
-    console.warn('[Startup] User chat setting migration:', err?.message || err);
-  }
-
-  try {
+    const supportChatDefaults = { enabled: true, hours_start: 9, hours_end: 17, timezone: 'America/Los_Angeles', offline_message: 'Support is currently offline. Please leave a message and we will get back to you.', welcome_message: 'Hi! How can we help you today?' };
     await pool.execute(
-      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('test_data_enabled', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('support_chat_config', ?) ON CONFLICT (setting_key) DO NOTHING",
+      [JSON.stringify(supportChatDefaults)]
+    );
+    await pool.execute(
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('user_chat_enabled', ?) ON CONFLICT (setting_key) DO NOTHING",
       [JSON.stringify(false)]
     );
-    console.log('[Startup] Enforced test_data_enabled setting (off)');
-  } catch (err) {
-    console.warn('[Startup] Test data setting migration:', err?.message || err);
-  }
-
-  try {
-    const [scTables] = await pool.execute(
-      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'support_chat_messages'",
-      [process.env.DB_NAME || 'mirart']
+    await pool.execute(
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('test_data_enabled', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value",
+      [JSON.stringify(false)]
     );
-    if (scTables.length === 0) {
-      await pool.execute(`
-        CREATE TABLE support_chat_messages (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          user_id INT NULL,
-          user_email VARCHAR(255) NULL,
-          user_name VARCHAR(255) NULL,
-          sender ENUM('user', 'admin') NOT NULL,
-          message TEXT NOT NULL,
-          admin_id INT NULL,
-          read_at TIMESTAMP NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_user (user_id, created_at),
-          INDEX idx_unread (sender, read_at)
-        )
-      `);
-      console.log('[Startup] Created support_chat_messages table');
-    }
   } catch (err) {
-    console.warn('[Startup] Support chat migration:', err?.message || err);
+    console.warn('[Startup] Site settings seed failed:', err?.message || err);
   }
 
   try {

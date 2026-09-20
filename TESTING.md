@@ -93,6 +93,7 @@ describe('My API', () => {
 
 ## Mock Conventions
 
-- **MySQL2 `pool.execute`**: Returns `[rows, fields]`. Use `mockResolvedValueOnce([[row1, row2]])` for rows.
+- **`pool.execute`** (`backend/config/database.js`): SELECT returns `[rows, fields]`; INSERT/UPDATE/DELETE return `[{ insertId, affectedRows, rows }]`. Use `mockResolvedValueOnce([[row1, row2]])` for rows.
+- **Authentication**: mock `attachAuth` from `backend/middleware/auth.js` and pass an `x-test-auth` header with the JSON `req.auth` object (see `backend/routes/subscriptions.test.js`).
 - **Stripe**: Mocked in `backend/config/stripe.js` for subscription tests.
 - **Fetch**: Mock `globalThis.fetch` in API service tests.

@@ -9,17 +9,17 @@ cd backend
 npm install
 ```
 
-## Step 2: Configure Database
+## Step 2: Configure Supabase
 
-Create a `.env` file in the `backend` directory with your MySQL credentials:
+Copy `.env.example` to `.env` and fill it in (see `README.md` for where each value lives in the Supabase dashboard):
 
 ```env
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_mysql_password_here
-DB_NAME=mirart
 PORT=3001
-FRONTEND_URL=http://localhost:5173
+FRONTEND_URL=http://localhost:3000
+DATABASE_URL=postgresql://postgres.<project-ref>:<url-encoded-password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 
 # SMTP Configuration (for sending emails)
 # Leave empty to use mock mode (emails will be logged to console)
@@ -31,31 +31,20 @@ SMTP_PASS=your_app_password
 SMTP_FROM_EMAIL=noreply@artzyla.com
 ```
 
-**Important**: 
-- Replace `your_mysql_password_here` with your actual MySQL root password.
-- For SMTP configuration:
-  - **Mock Mode (Default)**: If SMTP credentials are not provided, emails will be logged to the console instead of being sent.
-  - **Gmail Setup**: If using Gmail, you'll need to generate an "App Password" (not your regular password) from your Google Account settings.
-  - **Other Providers**: Update `SMTP_HOST`, `SMTP_PORT`, and `SMTP_SECURE` according to your email provider's settings.
+Use the **Session pooler** connection string; the direct database host is IPv6-only.
 
-## Step 3: Make Sure MySQL is Running
+## Step 3: Configure Supabase Auth emails
 
-Ensure your MySQL server is running on your machine. You can check by running:
-```bash
-mysql --version
-```
+The app asks users to type the verification code from their email, so the **Confirm signup** and **Reset password** email templates (Authentication -> Email Templates) must include `{{ .Token }}`.
+For production, configure a custom SMTP provider (Authentication -> SMTP); Supabase's built-in mailer is heavily rate limited.
 
 ## Step 4: Initialize the Database
-
-Run the database initialization script to create the database and tables:
 
 ```bash
 npm run init-db
 ```
 
-This will:
-- Create the `mirart` database (if it doesn't exist)
-- Create all necessary tables (users, listings, orders, dashboard_stats)
+This creates all tables, indexes, triggers and row-level-security settings from `database/schema.sql`. It is safe to re-run.
 
 ## Step 5: Start the Backend Server
 
@@ -82,10 +71,9 @@ You should see: `{"status":"ok","message":"ArtZyla API is running"}`
 
 ## Troubleshooting
 
-### "Access denied for user" error
-- Check your MySQL password in the `.env` file
-- Make sure MySQL is running
-- Verify your MySQL user has permission to create databases
+### "password authentication failed" or "ENOTFOUND" errors
+- Check the password in `DATABASE_URL` (URL-encode special characters such as `@`)
+- Use the Session pooler host (`aws-0-<region>.pooler.supabase.com`) and the `postgres.<project-ref>` user; the direct `db.<ref>.supabase.co` host is IPv6-only
 
 ### "Cannot find module" errors
 - Run `npm install` again in the backend directory

@@ -1,15 +1,16 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { requireAuth, requireSelf } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/conversations/:cognitoUsername', async (req, res) => {
+router.get('/conversations/:authUserId', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
 
     const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id FROM users WHERE auth_user_id = ?',
+      [authUserId]
     );
 
     if (users.length === 0) {
@@ -72,21 +73,11 @@ router.get('/conversations/:cognitoUsername', async (req, res) => {
   }
 });
 
-router.get('/conversation/:conversationId', async (req, res) => {
+router.get('/conversation/:conversationId', requireAuth, async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { cognitoUsername } = req.query;
 
-    const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     const [conversations] = await pool.execute(
       `SELECT * FROM chat_conversations 
@@ -119,30 +110,21 @@ router.get('/conversation/:conversationId', async (req, res) => {
   }
 });
 
-router.post('/conversation', async (req, res) => {
+router.post('/conversation', requireAuth, async (req, res) => {
   try {
-    const { cognitoUsername, otherUserId, otherUserCognitoUsername, listingId, message } = req.body;
+    const { otherUserId, otherUserAuthUserId, listingId, message } = req.body;
 
-    if ((!otherUserId && !otherUserCognitoUsername) || !message) {
-      return res.status(400).json({ error: 'otherUserId (or otherUserCognitoUsername) and message are required' });
+    if ((!otherUserId && !otherUserAuthUserId) || !message) {
+      return res.status(400).json({ error: 'otherUserId (or otherUserAuthUserId) and message are required' });
     }
 
-    const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     let otherUserDbId = otherUserId;
-    if (otherUserCognitoUsername && !otherUserId) {
+    if (otherUserAuthUserId && !otherUserId) {
       const [otherUsers] = await pool.execute(
-        'SELECT id FROM users WHERE cognito_username = ?',
-        [otherUserCognitoUsername]
+        'SELECT id FROM users WHERE auth_user_id = ?',
+        [otherUserAuthUserId]
       );
       if (otherUsers.length === 0) {
         return res.status(404).json({ error: 'Other user not found' });
@@ -159,8 +141,8 @@ router.post('/conversation', async (req, res) => {
 
     let [conversations] = await pool.execute(
       `SELECT id FROM chat_conversations 
-       WHERE user1_id = ? AND user2_id = ? AND (listing_id = ? OR (listing_id IS NULL AND ? IS NULL))`,
-      [user1Id, user2Id, listingId || null, listingId || null]
+       WHERE user1_id = ? AND user2_id = ? AND listing_id IS NOT DISTINCT FROM ?::int`,
+      [user1Id, user2Id, listingId || null]
     );
 
     let conversationId;
@@ -195,24 +177,15 @@ router.post('/conversation', async (req, res) => {
   }
 });
 
-router.post('/message', async (req, res) => {
+router.post('/message', requireAuth, async (req, res) => {
   try {
-    const { cognitoUsername, conversationId, message } = req.body;
+    const { conversationId, message } = req.body;
 
     if (!conversationId || !message) {
       return res.status(400).json({ error: 'conversationId and message are required' });
     }
 
-    const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     const [conversations] = await pool.execute(
       `SELECT * FROM chat_conversations 
@@ -244,21 +217,11 @@ router.post('/message', async (req, res) => {
   }
 });
 
-router.put('/messages/read/:conversationId', async (req, res) => {
+router.put('/messages/read/:conversationId', requireAuth, async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { cognitoUsername } = req.body;
 
-    const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     await pool.execute(
       `UPDATE chat_messages 

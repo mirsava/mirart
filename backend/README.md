@@ -1,6 +1,6 @@
 # ArtZyla Backend API
 
-Backend API for the ArtZyla marketplace built with Express.js and MySQL.
+Backend API for the ArtZyla marketplace built with Express.js and Supabase (Postgres + Auth).
 
 ## Setup Instructions
 
@@ -11,32 +11,25 @@ cd backend
 npm install
 ```
 
-### 2. Configure Database
+### 2. Configure Supabase
 
-Create a `.env` file in the `backend` directory:
+Copy `.env.example` to `.env` in the `backend` directory and fill it in:
 
-```env
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password_here
-DB_NAME=mirart
-PORT=3001
-FRONTEND_URL=http://localhost:5173
-```
+- `DATABASE_URL`: the **Session pooler** connection string from Supabase (Project Settings -> Database). The pooler is IPv4 compatible; the direct `db.<ref>.supabase.co` host is IPv6-only. URL-encode any special characters in the password.
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`: Project Settings -> API. The service role key is a secret; never expose it to the browser.
 
 ### 3. Initialize Database
 
-Make sure MySQL is running, then initialize the database schema:
+Creates every table, index, trigger and RLS setting in one go. It is idempotent, so it is safe to re-run:
 
 ```bash
 npm run init-db
 ```
 
-Or manually run the SQL schema:
+`database/schema.sql` is the single source of truth for the schema.
 
-```bash
-mysql -u root -p < database/schema.sql
-```
+To make yourself an admin after signing up: `npm run set-admin -- you@example.com`.
+To empty every table (and optionally the Supabase Auth users): `npm run reset-db` (add `-- --include-auth`).
 
 ### 4. Start the Server
 
@@ -56,9 +49,9 @@ The server will run on `http://localhost:3001`
 
 ### Users
 
-- `GET /api/users/:cognitoUsername` - Get user profile
+- `GET /api/users/:authUserId` - Get user profile
 - `POST /api/users` - Create or update user profile
-- `PUT /api/users/:cognitoUsername` - Update user profile
+- `PUT /api/users/:authUserId` - Update user profile
 
 ### Listings
 
@@ -67,11 +60,11 @@ The server will run on `http://localhost:3001`
 - `POST /api/listings` - Create new listing
 - `PUT /api/listings/:id` - Update listing
 - `DELETE /api/listings/:id` - Delete listing
-- `GET /api/listings/user/:cognitoUsername` - Get user's listings
+- `GET /api/listings/user/:authUserId` - Get user's listings
 
 ### Dashboard
 
-- `GET /api/dashboard/:cognitoUsername` - Get dashboard statistics and recent data
+- `GET /api/dashboard/:authUserId` - Get dashboard statistics and recent data
 
 ## Database Schema
 
@@ -86,9 +79,9 @@ See `database/schema.sql` for full schema details.
 
 ## Notes
 
-- User authentication is handled by AWS Cognito
-- The `cognito_username` is used to link database records with Cognito users
-- All prices are stored as DECIMAL(10, 2)
+- User authentication is handled by Supabase Auth. `users.auth_user_id` is the Supabase user UUID (`auth.users.id`); a database trigger creates the `users` row on sign-up.
+- The API verifies the `Authorization: Bearer <access token>` header; roles come from `users.user_type` (`artist`, `buyer`, `admin`), never from client-supplied parameters.
+- All prices are stored as NUMERIC(10, 2)
 - Dashboard stats are cached for performance but recalculated on each request
 
 ## SEO Sitemap Operations

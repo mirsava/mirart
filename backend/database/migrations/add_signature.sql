@@ -1,2 +1,0 @@
-ALTER TABLE users ADD COLUMN signature_url VARCHAR(500) NULL;
-

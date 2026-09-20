@@ -108,7 +108,7 @@ const Gallery: React.FC = () => {
       id: listing.id,
       title: listing.title,
       artist: listing.artist_name || 'Unknown Artist',
-      artistUsername: listing.cognito_username,
+      artistUsername: listing.auth_user_id,
       artistSignatureUrl: listing.signature_url,
       price: listing.price,
       image: getImageUrl(listing.primary_image_url) || '',
@@ -181,7 +181,7 @@ const Gallery: React.FC = () => {
   const fetchListingsWithFilters = async (filterValues: {
     categories?: string[];
     subcategories?: string[];
-    cognitoUsername?: string;
+    authUserId?: string;
     minPrice: string;
     maxPrice: string;
     minYear: string;
@@ -215,11 +215,11 @@ const Gallery: React.FC = () => {
         filters.search = searchTerm;
       }
       
-      const artistToUse = filterValues.cognitoUsername !== undefined
-        ? filterValues.cognitoUsername
+      const artistToUse = filterValues.authUserId !== undefined
+        ? filterValues.authUserId
         : searchParams.get('artist') || '';
       if (artistToUse) {
-        filters.cognitoUsername = artistToUse;
+        filters.authUserId = artistToUse;
       }
       
       if (filterValues.minPrice && filterValues.minPrice.trim() !== '') {
@@ -523,7 +523,7 @@ const Gallery: React.FC = () => {
     await fetchListingsWithFilters({
       categories: newCategories,
       subcategories: newSubcategories,
-      cognitoUsername: newArtist,
+      authUserId: newArtist,
       minPrice: newMinPrice,
       maxPrice: newMaxPrice,
       minYear: newMinYear,

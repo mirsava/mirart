@@ -1,3 +1,4 @@
+import { authFetch } from '../lib/supabase';
 import React, { useRef, useState, useEffect } from 'react';
 import {
   Box,
@@ -116,7 +117,7 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
       formData.append('image', blob, 'signature.png');
 
       const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/upload/image`, {
+      const response = await authFetch(`${API_BASE_URL}/upload/image`, {
         method: 'POST',
         body: formData,
       });
@@ -172,7 +173,7 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
 
     try {
       const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/upload/image`, {
+      const response = await authFetch(`${API_BASE_URL}/upload/image`, {
         method: 'POST',
         body: formData,
       });

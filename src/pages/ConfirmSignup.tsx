@@ -16,19 +16,14 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import apiService from '../services/api';
 
 const ConfirmSignup: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { confirmSignUp, resendConfirmationCode } = useAuth();
+  const { confirmSignUp, resendConfirmationCode, refreshUser } = useAuth();
   
-  // Get email, username, and user data from location state
   const emailFromState = location.state?.email || '';
-  const usernameFromState = location.state?.username || '';
-  const userDataFromState = location.state?.userData || null;
   const [email, setEmail] = useState(emailFromState);
-  const [username, setUsername] = useState(usernameFromState);
   const [code, setCode] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -52,21 +47,16 @@ const ConfirmSignup: React.FC = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    // If username is not from state, we need either username or email
-    if (!usernameFromState) {
-      if (!username.trim() && !email.trim()) {
-        newErrors.username = 'Username or email is required';
-      }
-    }
-
-    if (email.trim() && !/\S+@\S+\.\S+/.test(email)) {
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Email is invalid';
     }
 
     if (!code.trim()) {
       newErrors.code = 'Verification code is required';
     } else if (code.length < 6) {
-      newErrors.code = 'Verification code must be 6 digits';
+      newErrors.code = 'Verification code must be at least 6 digits';
     }
 
     setErrors(newErrors);
@@ -82,33 +72,13 @@ const ConfirmSignup: React.FC = () => {
     setErrors({});
     
     try {
-      // Prioritize username if available (from signup), otherwise use email
-      // Username is what was actually used during signup
-      const identifier = (username && username.trim()) || email;
-      if (!identifier) {
-        setErrors({ general: 'Username or email is required' });
-        return;
-      }
-      await confirmSignUp(identifier, code);
-      
-      // Try to save user data to database if it wasn't saved during signup
-      if (userDataFromState && username) {
-        try {
-          await apiService.createOrUpdateUser({
-            cognito_username: username,
-            ...userDataFromState,
-          });
-        } catch (dbError) {
-          console.error('Error saving user data after confirmation:', dbError);
-          // Don't fail confirmation if database save fails
-        }
-      }
-      
+      await confirmSignUp(email, code);
+      // Confirming the code also signs the user in.
+      await refreshUser();
+
       setSuccess(true);
       setTimeout(() => {
-        navigate('/signin', {
-          state: { message: 'Account confirmed successfully! Please sign in.' } 
-        });
+        navigate('/dashboard');
       }, 2000);
     } catch (error: any) {
       setErrors({ general: error.message || 'Invalid verification code. Please try again.' });
@@ -148,7 +118,7 @@ const ConfirmSignup: React.FC = () => {
               Account Confirmed!
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              Your account has been successfully verified. Redirecting to sign in...
+              Your account has been successfully verified. Redirecting to your dashboard...
             </Typography>
             <CircularProgress />
           </Paper>
@@ -193,18 +163,6 @@ const ConfirmSignup: React.FC = () => {
           )}
 
           <form onSubmit={handleConfirm} noValidate>
-            {!usernameFromState && (
-              <TextField
-                fullWidth
-                label="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                error={!!errors.username}
-                helperText={errors.username || 'Enter the username you used during signup'}
-                sx={{ mb: 2 }}
-              />
-            )}
-
             <TextField
               fullWidth
               label="Email Address"
@@ -212,8 +170,8 @@ const ConfirmSignup: React.FC = () => {
               value={email}
               onChange={handleEmailChange}
               error={!!errors.email}
-              helperText={errors.email || (usernameFromState ? 'Email used during signup' : 'Enter your email address')}
-              required={!usernameFromState}
+              helperText={errors.email || 'The email address you signed up with'}
+              required
               disabled={!!emailFromState}
               InputProps={{
                 startAdornment: <EmailIcon sx={{ mr: 1, color: 'text.secondary' }} />,
@@ -227,10 +185,10 @@ const ConfirmSignup: React.FC = () => {
               value={code}
               onChange={handleCodeChange}
               error={!!errors.code}
-              helperText={errors.code || 'Enter the 6-digit code from your email'}
+              helperText={errors.code || 'Enter the verification code from your email'}
               required
               inputProps={{
-                maxLength: 6,
+                maxLength: 10,
                 pattern: '[0-9]*',
               }}
               sx={{ mb: 3 }}

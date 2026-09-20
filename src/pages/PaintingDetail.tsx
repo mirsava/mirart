@@ -1,3 +1,4 @@
+import { authFetch } from '../lib/supabase';
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -106,7 +107,7 @@ const PaintingDetail: React.FC = () => {
       id: listing.id,
       title: listing.title,
       artist: listing.artist_name || 'Unknown Artist',
-      artistUsername: listing.cognito_username,
+      artistUsername: listing.auth_user_id,
       artistSignatureUrl: listing.signature_url,
       price: listing.price,
       image: getImageUrl(listing.primary_image_url) || '',
@@ -139,7 +140,7 @@ const PaintingDetail: React.FC = () => {
       setAverageRating(response.averageRating || 0);
       setReviewCount(response.reviewCount || 0);
       if (user?.id) {
-        setUserHasReviewed(response.reviews.some(r => r.cognito_username === user.id));
+        setUserHasReviewed(response.reviews.some(r => r.auth_user_id === user.id));
       }
     } catch {
     } finally {
@@ -181,10 +182,8 @@ const PaintingDetail: React.FC = () => {
         const listingId = resolvedListingId;
         if (!isNaN(listingId)) {
           try {
-            const url = user?.id 
-              ? `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/listings/${listingId}?cognitoUsername=${user.id}`
-              : `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/listings/${listingId}`;
-            const response = await fetch(url);
+            const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/listings/${listingId}`;
+            const response = await authFetch(url);
             if (!response.ok) {
               const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
               throw new Error(errorData.error || `Failed to fetch listing: ${response.status}`);
@@ -197,21 +196,10 @@ const PaintingDetail: React.FC = () => {
             
             const convertedPainting = convertListingToPainting(listing);
             
-            // Always fetch artist's default special instructions to combine with listing instructions
-            try {
-              const artistUsername = convertedPainting.artistUsername;
-              if (artistUsername) {
-                const settingsUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/users/${artistUsername}/settings`;
-                const settingsResponse = await fetch(settingsUrl);
-                if (settingsResponse.ok) {
-                  const settingsData = await settingsResponse.json();
-                  if (settingsData.default_special_instructions && settingsData.default_special_instructions.trim()) {
-                    setDefaultSpecialInstructions(settingsData.default_special_instructions);
-                  }
-                }
-              }
-            } catch (err) {
-              // Silently fail, use empty default
+            // The artist's default special instructions are combined with the listing's own instructions
+            const artistDefaults = (listing as any).artist_default_special_instructions;
+            if (typeof artistDefaults === 'string' && artistDefaults.trim()) {
+              setDefaultSpecialInstructions(artistDefaults);
             }
             
             setPainting(convertedPainting);
@@ -1192,7 +1180,7 @@ const PaintingDetail: React.FC = () => {
                           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 0.5 }}>{review.comment}</Typography>
                         )}
                       </Box>
-                      {user?.id === review.cognito_username && (
+                      {user?.id === review.auth_user_id && (
                         <IconButton
                           size="small"
                           onClick={() => {
@@ -1207,7 +1195,7 @@ const PaintingDetail: React.FC = () => {
                           <EditIcon fontSize="small" />
                         </IconButton>
                       )}
-                      {(user?.id === review.cognito_username || painting.userId === user?.id) && (
+                      {(user?.id === review.auth_user_id || painting.userId === user?.id) && (
                         <IconButton
                           size="small"
                           onClick={() => { setReviewToDelete(review.id); setDeleteDialogOpen(true); }}

@@ -111,7 +111,7 @@ const SupportChatWidget: React.FC = () => {
   const fetchMessages = useCallback(async () => {
     try {
       const msgs = await apiService.getSupportChatMessages({
-        cognitoUsername: isAuthenticated ? user?.id : undefined,
+        authUserId: isAuthenticated ? user?.id : undefined,
         userId: currentSupportUserId,
       });
       setMessages(msgs);
@@ -129,7 +129,7 @@ const SupportChatWidget: React.FC = () => {
       setLoading(true);
       fetchMessages().finally(() => setLoading(false));
       apiService.markSupportChatRead({
-        cognitoUsername: isAuthenticated ? user?.id : undefined,
+        authUserId: isAuthenticated ? user?.id : undefined,
         userId: currentSupportUserId,
         sender: 'admin',
       }).then(() => setUnreadCount(0)).catch(() => {});
@@ -150,7 +150,7 @@ const SupportChatWidget: React.FC = () => {
     setSending(true);
     try {
       await apiService.sendSupportChatMessage({
-        cognitoUsername: isAuthenticated ? user?.id : undefined,
+        authUserId: isAuthenticated ? user?.id : undefined,
         userId: currentSupportUserId,
         guestSessionId: isAuthenticated ? undefined : guestSessionId,
         guestName: isAuthenticated ? undefined : guestName.trim() || undefined,

@@ -1,2 +1,0 @@
-ALTER TABLE listings MODIFY COLUMN price DECIMAL(10, 2) NULL;
-

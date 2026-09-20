@@ -234,7 +234,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
     if (user.first_name || user.last_name) {
       return `${user.first_name || ''} ${user.last_name || ''}`.trim();
     }
-    return user.email || user.cognito_username;
+    return user.email || user.auth_user_id;
   };
 
   const isUserOnline = (userId: number): boolean => {
@@ -309,7 +309,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
   }, [searchQuery, user?.id]);
 
   const handleStartChatWithUser = async (otherUser: User) => {
-    if (!user?.id || !otherUser.cognito_username) {
+    if (!user?.id || !otherUser.auth_user_id) {
       setError('User information not available');
       return;
     }
@@ -323,7 +323,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
         otherUser.id || 0,
         null,
         message,
-        otherUser.cognito_username
+        otherUser.auth_user_id
       );
       
       if (response && response.conversationId) {
@@ -611,7 +611,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ open, onClose, initialConversat
                       </ListItemAvatar>
                       <ListItemText
                         primary={getUserDisplayName(resultUser)}
-                        secondary={`@${resultUser.cognito_username}`}
+                        secondary={`@${resultUser.auth_user_id}`}
                         primaryTypographyProps={{
                           variant: 'body2',
                           fontWeight: 500,

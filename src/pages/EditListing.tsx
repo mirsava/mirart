@@ -1,3 +1,4 @@
+import { authFetch } from '../lib/supabase';
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -333,7 +334,7 @@ const EditListing: React.FC = () => {
     });
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/upload/images`, {
+      const response = await authFetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/upload/images`, {
         method: 'POST',
         body: formData,
       });
@@ -443,7 +444,7 @@ const EditListing: React.FC = () => {
           ? (parseFloat(formData.fixed_shipping_fee) || 0)
           : 0,
         return_days: formData.return_days,
-        cognito_username: user.id,
+        auth_user_id: user.id,
         groups: user.groups || [],
       };
 

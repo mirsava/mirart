@@ -10,7 +10,7 @@ export interface FavoriteItem {
   category: string;
   in_stock: boolean;
   status: string;
-  cognito_username: string;
+  auth_user_id: string;
   artist_name: string;
   like_count: number;
   favorited_at: string;

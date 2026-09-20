@@ -9,6 +9,7 @@ import pool from '../config/database.js';
 import * as shippoService from '../services/shippoService.js';
 import { shippoConfig } from '../config/shippo.js';
 import { createNotification } from '../services/notificationService.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -151,22 +152,18 @@ router.post('/rates', async (req, res) => {
  * Get fresh shipping rates for an order (seller only, when ready to ship)
  * Rates expire ~24h so we fetch fresh when seller buys label
  */
-router.post('/rates-for-order', async (req, res) => {
+router.post('/rates-for-order', requireAuth, async (req, res) => {
   try {
     if (!shippoConfig.isConfigured) {
       return res.status(503).json({ error: 'Shipping is not configured' });
     }
 
-    const { order_id, cognito_username } = req.body;
-    if (!order_id || !cognito_username) {
-      return res.status(400).json({ error: 'order_id and cognito_username are required' });
+    const { order_id } = req.body;
+    if (!order_id) {
+      return res.status(400).json({ error: 'order_id is required' });
     }
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     const [orders] = await pool.execute(
       `SELECT o.*, l.weight_oz, l.length_in, l.width_in, l.height_in,
@@ -270,24 +267,20 @@ router.post('/rates-for-order', async (req, res) => {
 /**
  * POST /shipping/label
  * Purchase a shipping label for an order (seller only)
- * Body: { order_id, rate_id, cognito_username }
+ * Body: { order_id, rate_id }
  */
-router.post('/label', async (req, res) => {
+router.post('/label', requireAuth, async (req, res) => {
   try {
     if (!shippoConfig.isConfigured) {
       return res.status(503).json({ error: 'Shipping is not configured' });
     }
 
-    const { order_id, rate_id, cognito_username, rate_amount, carrier } = req.body;
-    if (!order_id || !rate_id || !cognito_username) {
-      return res.status(400).json({ error: 'order_id, rate_id, and cognito_username are required' });
+    const { order_id, rate_id, rate_amount, carrier } = req.body;
+    if (!order_id || !rate_id) {
+      return res.status(400).json({ error: 'order_id and rate_id are required' });
     }
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     const [orders] = await pool.execute(
       'SELECT * FROM orders WHERE id = ? AND seller_id = ?',
@@ -383,15 +376,18 @@ router.get('/track/:trackingNumber', async (req, res) => {
  * GET /shipping/track-order/:orderId
  * Detailed tracking for an order — returns full Shippo tracking history
  */
-router.get('/track-order/:orderId', async (req, res) => {
+router.get('/track-order/:orderId', requireAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
     const [orders] = await pool.execute(
-      'SELECT tracking_number, shipping_carrier, tracking_status, tracking_last_updated, shipped_at, delivered_at, status FROM orders WHERE id = ?',
+      'SELECT tracking_number, shipping_carrier, tracking_status, tracking_last_updated, shipped_at, delivered_at, status, buyer_id, seller_id FROM orders WHERE id = ?',
       [orderId]
     );
     if (orders.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
+    }
+    if (!req.auth.isAdmin && orders[0].buyer_id !== req.auth.userId && orders[0].seller_id !== req.auth.userId) {
+      return res.status(403).json({ error: 'Access denied' });
     }
     const order = orders[0];
     if (!order.tracking_number) {

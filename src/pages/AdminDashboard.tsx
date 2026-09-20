@@ -336,7 +336,7 @@ const AdminDashboard: React.FC = () => {
       await apiService.sendSupportChatMessage({
         message: supportReply.trim(),
         sender: 'admin',
-        adminCognitoUsername: user.id,
+        adminAuthUserId: user.id,
         targetUserId: supportSelectedUserId,
       });
       setSupportReply('');
@@ -436,10 +436,10 @@ const AdminDashboard: React.FC = () => {
       
       const subscriptions: Record<number, any> = {};
       const subscriptionPromises = fetchedUsers
-        .filter(userData => userData.cognito_username)
+        .filter(userData => userData.auth_user_id)
         .map(async (userData) => {
           try {
-            const subResponse = await apiService.getUserSubscription(userData.cognito_username);
+            const subResponse = await apiService.getUserSubscription(userData.auth_user_id);
             if (subResponse.subscription) {
               subscriptions[userData.id] = subResponse.subscription;
             }
@@ -797,7 +797,7 @@ const AdminDashboard: React.FC = () => {
     if (!user?.id || !selectedUser) return;
 
     try {
-      await apiService.updateUserType(user.id, selectedUser.cognito_username, newUserType);
+      await apiService.updateUserType(user.id, selectedUser.auth_user_id, newUserType);
       enqueueSnackbar('User type updated successfully', { variant: 'success' });
       setUserTypeDialogOpen(false);
       handleUserMenuClose();
@@ -1426,10 +1426,10 @@ const AdminDashboard: React.FC = () => {
                               {userData.business_name || 
                                (userData.first_name && userData.last_name 
                                  ? `${userData.first_name} ${userData.last_name}`
-                                 : userData.cognito_username)}
+                                 : userData.auth_user_id)}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              @{userData.cognito_username}
+                              @{userData.auth_user_id}
                             </Typography>
                           </Box>
                         </Box>
@@ -2215,7 +2215,7 @@ const AdminDashboard: React.FC = () => {
                           .then((r) => setNotificationUserOptions(r.users || []));
                       }
                     }}
-                    getOptionLabel={(o) => o?.email || o?.cognito_username || o?.first_name || o?.last_name || String(o?.id || '')}
+                    getOptionLabel={(o) => o?.email || o?.auth_user_id || o?.first_name || o?.last_name || String(o?.id || '')}
                     renderInput={(params) => (
                       <TextField {...params} label="Select user" placeholder="Search by email or name" />
                     )}
@@ -2463,7 +2463,7 @@ const AdminDashboard: React.FC = () => {
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                               {supportSelectedUserInfo
-                                ? (supportSelectedUserInfo.business_name || [supportSelectedUserInfo.first_name, supportSelectedUserInfo.last_name].filter(Boolean).join(' ') || supportSelectedUserInfo.cognito_username)
+                                ? (supportSelectedUserInfo.business_name || [supportSelectedUserInfo.first_name, supportSelectedUserInfo.last_name].filter(Boolean).join(' ') || supportSelectedUserInfo.auth_user_id)
                                 : (supportConversations.find((c: any) => Number(c.user_id) === Number(supportSelectedUserId))?.user_name || `User ${supportSelectedUserId}`)}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -2871,7 +2871,7 @@ const AdminDashboard: React.FC = () => {
                         .finally(() => setAnnouncementUserLoading(false));
                     }
                   }}
-                  getOptionLabel={(o) => o?.email || o?.cognito_username || o?.first_name || o?.last_name || String(o?.id || '')}
+                  getOptionLabel={(o) => o?.email || o?.auth_user_id || o?.first_name || o?.last_name || String(o?.id || '')}
                   loading={announcementUserLoading}
                   renderInput={(params) => (
                     <TextField {...params} label="Select user" placeholder="Search by email or name" />
@@ -3051,7 +3051,7 @@ const AdminDashboard: React.FC = () => {
               Deactivate User
             </MenuItem>
           )}
-          {selectedUser && selectedUser.cognito_username !== user?.id && !(selectedUser.blocked === 1 || selectedUser.blocked === true) && (
+          {selectedUser && selectedUser.auth_user_id !== user?.id && !(selectedUser.blocked === 1 || selectedUser.blocked === true) && (
             <MenuItem
               onClick={() => {
                 if (selectedUser) {
@@ -3078,7 +3078,7 @@ const AdminDashboard: React.FC = () => {
               {activatingUser === selectedUser?.id ? 'Activating...' : 'Activate User'}
             </MenuItem>
           )}
-          {selectedUser && selectedUser.cognito_username !== user?.id && (selectedUser.blocked === 1 || selectedUser.blocked === true) && (
+          {selectedUser && selectedUser.auth_user_id !== user?.id && (selectedUser.blocked === 1 || selectedUser.blocked === true) && (
             <MenuItem
               onClick={() => {
                 if (selectedUser) {
@@ -3246,8 +3246,8 @@ const AdminDashboard: React.FC = () => {
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
-                      primary={u.business_name || (u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.cognito_username)}
-                      secondary={`${u.email} • @${u.cognito_username}`}
+                      primary={u.business_name || (u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.auth_user_id)}
+                      secondary={`${u.email} • @${u.auth_user_id}`}
                     />
                   </ListItem>
                 ))}
@@ -3372,7 +3372,7 @@ const AdminDashboard: React.FC = () => {
           <DialogTitle>Delete User</DialogTitle>
           <DialogContent>
             <DialogContentText>
-              Are you sure you want to permanently delete this user? This will remove them from both the database and Cognito. This action cannot be undone.
+              Are you sure you want to permanently delete this user? This will remove them from both the database and the authentication service. This action cannot be undone.
             </DialogContentText>
           </DialogContent>
           <DialogActions>

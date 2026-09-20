@@ -26,7 +26,7 @@ router.post('/contact-seller', async (req, res) => {
         COALESCE(
           u.business_name,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
-          u.cognito_username
+          u.username
         ) as seller_name
       FROM listings l
       JOIN users u ON l.user_id = u.id
@@ -56,23 +56,8 @@ router.post('/contact-seller', async (req, res) => {
       sourceDetail: `Contact form from gallery — ${listing.title}`,
     });
 
-    const [buyers] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ? OR email = ?',
-      [buyerEmail, buyerEmail]
-    );
-
-    let senderId = null;
-    if (buyers.length > 0) {
-      senderId = buyers[0].id;
-    } else {
-      const [users] = await pool.execute(
-        'SELECT id FROM users WHERE email = ?',
-        [buyerEmail]
-      );
-      if (users.length > 0) {
-        senderId = users[0].id;
-      }
-    }
+    // Only a verified session may be attributed as the sender; anonymous inquiries are recorded against the seller.
+    const senderId = req.auth?.userId || null;
 
     const [msgResult] = await pool.execute(
       `INSERT INTO messages (

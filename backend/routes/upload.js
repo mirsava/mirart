@@ -3,8 +3,11 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
+
+router.use(requireAuth);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

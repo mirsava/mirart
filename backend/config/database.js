@@ -1,37 +1,90 @@
-import mysql from 'mysql2/promise';
+import pg from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'mirart',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+// COUNT()/SUM() come back as bigint; the app expects plain numbers. NUMERIC stays a string.
+pg.types.setTypeParser(20, (value) => parseInt(value, 10));
 
-pool.on('connection', (connection) => {
-  console.log('New MySQL connection established');
+// Tables whose primary key is not an `id` column, so INSERT must not append RETURNING id.
+const TABLES_WITHOUT_ID = new Set(['site_settings']);
+
+const isWriteCommand = (command) => command === 'INSERT' || command === 'UPDATE' || command === 'DELETE';
+
+// Converts `?` placeholders to `$1, $2, ...` (ignoring any inside single-quoted string literals).
+export function toPgPlaceholders(sql) {
+  let out = '';
+  let n = 0;
+  let inString = false;
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (ch === "'") {
+      if (inString && sql[i + 1] === "'") {
+        out += "''";
+        i++;
+        continue;
+      }
+      inString = !inString;
+    }
+    out += ch === '?' && !inString ? `$${++n}` : ch;
+  }
+  return out;
+}
+
+function prepare(sql) {
+  let text = toPgPlaceholders(sql).trim().replace(/;$/, '');
+  const insert = /^\s*INSERT\s+INTO\s+"?(\w+)"?/i.exec(text);
+  if (insert && !/\bRETURNING\b/i.test(text) && !TABLES_WITHOUT_ID.has(insert[1].toLowerCase())) {
+    text += ' RETURNING id';
+  }
+  return text;
+}
+
+// Mirrors the mysql2 result shape: SELECT -> [rows], INSERT/UPDATE/DELETE -> [{ insertId, affectedRows, rows }].
+function shape(result) {
+  if (isWriteCommand(result.command)) {
+    return [{
+      insertId: result.command === 'INSERT' ? result.rows[0]?.id : undefined,
+      affectedRows: result.rowCount,
+      rows: result.rows,
+    }];
+  }
+  return [result.rows, result.fields];
+}
+
+async function run(executor, sql, params = []) {
+  const result = await executor.query(prepare(sql), params);
+  return shape(result);
+}
+
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30000,
 });
 
 pool.on('error', (err) => {
-  console.error('MySQL pool error:', err);
-  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    console.error('Database connection was closed.');
-  }
-  if (err.code === 'ER_CON_COUNT_ERROR') {
-    console.error('Database has too many connections.');
-  }
-  if (err.code === 'ECONNREFUSED') {
-    console.error('Database connection was refused.');
-  }
-  if (err.code === 'ER_ACCESS_DENIED_ERROR') {
-    console.error('Database access denied. Check your credentials in .env file.');
-  }
+  console.error('Postgres pool error:', err.message);
 });
 
-export default pool;
+const db = {
+  query: (sql, params) => run(pool, sql, params),
+  execute: (sql, params) => run(pool, sql, params),
+  async getConnection() {
+    const client = await pool.connect();
+    const query = (sql, params) => run(client, sql, params);
+    return {
+      query,
+      execute: query,
+      beginTransaction: () => client.query('BEGIN'),
+      commit: () => client.query('COMMIT'),
+      rollback: () => client.query('ROLLBACK'),
+      release: () => client.release(),
+    };
+  },
+  end: () => pool.end(),
+  raw: pool,
+};
 
+export default db;

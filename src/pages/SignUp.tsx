@@ -28,7 +28,7 @@ import {
   Star as StarIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, SignUpProfile } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
 import apiService, { SubscriptionPlan } from '../services/api';
 import {
@@ -252,7 +252,7 @@ const SignUp: React.FC = () => {
       setIsLoading(true);
       try {
         await apiService.createOrUpdateUser({
-          cognito_username: user.id,
+          auth_user_id: user.id,
           email: user.email || formData.email || '',
           first_name: formData.firstName,
           last_name: formData.lastName,
@@ -289,34 +289,15 @@ const SignUp: React.FC = () => {
     // Direct signup without subscription - artists can list arts as draft and subscribe when activating
     setIsLoading(true);
     try {
-      const attributes: Record<string, string> = {
-        name: `${formData.firstName} ${formData.lastName}`,
-        given_name: formData.firstName,
-        family_name: formData.lastName,
-      };
-      if (normalizedPhone?.trim()) {
-        attributes.phone_number = normalizedPhone;
+      if (!(await apiService.isUsernameAvailable(formData.username))) {
+        setErrors({ username: 'That username is taken. Please choose another.' });
+        return;
       }
-      await signUp(formData.email, formData.password, attributes, formData.username);
-      await apiService.createOrUpdateUser({
-        cognito_username: formData.username,
-        email: formData.email,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        business_name: normalizedBusinessName,
-        user_type: formData.userType,
-        phone: normalizedPhone,
-        country: formData.country,
-        address_line1: formData.addressLine1 || undefined,
-        address_line2: formData.addressLine2 || undefined,
-        address_city: formData.addressCity || undefined,
-        address_state: formData.addressState || undefined,
-        address_zip: formData.addressZip || undefined,
-        address_country: formData.addressCountry || 'US',
-        website: formData.website || undefined,
-        specialties: normalizedSpecialties,
-        experience_level: normalizedExperience,
-      });
+      const { hasSession } = await signUp(formData.email, formData.password, buildSignUpProfile());
+      if (hasSession) {
+        navigate('/dashboard');
+        return;
+      }
       setSignupSuccess(true);
       enqueueSnackbar('Account created! Please check your email to verify your account.', { variant: 'success' });
     } catch (err: any) {
@@ -325,6 +306,29 @@ const SignUp: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const buildSignUpProfile = (): SignUpProfile => {
+    const phoneDigits = getDigitsWithoutCountryCode(formData.phone || '', selectedPhoneTemplate.code);
+    const isArtist = formData.userType === 'artist';
+    return {
+      username: formData.username.trim(),
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      business_name: isArtist ? (formData.businessName || undefined) : undefined,
+      user_type: formData.userType,
+      phone: phoneDigits.length > 0 ? `${selectedPhoneTemplate.code}${phoneDigits}` : undefined,
+      country: formData.country,
+      website: formData.website || undefined,
+      specialties: isArtist ? formData.specialties : undefined,
+      experience_level: isArtist ? (formData.experience || undefined) : undefined,
+      address_line1: formData.addressLine1 || undefined,
+      address_line2: formData.addressLine2 || undefined,
+      address_city: formData.addressCity || undefined,
+      address_state: formData.addressState || undefined,
+      address_zip: formData.addressZip || undefined,
+      address_country: formData.addressCountry || 'US',
+    };
   };
 
   const handleStripePayNow = async (): Promise<void> => {
@@ -339,17 +343,23 @@ const SignUp: React.FC = () => {
       : (typeof selectedPlan.price_yearly === 'number' ? selectedPlan.price_yearly : parseFloat(selectedPlan.price_yearly as any) || 0);
     setIsLoading(true);
     try {
-      sessionStorage.setItem('signupFormData', JSON.stringify({
-        ...formData,
-        password: formData.password,
-      }));
+      if (!(await apiService.isUsernameAvailable(formData.username))) {
+        setErrors({ username: 'That username is taken. Please choose another.' });
+        setIsLoading(false);
+        return;
+      }
+      const { userId } = await signUp(formData.email, formData.password, buildSignUpProfile());
+      if (!userId) {
+        throw new Error('Failed to create your account. Please try again.');
+      }
+      sessionStorage.setItem('pendingSignupEmail', formData.email);
       const items = [{ name: `${selectedPlan.name} Plan (${formData.billingPeriod})`, price, quantity: 1 }];
       const result = await apiService.createStripeCheckoutSession(items, {
         metadata: {
           is_subscription: 'true',
           plan_id: String(formData.selectedPlanId),
           billing_period: formData.billingPeriod,
-          cognito_username: formData.username,
+          auth_user_id: userId,
           cancel_url: '/signup',
         },
       });
@@ -502,30 +512,7 @@ const SignUp: React.FC = () => {
               </Alert>
               <Button
                 variant="contained"
-                onClick={() => navigate('/confirm-signup', { 
-                  state: { 
-                    email: formData.email,
-                    username: formData.username,
-                    userData: {
-                      email: formData.email,
-                      first_name: formData.firstName,
-                      last_name: formData.lastName,
-                      business_name: formData.userType === 'artist' ? (formData.businessName || null) : null,
-                      user_type: formData.userType,
-                      phone: formData.phone || null,
-                      country: formData.country,
-                      address_line1: formData.addressLine1 || null,
-                      address_line2: formData.addressLine2 || null,
-                      address_city: formData.addressCity || null,
-                      address_state: formData.addressState || null,
-                      address_zip: formData.addressZip || null,
-                      address_country: formData.addressCountry || 'US',
-                      website: formData.website || null,
-                      specialties: formData.userType === 'artist' ? formData.specialties : [],
-                      experience_level: formData.userType === 'artist' ? formData.experience : null,
-                    },
-                  } 
-                })}
+                onClick={() => navigate('/confirm-signup', { state: { email: formData.email } })}
                 sx={{ px: 4 }}
               >
                 Verify Email

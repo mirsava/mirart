@@ -144,7 +144,7 @@ const SubscriptionPlans: React.FC = () => {
           is_subscription: 'true',
           plan_id: String(paymentPlan.plan.id),
           billing_period: paymentPlan.billingPeriod,
-          cognito_username: user.id,
+          auth_user_id: user.id,
           cancel_url: '/subscription-plans',
         },
       });

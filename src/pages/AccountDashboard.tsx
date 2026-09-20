@@ -1,3 +1,4 @@
+import { authFetch } from '../lib/supabase';
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -768,7 +769,7 @@ const AccountDashboard: React.FC = () => {
     setLoadingListings(true);
     try {
       const filters: any = {
-        cognitoUsername: user.id,
+        authUserId: user.id,
         requestingUser: user.id,
         page: listingsPage,
         limit: 12,
@@ -905,7 +906,7 @@ const AccountDashboard: React.FC = () => {
           formData.append('image', blob, 'signature.png');
 
           const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
-          const response = await fetch(`${API_BASE_URL}/upload/image`, {
+          const response = await authFetch(`${API_BASE_URL}/upload/image`, {
             method: 'POST',
             body: formData,
           });
@@ -1060,7 +1061,7 @@ const AccountDashboard: React.FC = () => {
     setSettingsError(null);
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/users/${user.id}/settings`);
+      const response = await authFetch(`${API_BASE_URL}/users/${user.id}/settings`);
       if (!response.ok) throw new Error('Failed to fetch settings');
       const data = await response.json();
       setSettings({
@@ -1138,7 +1139,7 @@ const AccountDashboard: React.FC = () => {
     
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/users/${user.id}/settings`, {
+      const response = await authFetch(`${API_BASE_URL}/users/${user.id}/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

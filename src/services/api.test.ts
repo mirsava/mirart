@@ -4,6 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const originalFetch = globalThis.fetch;
 const originalEnv = import.meta.env;
 
+// Matches what ApiService reads from a fetch Response (status, content-type header, body text)
+const okResponse = (data: unknown) => ({
+  ok: true,
+  status: 200,
+  headers: { get: () => 'application/json' },
+  text: () => Promise.resolve(JSON.stringify(data)),
+});
+
 beforeEach(() => {
   vi.resetModules();
   globalThis.fetch = vi.fn();
@@ -17,10 +25,7 @@ afterEach(() => {
 describe('ApiService', () => {
   it('getListings builds correct URL with filters', async () => {
     const mockResponse = { listings: [], pagination: { page: 1, limit: 12, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockResponse),
-    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse(mockResponse));
 
     const { default: apiService } = await import('./api');
     await apiService.getListings({ category: 'Painting', page: 2, limit: 10 });
@@ -33,10 +38,7 @@ describe('ApiService', () => {
 
   it('getListings omits undefined and null filters', async () => {
     const mockResponse = { listings: [], pagination: { page: 1, limit: 12, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockResponse),
-    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse(mockResponse));
 
     const { default: apiService } = await import('./api');
     await apiService.getListings({ category: 'Painting', search: undefined, page: null as any });
@@ -48,11 +50,8 @@ describe('ApiService', () => {
   });
 
   it('getUser returns user with active as boolean', async () => {
-    const mockUser = { cognito_username: 'user1', email: 'a@b.com', active: 1 };
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockUser),
-    });
+    const mockUser = { auth_user_id: 'user1', email: 'a@b.com', active: 1 };
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse(mockUser));
 
     const { default: apiService } = await import('./api');
     const user = await apiService.getUser('user1');
@@ -66,10 +65,7 @@ describe('ApiService', () => {
 
   it('getListing fetches single listing by id', async () => {
     const mockListing = { id: 1, title: 'Test', user_id: 1, category: 'Painting', price: 100, in_stock: true, status: 'active', views: 0, created_at: '', updated_at: '' };
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockListing),
-    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse(mockListing));
 
     const { default: apiService } = await import('./api');
     const listing = await apiService.getListing(1);
@@ -83,14 +79,11 @@ describe('ApiService', () => {
   });
 
   it('createListing sends POST with body', async () => {
-    const mockListing = { id: 1, title: 'New', user_id: 1, cognito_username: 'u1', category: 'Painting', price: 50, in_stock: true, status: 'draft', views: 0, created_at: '', updated_at: '' };
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockListing),
-    });
+    const mockListing = { id: 1, title: 'New', user_id: 1, auth_user_id: 'u1', category: 'Painting', price: 50, in_stock: true, status: 'draft', views: 0, created_at: '', updated_at: '' };
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse(mockListing));
 
     const { default: apiService } = await import('./api');
-    await apiService.createListing({ title: 'New', category: 'Painting', price: 50, cognito_username: 'u1' });
+    await apiService.createListing({ title: 'New', category: 'Painting', price: 50, auth_user_id: 'u1' });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/listings'),
@@ -102,17 +95,14 @@ describe('ApiService', () => {
   });
 
   it('deleteListing sends DELETE request', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ message: 'Deleted' }),
-    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse({ message: 'Deleted' }));
 
     const { default: apiService } = await import('./api');
     await apiService.deleteListing(42, 'user1');
 
     const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(fetchCall[0]).toContain('/listings/42');
-    expect(fetchCall[0]).toContain('cognitoUsername=user1');
+    expect(fetchCall[0]).toContain('authUserId=user1');
     expect(fetchCall[1]).toMatchObject({ method: 'DELETE' });
   });
 
@@ -129,10 +119,7 @@ describe('ApiService', () => {
 
   it('getSubscriptionPlans fetches plans', async () => {
     const mockPlans = [{ id: 1, name: 'Starter', tier: 'starter', max_listings: 5, price_monthly: 9.99, price_yearly: 99.99 }];
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockPlans),
-    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse(mockPlans));
 
     const { default: apiService } = await import('./api');
     const plans = await apiService.getSubscriptionPlans();
@@ -146,10 +133,7 @@ describe('ApiService', () => {
   });
 
   it('getUserSubscription returns subscription or null', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ subscription: null }),
-    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse({ subscription: null }));
 
     const { default: apiService } = await import('./api');
     const res = await apiService.getUserSubscription('user1');
@@ -162,10 +146,7 @@ describe('ApiService', () => {
   });
 
   it('cancelSubscription sends PUT to cancel endpoint', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ message: 'Subscription cancelled.' }),
-    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse({ message: 'Subscription cancelled.' }));
 
     const { default: apiService } = await import('./api');
     await apiService.cancelSubscription('user1');
@@ -177,10 +158,7 @@ describe('ApiService', () => {
   });
 
   it('createStripeCheckoutSession sends items and metadata', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ url: 'https://checkout.stripe.com/...', sessionId: 'cs_xxx' }),
-    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse({ url: 'https://checkout.stripe.com/...', sessionId: 'cs_xxx' }));
 
     const { default: apiService } = await import('./api');
     const result = await apiService.createStripeCheckoutSession(

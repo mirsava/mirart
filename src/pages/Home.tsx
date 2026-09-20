@@ -66,7 +66,7 @@ const Home: React.FC = () => {
       id: listing.id,
       title: listing.title,
       artist: listing.artist_name || 'Unknown Artist',
-      artistUsername: listing.cognito_username,
+      artistUsername: listing.auth_user_id,
       artistSignatureUrl: listing.signature_url,
       price: listing.price,
       image: getImageUrl(listing.primary_image_url) || '',
@@ -93,7 +93,7 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchFeaturedListings = async () => {
       try {
-        // Featured listings must show ALL artists - do NOT pass cognitoUsername
+        // Featured listings must show ALL artists - do NOT pass authUserId
         const listingFilters = (category: string) => {
           const f: { status: string; category: string; limit: number; requestingUser?: string } = { status: 'active', category, limit: 3 };
           if (user?.id) f.requestingUser = user.id;

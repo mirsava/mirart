@@ -38,6 +38,7 @@ const SignIn: React.FC = () => {
   const [loginError, setLoginError] = useState('');
   const [requiresEmailVerification, setRequiresEmailVerification] = useState(false);
   const [requiresSignup, setRequiresSignup] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
 
   const handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -85,13 +86,14 @@ const SignIn: React.FC = () => {
     setLoginError('');
     setRequiresEmailVerification(false);
     setRequiresSignup(false);
+    setUnverifiedEmail('');
     
     try {
-      const cognitoUser = await signIn(formData.usernameOrEmail, formData.password);
+      const signedIn = await signIn(formData.usernameOrEmail, formData.password);
       
-      if (cognitoUser) {
+      if (signedIn) {
         try {
-          await apiService.getUser(cognitoUser.username);
+          await apiService.getUser(signedIn.username);
           const state = location.state as { returnTo?: string; pendingAdd?: any; from?: { pathname?: string } } | undefined;
           if (state?.returnTo === 'checkout' && state?.pendingAdd) {
             try {
@@ -108,7 +110,7 @@ const SignIn: React.FC = () => {
             state: {
               message: 'Please complete your artist profile to continue.',
               email: formData.usernameOrEmail.includes('@') ? formData.usernameOrEmail : undefined,
-              username: cognitoUser.username,
+              username: signedIn.username,
             }
           });
         }
@@ -118,33 +120,18 @@ const SignIn: React.FC = () => {
       }
     } catch (error: any) {
       const errorCode = String(error?.code || error?.name || '');
-      const errorMessage = String(error?.message || '');
-      const normalizedMessage = errorMessage.toLowerCase();
-      const isUnverified =
-        errorCode.includes('UserNotConfirmedException') ||
-        normalizedMessage.includes('not confirmed');
-      const isUserNotFound =
-        errorCode.includes('UserNotFoundException') ||
-        normalizedMessage.includes('user does not exist') ||
-        normalizedMessage.includes('user not found') ||
-        normalizedMessage.includes('account does not exist');
-      const isGenericInvalidCredentials =
-        normalizedMessage.includes('incorrect username or password') ||
-        normalizedMessage.includes('incorrect username/email or password') ||
-        normalizedMessage.includes('incorrect username or email');
+      const isUnverified = errorCode === 'email_not_confirmed';
+      const isInvalidCredentials = errorCode === 'invalid_credentials';
 
       if (isUnverified) {
         setRequiresEmailVerification(true);
+        setUnverifiedEmail(error?.email || (formData.usernameOrEmail.includes('@') ? formData.usernameOrEmail.trim() : ''));
         setLoginError('Please verify your email before logging in.');
-      } else if (isUserNotFound) {
-        setRequiresSignup(true);
-        setLoginError('We could not find an account with that username/email. Please create an account first.');
-      } else if (isGenericInvalidCredentials) {
-        setRequiresEmailVerification(true);
+      } else if (isInvalidCredentials) {
         setRequiresSignup(true);
         setLoginError('Incorrect username/email or password. If you do not have an account yet, create one. If you recently signed up, verify your email first.');
       } else {
-        setLoginError(errorMessage || 'Invalid username/email or password. Please try again.');
+        setLoginError(String(error?.message || '') || 'Invalid username/email or password. Please try again.');
       }
     } finally {
       setIsLoading(false);
@@ -197,8 +184,7 @@ const SignIn: React.FC = () => {
                     onClick={() =>
                       navigate('/confirm-signup', {
                         state: {
-                          email: formData.usernameOrEmail.includes('@') ? formData.usernameOrEmail : '',
-                          username: formData.usernameOrEmail.includes('@') ? '' : formData.usernameOrEmail,
+                          email: unverifiedEmail || (formData.usernameOrEmail.includes('@') ? formData.usernameOrEmail.trim() : ''),
                         },
                       })
                     }

@@ -1,3 +1,4 @@
+import { authFetch } from '../lib/supabase';
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -113,7 +114,7 @@ const CreateListing: React.FC = () => {
       
       try {
         const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-        const response = await fetch(`${API_BASE_URL}/users/${user.id}/settings`);
+        const response = await authFetch(`${API_BASE_URL}/users/${user.id}/settings`);
         if (response.ok) {
           const data = await response.json();
           setFormData(prev => ({
@@ -362,7 +363,7 @@ const CreateListing: React.FC = () => {
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/upload/images`, {
+      const response = await authFetch(`${API_BASE_URL}/upload/images`, {
         method: 'POST',
         body: formData,
       });
@@ -413,7 +414,7 @@ const CreateListing: React.FC = () => {
       const additionalImages = uploadedImageUrls.length > 1 ? uploadedImageUrls.slice(1) : [];
       
       const listingData: any = {
-        cognito_username: user.id,
+        auth_user_id: user.id,
         title: formData.title,
         description: formData.description || undefined,
         category: formData.category,

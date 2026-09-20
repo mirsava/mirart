@@ -1,54 +1,59 @@
 import express from 'express';
-import { CognitoIdentityProviderClient, AdminListGroupsForUserCommand } from '@aws-sdk/client-cognito-identity-provider';
+import pool from '../config/database.js';
+import { createSupabaseAnon } from '../config/supabase.js';
 
 const router = express.Router();
 
-const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || 'us-east-1_c9TqRAcz9';
-const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,}$/;
 
-const cognitoClient = new CognitoIdentityProviderClient({ 
-  region: AWS_REGION
+router.get('/username-available', async (req, res) => {
+  try {
+    const username = String(req.query.username || '').trim();
+    if (!USERNAME_PATTERN.test(username)) {
+      return res.status(400).json({ error: 'Invalid username' });
+    }
+    const [rows] = await pool.execute('SELECT 1 FROM users WHERE lower(username) = lower(?)', [username]);
+    res.json({ available: rows.length === 0 });
+  } catch (error) {
+    console.error('Username availability check failed:', error);
+    res.status(500).json({ error: 'Failed to check username' });
+  }
 });
 
-router.get('/user-groups/:cognitoUsername', async (req, res) => {
+// Username sign-in is resolved server-side so email addresses are never exposed to the browser.
+// Email sign-ins go straight to Supabase from the client.
+router.post('/login', async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
-
-    if (!cognitoUsername) {
-      return res.status(400).json({ error: 'cognitoUsername is required' });
+    const { identifier, password } = req.body || {};
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Username or email and password are required' });
     }
 
-    try {
-      const command = new AdminListGroupsForUserCommand({
-        UserPoolId: USER_POOL_ID,
-        Username: cognitoUsername,
-      });
+    let email = String(identifier).trim();
+    if (!email.includes('@')) {
+      const [rows] = await pool.execute('SELECT email FROM users WHERE lower(username) = lower(?)', [email]);
+      email = rows[0]?.email;
+    }
 
-      const response = await cognitoClient.send(command);
-      const groups = (response.Groups || []).map(group => group.GroupName);
+    const invalid = () => res.status(401).json({ error: 'Invalid login credentials', code: 'invalid_credentials' });
+    if (!email) return invalid();
 
-      res.json({ groups });
-    } catch (awsError) {
-      if (awsError.name === 'CredentialsProviderError' || awsError.message?.includes('credentials')) {
-        console.warn('AWS credentials not configured. Groups cannot be fetched from Cognito.');
-        console.warn('Please configure AWS credentials or enable groups in ID token.');
-        res.status(503).json({ 
-          error: 'AWS credentials not configured',
-          message: 'Backend cannot fetch groups from Cognito. Please configure AWS credentials in your .env file or enable groups in Cognito ID token.',
-          details: 'Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in your backend .env file'
-        });
-      } else {
-        throw awsError;
+    const { data, error } = await createSupabaseAnon().auth.signInWithPassword({ email, password });
+    if (error || !data?.session) {
+      if (error?.code === 'email_not_confirmed') {
+        return res.status(403).json({ error: 'Email not confirmed', code: 'email_not_confirmed', email });
       }
+      return invalid();
     }
-  } catch (error) {
-    console.error('Error fetching user groups:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch user groups', 
-      details: error.message 
+
+    res.json({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
     });
+  } catch (error) {
+    console.error('Login failed:', error);
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 
 export default router;
-

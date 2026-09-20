@@ -1,7 +1,15 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Guests chat under a client-generated numeric id, which must never collide with a real account.
+const isGuestId = async (id) => {
+  if (!/^\d+$/.test(String(id ?? ''))) return false;
+  const [rows] = await pool.execute('SELECT 1 FROM users WHERE id = ?', [id]);
+  return rows.length === 0;
+};
 
 router.get('/payout-config', async (_req, res) => {
   try {
@@ -21,7 +29,7 @@ router.get('/payout-config', async (_req, res) => {
   }
 });
 
-router.put('/payout-config', async (req, res) => {
+router.put('/payout-config', requireAdmin, async (req, res) => {
   try {
     const commissionRaw = Number(req.body?.commission_percent);
     if (!Number.isFinite(commissionRaw) || commissionRaw < 0 || commissionRaw > 100) {
@@ -29,8 +37,8 @@ router.put('/payout-config', async (req, res) => {
     }
     const config = { commission_percent: Number(commissionRaw.toFixed(2)) };
     await pool.execute(
-      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('payout_config', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
-      [JSON.stringify(config), JSON.stringify(config)]
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('payout_config', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value",
+      [JSON.stringify(config)]
     );
     res.json({ success: true, ...config });
   } catch (error) {
@@ -55,12 +63,12 @@ router.get('/config', async (req, res) => {
   }
 });
 
-router.put('/config', async (req, res) => {
+router.put('/config', requireAdmin, async (req, res) => {
   try {
     const config = req.body;
     await pool.execute(
-      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('support_chat_config', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
-      [JSON.stringify(config), JSON.stringify(config)]
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('support_chat_config', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value",
+      [JSON.stringify(config)]
     );
     res.json({ success: true });
   } catch (error) {
@@ -71,16 +79,16 @@ router.put('/config', async (req, res) => {
 
 router.get('/messages', async (req, res) => {
   try {
-    const { cognitoUsername, userId } = req.query;
-    let userIdResolved = userId;
-    if (!userIdResolved && cognitoUsername) {
-      const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-      if (users.length > 0) userIdResolved = users[0].id;
+    let resolvedUserId = null;
+    if (req.auth) {
+      resolvedUserId = req.auth.isAdmin && req.query.userId ? req.query.userId : req.auth.userId;
+    } else if (await isGuestId(req.query.userId)) {
+      resolvedUserId = req.query.userId;
     }
-    if (!userIdResolved) return res.json([]);
+    if (!resolvedUserId) return res.json([]);
     const [msgs] = await pool.execute(
       'SELECT * FROM support_chat_messages WHERE user_id = ? ORDER BY created_at ASC',
-      [userIdResolved]
+      [resolvedUserId]
     );
     res.json(msgs);
   } catch (error) {
@@ -91,8 +99,11 @@ router.get('/messages', async (req, res) => {
 
 router.post('/messages', async (req, res) => {
   try {
-    const { cognitoUsername, userId: bodyUserId, guestSessionId, guestName, guestEmail, supportType, message, sender, adminCognitoUsername, targetUserId } = req.body;
-    let userId = targetUserId || bodyUserId || null;
+    const { userId: bodyUserId, guestSessionId, guestName, guestEmail, supportType, message, sender, targetUserId } = req.body;
+    if (!message || !['user', 'admin'].includes(sender)) {
+      return res.status(400).json({ error: 'message and a valid sender are required' });
+    }
+    let userId = null;
     let userEmail = null;
     let userName = null;
     let adminId = null;
@@ -105,23 +116,10 @@ router.post('/messages', async (req, res) => {
       general: 'General',
     }[String(supportType || '').toLowerCase()] || 'General';
 
-    if (sender === 'user' && cognitoUsername) {
-      const [users] = await pool.execute('SELECT id, email, first_name, last_name FROM users WHERE cognito_username = ?', [cognitoUsername]);
-      if (users.length > 0) {
-        userId = users[0].id;
-        userEmail = users[0].email;
-        userName = [users[0].first_name, users[0].last_name].filter(Boolean).join(' ') || users[0].email;
-      }
-    }
-    if (sender === 'user' && !cognitoUsername && userId) {
-      const sessionLabel = guestSessionId ? `guest:${guestSessionId}` : null;
-      userEmail = guestEmail || sessionLabel || null;
-      const baseGuestName = guestName || guestEmail || 'Guest';
-      userName = `${baseGuestName} (${supportTypeLabel})`;
-    }
-    if (sender === 'admin' && adminCognitoUsername) {
-      const [admins] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [adminCognitoUsername]);
-      if (admins.length > 0) adminId = admins[0].id;
+    if (sender === 'admin') {
+      if (!req.auth?.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+      adminId = req.auth.userId;
+      userId = targetUserId || bodyUserId || null;
       if (userId) {
         const [targets] = await pool.execute('SELECT email, first_name, last_name FROM users WHERE id = ?', [userId]);
         if (targets.length > 0) {
@@ -139,6 +137,17 @@ router.post('/messages', async (req, res) => {
           }
         }
       }
+    } else if (req.auth) {
+      const [users] = await pool.execute('SELECT id, email, first_name, last_name FROM users WHERE auth_user_id = ?', [req.auth.authUserId]);
+      if (users.length > 0) {
+        userId = users[0].id;
+        userEmail = users[0].email;
+        userName = [users[0].first_name, users[0].last_name].filter(Boolean).join(' ') || users[0].email;
+      }
+    } else if (await isGuestId(bodyUserId)) {
+      userId = bodyUserId;
+      userEmail = guestEmail || (guestSessionId ? `guest:${guestSessionId}` : null);
+      userName = `${guestName || guestEmail || 'Guest'} (${supportTypeLabel})`;
     }
 
     const [result] = await pool.execute(
@@ -155,15 +164,18 @@ router.post('/messages', async (req, res) => {
 
 router.put('/messages/read', async (req, res) => {
   try {
-    const { cognitoUsername, userId, sender } = req.body;
-    let resolvedUserId = userId || null;
-    if (!resolvedUserId && cognitoUsername) {
-      const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-      if (users.length === 0) return res.status(404).json({ error: 'User not found' });
-      resolvedUserId = users[0].id;
+    const { userId, sender } = req.body;
+    const readSender = sender === 'user' ? 'user' : 'admin';
+    let resolvedUserId = null;
+    if (readSender === 'user') {
+      if (!req.auth?.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+      resolvedUserId = userId || null;
+    } else if (req.auth) {
+      resolvedUserId = req.auth.userId;
+    } else if (await isGuestId(userId)) {
+      resolvedUserId = userId;
     }
-    if (!resolvedUserId) return res.status(400).json({ error: 'cognitoUsername or userId required' });
-    const readSender = sender || 'admin';
+    if (!resolvedUserId) return res.status(400).json({ error: 'A valid conversation is required' });
     await pool.execute(
       'UPDATE support_chat_messages SET read_at = NOW() WHERE user_id = ? AND sender = ? AND read_at IS NULL',
       [resolvedUserId, readSender]
@@ -175,7 +187,7 @@ router.put('/messages/read', async (req, res) => {
   }
 });
 
-router.get('/admin/conversations', async (req, res) => {
+router.get('/admin/conversations', requireAdmin, async (req, res) => {
   try {
     const [conversations] = await pool.execute(`
       SELECT
@@ -186,7 +198,7 @@ router.get('/admin/conversations', async (req, res) => {
         ) as user_email,
         COALESCE(
           MAX(NULLIF(m.user_name, '')),
-          (SELECT COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.email) FROM users u WHERE u.id = m.user_id LIMIT 1)
+          (SELECT COALESCE(u.business_name, NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), u.email) FROM users u WHERE u.id = m.user_id LIMIT 1)
         ) as user_name,
         MAX(m.created_at) as last_message_at,
         (SELECT message FROM support_chat_messages m2 WHERE m2.user_id = m.user_id ORDER BY m2.created_at DESC LIMIT 1) as last_message,
@@ -204,7 +216,7 @@ router.get('/admin/conversations', async (req, res) => {
   }
 });
 
-router.get('/admin/messages/:userId', async (req, res) => {
+router.get('/admin/messages/:userId', requireAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
     const [msgs] = await pool.execute(
@@ -223,7 +235,7 @@ router.get('/user-chat-enabled', async (req, res) => {
     const [rows] = await pool.execute(
       "SELECT setting_value FROM site_settings WHERE setting_key = 'user_chat_enabled'"
     );
-    const enabled = rows.length > 0 ? JSON.parse(rows[0].setting_value) : false;
+    const enabled = rows.length > 0 ? rows[0].setting_value === true : false;
     res.json({ enabled });
   } catch (error) {
     console.error('Error fetching user chat setting:', error);
@@ -231,12 +243,12 @@ router.get('/user-chat-enabled', async (req, res) => {
   }
 });
 
-router.put('/user-chat-enabled', async (req, res) => {
+router.put('/user-chat-enabled', requireAdmin, async (req, res) => {
   try {
     const { enabled } = req.body;
     await pool.execute(
-      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('user_chat_enabled', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
-      [JSON.stringify(!!enabled), JSON.stringify(!!enabled)]
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('user_chat_enabled', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value",
+      [JSON.stringify(!!enabled)]
     );
     res.json({ success: true, enabled: !!enabled });
   } catch (error) {
@@ -250,8 +262,7 @@ router.get('/test-data-enabled', async (req, res) => {
     const [rows] = await pool.execute(
       "SELECT setting_value FROM site_settings WHERE setting_key = 'test_data_enabled'"
     );
-    const enabled = rows.length > 0 ? JSON.parse(rows[0].setting_value) : false;
-    console.log('[DEBUG] GET test-data-enabled:', { rows: rows.length, enabled });
+    const enabled = rows.length > 0 ? rows[0].setting_value === true : false;
     res.json({ enabled });
   } catch (error) {
     console.error('Error fetching test data setting:', error);
@@ -259,13 +270,12 @@ router.get('/test-data-enabled', async (req, res) => {
   }
 });
 
-router.put('/test-data-enabled', async (req, res) => {
+router.put('/test-data-enabled', requireAdmin, async (req, res) => {
   try {
     const { enabled } = req.body;
-    console.log('[DEBUG] PUT test-data-enabled body:', req.body, '-> storing:', !!enabled);
     await pool.execute(
-      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('test_data_enabled', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
-      [JSON.stringify(!!enabled), JSON.stringify(!!enabled)]
+      "INSERT INTO site_settings (setting_key, setting_value) VALUES ('test_data_enabled', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value",
+      [JSON.stringify(!!enabled)]
     );
     res.json({ success: true, enabled: !!enabled });
   } catch (error) {

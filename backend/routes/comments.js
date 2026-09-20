@@ -1,5 +1,6 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -10,8 +11,8 @@ router.get('/listing/:listingId', async (req, res) => {
     const [reviews] = await pool.execute(
       `SELECT 
         c.id, c.listing_id, c.user_id, c.comment, c.rating, c.created_at, c.updated_at,
-        u.cognito_username,
-        COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.cognito_username) as user_name,
+        u.auth_user_id,
+        COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.username) as user_name,
         u.profile_image_url
       FROM listing_comments c
       JOIN users u ON c.user_id = u.id
@@ -52,13 +53,13 @@ router.get('/average/:listingId', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
-    const { listingId, cognitoUsername, comment, rating } = req.body;
+    const { listingId, comment, rating } = req.body;
     const safeComment = typeof comment === 'string' ? comment.trim() : '';
 
-    if (!listingId || !cognitoUsername || !rating) {
-      return res.status(400).json({ error: 'listingId, cognitoUsername, and rating are required' });
+    if (!listingId || !rating) {
+      return res.status(400).json({ error: 'listingId and rating are required' });
     }
 
     const ratingNum = parseInt(rating);
@@ -66,13 +67,12 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Rating must be between 1 and 5' });
     }
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
-    const userId = users[0].id;
+    const userId = req.auth.userId;
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     const [listings] = await pool.execute('SELECT allow_comments, user_id FROM listings WHERE id = ?', [listingId]);
     if (listings.length === 0) return res.status(404).json({ error: 'Listing not found' });
-    if (listings[0].allow_comments === 0 || listings[0].allow_comments === false) {
+    if (listings[0].allow_comments === false) {
       return res.status(403).json({ error: 'Reviews are disabled for this listing' });
     }
     if (listings[0].user_id === userId) {
@@ -90,8 +90,8 @@ router.post('/', async (req, res) => {
       );
       const [updated] = await pool.execute(
         `SELECT c.id, c.listing_id, c.user_id, c.comment, c.rating, c.created_at, c.updated_at,
-          u.cognito_username,
-          COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.cognito_username) as user_name,
+          u.auth_user_id,
+          COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.username) as user_name,
           u.profile_image_url
         FROM listing_comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?`,
         [existing[0].id]
@@ -106,8 +106,8 @@ router.post('/', async (req, res) => {
 
     const [newReview] = await pool.execute(
       `SELECT c.id, c.listing_id, c.user_id, c.comment, c.rating, c.created_at, c.updated_at,
-        u.cognito_username,
-        COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.cognito_username) as user_name,
+        u.auth_user_id,
+        COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.username) as user_name,
         u.profile_image_url
       FROM listing_comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?`,
       [result.insertId]
@@ -120,16 +120,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.delete('/:commentId', async (req, res) => {
+router.delete('/:commentId', requireAuth, async (req, res) => {
   try {
     const { commentId } = req.params;
-    const { cognitoUsername } = req.query;
-
-    if (!cognitoUsername) return res.status(400).json({ error: 'cognitoUsername is required' });
-
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     const [comments] = await pool.execute('SELECT user_id, listing_id FROM listing_comments WHERE id = ?', [commentId]);
     if (comments.length === 0) return res.status(404).json({ error: 'Review not found' });

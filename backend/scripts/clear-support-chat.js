@@ -19,8 +19,8 @@ const run = async () => {
     }
   }
   await pool.execute(
-    "INSERT INTO site_settings (setting_key, setting_value) VALUES ('support_chat_config', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
-    [JSON.stringify(config), JSON.stringify(config)]
+    "INSERT INTO site_settings (setting_key, setting_value) VALUES ('support_chat_config', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value",
+    [JSON.stringify(config)]
   );
   const [conv] = await pool.execute(
     `SELECT m.user_id, COUNT(*) AS cnt

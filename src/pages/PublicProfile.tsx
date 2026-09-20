@@ -84,7 +84,7 @@ const PublicProfile: React.FC = () => {
       return;
     }
 
-    if (artist.cognito_username === user.id) {
+    if (artist.auth_user_id === user.id) {
       enqueueSnackbar('You cannot chat with yourself', { variant: 'error' });
       return;
     }
@@ -96,7 +96,7 @@ const PublicProfile: React.FC = () => {
         artist.id,
         null,
         message,
-        artist.cognito_username
+        artist.auth_user_id
       );
       
       openChat(response.conversationId);
@@ -162,7 +162,7 @@ const PublicProfile: React.FC = () => {
                     {artist.first_name} {artist.last_name}
                   </Typography>
                 )}
-                {isAuthenticated && artist.id && artist.cognito_username !== user?.id && chatEnabled && (
+                {isAuthenticated && artist.id && artist.auth_user_id !== user?.id && chatEnabled && (
                   <Button
                     variant="contained"
                     startIcon={<ChatIcon />}

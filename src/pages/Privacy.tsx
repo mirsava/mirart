@@ -267,7 +267,7 @@ const Privacy: React.FC = () => {
             </Typography>
             <Typography variant="body1" paragraph>
               We use industry-standard encryption for data transmission and secure authentication 
-              through AWS Cognito. Payment information is processed through secure, PCI-compliant 
+              through Supabase Auth. Payment information is processed through secure, PCI-compliant 
               third-party payment processors and is not stored on our servers.
             </Typography>
           </Box>

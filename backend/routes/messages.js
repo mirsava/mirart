@@ -1,17 +1,18 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { createNotification } from '../services/notificationService.js';
+import { requireAuth, requireSelf } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/user/:cognitoUsername', async (req, res) => {
+router.get('/user/:authUserId', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
     const { type = 'all' } = req.query;
 
     const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id FROM users WHERE auth_user_id = ?',
+      [authUserId]
     );
 
     if (users.length === 0) {
@@ -32,13 +33,13 @@ router.get('/user/:cognitoUsername', async (req, res) => {
           COALESCE(
             u_sender.business_name,
             CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
-            u_sender.cognito_username,
+            u_sender.username,
             m.sender_name
           ) as sender_name_display,
           COALESCE(
             u_recipient.business_name,
             CONCAT(COALESCE(u_recipient.first_name, ''), ' ', COALESCE(u_recipient.last_name, '')),
-            u_recipient.cognito_username
+            u_recipient.username
           ) as recipient_name
         FROM messages m
         JOIN listings l ON m.listing_id = l.id
@@ -58,7 +59,7 @@ router.get('/user/:cognitoUsername', async (req, res) => {
           COALESCE(
             u_recipient.business_name,
             CONCAT(COALESCE(u_recipient.first_name, ''), ' ', COALESCE(u_recipient.last_name, '')),
-            u_recipient.cognito_username
+            u_recipient.username
           ) as recipient_name
         FROM messages m
         JOIN listings l ON m.listing_id = l.id
@@ -78,7 +79,7 @@ router.get('/user/:cognitoUsername', async (req, res) => {
           COALESCE(
             u_sender.business_name,
             CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
-            u_sender.cognito_username,
+            u_sender.username,
             m.sender_name
           ) as sender_name_display
         FROM messages m
@@ -99,13 +100,13 @@ router.get('/user/:cognitoUsername', async (req, res) => {
           COALESCE(
             u_sender.business_name,
             CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
-            u_sender.cognito_username,
+            u_sender.username,
             m.sender_name
           ) as sender_name_display,
           COALESCE(
             u_recipient.business_name,
             CONCAT(COALESCE(u_recipient.first_name, ''), ' ', COALESCE(u_recipient.last_name, '')),
-            u_recipient.cognito_username
+            u_recipient.username
           ) as recipient_name
         FROM messages m
         JOIN listings l ON m.listing_id = l.id
@@ -169,22 +170,22 @@ router.get('/user/:cognitoUsername', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
-    const { cognitoUsername, listingId, subject, message } = req.body;
-    if (!cognitoUsername || !listingId || !subject || !message) {
-      return res.status(400).json({ error: 'cognitoUsername, listingId, subject, and message are required' });
+    const { listingId, subject, message } = req.body;
+    if (!listingId || !subject || !message) {
+      return res.status(400).json({ error: 'listingId, subject, and message are required' });
     }
 
     const [senders] = await pool.execute(
-      'SELECT id, email, business_name, first_name, last_name FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id, email, username, business_name, first_name, last_name FROM users WHERE auth_user_id = ?',
+      [req.auth.authUserId]
     );
     if (senders.length === 0) return res.status(404).json({ error: 'Sender not found' });
     const sender = senders[0];
 
     const [listings] = await pool.execute(
-      'SELECT l.id, l.user_id, u.email as seller_email, u.cognito_username as seller_cognito FROM listings l JOIN users u ON l.user_id = u.id WHERE l.id = ?',
+      'SELECT l.id, l.user_id, u.email as seller_email FROM listings l JOIN users u ON l.user_id = u.id WHERE l.id = ?',
       [listingId]
     );
     if (listings.length === 0) return res.status(404).json({ error: 'Listing not found' });
@@ -194,7 +195,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'You cannot message yourself' });
     }
 
-    const senderName = sender.business_name || `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || cognitoUsername;
+    const senderName = sender.business_name || `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || sender.username || 'A user';
 
     const [result] = await pool.execute(
       `INSERT INTO messages (listing_id, sender_id, recipient_id, subject, message, sender_email, sender_name, recipient_email, status)
@@ -203,13 +204,14 @@ router.post('/', async (req, res) => {
     );
 
     try {
-      await createNotification(
-        listing.user_id,
-        'New message',
-        `${senderName} sent you a message about a listing`,
-        '/messages',
-        'info'
-      );
+      await createNotification({
+        userId: listing.user_id,
+        type: 'message',
+        title: 'New message',
+        body: `${senderName} sent you a message about a listing`,
+        link: '/messages',
+        referenceId: result.insertId,
+      });
     } catch {}
 
     res.json({ success: true, messageId: result.insertId });
@@ -219,10 +221,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.get('/unread-count/:cognitoUsername', async (req, res) => {
+router.get('/unread-count/:authUserId', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
+    const { authUserId } = req.params;
+    const [users] = await pool.execute('SELECT id FROM users WHERE auth_user_id = ?', [authUserId]);
     if (users.length === 0) return res.status(404).json({ error: 'User not found' });
     const [[row]] = await pool.execute(
       "SELECT COUNT(*) as count FROM messages WHERE recipient_id = ? AND status = 'sent'",
@@ -235,21 +237,10 @@ router.get('/unread-count/:cognitoUsername', async (req, res) => {
   }
 });
 
-router.put('/:messageId/read', async (req, res) => {
+router.put('/:messageId/read', requireAuth, async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { cognitoUsername } = req.body;
-
-    const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     await pool.execute(
       'UPDATE messages SET status = ? WHERE id = ? AND recipient_id = ?',
@@ -263,21 +254,10 @@ router.put('/:messageId/read', async (req, res) => {
   }
 });
 
-router.put('/:messageId/archive', async (req, res) => {
+router.put('/:messageId/archive', requireAuth, async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { cognitoUsername } = req.body;
-
-    const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     // Archive message if user is sender or recipient
     await pool.execute(
@@ -292,21 +272,10 @@ router.put('/:messageId/archive', async (req, res) => {
   }
 });
 
-router.put('/:messageId/unarchive', async (req, res) => {
+router.put('/:messageId/unarchive', requireAuth, async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { cognitoUsername } = req.body;
-
-    const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     // Get the original status - if it was read, keep it read, otherwise set to sent
     const [messages] = await pool.execute(
@@ -341,21 +310,10 @@ router.put('/:messageId/unarchive', async (req, res) => {
   }
 });
 
-router.delete('/:messageId', async (req, res) => {
+router.delete('/:messageId', requireAuth, async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { cognitoUsername } = req.query;
-
-    const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = users[0].id;
+    const userId = req.auth.userId;
 
     // Delete message if user is sender or recipient
     await pool.execute(
@@ -370,18 +328,18 @@ router.delete('/:messageId', async (req, res) => {
   }
 });
 
-router.post('/:messageId/reply', async (req, res) => {
+router.post('/:messageId/reply', requireAuth, async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { cognitoUsername, subject, message } = req.body;
+    const { subject, message } = req.body;
 
     if (!subject || !message) {
       return res.status(400).json({ error: 'Subject and message are required' });
     }
 
     const [users] = await pool.execute(
-      'SELECT id, email, business_name, first_name, last_name FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id, email, username, business_name, first_name, last_name FROM users WHERE auth_user_id = ?',
+      [req.auth.authUserId]
     );
 
     if (users.length === 0) {
@@ -399,12 +357,12 @@ router.post('/:messageId/reply', async (req, res) => {
         COALESCE(
           u_sender.business_name,
           CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
-          u_sender.cognito_username
+          u_sender.username
         ) as sender_name_display,
         COALESCE(
           u_recipient.business_name,
           CONCAT(COALESCE(u_recipient.first_name, ''), ' ', COALESCE(u_recipient.last_name, '')),
-          u_recipient.cognito_username
+          u_recipient.username
         ) as recipient_name_display
       FROM messages m
       JOIN users u_sender ON m.sender_id = u_sender.id
@@ -426,7 +384,7 @@ router.post('/:messageId/reply', async (req, res) => {
     const newSenderEmail = originalMessage.recipient_email || currentUser.email;
     const newRecipientEmail = originalMessage.sender_email;
     const newSenderName = originalMessage.recipient_name_display || currentUser.business_name || 
-      `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.cognito_username;
+      `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.username;
 
     // Create reply subject with "Re: " prefix if not already present
     const replySubject = originalMessage.subject.startsWith('Re: ') 
@@ -438,17 +396,12 @@ router.post('/:messageId/reply', async (req, res) => {
       ? originalMessage.parent_message_id 
       : originalMessage.id;
 
-    // Check if parent_message_id column exists
-    let insertQuery;
-    let insertParams;
-    
-    try {
-      // Try to insert with parent_message_id
-      insertQuery = `INSERT INTO messages (
+    const [insertResult] = await pool.execute(
+      `INSERT INTO messages (
         listing_id, sender_id, recipient_id, subject, message,
         sender_email, sender_name, recipient_email, status, parent_message_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?)`;
-      insertParams = [
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?)`,
+      [
         originalMessage.listing_id,
         newSenderId,
         newRecipientId,
@@ -458,54 +411,19 @@ router.post('/:messageId/reply', async (req, res) => {
         newSenderName,
         newRecipientEmail,
         rootMessageId,
-      ];
-      const [insertResult] = await pool.execute(insertQuery, insertParams);
-      const newMessageId = insertResult.insertId;
-      try {
-        await createNotification({
-          userId: newRecipientId,
-          type: 'message',
-          title: 'New message',
-          body: `${newSenderName || newSenderEmail}: ${replySubject.slice(0, 80)}`,
-          link: '/messages',
-          referenceId: newMessageId,
-        });
-      } catch (nErr) {
-        console.warn('Could not create notification:', nErr.message);
-      }
-    } catch (error) {
-      // If column doesn't exist, insert without parent_message_id
-      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('parent_message_id')) {
-        insertQuery = `INSERT INTO messages (
-          listing_id, sender_id, recipient_id, subject, message,
-          sender_email, sender_name, recipient_email, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent')`;
-        insertParams = [
-          originalMessage.listing_id,
-          newSenderId,
-          newRecipientId,
-          replySubject,
-          message,
-          newSenderEmail,
-          newSenderName,
-          newRecipientEmail,
-        ];
-        const [fallbackResult] = await pool.execute(insertQuery, insertParams);
-        try {
-          await createNotification({
-            userId: newRecipientId,
-            type: 'message',
-            title: 'New message',
-            body: `${newSenderName || newSenderEmail}: ${replySubject.slice(0, 80)}`,
-            link: '/messages',
-            referenceId: fallbackResult.insertId,
-          });
-        } catch (nErr) {
-          console.warn('Could not create notification:', nErr.message);
-        }
-      } else {
-        throw error;
-      }
+      ]
+    );
+    try {
+      await createNotification({
+        userId: newRecipientId,
+        type: 'message',
+        title: 'New message',
+        body: `${newSenderName || newSenderEmail}: ${replySubject.slice(0, 80)}`,
+        link: '/messages',
+        referenceId: insertResult.insertId,
+      });
+    } catch (nErr) {
+      console.warn('Could not create notification:', nErr.message);
     }
 
     // Send email notification

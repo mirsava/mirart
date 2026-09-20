@@ -9,7 +9,7 @@ export async function runSubscriptionExpirationJob() {
     const [expiredSubs] = await pool.execute(
       `SELECT us.id, us.user_id 
        FROM user_subscriptions us 
-       WHERE us.end_date < CURDATE() 
+       WHERE us.end_date < CURRENT_DATE 
          AND us.status IN ('active', 'cancelled')
        ORDER BY us.id`
     );
@@ -23,7 +23,7 @@ export async function runSubscriptionExpirationJob() {
     await pool.execute(
       `UPDATE user_subscriptions 
        SET status = 'expired' 
-       WHERE end_date < CURDATE() AND status IN ('active', 'cancelled')`
+       WHERE end_date < CURRENT_DATE AND status IN ('active', 'cancelled')`
     );
 
     let totalDeactivated = 0;

@@ -25,12 +25,9 @@ Add to `backend/.env`:
 SHIPPO_API_KEY=shippo_test_xxxx  # Use shippo_test_ for development
 ```
 
-### 3. Database Migration
+### 3. Database
 
-```bash
-cd backend
-npm run migrate-shippo
-```
+The Shippo columns are part of `backend/database/schema.sql`; run `npm run init-db` from `backend/` if you have not already.
 
 ### 4. Seller Shipping Address
 
@@ -121,7 +118,7 @@ Purchase a shipping label for an order (seller only).
 ```json
 {
   "order_id": 123,
-  "cognito_username": "seller_sub"
+  "auth_user_id": "<supabase user uuid>"
 }
 ```
 

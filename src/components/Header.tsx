@@ -85,7 +85,7 @@ const Header: React.FC = () => {
   const [favoriteImageErrors, setFavoriteImageErrors] = useState<Record<number, boolean>>({});
   const [galleryMenuAnchor, setGalleryMenuAnchor] = useState<null | HTMLElement>(null);
   const galleryCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [artists, setArtists] = useState<Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }>>([]);
+  const [artists, setArtists] = useState<Array<{ id: number; auth_user_id: string; artist_name: string; profile_image_url?: string }>>([]);
   const [headerUserType, setHeaderUserType] = useState<'artist' | 'buyer' | 'admin' | null>(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isMediumScreen = useMediaQuery(theme.breakpoints.between('md', 'lg'));
@@ -174,13 +174,13 @@ const Header: React.FC = () => {
     setGalleryMenuAnchor(null);
   };
 
-  const handleArtistClick = (cognitoUsername: string) => {
-    navigate(`/gallery?artist=${cognitoUsername}`);
+  const handleArtistClick = (authUserId: string) => {
+    navigate(`/gallery?artist=${authUserId}`);
     setGalleryMenuAnchor(null);
   };
 
   const groupArtistsByLetter = () => {
-    const grouped: Record<string, Array<{ id: number; cognito_username: string; artist_name: string; profile_image_url?: string }>> = {};
+    const grouped: Record<string, Array<{ id: number; auth_user_id: string; artist_name: string; profile_image_url?: string }>> = {};
     artists.forEach(artist => {
       const firstLetter = artist.artist_name.charAt(0).toUpperCase();
       if (!grouped[firstLetter]) {
@@ -895,7 +895,7 @@ const Header: React.FC = () => {
                                           {letterArtists.map((artist) => (
                                             <MenuItem
                                               key={artist.id}
-                                              onClick={() => handleArtistClick(artist.cognito_username)}
+                                              onClick={() => handleArtistClick(artist.auth_user_id)}
                                               sx={{ 
                                                 py: 0.875, 
                                                 pl: 3.5,

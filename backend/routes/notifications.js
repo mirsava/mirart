@@ -1,57 +1,24 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-const ensureTable = async () => {
-  try {
-    await pool.execute('SELECT 1 FROM notifications LIMIT 1');
-  } catch (err) {
-    if (err.code === 'ER_NO_SUCH_TABLE') {
-      await pool.execute(`
-        CREATE TABLE notifications (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          user_id INT NOT NULL,
-          type VARCHAR(50) NOT NULL,
-          title VARCHAR(255) NOT NULL,
-          body TEXT,
-          link VARCHAR(500),
-          reference_id INT,
-          read_at TIMESTAMP NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-          INDEX idx_user_read (user_id, read_at),
-          INDEX idx_created (created_at)
-        )
-      `);
-    } else {
-      throw err;
-    }
-  }
-};
+router.use(requireAuth);
+
+router.use((req, res, next) => {
+  if (!req.auth.userId) return res.status(404).json({ error: 'User not found' });
+  next();
+});
 
 router.get('/', async (req, res) => {
   try {
-    await ensureTable();
-    const cognitoUsername = req.query.cognitoUsername;
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
+    const userId = req.auth.userId;
+    const [users] = await pool.execute('SELECT created_at FROM users WHERE id = ?', [userId]);
+    const userCreatedAt = users[0]?.created_at || new Date(0);
 
-    const [users] = await pool.execute('SELECT id, created_at FROM users WHERE cognito_username = ?', [cognitoUsername]);
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const userId = users[0].id;
-    const userCreatedAt = users[0].created_at || new Date(0);
-
-    let selectCols = 'id, type, title, body, link, reference_id, read_at, created_at';
-    try {
-      await pool.execute('SELECT severity FROM notifications LIMIT 1');
-      selectCols = 'id, type, severity, title, body, link, reference_id, read_at, created_at';
-    } catch {}
     const [rows] = await pool.execute(
-      `SELECT ${selectCols} FROM notifications WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 50`,
+      `SELECT id, type, severity, title, body, link, reference_id, read_at, created_at FROM notifications WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 50`,
       [userId, userCreatedAt]
     );
 
@@ -78,19 +45,7 @@ router.get('/', async (req, res) => {
 
 router.put('/read-all', async (req, res) => {
   try {
-    await ensureTable();
-    const cognitoUsername = req.query.cognitoUsername;
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const userId = users[0].id;
-
-    await pool.execute('UPDATE notifications SET read_at = NOW() WHERE user_id = ? AND read_at IS NULL', [userId]);
+    await pool.execute('UPDATE notifications SET read_at = NOW() WHERE user_id = ? AND read_at IS NULL', [req.auth.userId]);
     res.json({ success: true });
   } catch (error) {
     console.error('Error marking all read:', error);
@@ -100,19 +55,9 @@ router.put('/read-all', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    await ensureTable();
-    const cognitoUsername = req.query.cognitoUsername;
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
+    if (!/^\d+$/.test(req.params.id)) return res.status(404).json({ error: 'Notification not found' });
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const userId = users[0].id;
-
-    const [result] = await pool.execute('DELETE FROM notifications WHERE id = ? AND user_id = ?', [req.params.id, userId]);
+    const [result] = await pool.execute('DELETE FROM notifications WHERE id = ? AND user_id = ?', [req.params.id, req.auth.userId]);
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Notification not found' });
     }
@@ -125,21 +70,11 @@ router.delete('/:id', async (req, res) => {
 
 router.put('/:id/read', async (req, res) => {
   try {
-    await ensureTable();
-    const cognitoUsername = req.query.cognitoUsername;
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const userId = users[0].id;
+    if (!/^\d+$/.test(req.params.id)) return res.status(404).json({ error: 'Notification not found' });
 
     const [result] = await pool.execute(
       'UPDATE notifications SET read_at = NOW() WHERE id = ? AND user_id = ?',
-      [req.params.id, userId]
+      [req.params.id, req.auth.userId]
     );
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Notification not found' });

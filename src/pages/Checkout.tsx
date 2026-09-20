@@ -257,7 +257,7 @@ const Checkout: React.FC = () => {
           return { listing_id: item.id, quantity: item.quantity, shipping_fee_charged: proportionalFee };
         }),
         shipping_address: `${formData.firstName} ${formData.lastName}\n${formData.address}\n${formData.city}, ${formData.state} ${formData.zipCode}\n${formData.country}`,
-        cognito_username: user.id,
+        auth_user_id: user.id,
         shippo_rate_id: selectedRate?.object_id || null,
         shipping_cost: roundMoney(shippingCost),
       };
@@ -278,7 +278,7 @@ const Checkout: React.FC = () => {
     } catch (error: any) {
       console.error('Stripe checkout error:', error);
       const isPayoutError = error?.error === 'Artist has not set up payouts';
-      const isArtist = error?.seller_is_current_user || (isPayoutError && user?.id && error?.seller_cognito_username === user.id);
+      const isArtist = error?.seller_is_current_user || (isPayoutError && user?.id && error?.seller_auth_user_id === user.id);
       if (isPayoutError && isArtist) {
         setNeedsPayoutSetup(true);
       } else if (isPayoutError) {

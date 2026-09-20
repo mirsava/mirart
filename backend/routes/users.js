@@ -1,48 +1,95 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { requireAuth, requireSelf, isUuid } from '../middleware/auth.js';
 
 const router = express.Router();
 
+const clean = (value) => (value && String(value).trim()) || null;
+
+// Stored as a JSON array string. Accepts an array or a comma-separated string.
+const serializeSpecialties = (value) => {
+  if (!value) return null;
+  const list = Array.isArray(value) ? value : String(value).split(',');
+  const items = list.map((item) => String(item).trim()).filter(Boolean);
+  return items.length > 0 ? JSON.stringify(items) : null;
+};
+
+// Columns an owner can edit through the profile endpoints, with how each value is cleaned.
+const PROFILE_FIELDS = [
+  ['first_name', clean],
+  ['last_name', clean],
+  ['business_name', clean],
+  ['phone', clean],
+  ['country', clean],
+  ['website', clean],
+  ['social_instagram', clean],
+  ['social_tiktok', clean],
+  ['social_behance', clean],
+  ['social_youtube', clean],
+  ['specialties', serializeSpecialties],
+  ['experience_level', clean],
+  ['bio', clean],
+  ['profile_image_url', clean],
+  ['signature_url', clean],
+  ['address_line1', clean],
+  ['address_line2', clean],
+  ['address_city', clean],
+  ['address_state', clean],
+  ['address_zip', clean],
+  ['address_country', (v) => clean(v) || 'US'],
+  ['billing_line1', clean],
+  ['billing_line2', clean],
+  ['billing_city', clean],
+  ['billing_state', clean],
+  ['billing_zip', clean],
+  ['billing_country', (v) => clean(v) || 'US'],
+];
+
+const profileValues = (body) => PROFILE_FIELDS.map(([name, transform]) => transform(body[name]));
+
+// Never returned to anyone but the account owner (or an admin).
+const PRIVATE_FIELDS = [
+  'email', 'phone', 'stripe_account_id', 'blocked',
+  'address_line1', 'address_line2', 'address_city', 'address_state', 'address_zip', 'address_country',
+  'billing_line1', 'billing_line2', 'billing_city', 'billing_state', 'billing_zip', 'billing_country',
+  'default_allow_comments', 'email_notifications', 'comment_notifications', 'default_special_instructions',
+  'default_shipping_preference', 'default_shipping_carrier', 'default_return_days',
+];
+
+const toPublicUser = (user) => {
+  const copy = { ...user };
+  for (const field of PRIVATE_FIELDS) delete copy[field];
+  return copy;
+};
+
 // Search users (for chat)
-router.get('/search', async (req, res) => {
+router.get('/search', requireAuth, async (req, res) => {
   try {
     const { q, limit = 20 } = req.query;
-    const searchLimit = parseInt(limit) || 20;
-    
+    const searchLimit = Math.min(parseInt(limit) || 20, 50);
+
     if (!q || q.trim().length === 0) {
       return res.json({ users: [] });
     }
 
     const searchTerm = `%${q.trim()}%`;
-    
+
     const [users] = await pool.execute(
-      `SELECT 
-        id,
-        cognito_username,
-        first_name,
-        last_name,
-        business_name,
-        profile_image_url,
-        created_at
-      FROM users 
-      WHERE 
-        (email LIKE ? OR 
-         cognito_username LIKE ? OR 
-         first_name LIKE ? OR 
-         last_name LIKE ? OR 
-         business_name LIKE ?)
-      ORDER BY 
-        CASE 
-          WHEN business_name LIKE ? THEN 1
-          WHEN first_name LIKE ? OR last_name LIKE ? THEN 2
-          WHEN email LIKE ? THEN 3
-          ELSE 4
-        END,
-        created_at DESC
-      LIMIT ${searchLimit}`,
-      [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm]
+      `SELECT id, auth_user_id, username, first_name, last_name, business_name, profile_image_url, created_at
+       FROM users
+       WHERE (username ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ? OR business_name ILIKE ?)
+       ORDER BY
+         CASE
+           WHEN business_name ILIKE ? THEN 1
+           WHEN first_name ILIKE ? OR last_name ILIKE ? THEN 2
+           WHEN username ILIKE ? THEN 3
+           ELSE 4
+         END,
+         created_at DESC
+       LIMIT ${searchLimit}`,
+      Array(8).fill(searchTerm)
     );
-    
+
     res.json({ users: users || [] });
   } catch (error) {
     console.error('Error searching users:', error);
@@ -56,22 +103,23 @@ router.get('/artists/list', async (req, res) => {
     const [artists] = await pool.execute(
       `SELECT DISTINCT
         u.id,
-        u.cognito_username,
+        u.auth_user_id,
+        u.username,
         u.first_name,
         u.last_name,
         u.business_name,
         u.profile_image_url,
         COALESCE(
           u.business_name,
-          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
-          u.cognito_username
+          NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+          u.username
         ) as artist_name
       FROM users u
       INNER JOIN listings l ON u.id = l.user_id
-      WHERE l.status = 'active' AND (COALESCE(u.blocked, 0) = 0)
+      WHERE l.status = 'active' AND COALESCE(u.blocked, FALSE) = FALSE
       ORDER BY artist_name ASC`
     );
-    
+
     res.json({ artists: artists || [] });
   } catch (error) {
     console.error('Error fetching artists:', error);
@@ -79,240 +127,94 @@ router.get('/artists/list', async (req, res) => {
   }
 });
 
-// Get user by Cognito username
-router.get('/:cognitoUsername', async (req, res) => {
+// Get user by auth id (uuid) or username
+router.get('/:authUserId', async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
-    const { requestingUser } = req.query;
-    
+    const { authUserId: identifier } = req.params;
+
     const [rows] = await pool.execute(
-      'SELECT *, COALESCE(active, 1) as active FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      isUuid(identifier)
+        ? 'SELECT *, COALESCE(active, TRUE) as active FROM users WHERE auth_user_id = ?'
+        : 'SELECT *, COALESCE(active, TRUE) as active FROM users WHERE lower(username) = lower(?)',
+      [identifier]
     );
-    
+
     if (rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     const user = rows[0];
-    // Convert MySQL TINYINT (0/1) to boolean
     user.active = Boolean(user.active);
-    
-    if (requestingUser && requestingUser === cognitoUsername) {
-      res.json(user);
-    } else {
-      const { email, ...userWithoutEmail } = user;
-      res.json(userWithoutEmail);
-    }
+
+    const isOwnerOrAdmin = req.auth && (req.auth.authUserId === user.auth_user_id || req.auth.isAdmin);
+    res.json(isOwnerOrAdmin ? user : toPublicUser(user));
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Create or update user profile
-router.post('/', async (req, res) => {
+// Create or update the caller's own profile
+router.post('/', requireAuth, async (req, res) => {
   try {
-    const {
-      cognito_username,
-      email,
-      first_name,
-      last_name,
-      business_name,
-      phone,
-      country,
-      website,
-      social_instagram,
-      social_tiktok,
-      social_behance,
-      social_youtube,
-      specialties,
-      experience_level,
-      bio,
-      profile_image_url,
-      signature_url,
-      user_type,
-      address_line1,
-      address_line2,
-      address_city,
-      address_state,
-      address_zip,
-      address_country,
-      billing_line1,
-      billing_line2,
-      billing_city,
-      billing_state,
-      billing_zip,
-      billing_country
-    } = req.body;
-    const normalizedUserType = (user_type === 'artist' || user_type === 'buyer') ? user_type : null;
-    
-    // Check if user exists
-    const [existing] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognito_username]
+    const { authUserId, email } = req.auth;
+    const requestedType = (req.body.user_type === 'artist' || req.body.user_type === 'buyer') ? req.body.user_type : null;
+
+    const columns = PROFILE_FIELDS.map(([name]) => name);
+    const values = profileValues(req.body);
+    const assignments = columns.map((name) => `${name} = EXCLUDED.${name}`).join(', ');
+
+    const [result] = await pool.execute(
+      `INSERT INTO users (auth_user_id, email, user_type, ${columns.join(', ')})
+       VALUES (?, ?, ?, ${columns.map(() => '?').join(', ')})
+       ON CONFLICT (auth_user_id) DO UPDATE SET
+         ${assignments},
+         user_type = CASE WHEN users.user_type = 'admin' THEN 'admin' ELSE COALESCE(?, users.user_type) END
+       RETURNING *, (xmax = 0) AS inserted`,
+      [authUserId, email.toLowerCase(), requestedType || 'artist', ...values, requestedType]
     );
-    
-    if (existing.length > 0) {
-      // Update existing user
-      await pool.execute(
-        `UPDATE users SET 
-          email = ?, first_name = ?, last_name = ?, business_name = ?, 
-          phone = ?, country = ?, website = ?, social_instagram = ?, social_tiktok = ?, social_behance = ?, social_youtube = ?, specialties = ?, 
-          experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?,
-          user_type = COALESCE(?, user_type),
-          address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?,
-          billing_line1 = ?, billing_line2 = ?, billing_city = ?, billing_state = ?, billing_zip = ?, billing_country = ?
-        WHERE cognito_username = ?`,
-        [
-          (email && email.trim()) || null, 
-          (first_name && first_name.trim()) || null, 
-          (last_name && last_name.trim()) || null, 
-          (business_name && business_name.trim()) || null,
-          (phone && phone.trim()) || null, 
-          (country && country.trim()) || null, 
-          (website && website.trim()) || null, 
-          (social_instagram && social_instagram.trim()) || null,
-          (social_tiktok && social_tiktok.trim()) || null,
-          (social_behance && social_behance.trim()) || null,
-          (social_youtube && social_youtube.trim()) || null,
-          specialties ? JSON.stringify(specialties) : null,
-          (experience_level && experience_level.trim()) || null, 
-          (bio && bio.trim()) || null, 
-          (profile_image_url && profile_image_url.trim()) || null,
-          (signature_url && signature_url.trim()) || null,
-          normalizedUserType,
-          (address_line1 && address_line1.trim()) || null,
-          (address_line2 && address_line2.trim()) || null,
-          (address_city && address_city.trim()) || null,
-          (address_state && address_state.trim()) || null,
-          (address_zip && address_zip.trim()) || null,
-          (address_country && address_country.trim()) || 'US',
-          (billing_line1 && billing_line1.trim()) || null,
-          (billing_line2 && billing_line2.trim()) || null,
-          (billing_city && billing_city.trim()) || null,
-          (billing_state && billing_state.trim()) || null,
-          (billing_zip && billing_zip.trim()) || null,
-          (billing_country && billing_country.trim()) || 'US',
-          cognito_username
-        ]
-      );
-      
-      const [updated] = await pool.execute(
-        'SELECT * FROM users WHERE cognito_username = ?',
-        [cognito_username]
-      );
-      
-      return res.json(updated[0]);
-    } else {
-      // Create new user
-      const [result] = await pool.execute(
-        `INSERT INTO users (
-          cognito_username, email, first_name, last_name, business_name,
-          phone, country, website, social_instagram, social_tiktok, social_behance, social_youtube, specialties, experience_level, bio, profile_image_url, signature_url, user_type,
-          address_line1, address_line2, address_city, address_state, address_zip, address_country,
-          billing_line1, billing_line2, billing_city, billing_state, billing_zip, billing_country
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          cognito_username, 
-          (email && email.trim()) || null, 
-          (first_name && first_name.trim()) || null, 
-          (last_name && last_name.trim()) || null, 
-          (business_name && business_name.trim()) || null,
-          (phone && phone.trim()) || null, 
-          (country && country.trim()) || null, 
-          (website && website.trim()) || null, 
-          (social_instagram && social_instagram.trim()) || null,
-          (social_tiktok && social_tiktok.trim()) || null,
-          (social_behance && social_behance.trim()) || null,
-          (social_youtube && social_youtube.trim()) || null,
-          specialties ? JSON.stringify(specialties) : null,
-          (experience_level && experience_level.trim()) || null, 
-          (bio && bio.trim()) || null, 
-          (profile_image_url && profile_image_url.trim()) || null,
-          (signature_url && signature_url.trim()) || null,
-          normalizedUserType || 'artist',
-          (address_line1 && address_line1.trim()) || null,
-          (address_line2 && address_line2.trim()) || null,
-          (address_city && address_city.trim()) || null,
-          (address_state && address_state.trim()) || null,
-          (address_zip && address_zip.trim()) || null,
-          (address_country && address_country.trim()) || 'US',
-          (billing_line1 && billing_line1.trim()) || null,
-          (billing_line2 && billing_line2.trim()) || null,
-          (billing_city && billing_city.trim()) || null,
-          (billing_state && billing_state.trim()) || null,
-          (billing_zip && billing_zip.trim()) || null,
-          (billing_country && billing_country.trim()) || 'US'
-        ]
-      );
-      
-      // Initialize dashboard stats
-      await pool.execute(
-        'INSERT INTO dashboard_stats (user_id) VALUES (?)',
-        [result.insertId]
-      );
-      
-      const [newUser] = await pool.execute(
-        'SELECT * FROM users WHERE id = ?',
-        [result.insertId]
-      );
-      
-      res.status(201).json(newUser[0]);
+
+    const { inserted, ...user } = result.rows[0];
+    if (inserted) {
+      await pool.execute('INSERT INTO dashboard_stats (user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING', [user.id]);
     }
+    res.status(inserted ? 201 : 200).json(user);
   } catch (error) {
     console.error('Error creating/updating user:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
+const normalizeSettings = (row) => {
+  const pref = row.default_shipping_preference != null ? String(row.default_shipping_preference).trim().toLowerCase() : '';
+  const carrier = row.default_shipping_carrier != null ? String(row.default_shipping_carrier).trim().toLowerCase() : '';
+  const returnDays = row.default_return_days != null ? parseInt(String(row.default_return_days), 10) : null;
+  return {
+    default_allow_comments: row.default_allow_comments !== false,
+    email_notifications: row.email_notifications !== false,
+    comment_notifications: row.comment_notifications !== false,
+    default_special_instructions: row.default_special_instructions != null ? String(row.default_special_instructions) : '',
+    default_shipping_preference: pref === 'free' ? 'free' : 'buyer',
+    default_shipping_carrier: carrier === 'own' ? 'own' : 'shippo',
+    default_return_days: returnDays > 0 && returnDays <= 365 ? returnDays : null,
+  };
+};
+
+const SETTINGS_COLUMNS = 'default_allow_comments, email_notifications, comment_notifications, default_special_instructions, default_shipping_preference, default_shipping_carrier, default_return_days';
+
 // Get user settings
-router.get('/:cognitoUsername/settings', async (req, res) => {
+router.get('/:authUserId/settings', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
-    let rows;
-    try {
-      [rows] = await pool.execute(
-        'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions, default_shipping_preference, default_shipping_carrier, default_return_days FROM users WHERE cognito_username = ?',
-        [cognitoUsername]
-      );
-    } catch (selectError) {
-      if (selectError.code === 'ER_BAD_FIELD_ERROR' && (selectError.message?.includes('default_shipping_preference') || selectError.message?.includes('default_shipping_carrier') || selectError.message?.includes('default_return_days'))) {
-        [rows] = await pool.execute(
-          'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions, default_shipping_preference, default_shipping_carrier FROM users WHERE cognito_username = ?',
-          [cognitoUsername]
-        );
-      } else {
-        throw selectError;
-      }
-    }
-    
+    const [rows] = await pool.execute(
+      `SELECT ${SETTINGS_COLUMNS} FROM users WHERE auth_user_id = ?`,
+      [req.params.authUserId]
+    );
+
     if (rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
-    const specialInstructions = rows[0].default_special_instructions !== null && rows[0].default_special_instructions !== undefined
-      ? String(rows[0].default_special_instructions)
-      : '';
-    const rawPref = rows[0].default_shipping_preference;
-    const prefStr = rawPref != null ? String(rawPref).trim().toLowerCase() : '';
-    const shippingPref = prefStr === 'free' ? 'free' : 'buyer';
-    const rawCarrier = rows[0].default_shipping_carrier;
-    const carrierStr = rawCarrier != null ? String(rawCarrier).trim().toLowerCase() : '';
-    const shippingCarrier = carrierStr === 'own' ? 'own' : 'shippo';
-    const returnDays = rows[0].default_return_days != null ? (parseInt(String(rows[0].default_return_days), 10) || null) : null;
 
-    const responseData = {
-      default_allow_comments: rows[0].default_allow_comments !== 0,
-      email_notifications: rows[0].email_notifications !== 0,
-      comment_notifications: rows[0].comment_notifications !== 0,
-      default_special_instructions: specialInstructions,
-      default_shipping_preference: shippingPref,
-      default_shipping_carrier: shippingCarrier,
-      default_return_days: returnDays,
-    };
-    
-    res.json(responseData);
+    res.json(normalizeSettings(rows[0]));
   } catch (error) {
     console.error('Error fetching user settings:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -320,237 +222,71 @@ router.get('/:cognitoUsername/settings', async (req, res) => {
 });
 
 // Update user settings
-router.put('/:cognitoUsername/settings', async (req, res) => {
+router.put('/:authUserId/settings', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
     const { default_allow_comments, email_notifications, comment_notifications, default_special_instructions, default_shipping_preference, default_shipping_carrier, default_return_days } = req.body;
-    
+
     let specialInstructionsValue = null;
     if (default_special_instructions !== undefined && default_special_instructions !== null) {
-      if (typeof default_special_instructions === 'string') {
-        const trimmed = default_special_instructions.trim();
-        specialInstructionsValue = trimmed.length > 0 ? trimmed : null;
-      } else {
-        specialInstructionsValue = String(default_special_instructions);
-      }
+      const text = String(default_special_instructions).trim();
+      specialInstructionsValue = text.length > 0 ? text : null;
     }
-    
+
     const shippingPrefValue = (default_shipping_preference === 'free' || default_shipping_preference === 'buyer') ? default_shipping_preference : 'buyer';
     const shippingCarrierValue = (default_shipping_carrier === 'own' || default_shipping_carrier === 'shippo') ? default_shipping_carrier : 'shippo';
     const returnDaysNum = default_return_days === null || default_return_days === 'none' || default_return_days === undefined ? null : (parseInt(String(default_return_days), 10) || null);
     const returnDaysValue = returnDaysNum != null && returnDaysNum > 0 && returnDaysNum <= 365 ? returnDaysNum : null;
-    const updateParams = [
-      default_allow_comments !== undefined ? (default_allow_comments ? 1 : 0) : null,
-      email_notifications !== undefined ? (email_notifications ? 1 : 0) : null,
-      comment_notifications !== undefined ? (comment_notifications ? 1 : 0) : null,
-      specialInstructionsValue,
-      shippingPrefValue,
-      shippingCarrierValue,
-      returnDaysValue,
-      cognitoUsername
-    ];
+    const toBool = (value) => (value !== undefined ? Boolean(value) : null);
 
-    let updateResult;
-    try {
-      updateResult = await pool.execute(
-        `UPDATE users SET 
-          default_allow_comments = ?,
-          email_notifications = ?,
-          comment_notifications = ?,
-          default_special_instructions = ?,
-          default_shipping_preference = ?,
-          default_shipping_carrier = ?,
-          default_return_days = ?
-        WHERE cognito_username = ?`,
-        updateParams
-      );
-    } catch (updateError) {
-      if (updateError.code === 'ER_BAD_FIELD_ERROR' && (updateError.message?.includes('default_special_instructions') || updateError.message?.includes('default_shipping_preference') || updateError.message?.includes('default_shipping_carrier') || updateError.message?.includes('default_return_days'))) {
-        updateResult = await pool.execute(
-          `UPDATE users SET 
-            default_allow_comments = ?,
-            email_notifications = ?,
-            comment_notifications = ?
-          WHERE cognito_username = ?`,
-          [
-            default_allow_comments !== undefined ? (default_allow_comments ? 1 : 0) : null,
-            email_notifications !== undefined ? (email_notifications ? 1 : 0) : null,
-            comment_notifications !== undefined ? (comment_notifications ? 1 : 0) : null,
-            cognitoUsername
-          ]
-        );
-      } else {
-        throw updateError;
-      }
-    }
-    
-    let updated;
-    let hasSpecialInstructionsColumn = false;
-    let hasShippingPrefColumn = false;
-    let hasShippingCarrierColumn = false;
-    let hasReturnDaysColumn = false;
-    try {
-      [updated] = await pool.execute(
-        'SELECT default_allow_comments, email_notifications, comment_notifications, default_special_instructions, default_shipping_preference, default_shipping_carrier FROM users WHERE cognito_username = ?',
-        [cognitoUsername]
-      );
-      hasSpecialInstructionsColumn = updated.length > 0 && 'default_special_instructions' in updated[0];
-      hasShippingPrefColumn = updated.length > 0 && 'default_shipping_preference' in updated[0];
-      hasShippingCarrierColumn = updated.length > 0 && 'default_shipping_carrier' in updated[0];
-      hasReturnDaysColumn = updated.length > 0 && 'default_return_days' in updated[0];
-    } catch (selectError) {
-      if (selectError.code === 'ER_BAD_FIELD_ERROR' && (selectError.message?.includes('default_special_instructions') || selectError.message?.includes('default_shipping_preference') || selectError.message?.includes('default_shipping_carrier') || selectError.message?.includes('default_return_days'))) {
-        [updated] = await pool.execute(
-          'SELECT default_allow_comments, email_notifications, comment_notifications FROM users WHERE cognito_username = ?',
-          [cognitoUsername]
-        );
-        hasSpecialInstructionsColumn = false;
-        hasShippingPrefColumn = false;
-        hasShippingCarrierColumn = false;
-        hasReturnDaysColumn = false;
-      } else {
-        throw selectError;
-      }
-    }
-    
-    if (updated.length === 0) {
+    const [result] = await pool.execute(
+      `UPDATE users SET
+        default_allow_comments = COALESCE(?::boolean, default_allow_comments),
+        email_notifications = COALESCE(?::boolean, email_notifications),
+        comment_notifications = COALESCE(?::boolean, comment_notifications),
+        default_special_instructions = ?,
+        default_shipping_preference = ?,
+        default_shipping_carrier = ?,
+        default_return_days = ?
+      WHERE auth_user_id = ?
+      RETURNING ${SETTINGS_COLUMNS}`,
+      [
+        toBool(default_allow_comments),
+        toBool(email_notifications),
+        toBool(comment_notifications),
+        specialInstructionsValue,
+        shippingPrefValue,
+        shippingCarrierValue,
+        returnDaysValue,
+        req.params.authUserId,
+      ]
+    );
+
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
-    // ALWAYS include default_special_instructions in response
-    const responseData = {
-      default_allow_comments: updated[0].default_allow_comments !== 0,
-      email_notifications: updated[0].email_notifications !== 0,
-      comment_notifications: updated[0].comment_notifications !== 0,
-    };
-    
-    // Get default_special_instructions value
-    if (hasSpecialInstructionsColumn && 'default_special_instructions' in updated[0]) {
-      const dbValue = updated[0].default_special_instructions;
-      responseData.default_special_instructions = (dbValue !== null && dbValue !== undefined) 
-        ? String(dbValue) 
-        : '';
-    } else {
-      const requestValue = (default_special_instructions && typeof default_special_instructions === 'string') 
-        ? default_special_instructions.trim() 
-        : '';
-      responseData.default_special_instructions = requestValue;
-    }
-    if (hasShippingPrefColumn && 'default_shipping_preference' in updated[0]) {
-      const rawPref = updated[0].default_shipping_preference;
-      const prefStr = rawPref != null ? String(rawPref).trim().toLowerCase() : '';
-      responseData.default_shipping_preference = prefStr === 'free' ? 'free' : 'buyer';
-    } else {
-      responseData.default_shipping_preference = (default_shipping_preference === 'free' || default_shipping_preference === 'buyer') ? default_shipping_preference : 'buyer';
-    }
-    if (hasShippingCarrierColumn && 'default_shipping_carrier' in updated[0]) {
-      const rawCarrier = updated[0].default_shipping_carrier;
-      const carrierStr = rawCarrier != null ? String(rawCarrier).trim().toLowerCase() : '';
-      responseData.default_shipping_carrier = carrierStr === 'own' ? 'own' : 'shippo';
-    } else {
-      responseData.default_shipping_carrier = (default_shipping_carrier === 'own' || default_shipping_carrier === 'shippo') ? default_shipping_carrier : 'shippo';
-    }
-    if (hasReturnDaysColumn && 'default_return_days' in updated[0]) {
-      const rd = updated[0].default_return_days;
-      const n = rd != null ? parseInt(String(rd), 10) : null;
-      responseData.default_return_days = (n != null && n > 0 && n <= 365) ? n : null;
-    } else {
-      const n = (default_return_days === null || default_return_days === 'none' || default_return_days === undefined) ? null : (parseInt(String(default_return_days), 10) || null);
-      responseData.default_return_days = (n != null && n > 0 && n <= 365) ? n : null;
-    }
 
-    res.json(responseData);
+    res.json(normalizeSettings(result.rows[0]));
   } catch (error) {
     console.error('Error updating user settings:', error);
-    if (error.code === 'ER_BAD_FIELD_ERROR' || error.message?.includes('default_special_instructions')) {
-      return res.status(500).json({ 
-        error: 'Database column missing. Please run the migration: ALTER TABLE users ADD COLUMN default_special_instructions TEXT DEFAULT NULL AFTER comment_notifications;' 
-      });
-    }
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
 // Update user profile
-router.put('/:cognitoUsername', async (req, res) => {
+router.put('/:authUserId', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
-    const {
-      first_name,
-      last_name,
-      business_name,
-      phone,
-      country,
-      website,
-      social_instagram,
-      social_tiktok,
-      social_behance,
-      social_youtube,
-      specialties,
-      experience_level,
-      bio,
-      profile_image_url,
-      signature_url,
-      address_line1,
-      address_line2,
-      address_city,
-      address_state,
-      address_zip,
-      address_country,
-      billing_line1,
-      billing_line2,
-      billing_city,
-      billing_state,
-      billing_zip,
-      billing_country
-    } = req.body;
-    
-    await pool.execute(
-      `UPDATE users SET 
-        first_name = ?, last_name = ?, business_name = ?, 
-        phone = ?, country = ?, website = ?, social_instagram = ?, social_tiktok = ?, social_behance = ?, social_youtube = ?, specialties = ?, 
-        experience_level = ?, bio = ?, profile_image_url = ?, signature_url = ?,
-        address_line1 = ?, address_line2 = ?, address_city = ?, address_state = ?, address_zip = ?, address_country = ?,
-        billing_line1 = ?, billing_line2 = ?, billing_city = ?, billing_state = ?, billing_zip = ?, billing_country = ?
-      WHERE cognito_username = ?`,
-      [
-        (first_name && first_name.trim()) || null, 
-        (last_name && last_name.trim()) || null, 
-        (business_name && business_name.trim()) || null,
-        (phone && phone.trim()) || null, 
-        (country && country.trim()) || null, 
-        (website && website.trim()) || null, 
-        (social_instagram && social_instagram.trim()) || null,
-        (social_tiktok && social_tiktok.trim()) || null,
-        (social_behance && social_behance.trim()) || null,
-        (social_youtube && social_youtube.trim()) || null,
-        specialties ? JSON.stringify(specialties) : null,
-        (experience_level && experience_level.trim()) || null, 
-        (bio && bio.trim()) || null, 
-        (profile_image_url && profile_image_url.trim()) || null,
-        (signature_url && signature_url.trim()) || null,
-        (address_line1 && address_line1.trim()) || null,
-        (address_line2 && address_line2.trim()) || null,
-        (address_city && address_city.trim()) || null,
-        (address_state && address_state.trim()) || null,
-        (address_zip && address_zip.trim()) || null,
-        (address_country && address_country.trim()) || 'US',
-        (billing_line1 && billing_line1.trim()) || null,
-        (billing_line2 && billing_line2.trim()) || null,
-        (billing_city && billing_city.trim()) || null,
-        (billing_state && billing_state.trim()) || null,
-        (billing_zip && billing_zip.trim()) || null,
-        (billing_country && billing_country.trim()) || 'US',
-        cognitoUsername
-      ]
+    const assignments = PROFILE_FIELDS.map(([name]) => `${name} = ?`).join(', ');
+
+    const [result] = await pool.execute(
+      `UPDATE users SET ${assignments} WHERE auth_user_id = ? RETURNING *`,
+      [...profileValues(req.body), req.params.authUserId]
     );
-    
-    const [updated] = await pool.execute(
-      'SELECT * FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
-    );
-    
-    res.json(updated[0]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -558,57 +294,24 @@ router.put('/:cognitoUsername', async (req, res) => {
 });
 
 // Reactivate user account (self-service)
-router.put('/:cognitoUsername/reactivate', async (req, res) => {
+router.put('/:authUserId/reactivate', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
-    const { requestingUser } = req.query;
-    
-    // Only allow users to reactivate themselves
-    if (!requestingUser || requestingUser !== cognitoUsername) {
-      return res.status(403).json({ error: 'You can only reactivate your own account' });
+    const { authUserId } = req.params;
+
+    const [existing] = await pool.execute('SELECT blocked FROM users WHERE auth_user_id = ?', [authUserId]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
     }
-    
-    // Check if user is blocked - blocked users cannot self-reactivate
-    try {
-      const [existing] = await pool.execute(
-        'SELECT id, blocked FROM users WHERE cognito_username = ?',
-        [cognitoUsername]
-      );
-      if (existing.length > 0 && (existing[0].blocked === 1 || existing[0].blocked === true)) {
-        return res.status(403).json({ error: 'Your account has been blocked. Please contact support.' });
-      }
-    } catch (colErr) {
-      if (colErr.code === 'ER_BAD_FIELD_ERROR' && colErr.message?.includes('blocked')) {
-        // blocked column not yet migrated, proceed
-      } else {
-        throw colErr;
-      }
+    if (existing[0].blocked) {
+      return res.status(403).json({ error: 'Your account has been blocked. Please contact support.' });
     }
-    
-    // Check if active column exists
-    try {
-      await pool.execute('UPDATE users SET active = 1 WHERE cognito_username = ?', [cognitoUsername]);
-      
-      const [updated] = await pool.execute(
-        'SELECT *, COALESCE(active, 1) as active FROM users WHERE cognito_username = ?',
-        [cognitoUsername]
-      );
-      
-      if (updated.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      const user = updated[0];
-      user.active = Boolean(user.active);
-      
-      res.json({ success: true, message: 'Account reactivated successfully', user });
-    } catch (error) {
-      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('active')) {
-        res.status(400).json({ error: 'Active column does not exist. Please contact support.' });
-      } else {
-        throw error;
-      }
-    }
+
+    const [result] = await pool.execute(
+      'UPDATE users SET active = TRUE WHERE auth_user_id = ? RETURNING *',
+      [authUserId]
+    );
+
+    res.json({ success: true, message: 'Account reactivated successfully', user: { ...result.rows[0], active: true } });
   } catch (error) {
     console.error('Error reactivating user:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
@@ -616,4 +319,3 @@ router.put('/:cognitoUsername/reactivate', async (req, res) => {
 });
 
 export default router;
-

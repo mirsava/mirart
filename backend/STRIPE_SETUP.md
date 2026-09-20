@@ -39,10 +39,7 @@ For recurring subscriptions, your Stripe Products are linked to plans:
 | professional | prod_TzSmufdMNiztkM    |
 | enterprise   | prod_TzSnMMYvDF4ajU    |
 
-Run the migration to add these to your database:
-```bash
-npm run migrate-stripe-product
-```
+The `subscription_plans.stripe_product_id` column already exists in the schema. Link plans to these products with **Sync from Stripe** in the admin dashboard.
 
 **Note:** In Stripe Dashboard, ensure each Product has recurring Prices configured (monthly and yearly) that match your plan amounts. The checkout uses `price_data` with your Product ID, so Prices are created at checkout time.
 
@@ -77,7 +74,7 @@ Artwork purchases use Stripe Connect so artists receive payouts when buyers conf
    - Find **Cards** and set the dropdown to **On by default**
    - Click **Review changes** and confirm
    - This allows your connected accounts (artists) to receive card payments
-3. Run the migration: `npm run migrate-stripe-connect`
+3. The Connect columns (`users.stripe_account_id`, `orders.stripe_transfer_id`) are part of the schema; no migration is needed
 4. Artists set up payouts in **Artist Dashboard** → **Settings** → **Payouts**
 5. Flow: Buyer pays (auth only) → Seller ships → Buyer confirms delivery → Funds captured and transferred to artist
 

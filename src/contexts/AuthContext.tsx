@@ -1,17 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { 
-  signIn, 
-  signUp, 
-  signOut, 
-  confirmSignUp, 
-  getCurrentUser, 
-  fetchUserAttributes,
-  fetchAuthSession,
-  resetPassword,
-  confirmResetPassword
-} from 'aws-amplify/auth';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { AuthError } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 import apiService, { User as ApiUser } from '../services/api';
 import { UserRole, UserRoleType } from '../types/userRoles';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 interface User {
   id: string;
@@ -22,13 +15,32 @@ interface User {
   attributes?: Record<string, any>;
 }
 
+export interface SignUpProfile {
+  username: string;
+  first_name?: string;
+  last_name?: string;
+  business_name?: string;
+  user_type?: 'artist' | 'buyer';
+  phone?: string;
+  country?: string;
+  website?: string;
+  specialties?: string[];
+  experience_level?: string;
+  address_line1?: string;
+  address_line2?: string;
+  address_city?: string;
+  address_state?: string;
+  address_zip?: string;
+  address_country?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (usernameOrEmail: string, password: string) => Promise<{ username: string } | null>;
-  signUp: (email: string, password: string, attributes: Record<string, string>, username?: string) => Promise<void>;
+  signUp: (email: string, password: string, profile: SignUpProfile) => Promise<{ userId: string | null; hasSession: boolean }>;
   signOut: () => Promise<void>;
-  confirmSignUp: (usernameOrEmail: string, code: string) => Promise<void>;
+  confirmSignUp: (email: string, code: string) => Promise<void>;
   resendConfirmationCode: (email: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
@@ -50,117 +62,61 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const roleFromUserType = (userType?: string): { role?: UserRoleType; groups: string[] } => {
+  if (userType === 'admin') return { role: UserRole.SITE_ADMIN, groups: [UserRole.SITE_ADMIN] };
+  if (userType === 'artist') return { role: UserRole.ARTIST, groups: [UserRole.ARTIST] };
+  if (userType === 'buyer') return { role: UserRole.BUYER, groups: [UserRole.BUYER] };
+  return { groups: [] };
+};
+
+// Keeps the { name, code, message } shape the sign-in / confirm pages branch on.
+const toAuthError = (error: { message?: string; code?: string; name?: string }, fallback: string) => {
+  const authError: any = new Error(error?.message || fallback);
+  authError.code = error?.code || error?.name || 'auth_error';
+  authError.name = error?.code || error?.name || 'AuthError';
+  return authError;
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const getRoleFromGroups = (groups: string[]): UserRoleType | undefined => {
-    if (!groups || groups.length === 0) {
-      return undefined;
-    }
-    
-    if (groups.includes(UserRole.SITE_ADMIN) || groups.includes('site_admin') || groups.includes('admin')) {
-      return UserRole.SITE_ADMIN;
-    }
-    if (groups.includes(UserRole.ARTIST) || groups.includes('artist')) {
-      return UserRole.ARTIST;
-    }
-    if (groups.includes(UserRole.BUYER) || groups.includes('buyer')) {
-      return UserRole.BUYER;
-    }
-    return undefined;
-  };
-
-  const decodeToken = (token: string): any => {
-    try {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-          .join('')
-      );
-      return JSON.parse(jsonPayload);
-    } catch (error) {
-      return null;
-    }
-  };
+  const userRef = useRef<User | null>(null);
+  userRef.current = user;
 
   const checkAuthState = useCallback(async () => {
     try {
-      const cognitoUser = await getCurrentUser();
-      if (cognitoUser) {
-        const attributes = await fetchUserAttributes();
-        const userAttributesObj = attributes;
-        
-        let groups: string[] = [];
-        let userRole: UserRoleType | undefined;
-        
-        try {
-          const session = await fetchAuthSession({ forceRefresh: true });
-          
-          if (session.tokens?.idToken) {
-            const idToken = session.tokens.idToken.toString();
-            const decodedIdToken = decodeToken(idToken);
-            
-            if (decodedIdToken['cognito:groups']) {
-              groups = Array.isArray(decodedIdToken['cognito:groups']) 
-                ? decodedIdToken['cognito:groups'] 
-                : [decodedIdToken['cognito:groups']];
-            } else if (decodedIdToken['groups']) {
-              groups = Array.isArray(decodedIdToken['groups']) 
-                ? decodedIdToken['groups'] 
-                : [decodedIdToken['groups']];
-            }
-          }
-          
-          if (groups.length === 0 && session.tokens?.accessToken) {
-            const accessToken = session.tokens.accessToken.toString();
-            const decodedAccessToken = decodeToken(accessToken);
-            
-            if (decodedAccessToken['cognito:groups']) {
-              groups = Array.isArray(decodedAccessToken['cognito:groups']) 
-                ? decodedAccessToken['cognito:groups'] 
-                : [decodedAccessToken['cognito:groups']];
-            }
-          }
-          
-          userRole = getRoleFromGroups(groups);
-        } catch (tokenError) {
-          // Token fetch/decoding failed, continue without groups
-        }
-
-        try {
-          const dbUser: ApiUser = await apiService.getUser(cognitoUser.username);
-          
-          // Convert active to boolean (handle MySQL 0/1)
-          const isActive = dbUser.active !== undefined 
-            ? Boolean(dbUser.active)
-            : true;
-          
-          setUser({
-            id: cognitoUser.username,
-            email: userAttributesObj.email || dbUser.email || '',
-            name: dbUser.first_name && dbUser.last_name 
-              ? `${dbUser.first_name} ${dbUser.last_name}`
-              : userAttributesObj.name || (userAttributesObj.given_name ? `${userAttributesObj.given_name} ${userAttributesObj.family_name || ''}`.trim() : ''),
-            userRole: userRole,
-            groups: groups,
-            attributes: { ...userAttributesObj, ...dbUser, active: isActive } as Record<string, any>,
-          });
-        } catch (dbError) {
-          setUser({
-            id: cognitoUser.username,
-            email: userAttributesObj.email || '',
-            name: userAttributesObj.name || (userAttributesObj.given_name ? `${userAttributesObj.given_name} ${userAttributesObj.family_name || ''}`.trim() : ''),
-            userRole: userRole,
-            groups: groups,
-            attributes: { ...userAttributesObj, active: true },
-          });
-        }
+      const { data } = await supabase.auth.getSession();
+      const authUser = data.session?.user;
+      if (!authUser) {
+        setUser(null);
+        return;
       }
-    } catch (error) {
+
+      const metadata = authUser.user_metadata || {};
+      const metaName = [metadata.first_name, metadata.last_name].filter(Boolean).join(' ');
+
+      try {
+        const dbUser: ApiUser = await apiService.getUser(authUser.id);
+        const { role, groups } = roleFromUserType(dbUser.user_type);
+        setUser({
+          id: authUser.id,
+          email: authUser.email || dbUser.email || '',
+          name: dbUser.first_name && dbUser.last_name ? `${dbUser.first_name} ${dbUser.last_name}` : metaName,
+          userRole: role,
+          groups,
+          attributes: { ...dbUser, active: dbUser.active !== undefined ? Boolean(dbUser.active) : true } as Record<string, any>,
+        });
+      } catch {
+        setUser({
+          id: authUser.id,
+          email: authUser.email || '',
+          name: metaName,
+          userRole: undefined,
+          groups: [],
+          attributes: { ...metadata, active: true },
+        });
+      }
+    } catch {
       setUser(null);
     } finally {
       setLoading(false);
@@ -169,98 +125,107 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     checkAuthState();
+
+    // Never call other Supabase methods directly inside this callback; defer to avoid a client deadlock.
+    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+      } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        setTimeout(() => checkAuthState(), 0);
+      }
+    });
+    return () => subscription.subscription.unsubscribe();
   }, [checkAuthState]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (user) {
-        checkAuthState();
-      }
+      if (userRef.current) checkAuthState();
     }, 30000);
     return () => clearInterval(interval);
-  }, [user, checkAuthState]);
+  }, [checkAuthState]);
 
   const handleSignIn = async (usernameOrEmail: string, password: string) => {
-    try {
-      await signIn({ username: usernameOrEmail, password });
-      await checkAuthState();
-      // Return the current user so caller can check if they exist in DB
-      const cognitoUser = await getCurrentUser();
-      return cognitoUser;
-    } catch (error: any) {
-      const authError: any = new Error(error?.message || 'Sign in failed');
-      authError.name = error?.name || error?.code || 'SignInError';
-      authError.code = error?.code || error?.name;
-      throw authError;
+    const identifier = usernameOrEmail.trim();
+
+    if (identifier.includes('@')) {
+      const { error } = await supabase.auth.signInWithPassword({ email: identifier, password });
+      if (error) throw toAuthError(error, 'Sign in failed');
+    } else {
+      // Usernames are resolved on the server so email addresses are never exposed to the browser.
+      let response: Response;
+      try {
+        response = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, password }),
+        });
+      } catch {
+        throw toAuthError({ message: 'Failed to connect to server. Please try again.' }, 'Sign in failed');
+      }
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const err = toAuthError({ message: body.error, code: body.code }, 'Sign in failed');
+        if (body.email) err.email = body.email;
+        throw err;
+      }
+      const { error } = await supabase.auth.setSession({ access_token: body.access_token, refresh_token: body.refresh_token });
+      if (error) throw toAuthError(error, 'Sign in failed');
     }
+
+    await checkAuthState();
+    const { data } = await supabase.auth.getSession();
+    return data.session ? { username: data.session.user.id } : null;
   };
 
-  const handleSignUp = async (email: string, password: string, attributes: Record<string, string>, username?: string) => {
-    try {
-      // Use provided username or generate a unique one
-      const finalUsername = username || `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      await signUp({
-        username: finalUsername,
-        password,
-        options: {
-          userAttributes: {
-            email: email,
-            ...attributes,
-          },
-        },
-      });
-    } catch (error: any) {
-      throw new Error(error.message || 'Sign up failed');
+  const handleSignUp = async (email: string, password: string, profile: SignUpProfile) => {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: profile,
+        emailRedirectTo: `${window.location.origin}/signin`,
+      },
+    });
+    if (error) throw toAuthError(error, 'Sign up failed');
+
+    // Supabase hides duplicates when confirmation is on: an existing account comes back with no identities.
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      throw toAuthError({ message: 'An account with this email already exists. Try signing in instead.', code: 'user_already_exists' }, 'Sign up failed');
     }
+    return { userId: data.user?.id ?? null, hasSession: Boolean(data.session) };
   };
 
-  const handleConfirmSignUp = async (usernameOrEmail: string, code: string) => {
-    try {
-      await confirmSignUp({ username: usernameOrEmail, confirmationCode: code });
-    } catch (error: any) {
-      throw new Error(error.message || 'Confirmation failed');
-    }
+  const handleConfirmSignUp = async (email: string, code: string) => {
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'signup' });
+    if (error) throw toAuthError(error, 'Confirmation failed');
   };
 
-  const handleResendConfirmationCode = async (_email: string) => {
-    try {
-      // In AWS Amplify v6, resending confirmation codes requires backend support
-      // or using AWS SDK directly. For now, we'll show a helpful error message.
-      // TODO: Implement backend endpoint or AWS SDK call for resending codes
-      throw new Error('Resend confirmation code feature is not available. Please contact support or try signing up again.');
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to resend confirmation code');
-    }
+  const handleResendConfirmationCode = async (email: string) => {
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+    if (error) throw toAuthError(error, 'Failed to resend confirmation code');
   };
 
   const handleForgotPassword = async (email: string) => {
-    try {
-      await resetPassword({ username: email });
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to send reset code');
-    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/forgot-password`,
+    });
+    if (error) throw toAuthError(error, 'Failed to send reset code');
   };
 
   const handleResetPassword = async (email: string, code: string, newPassword: string) => {
-    try {
-      await confirmResetPassword({
-        username: email,
-        confirmationCode: code,
-        newPassword: newPassword,
-      });
-    } catch (error: any) {
-      throw new Error(error.message || 'Password reset failed');
-    }
+    const { error: verifyError } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'recovery' });
+    if (verifyError) throw toAuthError(verifyError, 'Password reset failed');
+
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) throw toAuthError(updateError as AuthError, 'Password reset failed');
+
+    await supabase.auth.signOut();
   };
 
   const handleSignOut = async () => {
-    try {
-      await signOut();
-      setUser(null);
-    } catch (error: any) {
-      throw new Error(error.message || 'Sign out failed');
-    }
+    const { error } = await supabase.auth.signOut();
+    if (error) throw toAuthError(error, 'Sign out failed');
+    setUser(null);
   };
 
   const value: AuthContextType = {

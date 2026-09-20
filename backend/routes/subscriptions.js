@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
+import { requireAdmin, requireSelf } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -10,28 +11,10 @@ router.get('/test', (req, res) => {
 });
 
 // Admin routes must come BEFORE public routes to avoid route matching conflicts
-router.get('/admin/subscriptions', async (req, res) => {
+router.get('/admin/subscriptions', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
     const { page = 1, limit = 20, status, plan, search } = req.query;
 
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    let userGroups = [];
-    if (groups) {
-      try {
-        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
-      } catch {
-        userGroups = Array.isArray(groups) ? groups : [groups];
-      }
-    }
-
-    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
 
     const pageNum = Math.max(1, parseInt(page) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
@@ -39,8 +22,8 @@ router.get('/admin/subscriptions', async (req, res) => {
 
     let baseQuery = `
       SELECT us.*, sp.name as plan_name, sp.tier, sp.max_listings,
-        u.email, u.cognito_username,
-        COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.cognito_username) as user_name
+        u.email, u.auth_user_id,
+        COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.username) as user_name
       FROM user_subscriptions us
       JOIN subscription_plans sp ON us.plan_id = sp.id
       JOIN users u ON us.user_id = u.id
@@ -63,7 +46,7 @@ router.get('/admin/subscriptions', async (req, res) => {
 
     if (search && String(search).trim()) {
       const term = `%${String(search).trim()}%`;
-      baseQuery += ' AND (u.email LIKE ? OR u.cognito_username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.business_name LIKE ?)';
+      baseQuery += ' AND (u.email ILIKE ? OR u.username ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ? OR u.business_name ILIKE ?)';
       params.push(term, term, term, term, term);
       countParams.push(term, term, term, term, term);
     }
@@ -76,7 +59,7 @@ router.get('/admin/subscriptions', async (req, res) => {
     `;
     if (status && status !== 'all') countQuery += ' AND us.status = ?';
     if (plan) countQuery += ' AND sp.name = ?';
-    if (search && String(search).trim()) countQuery += ' AND (u.email LIKE ? OR u.cognito_username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.business_name LIKE ?)';
+    if (search && String(search).trim()) countQuery += ' AND (u.email ILIKE ? OR u.username ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ? OR u.business_name ILIKE ?)';
 
     const [countResult] = await pool.execute(countQuery, countParams);
 
@@ -104,30 +87,12 @@ router.get('/admin/subscriptions', async (req, res) => {
   }
 });
 
-router.put('/admin/subscriptions/:userId/cancel', async (req, res) => {
+router.put('/admin/subscriptions/:userId/cancel', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
     const { userId } = req.params;
 
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
 
-    let userGroups = [];
-    if (groups) {
-      try {
-        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
-      } catch {
-        userGroups = Array.isArray(groups) ? groups : [groups];
-      }
-    }
-
-    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    const [users] = await pool.execute('SELECT cognito_username FROM users WHERE id = ?', [userId]);
+    const [users] = await pool.execute('SELECT auth_user_id FROM users WHERE id = ?', [userId]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -163,32 +128,14 @@ router.put('/admin/subscriptions/:userId/cancel', async (req, res) => {
   }
 });
 
-router.put('/admin/subscriptions/:userId/resume', async (req, res) => {
+router.put('/admin/subscriptions/:userId/resume', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
     const { userId } = req.params;
 
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    let userGroups = [];
-    if (groups) {
-      try {
-        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
-      } catch {
-        userGroups = Array.isArray(groups) ? groups : [groups];
-      }
-    }
-
-    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
 
     const [subs] = await pool.execute(
       `SELECT id, payment_intent_id FROM user_subscriptions
-       WHERE user_id = ? AND status = 'active' AND end_date >= CURDATE() ORDER BY created_at DESC LIMIT 1`,
+       WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
 
@@ -217,28 +164,10 @@ router.put('/admin/subscriptions/:userId/resume', async (req, res) => {
   }
 });
 
-router.put('/admin/subscriptions/:userId/expire', async (req, res) => {
+router.put('/admin/subscriptions/:userId/expire', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
     const { userId } = req.params;
 
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    let userGroups = [];
-    if (groups) {
-      try {
-        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
-      } catch {
-        userGroups = Array.isArray(groups) ? groups : [groups];
-      }
-    }
-
-    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
 
     const [result] = await pool.execute(
       `UPDATE user_subscriptions SET status = 'expired'
@@ -257,29 +186,11 @@ router.put('/admin/subscriptions/:userId/expire', async (req, res) => {
   }
 });
 
-router.put('/admin/subscriptions/:userId/extend', async (req, res) => {
+router.put('/admin/subscriptions/:userId/extend', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
     const { userId } = req.params;
     const { days } = req.body;
 
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    let userGroups = [];
-    if (groups) {
-      try {
-        userGroups = typeof groups === 'string' ? JSON.parse(groups) : groups;
-      } catch {
-        userGroups = Array.isArray(groups) ? groups : [groups];
-      }
-    }
-
-    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
 
     const extendDays = Math.min(365, Math.max(1, parseInt(days) || 30));
 
@@ -310,67 +221,8 @@ router.put('/admin/subscriptions/:userId/extend', async (req, res) => {
 });
 
 // Admin: Get all subscription plans
-router.get('/admin/plans', async (req, res) => {
-  console.log('=== ADMIN PLANS ROUTE HIT ===');
-  console.log('Request method:', req.method);
-  console.log('Request path:', req.path);
-  console.log('Request URL:', req.url);
-  console.log('Request originalUrl:', req.originalUrl);
-  console.log('Request query:', req.query);
-  console.log('Router mounted at:', req.baseUrl);
-  
+router.get('/admin/plans', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
-    
-    console.log('Admin subscription plans request received:', {
-      cognitoUsername,
-      groups,
-      query: req.query,
-      url: req.url,
-      path: req.path
-    });
-
-    if (!cognitoUsername) {
-      console.log('Missing cognitoUsername in request');
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    let userGroups = [];
-    if (groups) {
-      try {
-        if (typeof groups === 'string') {
-          userGroups = JSON.parse(groups);
-        } else if (Array.isArray(groups)) {
-          userGroups = groups;
-        } else {
-          userGroups = [groups];
-        }
-      } catch (parseError) {
-        console.error('Error parsing groups:', parseError);
-        userGroups = Array.isArray(groups) ? groups : [groups];
-      }
-    }
-
-    console.log('Parsed userGroups:', userGroups);
-
-    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
-
-    if (!isAdmin) {
-      console.log('User is not admin. Groups:', userGroups);
-      return res.status(403).json({ error: 'Admin access required', receivedGroups: userGroups });
-    }
-
-    // Check if table exists, if not return empty array
-    try {
-      await pool.execute('SELECT 1 FROM subscription_plans LIMIT 1');
-    } catch (tableError) {
-      if (tableError.code === 'ER_NO_SUCH_TABLE') {
-        console.warn('subscription_plans table does not exist. Please run the migration.');
-        return res.json([]);
-      }
-      throw tableError;
-    }
-
     const [plans] = await pool.execute(
       'SELECT * FROM subscription_plans ORDER BY display_order ASC'
     );
@@ -397,17 +249,6 @@ router.get('/admin/plans', async (req, res) => {
 // Get all subscription plans (public)
 router.get('/plans', async (req, res) => {
   try {
-    // Check if table exists, if not return empty array
-    try {
-      await pool.execute('SELECT 1 FROM subscription_plans LIMIT 1');
-    } catch (tableError) {
-      if (tableError.code === 'ER_NO_SUCH_TABLE') {
-        console.warn('subscription_plans table does not exist. Please run the migration.');
-        return res.json([]);
-      }
-      throw tableError;
-    }
-
     const [plans] = await pool.execute(
       'SELECT * FROM subscription_plans WHERE is_active = TRUE ORDER BY display_order ASC'
     );
@@ -419,13 +260,13 @@ router.get('/plans', async (req, res) => {
 });
 
 // Get user's current subscription
-router.get('/user/:cognitoUsername', async (req, res) => {
+router.get('/user/:authUserId', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
 
     const [users] = await pool.execute(
-      'SELECT id, user_type, created_at FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id, user_type, created_at FROM users WHERE auth_user_id = ?',
+      [authUserId]
     );
 
     if (users.length === 0) {
@@ -444,7 +285,7 @@ router.get('/user/:cognitoUsername', async (req, res) => {
       `SELECT us.*, sp.name as plan_name, sp.tier, sp.max_listings, sp.price_monthly, sp.price_yearly
        FROM user_subscriptions us
        JOIN subscription_plans sp ON us.plan_id = sp.id
-       WHERE us.user_id = ? AND us.status = 'active' AND us.end_date >= CURDATE() AND us.created_at >= ?
+       WHERE us.user_id = ? AND us.status = 'active' AND us.end_date >= CURRENT_DATE AND us.created_at >= ?
        ORDER BY us.created_at DESC
        LIMIT 1`,
       [userId, userCreatedAt]
@@ -457,7 +298,7 @@ router.get('/user/:cognitoUsername', async (req, res) => {
     const subscription = subscriptions[0];
 
     const [activeListings] = await pool.execute(
-      'SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = "active"',
+      "SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = 'active'",
       [userId]
     );
 
@@ -476,9 +317,9 @@ router.get('/user/:cognitoUsername', async (req, res) => {
 
 // Create user subscription - REQUIRES valid Stripe checkout session (payment verification)
 // Subscriptions can only be created after successful Stripe payment
-router.post('/user/:cognitoUsername', async (req, res) => {
+router.post('/user/:authUserId', async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
     const { plan_id, billing_period, session_id, auto_renew = true } = req.body;
 
     if (!plan_id || !billing_period) {
@@ -525,7 +366,7 @@ router.post('/user/:cognitoUsername', async (req, res) => {
       });
     }
 
-    if (metadata.cognito_username && metadata.cognito_username !== cognitoUsername) {
+    if (metadata.auth_user_id && metadata.auth_user_id !== authUserId) {
       return res.status(403).json({
         error: 'User mismatch',
         message: 'This payment was made by a different user.',
@@ -533,8 +374,8 @@ router.post('/user/:cognitoUsername', async (req, res) => {
     }
 
     const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id FROM users WHERE auth_user_id = ?',
+      [authUserId]
     );
 
     if (users.length === 0) {
@@ -600,13 +441,13 @@ router.post('/user/:cognitoUsername', async (req, res) => {
 });
 
 // Cancel user subscription
-router.put('/user/:cognitoUsername/cancel', async (req, res) => {
+router.put('/user/:authUserId/cancel', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
 
     const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id FROM users WHERE auth_user_id = ?',
+      [authUserId]
     );
 
     if (users.length === 0) {
@@ -652,13 +493,13 @@ router.put('/user/:cognitoUsername/cancel', async (req, res) => {
 });
 
 // Undo cancellation / resume subscription
-router.put('/user/:cognitoUsername/resume', async (req, res) => {
+router.put('/user/:authUserId/resume', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
 
     const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id FROM users WHERE auth_user_id = ?',
+      [authUserId]
     );
 
     if (users.length === 0) {
@@ -669,7 +510,7 @@ router.put('/user/:cognitoUsername/resume', async (req, res) => {
 
     const [subs] = await pool.execute(
       `SELECT id, payment_intent_id FROM user_subscriptions 
-       WHERE user_id = ? AND status = 'active' AND end_date >= CURDATE() ORDER BY created_at DESC LIMIT 1`,
+       WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
 
@@ -703,15 +544,8 @@ router.put('/user/:cognitoUsername/resume', async (req, res) => {
   }
 });
 
-router.get('/admin/stripe-plans', async (req, res) => {
+router.get('/admin/stripe-plans', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
-    if (!cognitoUsername) return res.status(401).json({ error: 'Authentication required' });
-
-    let userGroups = [];
-    try { userGroups = typeof groups === 'string' ? JSON.parse(groups) : (Array.isArray(groups) ? groups : [groups]); } catch { userGroups = [groups]; }
-    if (!userGroups.includes('site_admin') && !userGroups.includes('admin')) return res.status(403).json({ error: 'Admin access required' });
-
     if (!stripe) return res.status(500).json({ error: 'Stripe not configured' });
 
     const products = await stripe.products.list({ active: true, limit: 100, expand: ['data.default_price'] });
@@ -750,15 +584,8 @@ router.get('/admin/stripe-plans', async (req, res) => {
   }
 });
 
-router.post('/admin/sync-stripe-plans', async (req, res) => {
+router.post('/admin/sync-stripe-plans', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
-    if (!cognitoUsername) return res.status(401).json({ error: 'Authentication required' });
-
-    let userGroups = [];
-    try { userGroups = typeof groups === 'string' ? JSON.parse(groups) : (Array.isArray(groups) ? groups : [groups]); } catch { userGroups = [groups]; }
-    if (!userGroups.includes('site_admin') && !userGroups.includes('admin')) return res.status(403).json({ error: 'Admin access required' });
-
     if (!stripe) return res.status(500).json({ error: 'Stripe not configured' });
 
     const products = await stripe.products.list({ active: true, limit: 100 });
@@ -796,15 +623,8 @@ router.post('/admin/sync-stripe-plans', async (req, res) => {
   }
 });
 
-router.put('/admin/stripe-plans/:productId/prices', async (req, res) => {
+router.put('/admin/stripe-plans/:productId/prices', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
-    if (!cognitoUsername) return res.status(401).json({ error: 'Authentication required' });
-
-    let userGroups = [];
-    try { userGroups = typeof groups === 'string' ? JSON.parse(groups) : (Array.isArray(groups) ? groups : [groups]); } catch { userGroups = [groups]; }
-    if (!userGroups.includes('site_admin') && !userGroups.includes('admin')) return res.status(403).json({ error: 'Admin access required' });
-
     if (!stripe) return res.status(500).json({ error: 'Stripe not configured' });
 
     const { productId } = req.params;
@@ -853,29 +673,10 @@ router.put('/admin/stripe-plans/:productId/prices', async (req, res) => {
 });
 
 // Admin: Create or update subscription plan
-router.post('/admin/plans', async (req, res) => {
+router.post('/admin/plans', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
     const { id, name, description, tier, max_listings, price_monthly, price_yearly, features, is_active, display_order } = req.body;
 
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    let userGroups = [];
-    if (groups) {
-      try {
-        userGroups = JSON.parse(groups);
-      } catch (parseError) {
-        userGroups = Array.isArray(groups) ? groups : [groups];
-      }
-    }
-
-    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
-
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
 
     if (!name || !tier || !max_listings || price_monthly === undefined || price_yearly === undefined) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -906,29 +707,10 @@ router.post('/admin/plans', async (req, res) => {
 });
 
 // Admin: Delete subscription plan
-router.delete('/admin/plans/:id', async (req, res) => {
+router.delete('/admin/plans/:id', requireAdmin, async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
     const { id } = req.params;
 
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    let userGroups = [];
-    if (groups) {
-      try {
-        userGroups = JSON.parse(groups);
-      } catch (parseError) {
-        userGroups = Array.isArray(groups) ? groups : [groups];
-      }
-    }
-
-    const isAdmin = userGroups.includes('site_admin') || userGroups.includes('admin');
-
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
 
     await pool.execute('DELETE FROM subscription_plans WHERE id = ?', [id]);
     res.json({ message: 'Plan deleted successfully' });

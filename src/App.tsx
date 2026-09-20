@@ -9,7 +9,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
-import './aws-config';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Gallery from './pages/Gallery';

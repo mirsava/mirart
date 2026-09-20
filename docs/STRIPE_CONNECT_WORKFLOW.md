@@ -6,7 +6,7 @@ This document describes the end-to-end flow for the Stripe Connect Express marke
 
 | Step | Description | Implementation |
 |------|-------------|----------------|
-| 1 | Seller signs up on your site | Cognito auth + `users` table |
+| 1 | Seller signs up on your site | Supabase auth + `users` table |
 | 2 | Platform creates Connected Account | `POST /api/stripe/connect/create-account` |
 | 3 | Seller completes Stripe onboarding (KYC) | Account Link → Stripe hosted onboarding |
 | 4 | Customer purchases item | Stripe Checkout (manual capture) |
@@ -18,8 +18,8 @@ This document describes the end-to-end flow for the Stripe Connect Express marke
 
 ### 1. Seller Signup
 
-- Seller registers via Cognito (sign up / sign in)
-- User record created in `users` table with `cognito_username`, `email`, etc.
+- Seller registers via Supabase Auth (sign up / sign in)
+- User record created in `users` table with `auth_user_id`, `email`, etc.
 
 ### 2. Create Connected Account
 
@@ -93,10 +93,8 @@ This document describes the end-to-end flow for the Stripe Connect Express marke
 - `orders.payment_intent_id` — Stripe PaymentIntent ID
 - `orders.stripe_transfer_id` — Transfer ID (set when delivery confirmed)
 
-## Run Migrations
+## Database
 
-```bash
-npm run migrate-stripe-connect
-```
+These columns are part of `backend/database/schema.sql`; `npm run init-db` creates them.
 
 See `backend/STRIPE_SETUP.md` for Stripe Dashboard configuration.

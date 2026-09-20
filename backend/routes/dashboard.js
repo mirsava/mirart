@@ -1,17 +1,19 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { requireSelf } from '../middleware/auth.js';
+import { parseImageUrls } from '../utils/json.js';
 
 const router = express.Router();
 
 // Get dashboard stats for a user
-router.get('/:cognitoUsername', async (req, res) => {
+router.get('/:authUserId', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
     
     // Get user_id
     const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id FROM users WHERE auth_user_id = ?',
+      [authUserId]
     );
     
     let user_id;
@@ -133,36 +135,11 @@ router.get('/:cognitoUsername', async (req, res) => {
         messagesReceived: messagesReceived[0].messages_received || 0,
         totalLikes: totalLikes[0].total_likes || 0,
       },
-      recentListings: recentListings.map(listing => {
-          let parsedImageUrls = null;
-          if (listing.image_urls && listing.image_urls !== 'null' && listing.image_urls !== '') {
-            try {
-              const imageUrlsStr = String(listing.image_urls).trim();
-              if (!imageUrlsStr || imageUrlsStr === 'null' || imageUrlsStr === '') {
-                parsedImageUrls = null;
-              } else if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
-                parsedImageUrls = JSON.parse(imageUrlsStr);
-              } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
-                parsedImageUrls = [imageUrlsStr];
-              } else {
-                parsedImageUrls = JSON.parse(imageUrlsStr);
-              }
-            } catch (parseError) {
-              console.error('Error parsing image_urls JSON:', parseError);
-              const imageUrlsStr = String(listing.image_urls).trim();
-              if (imageUrlsStr && imageUrlsStr !== 'null' && imageUrlsStr !== '' && (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/'))) {
-                parsedImageUrls = [imageUrlsStr];
-              } else {
-                parsedImageUrls = null;
-              }
-            }
-          }
-        return {
-          ...listing,
-          price: parseFloat(listing.price),
-          image_urls: parsedImageUrls
-        };
-      }),
+      recentListings: recentListings.map(listing => ({
+        ...listing,
+        price: parseFloat(listing.price),
+        image_urls: parseImageUrls(listing.image_urls)
+      })),
       recentOrders: recentOrders.map(order => ({
         ...order,
         unit_price: parseFloat(order.unit_price),
@@ -177,13 +154,13 @@ router.get('/:cognitoUsername', async (req, res) => {
   }
 });
 
-router.get('/:cognitoUsername/analytics', async (req, res) => {
+router.get('/:authUserId/analytics', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
 
     const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id FROM users WHERE auth_user_id = ?',
+      [authUserId]
     );
     if (users.length === 0) return res.status(404).json({ error: 'User not found' });
     const userId = users[0].id;
@@ -228,7 +205,7 @@ router.get('/:cognitoUsername/analytics', async (req, res) => {
     );
 
     const [revenueOverTime] = await pool.execute(
-      `SELECT DATE_FORMAT(created_at, '%Y-%m') as month,
+      `SELECT to_char(created_at, 'YYYY-MM') as month,
               COALESCE(SUM(CASE
                 WHEN payout_amount IS NOT NULL THEN payout_amount + COALESCE(payout_stripe_fee, 0) + COALESCE(payout_label_cost, 0) + COALESCE(payout_commission_amount, 0)
                 ELSE (total_price - platform_fee)
@@ -240,8 +217,8 @@ router.get('/:cognitoUsername/analytics', async (req, res) => {
               COUNT(*) as orders
        FROM orders
        WHERE seller_id = ? AND status NOT IN ('cancelled')
-         AND created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-       GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+         AND created_at >= CURRENT_DATE - INTERVAL '12 months'
+       GROUP BY to_char(created_at, 'YYYY-MM')
        ORDER BY month ASC`,
       [userId]
     );

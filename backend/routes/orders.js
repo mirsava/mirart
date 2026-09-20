@@ -2,6 +2,7 @@ import express from 'express';
 import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
 import { createNotification } from '../services/notificationService.js';
+import { requireAuth, requireSelf } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -24,10 +25,9 @@ async function getPayoutCommissionPercent() {
 }
 
 // Create new order
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const {
-      cognito_username,
       listing_id,
       quantity = 1,
       shipping_address,
@@ -38,23 +38,14 @@ router.post('/', async (req, res) => {
       shipping_label_cost
     } = req.body;
 
-    if (!cognito_username) {
-      return res.status(400).json({ error: 'cognito_username is required' });
-    }
     if (!listing_id) {
       return res.status(400).json({ error: 'listing_id is required' });
     }
 
-    // Get buyer user_id from cognito_username
-    const [buyers] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognito_username]
-    );
-
-    if (buyers.length === 0) {
+    const buyer_id = req.auth.userId;
+    if (!buyer_id) {
       return res.status(404).json({ error: 'Buyer not found' });
     }
-    const buyer_id = buyers[0].id;
 
     // Get listing details
     const [listings] = await pool.execute(
@@ -208,14 +199,14 @@ router.post('/', async (req, res) => {
 });
 
 // Get orders for a user
-router.get('/user/:cognitoUsername', async (req, res) => {
+router.get('/user/:authUserId', requireSelf(), async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
     const { type } = req.query; // 'buyer' or 'seller'
 
     const [users] = await pool.execute(
-      'SELECT id FROM users WHERE cognito_username = ?',
-      [cognitoUsername]
+      'SELECT id FROM users WHERE auth_user_id = ?',
+      [authUserId]
     );
 
     if (users.length === 0) {
@@ -270,16 +261,11 @@ router.get('/user/:cognitoUsername', async (req, res) => {
   }
 });
 
-router.get('/:orderId', async (req, res) => {
+router.get('/:orderId', requireAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cognitoUsername } = req.query;
-
-    if (!cognitoUsername) return res.status(400).json({ error: 'cognitoUsername required' });
-
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognitoUsername]);
-    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
-    const userId = users[0].id;
+    if (!/^\d+$/.test(orderId)) return res.status(404).json({ error: 'Order not found' });
+    const userId = req.auth.userId;
 
     const [orders] = await pool.execute(
       `SELECT o.*,
@@ -329,11 +315,10 @@ router.get('/:orderId', async (req, res) => {
 });
 
 // Mark order as shipped (seller)
-router.put('/:orderId/mark-shipped', async (req, res) => {
+router.put('/:orderId/mark-shipped', requireAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cognito_username, tracking_number, tracking_url, shipping_carrier } = req.body;
-    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+    const { tracking_number, tracking_url, shipping_carrier } = req.body;
     const normalizedCarrier = (shipping_carrier || '').toString().trim().toLowerCase();
     const normalizedTrackingNumber = (tracking_number || '').toString().trim();
     const normalizedTrackingUrl = (tracking_url || '').toString().trim();
@@ -341,9 +326,7 @@ router.put('/:orderId/mark-shipped', async (req, res) => {
       return res.status(400).json({ error: 'Tracking number is required for manual shipping' });
     }
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
-    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
-    const seller_id = users[0].id;
+    const seller_id = req.auth.userId;
 
     const [orders] = await pool.execute(
       'SELECT id, seller_id, buyer_id, order_number, status FROM orders WHERE id = ? AND seller_id = ?',
@@ -388,17 +371,13 @@ router.put('/:orderId/mark-shipped', async (req, res) => {
 });
 
 // Confirm delivery (buyer) - captures payment and transfers funds to artist via Stripe Connect
-router.put('/:orderId/confirm-delivery', async (req, res) => {
+router.put('/:orderId/confirm-delivery', requireAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cognito_username } = req.body;
-    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
 
     if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
-    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
-    const buyer_id = users[0].id;
+    const buyer_id = req.auth.userId;
 
     const [orders] = await pool.execute(
       `SELECT o.*, u.stripe_account_id as seller_stripe_account_id
@@ -536,15 +515,12 @@ router.put('/:orderId/confirm-delivery', async (req, res) => {
   }
 });
 
-router.post('/:orderId/return-request', async (req, res) => {
+router.post('/:orderId/return-request', requireAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cognito_username, reason } = req.body;
-    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+    const { reason } = req.body;
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
-    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
-    const buyer_id = users[0].id;
+    const buyer_id = req.auth.userId;
 
     const [orders] = await pool.execute(
       `SELECT o.*, l.return_days, l.returns_info
@@ -599,16 +575,13 @@ router.post('/:orderId/return-request', async (req, res) => {
   }
 });
 
-router.put('/:orderId/return-respond', async (req, res) => {
+router.put('/:orderId/return-respond', requireAuth, async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cognito_username, action } = req.body;
-    if (!cognito_username) return res.status(400).json({ error: 'cognito_username is required' });
+    const { action } = req.body;
     if (!['approved', 'denied'].includes(action)) return res.status(400).json({ error: 'action must be approved or denied' });
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE cognito_username = ?', [cognito_username]);
-    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
-    const seller_id = users[0].id;
+    const seller_id = req.auth.userId;
 
     const [orders] = await pool.execute(
       'SELECT id, seller_id, buyer_id, order_number, return_status FROM orders WHERE id = ? AND seller_id = ?',

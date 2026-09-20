@@ -1,59 +1,19 @@
 import express from 'express';
 import pool from '../config/database.js';
-import UserRole from '../constants/userRoles.js';
 import { createNotification } from '../services/notificationService.js';
-import { CognitoIdentityProviderClient, AdminDeleteUserCommand, AdminDisableUserCommand, AdminEnableUserCommand } from '@aws-sdk/client-cognito-identity-provider';
-
-const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || 'us-east-1_c9TqRAcz9';
-const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
-
-const cognitoClient = new CognitoIdentityProviderClient({ 
-  region: AWS_REGION
-});
+import { getSupabaseAdmin } from '../config/supabase.js';
+import { requireAdmin, clearAuthCache } from '../middleware/auth.js';
+import { parseImageUrls } from '../utils/json.js';
 
 const router = express.Router();
 
-const checkAdminAccess = async (req, res, next) => {
+router.use(requireAdmin);
+
+// Supabase returns { error } instead of throwing; "not found" is fine when the target is already gone.
+const isAuthUserNotFound = (error) => error?.status === 404 || error?.code === 'user_not_found';
+
+router.post('/notifications/send', async (req, res) => {
   try {
-    const { cognitoUsername, groups } = req.query;
-    
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    let userGroups = [];
-    if (groups) {
-      try {
-        userGroups = JSON.parse(groups);
-      } catch (parseError) {
-        userGroups = Array.isArray(groups) ? groups : [groups];
-      }
-    }
-
-    const isAdmin = userGroups.includes(UserRole.SITE_ADMIN) || 
-                   userGroups.includes('site_admin') || 
-                   userGroups.includes('admin');
-
-    if (!isAdmin) {
-      return res.status(403).json({ 
-        error: 'Admin access required',
-        message: `You must be a member of the '${UserRole.SITE_ADMIN}' group to access this resource.`
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Admin access check error:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
-  }
-};
-
-router.post('/notifications/send', checkAdminAccess, async (req, res) => {
-  try {
-    const { cognitoUsername } = req.query;
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
     const { title, body, link, target, user_ids, severity } = req.body;
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'Title is required' });
@@ -94,7 +54,7 @@ router.post('/notifications/send', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.get('/stats', checkAdminAccess, async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     const [userStats] = await pool.execute('SELECT COUNT(*) as total FROM users');
     const [listingStats] = await pool.execute('SELECT COUNT(*) as total, status FROM listings GROUP BY status');
@@ -114,13 +74,13 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
         `SELECT 
           COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN total_price ELSE 0 END), 0) as total,
           COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN platform_fee ELSE 0 END), 0) as fees`
-        + ` FROM orders WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())`
+        + ` FROM orders WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE) AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)`
       );
       const [ytdRev] = await pool.execute(
         `SELECT 
           COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN total_price ELSE 0 END), 0) as total,
           COALESCE(SUM(CASE WHEN status IN ('paid','shipped','delivered') THEN platform_fee ELSE 0 END), 0) as fees`
-        + ` FROM orders WHERE YEAR(created_at) = YEAR(CURDATE())`
+        + ` FROM orders WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)`
       );
       orderRevenue = {
         total: parseFloat(rev[0]?.total || 0),
@@ -146,7 +106,7 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
     };
     try {
       const [subActive] = await pool.execute(
-        "SELECT COUNT(*) as total FROM user_subscriptions WHERE status = 'active' AND end_date >= CURDATE()"
+        "SELECT COUNT(*) as total FROM user_subscriptions WHERE status = 'active' AND end_date >= CURRENT_DATE"
       );
       const [subExpired] = await pool.execute(
         "SELECT COUNT(*) as total FROM user_subscriptions WHERE status = 'expired'"
@@ -155,20 +115,20 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
         "SELECT COUNT(*) as total FROM user_subscriptions WHERE status = 'cancelled'"
       );
       const [subThisMonth] = await pool.execute(
-        "SELECT COUNT(*) as total FROM user_subscriptions WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())"
+        "SELECT COUNT(*) as total FROM user_subscriptions WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE) AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)"
       );
       const [subYtd] = await pool.execute(
-        "SELECT COUNT(*) as total FROM user_subscriptions WHERE YEAR(created_at) = YEAR(CURDATE())"
+        "SELECT COUNT(*) as total FROM user_subscriptions WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)"
       );
       const [subByPlan] = await pool.execute(
         `SELECT sp.name, COUNT(*) as total FROM user_subscriptions us
          JOIN subscription_plans sp ON us.plan_id = sp.id
-         WHERE us.status = 'active' AND us.end_date >= CURDATE()
+         WHERE us.status = 'active' AND us.end_date >= CURRENT_DATE
          GROUP BY sp.id, sp.name`
       );
       const [subByBilling] = await pool.execute(
         `SELECT billing_period, COUNT(*) as total FROM user_subscriptions
-         WHERE status = 'active' AND end_date >= CURDATE()
+         WHERE status = 'active' AND end_date >= CURRENT_DATE
          GROUP BY billing_period`
       );
       const byPlan = {};
@@ -223,7 +183,7 @@ router.get('/stats', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.get('/users/:id', checkAdminAccess, async (req, res) => {
+router.get('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const [rows] = await pool.execute('SELECT * FROM users WHERE id = ?', [id]);
@@ -234,7 +194,7 @@ router.get('/users/:id', checkAdminAccess, async (req, res) => {
     res.json({
       ...user,
       active: user.active !== undefined ? Boolean(user.active) : true,
-      blocked: user.blocked === 1 || user.blocked === true || user.blocked === '1',
+      blocked: Boolean(user.blocked),
     });
   } catch (error) {
     console.error('Error fetching user:', error);
@@ -242,23 +202,8 @@ router.get('/users/:id', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.get('/users', checkAdminAccess, async (req, res) => {
+router.get('/users', async (req, res) => {
   try {
-    // Ensure blocked column exists (auto-migrate if missing)
-    try {
-      await pool.execute('SELECT blocked FROM users LIMIT 1');
-    } catch (colError) {
-      if (colError.code === 'ER_BAD_FIELD_ERROR' && colError.message?.includes('blocked')) {
-        try {
-          await pool.execute('ALTER TABLE users ADD COLUMN blocked TINYINT(1) DEFAULT 0');
-        } catch (alterError) {
-          if (alterError.code !== 'ER_DUP_FIELDNAME') {
-            console.warn('Could not add blocked column:', alterError.message);
-          }
-        }
-      }
-    }
-
     const { page = 1, limit = 20, search, subscriptionFilter, subscriptionPlan, subscriptionBilling } = req.query;
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 20;
@@ -278,17 +223,17 @@ router.get('/users', checkAdminAccess, async (req, res) => {
         JOIN subscription_plans sp ON us.plan_id = sp.id
         WHERE 1=1`;
       if (subscriptionFilter === 'active') {
-        query += " AND us.status = 'active' AND us.end_date >= CURDATE()";
-        countQuery += " AND us.status = 'active' AND us.end_date >= CURDATE()";
+        query += " AND us.status = 'active' AND us.end_date >= CURRENT_DATE";
+        countQuery += " AND us.status = 'active' AND us.end_date >= CURRENT_DATE";
       } else if (subscriptionFilter === 'expired') {
         query += " AND us.status = 'expired'";
         countQuery += " AND us.status = 'expired'";
       } else if (subscriptionFilter === 'this_month') {
-        query += ' AND YEAR(us.created_at) = YEAR(CURDATE()) AND MONTH(us.created_at) = MONTH(CURDATE())';
-        countQuery += ' AND YEAR(us.created_at) = YEAR(CURDATE()) AND MONTH(us.created_at) = MONTH(CURDATE())';
+        query += ' AND EXTRACT(YEAR FROM us.created_at) = EXTRACT(YEAR FROM CURRENT_DATE) AND EXTRACT(MONTH FROM us.created_at) = EXTRACT(MONTH FROM CURRENT_DATE)';
+        countQuery += ' AND EXTRACT(YEAR FROM us.created_at) = EXTRACT(YEAR FROM CURRENT_DATE) AND EXTRACT(MONTH FROM us.created_at) = EXTRACT(MONTH FROM CURRENT_DATE)';
       } else if (subscriptionFilter === 'ytd') {
-        query += ' AND YEAR(us.created_at) = YEAR(CURDATE())';
-        countQuery += ' AND YEAR(us.created_at) = YEAR(CURDATE())';
+        query += ' AND EXTRACT(YEAR FROM us.created_at) = EXTRACT(YEAR FROM CURRENT_DATE)';
+        countQuery += ' AND EXTRACT(YEAR FROM us.created_at) = EXTRACT(YEAR FROM CURRENT_DATE)';
       }
       if (subscriptionPlan) {
         query += ' AND sp.name = ?';
@@ -311,11 +256,11 @@ router.get('/users', checkAdminAccess, async (req, res) => {
     if (search) {
       const searchTerm = `%${search}%`;
       if (hasSubscriptionFilter) {
-        query += ' AND (u.email LIKE ? OR u.cognito_username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.business_name LIKE ?)';
-        countQuery += ' AND (u.email LIKE ? OR u.cognito_username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.business_name LIKE ?)';
+        query += ' AND (u.email ILIKE ? OR u.username ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ? OR u.business_name ILIKE ?)';
+        countQuery += ' AND (u.email ILIKE ? OR u.username ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ? OR u.business_name ILIKE ?)';
       } else {
-        query += ' AND (email LIKE ? OR cognito_username LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR business_name LIKE ?)';
-        countQuery += ' AND (email LIKE ? OR cognito_username LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR business_name LIKE ?)';
+        query += ' AND (email ILIKE ? OR username ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ? OR business_name ILIKE ?)';
+        countQuery += ' AND (email ILIKE ? OR username ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ? OR business_name ILIKE ?)';
       }
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
       countParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
@@ -330,11 +275,10 @@ router.get('/users', checkAdminAccess, async (req, res) => {
 
     const [users] = await pool.execute(query, params);
     
-    // Add active and blocked fields, convert MySQL TINYINT to boolean
     const usersWithActive = users.map(user => ({
       ...user,
       active: user.active !== undefined ? Boolean(user.active) : true,
-      blocked: user.blocked === 1 || user.blocked === true || user.blocked === '1'
+      blocked: Boolean(user.blocked)
     }));
 
     const countParamsToUse = hasSubscriptionFilter ? countParams : (search ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`] : []);
@@ -358,7 +302,7 @@ router.get('/users', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.get('/listings', checkAdminAccess, async (req, res) => {
+router.get('/listings', async (req, res) => {
   try {
     const { page = 1, limit = 20, status, category, search } = req.query;
     const pageNum = parseInt(page) || 1;
@@ -370,10 +314,10 @@ router.get('/listings', checkAdminAccess, async (req, res) => {
         COALESCE(
           u.business_name,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')),
-          u.cognito_username,
+          u.username,
           u.email
         ) as artist_name,
-        u.cognito_username,
+        u.auth_user_id,
         u.email as artist_email
       FROM listings l
       JOIN users u ON l.user_id = u.id
@@ -382,7 +326,7 @@ router.get('/listings', checkAdminAccess, async (req, res) => {
     const params = [];
 
     if (search) {
-      query += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)';
+      query += ' AND (l.title ILIKE ? OR l.description ILIKE ? OR u.business_name ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ? OR u.email ILIKE ?)';
       const term = `%${String(search)}%`;
       params.push(term, term, term, term, term, term);
     }
@@ -410,7 +354,7 @@ router.get('/listings', checkAdminAccess, async (req, res) => {
     const countParams = [];
 
     if (search) {
-      countQuery += ' AND (l.title LIKE ? OR l.description LIKE ? OR u.business_name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)';
+      countQuery += ' AND (l.title ILIKE ? OR l.description ILIKE ? OR u.business_name ILIKE ? OR u.first_name ILIKE ? OR u.last_name ILIKE ? OR u.email ILIKE ?)';
       const term = `%${String(search)}%`;
       countParams.push(term, term, term, term, term, term);
     }
@@ -429,28 +373,11 @@ router.get('/listings', checkAdminAccess, async (req, res) => {
     const total = countResult[0].total;
     const totalPages = Math.ceil(total / limitNum);
 
-    const listingsWithParsedUrls = listings.map(listing => {
-      let parsedImageUrls = null;
-      if (listing.image_urls && listing.image_urls !== 'null' && listing.image_urls !== '') {
-        try {
-          const imageUrlsStr = String(listing.image_urls).trim();
-          if (imageUrlsStr.startsWith('[') || imageUrlsStr.startsWith('{')) {
-            parsedImageUrls = JSON.parse(imageUrlsStr);
-          } else if (imageUrlsStr.startsWith('http://') || imageUrlsStr.startsWith('https://') || imageUrlsStr.startsWith('/')) {
-            parsedImageUrls = [imageUrlsStr];
-          } else {
-            parsedImageUrls = JSON.parse(imageUrlsStr);
-          }
-        } catch (parseError) {
-          parsedImageUrls = null;
-        }
-      }
-      return {
-        ...listing,
-        price: listing.price ? parseFloat(listing.price) : null,
-        image_urls: parsedImageUrls,
-      };
-    });
+    const listingsWithParsedUrls = listings.map(listing => ({
+      ...listing,
+      price: listing.price ? parseFloat(listing.price) : null,
+      image_urls: parseImageUrls(listing.image_urls),
+    }));
 
     res.json({
       listings: listingsWithParsedUrls,
@@ -467,7 +394,7 @@ router.get('/listings', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.get('/messages', checkAdminAccess, async (req, res) => {
+router.get('/messages', async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
     const pageNum = parseInt(page) || 1;
@@ -482,13 +409,13 @@ router.get('/messages', checkAdminAccess, async (req, res) => {
         COALESCE(
           u_sender.business_name,
           CONCAT(COALESCE(u_sender.first_name, ''), ' ', COALESCE(u_sender.last_name, '')),
-          u_sender.cognito_username,
+          u_sender.username,
           m.sender_name
         ) as sender_name_display,
         COALESCE(
           u_recipient.business_name,
           CONCAT(COALESCE(u_recipient.first_name, ''), ' ', COALESCE(u_recipient.last_name, '')),
-          u_recipient.cognito_username
+          u_recipient.username
         ) as recipient_name
       FROM messages m
       LEFT JOIN listings l ON m.listing_id = l.id
@@ -518,7 +445,7 @@ router.get('/messages', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.get('/orders', checkAdminAccess, async (req, res) => {
+router.get('/orders', async (req, res) => {
   try {
     const { page = 1, limit = 20, search, status, buyer_id, seller_id, user_id } = req.query;
     const pageNum = parseInt(page) || 1;
@@ -531,8 +458,8 @@ router.get('/orders', checkAdminAccess, async (req, res) => {
         l.primary_image_url,
         u_buyer.email as buyer_email,
         u_seller.email as seller_email,
-        COALESCE(u_buyer.business_name, CONCAT(COALESCE(u_buyer.first_name, ''), ' ', COALESCE(u_buyer.last_name, '')), u_buyer.cognito_username) as buyer_name,
-        COALESCE(u_seller.business_name, CONCAT(COALESCE(u_seller.first_name, ''), ' ', COALESCE(u_seller.last_name, '')), u_seller.cognito_username) as seller_name
+        COALESCE(u_buyer.business_name, CONCAT(COALESCE(u_buyer.first_name, ''), ' ', COALESCE(u_buyer.last_name, '')), u_buyer.username) as buyer_name,
+        COALESCE(u_seller.business_name, CONCAT(COALESCE(u_seller.first_name, ''), ' ', COALESCE(u_seller.last_name, '')), u_seller.username) as seller_name
       FROM orders o
       JOIN listings l ON o.listing_id = l.id
       JOIN users u_buyer ON o.buyer_id = u_buyer.id
@@ -567,7 +494,7 @@ router.get('/orders', checkAdminAccess, async (req, res) => {
     }
     if (search && String(search).trim()) {
       const term = `%${String(search).trim()}%`;
-      baseQuery += ' AND (o.order_number LIKE ? OR l.title LIKE ? OR u_buyer.email LIKE ? OR u_seller.email LIKE ? OR u_buyer.cognito_username LIKE ? OR u_seller.cognito_username LIKE ?)';
+      baseQuery += ' AND (o.order_number ILIKE ? OR l.title ILIKE ? OR u_buyer.email ILIKE ? OR u_seller.email ILIKE ? OR u_buyer.username ILIKE ? OR u_seller.username ILIKE ?)';
       params.push(term, term, term, term, term, term);
       countParams.push(term, term, term, term, term, term);
     }
@@ -583,7 +510,7 @@ router.get('/orders', checkAdminAccess, async (req, res) => {
       if (buyer_id) countQuery += ' AND o.buyer_id = ?';
       if (seller_id) countQuery += ' AND o.seller_id = ?';
     }
-    if (search && String(search).trim()) countQuery += ' AND (o.order_number LIKE ? OR l.title LIKE ? OR u_buyer.email LIKE ? OR u_seller.email LIKE ? OR u_buyer.cognito_username LIKE ? OR u_seller.cognito_username LIKE ?)';
+    if (search && String(search).trim()) countQuery += ' AND (o.order_number ILIKE ? OR l.title ILIKE ? OR u_buyer.email ILIKE ? OR u_seller.email ILIKE ? OR u_buyer.username ILIKE ? OR u_seller.username ILIKE ?)';
     const [countResult] = await pool.execute(countQuery, countParams);
     const total = countResult[0].total;
     const totalPages = Math.ceil(total / limitNum);
@@ -614,15 +541,10 @@ router.get('/orders', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.put('/orders/:orderId/shipping', checkAdminAccess, async (req, res) => {
+router.put('/orders/:orderId/shipping', async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { cognitoUsername } = req.query;
     const { tracking_number, tracking_url, status } = req.body;
-
-    if (!cognitoUsername) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
 
     const [orders] = await pool.execute('SELECT id, status, buyer_id, order_number FROM orders WHERE id = ?', [orderId]);
     if (orders.length === 0) {
@@ -678,20 +600,24 @@ router.put('/orders/:orderId/shipping', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.put('/users/:cognitoUsername/user-type', checkAdminAccess, async (req, res) => {
+router.put('/users/:authUserId/user-type', async (req, res) => {
   try {
-    const { cognitoUsername } = req.params;
+    const { authUserId } = req.params;
     const { user_type } = req.body;
 
-    const validUserTypes = [UserRole.ARTIST, UserRole.BUYER, UserRole.SITE_ADMIN];
-    if (!validUserTypes.includes(user_type)) {
+    const dbType = user_type === 'site_admin' ? 'admin' : user_type;
+    if (!['artist', 'buyer', 'admin'].includes(dbType)) {
       return res.status(400).json({ error: 'Invalid user_type' });
+    }
+    if (authUserId === req.auth.authUserId && dbType !== 'admin') {
+      return res.status(400).json({ error: 'You cannot remove your own admin role' });
     }
 
     await pool.execute(
-      'UPDATE users SET user_type = ? WHERE cognito_username = ?',
-      [user_type, cognitoUsername]
+      'UPDATE users SET user_type = ? WHERE auth_user_id = ?',
+      [dbType, authUserId]
     );
+    clearAuthCache();
 
     res.json({ success: true });
   } catch (error) {
@@ -700,7 +626,7 @@ router.put('/users/:cognitoUsername/user-type', checkAdminAccess, async (req, re
   }
 });
 
-router.put('/listings/:id/inactivate', checkAdminAccess, async (req, res) => {
+router.put('/listings/:id/inactivate', async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -713,7 +639,7 @@ router.put('/listings/:id/inactivate', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.put('/listings/:id/status', checkAdminAccess, async (req, res) => {
+router.put('/listings/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -732,7 +658,7 @@ router.put('/listings/:id/status', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.delete('/listings/:id', checkAdminAccess, async (req, res) => {
+router.delete('/listings/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -745,247 +671,121 @@ router.delete('/listings/:id', checkAdminAccess, async (req, res) => {
   }
 });
 
-router.delete('/users/:userId', checkAdminAccess, async (req, res) => {
-  let connection;
+router.delete('/users/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { cognitoUsername: adminCognitoUsername } = req.query;
 
-    const [users] = await pool.execute(
-      'SELECT cognito_username, email, user_type FROM users WHERE id = ?',
-      [userId]
-    );
-
+    const [users] = await pool.execute('SELECT auth_user_id FROM users WHERE id = ?', [userId]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = users[0];
-    const cognitoUsername = user.cognito_username;
-    const userEmail = user.email;
-    const cognitoUsernameToUse = cognitoUsername || userEmail;
-
-    if (cognitoUsername === adminCognitoUsername) {
+    const { auth_user_id: authUserId } = users[0];
+    if (authUserId === req.auth.authUserId) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    if (!cognitoUsernameToUse) {
-      return res.status(400).json({ error: 'User does not have a Cognito username or email' });
+    await pool.execute('DELETE FROM orders WHERE buyer_id = ? OR seller_id = ?', [userId, userId]);
+
+    // Deleting the auth user cascades to the profile row and everything hanging off it.
+    const { error: authError } = await getSupabaseAdmin().auth.admin.deleteUser(authUserId);
+    if (authError && !isAuthUserNotFound(authError)) {
+      console.error('Supabase delete user error:', authError);
+      return res.status(502).json({ error: 'Failed to delete user from Supabase Auth', details: authError.message });
     }
+    await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
 
-    // Try to delete from Cognito (requires IAM). If credentials not configured, proceed with DB-only delete.
-    let cognitoDeleted = false;
-    try {
-      const command = new AdminDeleteUserCommand({
-        UserPoolId: USER_POOL_ID,
-        Username: cognitoUsernameToUse,
-      });
-      await cognitoClient.send(command);
-      cognitoDeleted = true;
-    } catch (cognitoError) {
-      if (cognitoError.name === 'UserNotFoundException') {
-        console.warn(`User ${cognitoUsernameToUse} not found in Cognito, proceeding with database deletion`);
-      } else if (cognitoError.name === 'CredentialsProviderError' || cognitoError.message?.includes('credentials')) {
-        console.warn('AWS credentials not configured. Deleting from database only. User may still exist in Cognito.');
-      } else {
-        console.error('Cognito delete error:', cognitoError);
-        return res.status(502).json({
-          error: 'Failed to delete user from Cognito',
-          details: cognitoError.message || 'Cognito API error',
-        });
-      }
-    }
-
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
-      await connection.execute('DELETE FROM orders WHERE buyer_id = ? OR seller_id = ?', [userId, userId]);
-      await connection.execute('DELETE FROM users WHERE id = ?', [userId]);
-      await connection.commit();
-
-      res.json({
-        success: true,
-        message: cognitoDeleted ? 'User deleted successfully' : 'User removed from database. (Cognito deletion skipped — add AWS credentials to delete from Cognito too.)',
-      });
-    } catch (dbError) {
-      if (connection) {
-        await connection.rollback();
-      }
-      throw dbError;
-    } finally {
-      if (connection) {
-        connection.release();
-      }
-    }
+    res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
-    const errorMessage = error.message || 'Unknown error occurred';
-    const errorCode = error.code || 'UNKNOWN_ERROR';
-    
-    if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.message?.includes('foreign key constraint')) {
-      return res.status(400).json({ 
-        error: 'Cannot delete user', 
+    if (error.code === '23503') {
+      return res.status(400).json({
+        error: 'Cannot delete user',
         details: 'User has related records that prevent deletion. Please contact support.',
-        code: errorCode
+        code: error.code,
       });
     }
-    
-    res.status(500).json({ 
-      error: 'Internal server error', 
-      details: errorMessage,
-      code: errorCode
-    });
+    res.status(500).json({ error: 'Internal server error', details: error.message, code: error.code || 'UNKNOWN_ERROR' });
   }
 });
 
-router.put('/users/:userId/activate', checkAdminAccess, async (req, res) => {
+router.put('/users/:userId/activate', async (req, res) => {
   try {
-    const { userId } = req.params;
-
-    // Check if active column exists
-    try {
-      await pool.execute('UPDATE users SET active = 1 WHERE id = ?', [userId]);
-      res.json({ success: true, message: 'User activated successfully' });
-    } catch (error) {
-      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('active')) {
-        res.status(400).json({ error: 'Active column does not exist. Please run the migration first.' });
-      } else {
-        throw error;
-      }
-    }
+    await pool.execute('UPDATE users SET active = TRUE WHERE id = ?', [req.params.userId]);
+    res.json({ success: true, message: 'User activated successfully' });
   } catch (error) {
     console.error('Error activating user:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
-router.put('/users/:userId/deactivate', checkAdminAccess, async (req, res) => {
+router.put('/users/:userId/deactivate', async (req, res) => {
   try {
-    const { userId } = req.params;
-
-    // Check if active column exists
-    try {
-      await pool.execute('UPDATE users SET active = 0 WHERE id = ?', [userId]);
-      res.json({ success: true, message: 'User deactivated successfully' });
-    } catch (error) {
-      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('active')) {
-        res.status(400).json({ error: 'Active column does not exist. Please run the migration first.' });
-      } else {
-        throw error;
-      }
-    }
+    await pool.execute('UPDATE users SET active = FALSE WHERE id = ?', [req.params.userId]);
+    res.json({ success: true, message: 'User deactivated successfully' });
   } catch (error) {
     console.error('Error deactivating user:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
-// Block user: disables in Cognito so they cannot sign in. Prevents creating account with same credential.
-router.put('/users/:userId/block', checkAdminAccess, async (req, res) => {
+// Ban duration long enough to be permanent; 'none' lifts it.
+const setBanned = async (authUserId, banned) => {
+  const { error } = await getSupabaseAdmin().auth.admin.updateUserById(authUserId, {
+    ban_duration: banned ? '876000h' : 'none',
+  });
+  if (error && !isAuthUserNotFound(error)) throw error;
+};
+
+// Block user: bans them in Supabase Auth so they cannot sign in.
+router.put('/users/:userId/block', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const [users] = await pool.execute(
-      'SELECT cognito_username, email FROM users WHERE id = ?',
-      [userId]
-    );
-
+    const [users] = await pool.execute('SELECT auth_user_id FROM users WHERE id = ?', [userId]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    const cognitoUsername = users[0].cognito_username || users[0].email;
-    if (!cognitoUsername) {
-      return res.status(400).json({ error: 'User does not have Cognito username or email' });
+    if (users[0].auth_user_id === req.auth.authUserId) {
+      return res.status(400).json({ error: 'Cannot block your own account' });
     }
 
-    // Disable user in Cognito (prevents sign-in)
     try {
-      await cognitoClient.send(new AdminDisableUserCommand({
-        UserPoolId: USER_POOL_ID,
-        Username: cognitoUsername,
-      }));
-    } catch (cognitoError) {
-      if (cognitoError.name === 'UserNotFoundException') {
-        console.warn(`User ${cognitoUsername} not found in Cognito, proceeding with DB update`);
-      } else if (cognitoError.name === 'CredentialsProviderError' || cognitoError.message?.includes('credentials')) {
-        console.warn('AWS credentials not configured. Updating database only.');
-      } else {
-        console.error('Cognito disable error:', cognitoError);
-        return res.status(502).json({
-          error: 'Failed to block user in Cognito',
-          details: cognitoError.message || 'Cognito API error',
-        });
-      }
+      await setBanned(users[0].auth_user_id, true);
+    } catch (authError) {
+      console.error('Supabase ban error:', authError);
+      return res.status(502).json({ error: 'Failed to block user in Supabase Auth', details: authError.message });
     }
 
-    // Ensure blocked column exists, then update
-    try {
-      await pool.execute('SELECT blocked FROM users LIMIT 1');
-    } catch (colErr) {
-      if (colErr.code === 'ER_BAD_FIELD_ERROR' && colErr.message?.includes('blocked')) {
-        await pool.execute('ALTER TABLE users ADD COLUMN blocked TINYINT(1) DEFAULT 0');
-      }
-    }
-    await pool.execute('UPDATE users SET active = 0, blocked = 1 WHERE id = ?', [userId]);
+    await pool.execute('UPDATE users SET active = FALSE, blocked = TRUE WHERE id = ?', [userId]);
+    clearAuthCache();
 
-    res.json({ success: true, message: 'User blocked successfully. They cannot sign in or create an account with the same credentials.' });
+    res.json({ success: true, message: 'User blocked successfully. They cannot sign in.' });
   } catch (error) {
     console.error('Error blocking user:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
-// Unblock user: re-enables in Cognito
-router.put('/users/:userId/unblock', checkAdminAccess, async (req, res) => {
+// Unblock user: lifts the Supabase Auth ban.
+router.put('/users/:userId/unblock', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const [users] = await pool.execute(
-      'SELECT cognito_username, email FROM users WHERE id = ?',
-      [userId]
-    );
-
+    const [users] = await pool.execute('SELECT auth_user_id FROM users WHERE id = ?', [userId]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const cognitoUsername = users[0].cognito_username || users[0].email;
-    if (!cognitoUsername) {
-      return res.status(400).json({ error: 'User does not have Cognito username or email' });
+    try {
+      await setBanned(users[0].auth_user_id, false);
+    } catch (authError) {
+      console.error('Supabase unban error:', authError);
+      return res.status(502).json({ error: 'Failed to unblock user in Supabase Auth', details: authError.message });
     }
 
-    // Enable user in Cognito
-    try {
-      await cognitoClient.send(new AdminEnableUserCommand({
-        UserPoolId: USER_POOL_ID,
-        Username: cognitoUsername,
-      }));
-    } catch (cognitoError) {
-      if (cognitoError.name === 'UserNotFoundException') {
-        console.warn(`User ${cognitoUsername} not found in Cognito, proceeding with DB update`);
-      } else if (cognitoError.name === 'CredentialsProviderError' || cognitoError.message?.includes('credentials')) {
-        console.warn('AWS credentials not configured. Updating database only.');
-      } else {
-        console.error('Cognito enable error:', cognitoError);
-        return res.status(502).json({
-          error: 'Failed to unblock user in Cognito',
-          details: cognitoError.message || 'Cognito API error',
-        });
-      }
-    }
-
-    // Update DB: set active=1, blocked=0
-    try {
-      await pool.execute('UPDATE users SET active = 1, blocked = 0 WHERE id = ?', [userId]);
-    } catch (dbError) {
-      if (dbError.code === 'ER_BAD_FIELD_ERROR' && dbError.message?.includes('blocked')) {
-        await pool.execute('UPDATE users SET active = 1 WHERE id = ?', [userId]);
-      } else {
-        throw dbError;
-      }
-    }
+    await pool.execute('UPDATE users SET active = TRUE, blocked = FALSE WHERE id = ?', [userId]);
+    clearAuthCache();
 
     res.json({ success: true, message: 'User unblocked successfully' });
   } catch (error) {
@@ -995,7 +795,3 @@ router.put('/users/:userId/unblock', checkAdminAccess, async (req, res) => {
 });
 
 export default router;
-
-
-
-
