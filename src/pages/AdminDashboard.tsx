@@ -87,6 +87,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { invalidateBillingStatus } from '../hooks/useBillingStatus';
 import { invalidateMarketplaceSettings } from '../hooks/useMarketplaceSettings';
+import { invalidateSocialLinks } from '../hooks/useSocialLinks';
 import apiService, { SubscriptionPlan } from '../services/api';
 import { useSnackbar } from 'notistack';
 import { useChat } from '../contexts/ChatContext';
@@ -217,6 +218,9 @@ const AdminDashboard: React.FC = () => {
   const [savingBilling, setSavingBilling] = useState(false);
   const [checkoutEnabled, setCheckoutEnabled] = useState(false);
   const [savingCheckout, setSavingCheckout] = useState(false);
+  const emptySocialLinks = { facebook: '', instagram: '', twitter: '', pinterest: '', youtube: '', email: '' };
+  const [socialLinks, setSocialLinks] = useState<Record<string, string>>(emptySocialLinks);
+  const [savingSocial, setSavingSocial] = useState(false);
   const [savingPayoutConfig, setSavingPayoutConfig] = useState(false);
   const [stripePlans, setStripePlans] = useState<any[]>([]);
   const [loadingStripePlans, setLoadingStripePlans] = useState(false);
@@ -251,6 +255,26 @@ const AdminDashboard: React.FC = () => {
       const settings = await apiService.getMarketplaceSettings();
       setCheckoutEnabled(settings.checkout_enabled === true);
     } catch {}
+  };
+
+  const fetchSocialLinks = async () => {
+    try {
+      setSocialLinks({ ...emptySocialLinks, ...(await apiService.getSocialLinks()) });
+    } catch {}
+  };
+
+  const saveSocialLinks = async () => {
+    setSavingSocial(true);
+    try {
+      const saved = await apiService.updateSocialLinks(socialLinks);
+      setSocialLinks({ ...emptySocialLinks, ...saved });
+      invalidateSocialLinks();
+      enqueueSnackbar('Footer links saved', { variant: 'success' });
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Failed to save footer links', { variant: 'error' });
+    } finally {
+      setSavingSocial(false);
+    }
   };
 
   const saveCheckoutEnabled = async (enabled: boolean) => {
@@ -831,6 +855,7 @@ const AdminDashboard: React.FC = () => {
       fetchPayoutConfig();
       fetchBillingConfig();
       fetchMarketplaceSettings();
+      fetchSocialLinks();
     }
     if (section === 'plans') {
       fetchStripePlans();
@@ -2604,6 +2629,38 @@ const AdminDashboard: React.FC = () => {
                     </Typography>
                   </Box>
                   <Switch checked={checkoutEnabled} disabled={savingCheckout} onChange={(e) => saveCheckoutEnabled(e.target.checked)} />
+                </Box>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Footer: Connect With Us</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Only the links you fill in appear in the footer. Leave everything empty to hide the section.
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {[
+                    ['facebook', 'Facebook page URL'],
+                    ['instagram', 'Instagram URL'],
+                    ['twitter', 'X (Twitter) URL'],
+                    ['pinterest', 'Pinterest URL'],
+                    ['youtube', 'YouTube URL'],
+                    ['email', 'Contact email'],
+                  ].map(([field, label]) => (
+                    <TextField
+                      key={field}
+                      label={label}
+                      size="small"
+                      value={socialLinks[field] || ''}
+                      onChange={(e) => setSocialLinks((prev) => ({ ...prev, [field]: e.target.value }))}
+                      placeholder={field === 'email' ? 'hello@yourdomain.com' : 'https://'}
+                      inputProps={{ maxLength: 300 }}
+                    />
+                  ))}
+                  <Box>
+                    <Button variant="contained" disabled={savingSocial} onClick={saveSocialLinks}>
+                      {savingSocial ? 'Saving...' : 'Save footer links'}
+                    </Button>
+                  </Box>
                 </Box>
               </Paper>
 

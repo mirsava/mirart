@@ -6,16 +6,20 @@ import {
   Link,
   IconButton,
   Divider,
+  Snackbar,
 } from '@mui/material';
 import {
   Facebook as FacebookIcon,
   Instagram as InstagramIcon,
   Twitter as TwitterIcon,
+  Pinterest as PinterestIcon,
+  YouTube as YouTubeIcon,
   Email as EmailIcon,
 } from '@mui/icons-material';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import { useBillingStatus } from '../hooks/useBillingStatus';
+import { useSocialLinks } from '../hooks/useSocialLinks';
 import logoLight from '../assets/images/logo.svg';
 import logoDark from '../assets/images/logo-dark.svg';
 
@@ -23,6 +27,26 @@ const Footer: React.FC = () => {
   const { isDarkMode } = useCustomTheme();
   const { checkoutEnabled, loaded } = useMarketplaceSettings();
   const billing = useBillingStatus();
+  const social = useSocialLinks();
+  const [emailCopied, setEmailCopied] = React.useState(false);
+
+  // mailto: does nothing on computers without a mail app, so also copy the address.
+  const copyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(social?.email || '');
+      setEmailCopied(true);
+    } catch {}
+  };
+  const socialItems = social
+    ? [
+        { label: 'Facebook', href: social.facebook, icon: <FacebookIcon /> },
+        { label: 'Instagram', href: social.instagram, icon: <InstagramIcon /> },
+        { label: 'X (Twitter)', href: social.twitter, icon: <TwitterIcon /> },
+        { label: 'Pinterest', href: social.pinterest, icon: <PinterestIcon /> },
+        { label: 'YouTube', href: social.youtube, icon: <YouTubeIcon /> },
+        { label: 'Email', href: social.email ? `mailto:${social.email}` : '', icon: <EmailIcon /> },
+      ].filter((item) => item.href)
+    : [];
 
   return (
     <Box
@@ -115,28 +139,36 @@ const Footer: React.FC = () => {
             </Box>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 2 }}>
-              Connect With Us
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, mb: 2.5 }}>
-              <IconButton color="secondary" size="small" sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                <FacebookIcon />
-              </IconButton>
-              <IconButton color="secondary" size="small" sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                <InstagramIcon />
-              </IconButton>
-              <IconButton color="secondary" size="small" sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                <TwitterIcon />
-              </IconButton>
-              <IconButton color="secondary" size="small" sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                <EmailIcon />
-              </IconButton>
-            </Box>
-            <Typography variant="body2" color="text.secondary">
-              Email: info@artzyla.com
-            </Typography>
-          </Grid>
+          {socialItems.length > 0 && (
+            <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="h6" fontWeight={600} gutterBottom sx={{ mb: 2 }}>
+                Connect With Us
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2.5, flexWrap: 'wrap' }}>
+                {socialItems.map((item) => (
+                  <IconButton
+                    key={item.label}
+                    component="a"
+                    href={item.href}
+                    aria-label={item.label}
+                    target={item.label === 'Email' ? undefined : '_blank'}
+                    rel="noopener noreferrer"
+                    onClick={item.label === 'Email' ? copyEmail : undefined}
+                    color="secondary"
+                    size="small"
+                    sx={{ '&:hover': { bgcolor: 'action.hover' } }}
+                  >
+                    {item.icon}
+                  </IconButton>
+                ))}
+              </Box>
+              {social?.email && (
+                <Typography variant="body2" color="text.secondary">
+                  Email: {social.email}
+                </Typography>
+              )}
+            </Grid>
+          )}
         </Grid>
 
         <Divider sx={{ my: { xs: 4, md: 5 } }} />
@@ -165,6 +197,12 @@ const Footer: React.FC = () => {
           </Typography>
         </Box>
       </Box>
+      <Snackbar
+        open={emailCopied}
+        autoHideDuration={2500}
+        onClose={() => setEmailCopied(false)}
+        message={`Email address copied: ${social?.email || ''}`}
+      />
     </Box>
   );
 };

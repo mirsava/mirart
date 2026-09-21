@@ -148,6 +148,15 @@ export interface SubscriptionPlan {
   stripe_product_id?: string;
 }
 
+export interface SocialLinks {
+  facebook: string;
+  instagram: string;
+  twitter: string;
+  pinterest: string;
+  youtube: string;
+  email: string;
+}
+
 export interface BillingStatus {
   billing_enabled: boolean;
   in_grace: boolean;
@@ -982,6 +991,17 @@ class ApiService {
     return this.request<{ checkout_enabled: boolean }>('/settings/marketplace', {
       method: 'PUT',
       body: JSON.stringify({ checkout_enabled }),
+    });
+  }
+
+  async getSocialLinks(): Promise<SocialLinks> {
+    return this.request<SocialLinks>('/settings/social');
+  }
+
+  async updateSocialLinks(links: Partial<SocialLinks>): Promise<SocialLinks> {
+    return this.request<SocialLinks>('/settings/social', {
+      method: 'PUT',
+      body: JSON.stringify(links),
     });
   }
 
