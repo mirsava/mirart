@@ -26,7 +26,7 @@ const FAQ: React.FC = () => {
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pb: { xs: 4, md: 6 } }}>
         <Grid container spacing={4}>
           <Grid item xs={12} md={9}>
-            <FAQSection items={faqItems} titleVariant="h5" />
+            <FAQSection items={faqItems} title={null} />
           </Grid>
         </Grid>
       </Box>

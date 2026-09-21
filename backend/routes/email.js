@@ -1,12 +1,13 @@
 import express from 'express';
 import { sendContactEmail, verifyEmailConfig } from '../services/emailService.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { anonymousContactLimiter } from '../middleware/security.js';
 import { createNotification } from '../services/notificationService.js';
 import pool from '../config/database.js';
 
 const router = express.Router();
 
-router.post('/contact-seller', async (req, res) => {
+router.post('/contact-seller', anonymousContactLimiter, async (req, res) => {
   try {
     const {
       listingId,

@@ -2,6 +2,7 @@ import express from 'express';
 import pool from '../config/database.js';
 import { createNotification } from '../services/notificationService.js';
 import { requireAuth, requireSelf } from '../middleware/auth.js';
+import { outboundMessageLimiter } from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -170,7 +171,7 @@ router.get('/user/:authUserId', requireSelf(), async (req, res) => {
   }
 });
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, outboundMessageLimiter, async (req, res) => {
   try {
     const { listingId, subject, message } = req.body;
     if (!listingId || !subject || !message) {
@@ -346,7 +347,7 @@ router.delete('/:messageId', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/:messageId/reply', requireAuth, async (req, res) => {
+router.post('/:messageId/reply', requireAuth, outboundMessageLimiter, async (req, res) => {
   try {
     const { messageId } = req.params;
     const { subject, message } = req.body;

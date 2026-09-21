@@ -104,13 +104,8 @@ const Header: React.FC = () => {
   useEffect(() => {
     const fetchArtists = async () => {
       try {
-        console.log('Fetching artists...');
         const response = await apiService.getArtists();
-        console.log('Fetched artists response:', response);
-        console.log('Artists array:', response.artists);
-        console.log('Artists length:', response.artists?.length || 0);
         setArtists(response.artists || []);
-        console.log('Artists state set, length:', response.artists?.length || 0);
       } catch (error) {
         console.error('Error fetching artists:', error);
         setArtists([]);
@@ -1549,6 +1544,7 @@ const Header: React.FC = () => {
             Messages
           </MenuItem>
         )}
+        {checkoutEnabled && (
         <MenuItem 
           onClick={() => {
             handleUserMenuClose();
@@ -1563,6 +1559,7 @@ const Header: React.FC = () => {
           <ReceiptIcon sx={{ mr: 2, fontSize: 20 }} />
           Orders
         </MenuItem>
+        )}
         <MenuItem 
           onClick={() => {
             handleUserMenuClose();

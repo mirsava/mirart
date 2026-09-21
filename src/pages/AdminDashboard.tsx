@@ -679,13 +679,10 @@ const AdminDashboard: React.FC = () => {
 
   const fetchSubscriptionPlans = async (): Promise<void> => {
     if (!user?.id) {
-      console.log('No user ID available');
       return;
     }
     try {
-      console.log('Fetching subscription plans for user:', user.id, 'groups:', user.groups);
       const plans = await apiService.getAdminSubscriptionPlans(user.id, user.groups);
-      console.log('Received plans:', plans);
       setSubscriptionPlans(plans || []);
     } catch (error: any) {
       console.error('Error fetching subscription plans:', error);

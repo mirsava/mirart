@@ -193,7 +193,7 @@ const AccountDashboard: React.FC = () => {
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const billing = useBillingStatus();
-  const { checkoutEnabled } = useMarketplaceSettings();
+  const { checkoutEnabled, loaded: marketplaceLoaded } = useMarketplaceSettings();
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [activatingListing, setActivatingListing] = useState<number | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -517,10 +517,12 @@ const AccountDashboard: React.FC = () => {
   }, [listingsStatusFilter, tabValue]);
 
   useEffect(() => {
-    if (isBuyerDashboard && ![1, 4].includes(tabValue)) {
-      setTabValue(1);
+    if (!marketplaceLoaded) return;
+    const allowedTabs = isBuyerDashboard ? (checkoutEnabled ? [1, 4] : [4]) : (checkoutEnabled ? [0, 1, 2, 3, 4, 5] : [0, 2, 3, 4, 5]);
+    if (!allowedTabs.includes(tabValue)) {
+      setTabValue(allowedTabs[0]);
     }
-  }, [isBuyerDashboard, tabValue]);
+  }, [isBuyerDashboard, tabValue, checkoutEnabled, marketplaceLoaded]);
 
   useEffect(() => {
     if (isBuyerDashboard && ordersSubTab !== 0) {
@@ -1332,17 +1334,17 @@ const AccountDashboard: React.FC = () => {
             <Tabs value={tabValue} onChange={handleTabChange} variant="scrollable" scrollButtons="auto">
               {isBuyerDashboard ? (
                 [
-                  <Tab key="orders" value={1} label="Orders" />,
+                  ...(checkoutEnabled ? [<Tab key="orders" value={1} label="Orders" />] : []),
                   <Tab key="profile" value={4} label="Profile" />,
                 ]
               ) : (
                 [
-                  <Tab key="listings" label="My Listings" />,
-                  <Tab key="orders" label="Orders" />,
-                  <Tab key="analytics" label="Analytics" />,
-                  <Tab key="subscription" label="Subscription" />,
-                  <Tab key="profile" label="Profile" />,
-                  <Tab key="settings" label="Settings" />,
+                  <Tab key="listings" value={0} label="My Listings" />,
+                  ...(checkoutEnabled ? [<Tab key="orders" value={1} label="Orders" />] : []),
+                  <Tab key="analytics" value={2} label="Analytics" />,
+                  <Tab key="subscription" value={3} label="Subscription" />,
+                  <Tab key="profile" value={4} label="Profile" />,
+                  <Tab key="settings" value={5} label="Settings" />,
                 ]
               )}
             </Tabs>

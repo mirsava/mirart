@@ -15,12 +15,14 @@ import {
 } from '@mui/icons-material';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
+import { useBillingStatus } from '../hooks/useBillingStatus';
 import logoLight from '../assets/images/logo.svg';
 import logoDark from '../assets/images/logo-dark.svg';
 
 const Footer: React.FC = () => {
   const { isDarkMode } = useCustomTheme();
   const { checkoutEnabled, loaded } = useMarketplaceSettings();
+  const billing = useBillingStatus();
 
   return (
     <Box
@@ -96,11 +98,16 @@ const Footer: React.FC = () => {
               <Link href="/about" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 How It Works
               </Link>
+              {billing?.billing_enabled && (
               <Link href="/subscription-plans" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 Subscription Plans
               </Link>
+              )}
               <Link href="/faq" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 FAQ
+              </Link>
+              <Link href="/terms" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
+                Terms of Service
               </Link>
               <Link href="/privacy" color="text.secondary" underline="hover" sx={{ '&:hover': { color: 'secondary.main' } }}>
                 Privacy Policy
@@ -151,10 +158,10 @@ const Footer: React.FC = () => {
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            © 2023 ArtZyla. All rights reserved.
+            © {new Date().getFullYear()} ArtZyla. All rights reserved.
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Made with ❤️ for art lovers
+            Made with <Box component="span" sx={{ color: 'primary.main' }}>♥</Box> for art lovers
           </Typography>
         </Box>
       </Box>

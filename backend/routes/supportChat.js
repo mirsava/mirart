@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { outboundMessageLimiter } from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -97,7 +98,7 @@ router.get('/messages', async (req, res) => {
   }
 });
 
-router.post('/messages', async (req, res) => {
+router.post('/messages', outboundMessageLimiter, async (req, res) => {
   try {
     const { userId: bodyUserId, guestSessionId, guestName, guestEmail, supportType, message, sender, targetUserId } = req.body;
     if (!message || !['user', 'admin'].includes(sender)) {

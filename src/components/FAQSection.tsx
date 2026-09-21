@@ -6,7 +6,7 @@ import { FAQItem } from '../data/faqs';
 interface FAQSectionProps {
   items: FAQItem[];
   id?: string;
-  title?: string;
+  title?: string | null;
   titleVariant?: 'h4' | 'h5' | 'h6';
 }
 
@@ -14,10 +14,12 @@ const FAQSection: React.FC<FAQSectionProps> = ({ items, id, title = 'Frequently 
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
 
   return (
-    <Box id={id} sx={{ mt: 8, scrollMarginTop: { xs: '96px', md: '88px' } }}>
-      <Typography variant={titleVariant} fontWeight={700} gutterBottom sx={{ mb: 4, color: 'primary.main' }}>
-        {title}
-      </Typography>
+    <Box id={id} sx={{ mt: title === null ? 0 : 8, scrollMarginTop: { xs: '96px', md: '88px' } }}>
+      {title !== null && (
+        <Typography variant={titleVariant} fontWeight={700} gutterBottom sx={{ mb: 4, color: 'primary.main' }}>
+          {title}
+        </Typography>
+      )}
       <Paper sx={{ p: { xs: 2, md: 3 } }}>
         {items.map((faq, index) => (
           <Accordion

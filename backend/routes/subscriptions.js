@@ -787,16 +787,4 @@ router.delete('/admin/plans/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// Debug: Log registered routes when module loads
-console.log('=== SUBSCRIPTIONS ROUTER LOADED ===');
-console.log('Router stack length:', router.stack.length);
-router.stack.forEach((layer, index) => {
-  if (layer.route) {
-    const methods = Object.keys(layer.route.methods).join(',').toUpperCase();
-    console.log(`  Route ${index + 1}: ${methods} ${layer.route.path}`);
-  } else if (layer.name === 'router') {
-    console.log(`  Nested router ${index + 1}: ${layer.regexp}`);
-  }
-});
-
 export default router;

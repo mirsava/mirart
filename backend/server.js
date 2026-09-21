@@ -26,38 +26,35 @@ import supportChatRouter from './routes/supportChat.js';
 import authRouter from './routes/auth.js';
 import settingsRouter from './routes/settings.js';
 import { attachAuth } from './middleware/auth.js';
+import { securityHeaders, apiLimiter } from './middleware/security.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Behind Render's proxy: use the real client IP for rate limiting
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+
 // Middleware
+app.use(securityHeaders);
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (server-to-server calls, curl, health checks)
     if (!origin) return callback(null, true);
-    
-    // Allow localhost on any port
-    if (origin.match(/^http:\/\/localhost:\d+$/)) {
-      return callback(null, true);
+
+    if (process.env.NODE_ENV !== 'production') {
+      if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
     }
-    
-    // Allow the configured frontend URL
-    const allowedOrigins = [
-      process.env.FRONTEND_URL,
-      'http://localhost:3000',
-      'http://localhost:5173'
-    ].filter(Boolean);
-    
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
+
+    const allowedOrigins = [process.env.FRONTEND_URL].filter(Boolean);
+    if (allowedOrigins.includes(origin.replace(/\/$/, ''))) return callback(null, true);
+
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
+app.use('/api', apiLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(attachAuth);
@@ -66,8 +63,9 @@ app.use(attachAuth);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Generate email previews at startup (so /email-previews/ works without running script)
+// Development only: generate email previews at startup so /email-previews/ works without running the script
 const emailPreviewsDir = path.join(__dirname, 'email-previews');
+if (process.env.NODE_ENV !== 'production') {
 try {
   const { buildTemplate, templates } = await import('./services/emailService.js');
   const sampleData = {
@@ -89,8 +87,8 @@ try {
   console.warn('Could not generate email previews:', err.message);
 }
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/email-previews', express.static(emailPreviewsDir));
+}
 
 const SITE_URL = (process.env.FRONTEND_URL || 'https://artzyla.com').replace(/\/$/, '');
 
@@ -126,6 +124,7 @@ const STATIC_SITEMAP_ENTRIES = [
   { path: '/contact', changefreq: 'monthly', priority: '0.7' },
   { path: '/faq', changefreq: 'monthly', priority: '0.7' },
   { path: '/privacy', changefreq: 'yearly', priority: '0.3' },
+  { path: '/terms', changefreq: 'yearly', priority: '0.3' },
   { path: '/subscription-plans', changefreq: 'weekly', priority: '0.8' },
   { path: '/artist-signup', changefreq: 'monthly', priority: '0.6' },
 ];
@@ -210,14 +209,6 @@ ${urls}
 app.get('/sitemap-listings.xml', sendListingsSitemap);
 app.get('/api/sitemap-listings.xml', sendListingsSitemap);
 
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-  if (req.path.includes('subscriptions') || req.url.includes('subscriptions')) {
-    console.log(`[DEBUG] Subscriptions request: ${req.method} ${req.path} ${req.url} ${req.originalUrl}`);
-  }
-  next();
-});
-
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'ArtZyla API is running' });
@@ -290,25 +281,6 @@ app.listen(PORT, async () => {
     console.warn('[Startup] Subscription expiration job failed:', err?.message || err);
   }
   console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`\n=== REGISTERED ROUTES ===`);
-  console.log(`Subscriptions routes registered at /api/subscriptions`);
-  console.log(`Test route: http://localhost:${PORT}/api/subscriptions/test`);
-  console.log(`Admin plans route: http://localhost:${PORT}/api/subscriptions/admin/plans`);
-  console.log(`\n=== VERIFYING SUBSCRIPTIONS ROUTER ===`);
-  if (subscriptionsRouter && subscriptionsRouter.stack) {
-    console.log(`Subscriptions router stack length: ${subscriptionsRouter.stack.length}`);
-    subscriptionsRouter.stack.forEach((layer, index) => {
-      if (layer.route) {
-        const methods = Object.keys(layer.route.methods).join(',').toUpperCase();
-        console.log(`  Route ${index + 1}: ${methods} ${layer.route.path}`);
-      }
-    });
-  } else {
-    console.log(`ERROR: Subscriptions router not properly initialized!`);
-  }
-  console.log(`\n`);
-
-  // Tracking poll: check shipped orders every 30 minutes for delivery status
   // Re-check subscriptions daily so an ended grace period (or expired plan) takes effect without a restart
   setInterval(async () => {
     try {

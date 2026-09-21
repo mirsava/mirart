@@ -192,7 +192,6 @@ class ApiService {
     const url = `${API_BASE_URL}${endpoint}`;
     
     try {
-      console.log('API Request:', url, options.method || 'GET');
       const token = await getAccessToken();
       const response = await fetch(url, {
         ...options,
@@ -204,13 +203,11 @@ class ApiService {
         },
       });
       
-      console.log('API Response status:', response.status, response.statusText);
       
       if (!response.ok) {
         let errorData;
         try {
           const text = await response.text();
-          console.log('Error response body:', text);
           errorData = JSON.parse(text);
         } catch (parseError) {
           errorData = { error: `HTTP error! status: ${response.status}`, status: response.status };
@@ -241,7 +238,6 @@ class ApiService {
         throw error;
       }
       const data = text ? JSON.parse(text) : null;
-      console.log('API Response data:', data);
       return data as T;
     } catch (error: any) {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
@@ -1036,8 +1032,6 @@ class ApiService {
       params.append('groups', JSON.stringify(groups));
     }
     const url = `/subscriptions/admin/plans?${params.toString()}`;
-    console.log('Calling subscription plans API:', url);
-    console.log('With params:', { authUserId, groups });
     return this.request<SubscriptionPlan[]>(url);
   }
 

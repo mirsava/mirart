@@ -1,71 +1,48 @@
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
 import { requireAuth } from '../middleware/auth.js';
+import { ALLOWED_IMAGE_TYPES, uploadImage } from '../services/storage.js';
 
 const router = express.Router();
 
 router.use(requireAuth);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    // Generate unique filename: timestamp-random-originalname
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, `listing-${uniqueSuffix}${ext}`);
-  }
-});
-
-// File filter - only allow images
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
-
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
-  }
-};
-
+// Images are held in memory just long enough to hand them to Supabase Storage (the server disk is not persistent).
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB max file size
+    fileSize: 10 * 1024 * 1024, // 10MB per file
+    files: 10,
   },
-  fileFilter: fileFilter
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) return cb(null, true);
+    cb(new Error('Only image files are allowed (jpeg, png, gif, webp)'));
+  },
 });
+
+const toResponse = (file, stored) => ({
+  url: stored.url,
+  filename: stored.path,
+  originalName: file.originalname,
+  size: file.size,
+});
+
+// Run multer and turn its errors (wrong type, too large, too many files) into 400 responses.
+const accept = (middleware) => (req, res, next) =>
+  middleware(req, res, (error) => {
+    if (!error) return next();
+    const message = error.code === 'LIMIT_FILE_SIZE' ? 'Each image must be 10MB or smaller' : error.message;
+    res.status(400).json({ error: message });
+  });
 
 // Upload single image
-router.post('/image', upload.single('image'), (req, res) => {
+router.post('/image', accept(upload.single('image')), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-
-    // Return the URL path (relative to the server)
-    const fileUrl = `/uploads/${req.file.filename}`;
-    res.json({ 
-      url: fileUrl,
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      size: req.file.size
-    });
+    const stored = await uploadImage({ buffer: req.file.buffer, mimetype: req.file.mimetype, folder: req.auth.authUserId });
+    res.json(toResponse(req.file, stored));
   } catch (error) {
     console.error('Error uploading file:', error);
     res.status(500).json({ error: 'Failed to upload file' });
@@ -73,20 +50,17 @@ router.post('/image', upload.single('image'), (req, res) => {
 });
 
 // Upload multiple images (up to 10)
-router.post('/images', upload.array('images', 10), (req, res) => {
+router.post('/images', accept(upload.array('images', 10)), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
-
-    const uploadedFiles = req.files.map(file => ({
-      url: `/uploads/${file.filename}`,
-      filename: file.filename,
-      originalName: file.originalname,
-      size: file.size
-    }));
-
-    res.json({ files: uploadedFiles });
+    const files = [];
+    for (const file of req.files) {
+      const stored = await uploadImage({ buffer: file.buffer, mimetype: file.mimetype, folder: req.auth.authUserId });
+      files.push(toResponse(file, stored));
+    }
+    res.json({ files });
   } catch (error) {
     console.error('Error uploading files:', error);
     res.status(500).json({ error: 'Failed to upload files' });
@@ -94,4 +68,3 @@ router.post('/images', upload.array('images', 10), (req, res) => {
 });
 
 export default router;
-

@@ -1,11 +1,9 @@
 import express from 'express';
 import pool from '../config/database.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { requireAuth, isUuid } from '../middleware/auth.js';
 import { parseImageUrls } from '../utils/json.js';
 import { getListingAccess } from '../services/billing.js';
+import { deleteImages } from '../services/storage.js';
 
 const router = express.Router();
 
@@ -855,39 +853,15 @@ router.delete('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Listing not found' });
     }
     
-    // Delete image files from filesystem
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    const uploadsDir = path.join(__dirname, '../uploads');
-    
-    const filesToDelete = [];
-    
-    // Add primary image
-    if (listing[0].primary_image_url) {
-      const primaryImagePath = extractFilePath(listing[0].primary_image_url, uploadsDir);
-      if (primaryImagePath) {
-        filesToDelete.push(primaryImagePath);
-      }
+    // Remove the images from storage (only files in the listing owner's own folder)
+    try {
+      const [owners] = await pool.execute('SELECT auth_user_id FROM users WHERE id = ?', [listing[0].user_id]);
+      const imageUrls = [listing[0].primary_image_url, ...(parseImageUrls(listing[0].image_urls) || [])].filter(Boolean);
+      if (owners[0]) await deleteImages(imageUrls, { onlyFolder: owners[0].auth_user_id });
+    } catch (storageError) {
+      console.warn('Could not delete listing images from storage:', storageError.message);
     }
-    
-    // Add additional images
-    (parseImageUrls(listing[0].image_urls) || []).forEach(url => {
-      const imagePath = extractFilePath(url, uploadsDir);
-      if (imagePath) {
-        filesToDelete.push(imagePath);
-      }
-    });
 
-    // Delete files from filesystem
-    filesToDelete.forEach(filePath => {
-      try {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      } catch (fileError) {
-      }
-    });
-    
     // Delete listing from database
     await pool.execute('DELETE FROM listings WHERE id = ?', [id]);
     
@@ -909,40 +883,6 @@ router.delete('/:id', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// Helper function to extract file path from URL
-function extractFilePath(url, uploadsDir) {
-  if (!url) return null;
-  
-  // Handle both absolute URLs (http://localhost:3001/uploads/filename.jpg) 
-  // and relative URLs (/uploads/filename.jpg)
-  let filename = null;
-  
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    // Extract filename from absolute URL
-    const urlParts = url.split('/uploads/');
-    if (urlParts.length > 1) {
-      filename = urlParts[1].split('?')[0]; // Remove query params if any
-    }
-  } else if (url.startsWith('/uploads/')) {
-    // Extract filename from relative URL
-    filename = url.replace('/uploads/', '');
-  }
-  
-  if (!filename) return null;
-  
-  const filePath = path.join(uploadsDir, filename);
-  
-  // Security check: ensure the file is within the uploads directory
-  const resolvedPath = path.resolve(filePath);
-  const resolvedUploadsDir = path.resolve(uploadsDir);
-  
-  if (!resolvedPath.startsWith(resolvedUploadsDir)) {
-    return null;
-  }
-  
-  return resolvedPath;
-}
 
 // Get user's listings
 router.get('/user/:authUserId', async (req, res) => {

@@ -20,6 +20,7 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import FAQ from './pages/FAQ';
 import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
 import SignUp from './pages/SignUp';
 import SignIn from './pages/SignIn';
 import AccountDashboard from './pages/AccountDashboard';
@@ -110,6 +111,7 @@ function AppContent(): JSX.Element {
             <Route path="/contact" element={<Contact />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
                     <Route path="/signup" element={<SignUp />} />
                     <Route path="/signin" element={<SignIn />} />
                     <Route path="/profile/:username" element={<PublicProfile />} />

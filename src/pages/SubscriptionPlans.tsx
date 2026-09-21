@@ -83,7 +83,6 @@ const SubscriptionPlans: React.FC = () => {
     try {
       setError(null);
       const data = await apiService.getSubscriptionPlans();
-      console.log('Fetched subscription plans:', data);
       if (data && Array.isArray(data) && data.length > 0) {
         const formattedPlans = data
           .map(plan => ({

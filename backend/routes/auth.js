@@ -1,12 +1,13 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { createSupabaseAnon } from '../config/supabase.js';
+import { loginLimiter, usernameLookupLimiter } from '../middleware/security.js';
 
 const router = express.Router();
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,}$/;
 
-router.get('/username-available', async (req, res) => {
+router.get('/username-available', usernameLookupLimiter, async (req, res) => {
   try {
     const username = String(req.query.username || '').trim();
     if (!USERNAME_PATTERN.test(username)) {
@@ -22,7 +23,7 @@ router.get('/username-available', async (req, res) => {
 
 // Username sign-in is resolved server-side so email addresses are never exposed to the browser.
 // Email sign-ins go straight to Supabase from the client.
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { identifier, password } = req.body || {};
     if (!identifier || !password) {

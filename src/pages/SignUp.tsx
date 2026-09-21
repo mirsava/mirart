@@ -102,7 +102,6 @@ const SignUp: React.FC = () => {
       }
       try {
         const plans = await apiService.getSubscriptionPlans();
-        console.log('Fetched subscription plans:', plans);
         if (plans && Array.isArray(plans) && plans.length > 0) {
           const sortedPlans = plans
             .map(plan => ({
@@ -903,11 +902,11 @@ const SignUp: React.FC = () => {
                       label={
                         <Typography variant="body2" color={errors.agreeToTerms ? 'error' : 'inherit'}>
                           I agree to the{' '}
-                          <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
+                          <Button component="a" href="/terms" target="_blank" rel="noopener noreferrer" variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
                             Terms of Service
                           </Button>{' '}
                           and{' '}
-                          <Button variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
+                          <Button component="a" href="/privacy" target="_blank" rel="noopener noreferrer" variant="text" size="small" sx={{ p: 0, minWidth: 'auto' }}>
                             Privacy Policy
                           </Button>
                         </Typography>
