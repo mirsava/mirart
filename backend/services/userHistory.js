@@ -19,6 +19,8 @@ const ACTION_LABELS = {
   subscription_resumed: 'Subscription resumed',
   subscription_expired: 'Subscription expired',
   subscription_extended: 'Subscription extended',
+  featured_artist_assigned: 'Given a featured artist week',
+  featured_artist_removed: 'Featured artist week removed',
 };
 
 const PROMOTION_LABELS = { feature: 'Featured a listing', bump: 'Bumped a listing', listing_pass: 'Bought a listing pass' };
@@ -30,6 +32,7 @@ function describeActivity(row) {
   if (d.from || d.to) parts.push(`${d.from ?? '?'} → ${d.to ?? '?'}`);
   if (d.fields?.length) parts.push(`fields: ${d.fields.join(', ')}`);
   if (d.days) parts.push(`+${d.days} days`);
+  if (d.week_start) parts.push(`week of ${d.week_start}`);
   if (d.reason) parts.push(d.reason);
   if (d.email) parts.push(d.email);
   return parts.join(' · ') || null;

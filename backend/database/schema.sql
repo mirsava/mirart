@@ -400,6 +400,18 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
   unsubscribed_at TIMESTAMPTZ
 );
 
+-- Subscription renewal charges, recorded by the Stripe webhook (the first charge is the user_subscriptions row).
+CREATE TABLE IF NOT EXISTS subscription_payments (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  subscription_id INTEGER REFERENCES user_subscriptions(id) ON DELETE SET NULL,
+  stripe_invoice_id VARCHAR(255) NOT NULL UNIQUE,
+  amount NUMERIC(10,2) NOT NULL,
+  period_end DATE,
+  paid_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_subscription_payments_user ON subscription_payments (user_id);
+
 -- Account and listing history for the admin "User details" timeline. user_id is whose history it is (no foreign
 -- key, so entries survive a deleted account); actor_id is who did it (the user, an admin, or NULL for the system).
 CREATE TABLE IF NOT EXISTS activity_log (
@@ -435,7 +447,7 @@ BEGIN
     'users','listings','likes','listing_comments','messages','chat_conversations','chat_messages',
     'support_chat_messages','notifications','admin_announcements','site_settings','dashboard_stats',
     'orders','subscription_plans','user_subscriptions','listing_promotions',
-    'featured_artist_bookings','listing_reminders','newsletter_subscribers','activity_log'
+    'featured_artist_bookings','listing_reminders','newsletter_subscribers','activity_log','subscription_payments'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;

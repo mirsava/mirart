@@ -6,6 +6,9 @@ import { requireAdmin, clearAuthCache } from '../middleware/auth.js';
 import { parseImageUrls } from '../utils/json.js';
 import { logActivity, logListingActivity } from '../services/activityLog.js';
 import { getUserHistory } from '../services/userHistory.js';
+import { getAdminOverview, listPayments, getFeaturedArtistCalendar } from '../services/adminRevenue.js';
+import { getPromotionConfig } from '../services/promotions.js';
+import { weekStartOf } from '../services/featuredArtist.js';
 
 const router = express.Router();
 
@@ -181,6 +184,82 @@ router.get('/stats', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching admin stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Home page of the admin dashboard: revenue from every source, growth, and what needs attention.
+router.get('/overview', async (req, res) => {
+  try {
+    res.json(await getAdminOverview());
+  } catch (error) {
+    console.error('Error fetching admin overview:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Every purchase across subscriptions, promotions and featured artist weeks.
+router.get('/payments', async (req, res) => {
+  try {
+    res.json(await listPayments(req.query));
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/featured-artist/calendar', async (req, res) => {
+  try {
+    const config = await getPromotionConfig();
+    res.json({ weeks: await getFeaturedArtistCalendar(config.featured_artist_weeks_ahead) });
+  } catch (error) {
+    console.error('Error fetching featured artist calendar:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin curation: give an artist a week for free.
+router.post('/featured-artist/bookings', async (req, res) => {
+  try {
+    const { week_start: weekStart, user_id: userId } = req.body || {};
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(weekStart)) || weekStartOf(new Date(`${weekStart}T00:00:00Z`)) !== weekStart) {
+      return res.status(400).json({ error: 'week_start must be a Monday (YYYY-MM-DD)' });
+    }
+    if (weekStart < weekStartOf()) return res.status(400).json({ error: 'That week has already passed' });
+    const [users] = await pool.execute("SELECT id, email FROM users WHERE id = ? AND user_type <> 'buyer'", [userId]);
+    if (!users[0]) return res.status(404).json({ error: 'Artist not found' });
+    const [insert] = await pool.execute(
+      `INSERT INTO featured_artist_bookings (user_id, week_start, amount, source) VALUES (?, ?::date, 0, 'admin')
+       ON CONFLICT (week_start) DO NOTHING`,
+      [users[0].id, weekStart]
+    );
+    if (!insert.affectedRows) return res.status(409).json({ error: 'That week is already booked' });
+    await logActivity({ userId: users[0].id, actorId: req.auth.userId, action: 'featured_artist_assigned', details: { week_start: weekStart } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error assigning featured artist week:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Remove a booking. Paid bookings must be refunded in Stripe separately.
+router.delete('/featured-artist/bookings/:weekStart', async (req, res) => {
+  try {
+    const [result] = await pool.execute(
+      'DELETE FROM featured_artist_bookings WHERE week_start = ?::date RETURNING user_id, source, amount',
+      [req.params.weekStart]
+    );
+    const removed = result.rows?.[0];
+    if (!removed) return res.status(404).json({ error: 'No booking for that week' });
+    await logActivity({
+      userId: removed.user_id,
+      actorId: req.auth.userId,
+      action: 'featured_artist_removed',
+      details: { week_start: req.params.weekStart, source: removed.source, amount: parseFloat(removed.amount) },
+    });
+    res.json({ success: true, was_paid: removed.source === 'stripe' });
+  } catch (error) {
+    console.error('Error removing featured artist week:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

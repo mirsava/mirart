@@ -208,6 +208,55 @@ export interface FeaturedArtist {
   listings: Array<{ id: number; title: string; price: number | null; primary_image_url?: string | null; category: string }>;
 }
 
+export type AdminPaymentType = 'subscription' | 'feature' | 'bump' | 'listing_pass' | 'featured_artist' | 'order_fee';
+
+export interface AdminOverview {
+  revenue: {
+    this_month: number;
+    last_30d: number;
+    all_time: number;
+    by_type: Partial<Record<AdminPaymentType, { this_month: number; last_30d: number; all_time: number; purchases: number }>>;
+  };
+  monthly: Array<{ month: string; total: number } & Partial<Record<AdminPaymentType, number>>>;
+  growth: {
+    users_total: number;
+    users_7d: number;
+    users_30d: number;
+    artists: number;
+    buyers: number;
+    listings_active: number;
+    listings_7d: number;
+    subscriptions_active: number;
+    newsletter_subscribers: number;
+    messages_7d: number;
+  };
+  attention: {
+    unread_support: number;
+    passes_ending: number;
+    features_ending: number;
+    subscriptions_ending: number;
+    orders_to_ship: number;
+  };
+  upcoming_featured: Array<{ week_start: string; artist_name: string; user_id: number; source: string }>;
+}
+
+export interface AdminPayment {
+  at: string;
+  type: AdminPaymentType;
+  description: string;
+  amount: number;
+  source: 'stripe' | 'plan' | 'admin';
+  user_id: number | null;
+  user_email?: string | null;
+  user_name?: string | null;
+}
+
+export interface FeaturedArtistCalendarWeek {
+  week_start: string;
+  status: 'past' | 'current' | 'upcoming';
+  booking: { user_id: number; artist_name: string; email: string; amount: number; source: 'stripe' | 'admin' } | null;
+}
+
 export interface UserHistoryEvent {
   at: string;
   type: 'account' | 'listing' | 'subscription' | 'payment' | 'message' | 'notice';
@@ -1140,6 +1189,34 @@ class ApiService {
 
   async getArtistShowcase(): Promise<{ artists: ShowcaseArtist[] }> {
     return this.request<{ artists: ShowcaseArtist[] }>('/users/artists/showcase');
+  }
+
+  async getAdminOverview(): Promise<AdminOverview> {
+    return this.request<AdminOverview>('/admin/overview');
+  }
+
+  async getAdminPayments(params: { type?: string; search?: string; page?: number; limit?: number }): Promise<{
+    payments: AdminPayment[];
+    paid_total: number;
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') query.append(k, String(v));
+    });
+    return this.request(`/admin/payments?${query.toString()}`);
+  }
+
+  async getFeaturedArtistCalendar(): Promise<{ weeks: FeaturedArtistCalendarWeek[] }> {
+    return this.request<{ weeks: FeaturedArtistCalendarWeek[] }>('/admin/featured-artist/calendar');
+  }
+
+  async assignFeaturedArtistWeek(weekStart: string, userId: number): Promise<{ success: boolean }> {
+    return this.request('/admin/featured-artist/bookings', { method: 'POST', body: JSON.stringify({ week_start: weekStart, user_id: userId }) });
+  }
+
+  async removeFeaturedArtistWeek(weekStart: string): Promise<{ success: boolean; was_paid: boolean }> {
+    return this.request(`/admin/featured-artist/bookings/${weekStart}`, { method: 'DELETE' });
   }
 
   async getUserHistory(userId: number): Promise<UserHistory> {

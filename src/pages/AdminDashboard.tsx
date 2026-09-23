@@ -4,6 +4,9 @@ import {
   Typography,
   Paper,
   Tooltip,
+  Badge,
+  Tabs,
+  Tab,
   Grid,
   Card,
   CardContent,
@@ -59,13 +62,16 @@ import {
   OpenInNew as OpenInNewIcon,
   Star as StarIcon,
   History as HistoryIcon,
+  Dashboard as DashboardIcon,
+  Payments as PaymentsIcon,
+  Loyalty as PromotionsIcon,
+  MarkEmailRead as WeeklyEmailIcon,
   StarBorder as StarBorderIcon,
   Block as BlockIcon,
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
   CheckCircle as CheckCircleIcon,
   CreditCard as CreditCardIcon,
-  ShoppingCart as ShoppingCartIcon,
   Receipt as ReceiptIcon,
   CardMembership as CardMembershipIcon,
   Cancel as CancelIcon,
@@ -81,13 +87,12 @@ import {
   Menu as MenuIcon,
   Search as SearchIcon,
   TrendingUp as TrendingUpIcon,
-  AttachMoney as AttachMoneyIcon,
   CalendarMonth as CalendarMonthIcon,
   MonetizationOn as MonetizationOnIcon,
   Sync as SyncIcon,
   CloudSync as CloudSyncIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { invalidateBillingStatus } from '../hooks/useBillingStatus';
 import { invalidateMarketplaceSettings } from '../hooks/useMarketplaceSettings';
@@ -99,6 +104,9 @@ import PageHeader from '../components/PageHeader';
 import PromotionSettingsCard from '../components/PromotionSettingsCard';
 import NewsletterSettingsCard from '../components/NewsletterSettingsCard';
 import UserHistoryDialog from '../components/UserHistoryDialog';
+import AdminOverview from '../components/admin/AdminOverview';
+import AdminPayments from '../components/admin/AdminPayments';
+import FeaturedArtistCalendar from '../components/admin/FeaturedArtistCalendar';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
@@ -112,7 +120,22 @@ const AdminDashboard: React.FC = () => {
   const { setChatEnabled: setGlobalChatEnabled, setSupportChatEnabled: setGlobalSupportChatEnabled } = useChat();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [activeSection, setActiveSection] = useState('users');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The open section lives in the URL (?section=...), so refresh, Back and links keep it.
+  const activeSection = searchParams.get('section') || 'overview';
+  const setActiveSection = (section: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('section', section);
+    next.delete('tab');
+    setSearchParams(next);
+  };
+  const settingsTab = searchParams.get('tab') || 'marketplace';
+  const setSettingsTab = (tab: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', tab);
+    setSearchParams(next, { replace: true });
+  };
+  const [supportUnread, setSupportUnread] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -897,10 +920,13 @@ const AdminDashboard: React.FC = () => {
       setSupportSelectedUserInfo(null);
       setSupportMessages([]);
       setSupportReply('');
-      fetchSupportConfig();
-      fetchSupportConversations();
     }
-    if (section === 'settings') {
+  };
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (activeSection === 'support') fetchSupportConfig();
+    if (activeSection === 'settings') {
       fetchUserChatEnabled();
       fetchSupportConfig();
       fetchTestDataEnabled();
@@ -909,10 +935,21 @@ const AdminDashboard: React.FC = () => {
       fetchMarketplaceSettings();
       fetchSocialLinks();
     }
-    if (section === 'plans') {
-      fetchStripePlans();
-    }
-  };
+    if (activeSection === 'plans') fetchStripePlans();
+  }, [user?.id, activeSection]);
+
+  // Sidebar badges: checkout switch (hides Orders) and support chats waiting for a reply.
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchMarketplaceSettings();
+    const refreshUnread = () =>
+      apiService.getSupportChatConversations()
+        .then((convs: any[]) => setSupportUnread(convs.filter((c) => Number(c.unread_count) > 0).length))
+        .catch(() => {});
+    refreshUnread();
+    const id = setInterval(refreshUnread, 60000);
+    return () => clearInterval(id);
+  }, [user?.id]);
 
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>, userData: any): void => {
     setUserMenuAnchor(event.currentTarget);
@@ -1274,29 +1311,38 @@ const AdminDashboard: React.FC = () => {
 
   const sidebarNav = (
     <List component="nav" disablePadding>
+      <ListItemButton selected={activeSection === 'overview'} onClick={() => handleSectionChange('overview')} sx={{ py: 0.75, pl: 3, mt: 1 }}>
+        <ListItemIcon sx={{ minWidth: 36 }}><DashboardIcon fontSize="small" /></ListItemIcon>
+        <ListItemText primary="Overview" primaryTypographyProps={{ variant: 'body2' }} />
+      </ListItemButton>
       {[
-        { label: 'Core', items: [
+        { label: 'Marketplace', items: [
           { key: 'users', name: 'Users', icon: <PeopleIcon fontSize="small" /> },
           { key: 'listings', name: 'Listings', icon: <InventoryIcon fontSize="small" /> },
-          { key: 'orders', name: 'Orders', icon: <ReceiptIcon fontSize="small" /> },
+          // Orders only exist while online checkout is on
+          ...(checkoutEnabled ? [{ key: 'orders', name: 'Orders', icon: <ReceiptIcon fontSize="small" /> }] : []),
+        ]},
+        { label: 'Revenue', items: [
+          { key: 'payments', name: 'Payments', icon: <PaymentsIcon fontSize="small" /> },
+          { key: 'subscriptions', name: 'Subscriptions', icon: <CardMembershipIcon fontSize="small" /> },
+          { key: 'plans', name: 'Plans', icon: <CreditCardIcon fontSize="small" /> },
+          { key: 'promotions', name: 'Promotions', icon: <PromotionsIcon fontSize="small" /> },
         ]},
         { label: 'Communication', items: [
+          { key: 'support', name: 'Support Chat', icon: <SupportIcon fontSize="small" />, badge: supportUnread },
           { key: 'messages', name: 'Messages', icon: <EmailIcon fontSize="small" /> },
           { key: 'notifications', name: 'Notifications', icon: <NotificationsIcon fontSize="small" /> },
           { key: 'announcements', name: 'Announcements', icon: <CampaignIcon fontSize="small" /> },
-          { key: 'support', name: 'Support Chat', icon: <SupportIcon fontSize="small" /> },
-        ]},
-        { label: 'Billing', items: [
-          { key: 'subscriptions', name: 'Subscriptions', icon: <CardMembershipIcon fontSize="small" /> },
-          { key: 'plans', name: 'Plans', icon: <CreditCardIcon fontSize="small" /> },
+          { key: 'newsletter', name: 'Weekly Email', icon: <WeeklyEmailIcon fontSize="small" /> },
         ]},
       ].map(group => (
         <React.Fragment key={group.label}>
           <ListSubheader sx={{ lineHeight: '36px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'text.disabled', bgcolor: 'transparent' }}>{group.label}</ListSubheader>
-          {group.items.map(item => (
+          {group.items.map((item: { key: string; name: string; icon: React.ReactNode; badge?: number }) => (
             <ListItemButton key={item.key} selected={activeSection === item.key} onClick={() => handleSectionChange(item.key)} sx={{ py: 0.75, pl: 3 }}>
               <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.name} primaryTypographyProps={{ variant: 'body2' }} />
+              {item.badge ? <Badge badgeContent={item.badge} color="error" sx={{ mr: 1.5 }} /> : null}
             </ListItemButton>
           ))}
         </React.Fragment>
@@ -1336,168 +1382,6 @@ const AdminDashboard: React.FC = () => {
             </IconButton>
           )}
         </Box>
-        {stats && (<>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {[
-              { label: 'Total Users', value: stats.users.total, icon: <PeopleIcon />, color: '#6366f1' },
-              { label: 'Total Listings', value: stats.listings.total, icon: <InventoryIcon />, color: '#10b981' },
-              { label: 'Total Messages', value: stats.messages.total, icon: <EmailIcon />, color: '#f59e0b' },
-              { label: 'Total Orders', value: stats.orders?.total ?? 0, icon: <ShoppingCartIcon />, color: '#ef4444' },
-              { label: 'Total Revenue', value: `$${(stats.orders?.revenue?.total ?? 0).toFixed(0)}`, icon: <AttachMoneyIcon />, color: '#8b5cf6' },
-              { label: 'Active Subs', value: stats.subscriptions?.active ?? 0, icon: <CreditCardIcon />, color: '#06b6d4' },
-            ].map((stat) => (
-              <Grid item xs={6} sm={4} md={2} key={stat.label}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 2,
-                    textAlign: 'center',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Avatar sx={{ bgcolor: `${stat.color}15`, color: stat.color, width: 40, height: 40, mx: 'auto', mb: 1 }}>
-                    {stat.icon}
-                  </Avatar>
-                  <Typography variant="h5" fontWeight={700}>{stat.value}</Typography>
-                  <Typography variant="caption" color="text.secondary">{stat.label}</Typography>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-
-          <Grid container spacing={2} sx={{ mb: 4 }}>
-            <Grid item xs={12} md={6}>
-              <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                  <Avatar sx={{ bgcolor: 'error.main', width: 32, height: 32 }}>
-                    <ReceiptIcon sx={{ fontSize: 18 }} />
-                  </Avatar>
-                  <Typography variant="subtitle1" fontWeight={700}>Orders</Typography>
-                </Box>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                      {stats.orders?.byStatus && Object.entries(stats.orders.byStatus).map(([status, count]) => (
-                        <Chip
-                          key={status}
-                          label={`${status}: ${count as number}`}
-                          size="small"
-                          sx={{ textTransform: 'capitalize', fontWeight: 500 }}
-                          color={status === 'delivered' ? 'success' : status === 'shipped' ? 'info' : status === 'pending' ? 'warning' : 'default'}
-                          variant="outlined"
-                        />
-                      ))}
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 0.5 }} />
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Revenue</Typography>
-                    <Typography variant="h6" fontWeight={700} color="success.main">${(stats.orders?.revenue?.total ?? 0).toFixed(2)}</Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Platform Fees</Typography>
-                    <Typography variant="h6" fontWeight={700}>${(stats.orders?.revenue?.platformFees ?? 0).toFixed(2)}</Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>This Month</Typography>
-                    <Typography variant="h6" fontWeight={700}>${(stats.orders?.revenue?.thisMonth ?? 0).toFixed(2)}</Typography>
-                    <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.thisMonthFees ?? 0).toFixed(2)}</Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Year to Date</Typography>
-                    <Typography variant="h6" fontWeight={700}>${(stats.orders?.revenue?.ytd ?? 0).toFixed(2)}</Typography>
-                    <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.ytdFees ?? 0).toFixed(2)}</Typography>
-                  </Grid>
-                </Grid>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                  <Avatar sx={{ bgcolor: 'info.main', width: 32, height: 32 }}>
-                    <CreditCardIcon sx={{ fontSize: 18 }} />
-                  </Avatar>
-                  <Typography variant="subtitle1" fontWeight={700}>Subscriptions</Typography>
-                </Box>
-                <Grid container spacing={2}>
-                  {[
-                    { label: 'Active', value: stats.subscriptions?.active ?? 0, color: 'success.main', filter: 'active' },
-                    { label: 'Expired', value: stats.subscriptions?.expired ?? 0, color: 'text.secondary', filter: 'expired' },
-                    { label: 'This Month', value: stats.subscriptions?.thisMonth ?? 0, color: 'info.main', filter: 'this_month' },
-                    { label: 'Year to Date', value: stats.subscriptions?.ytd ?? 0, color: 'warning.main', filter: 'ytd' },
-                  ].map((item) => (
-                    <Grid item xs={6} sm={3} key={item.label}>
-                      <Box
-                        onClick={() => handleSubscriptionStatClick(item.filter, `${item.label} Subscriptions`)}
-                        sx={{
-                          cursor: item.value > 0 ? 'pointer' : 'default',
-                          p: 1.5,
-                          borderRadius: 1.5,
-                          textAlign: 'center',
-                          bgcolor: 'action.hover',
-                          transition: 'all 0.2s',
-                          '&:hover': item.value > 0 ? { bgcolor: 'action.selected', transform: 'translateY(-1px)' } : {},
-                        }}
-                      >
-                        <Typography variant="h5" fontWeight={700} color={item.color}>{item.value}</Typography>
-                        <Typography variant="caption" color="text.secondary">{item.label}</Typography>
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
-                <Divider sx={{ my: 2 }} />
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Billing Split</Typography>
-                    <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                      <Chip
-                        label={`Monthly: ${stats.subscriptions?.byBilling?.monthly ?? 0}`}
-                        size="small"
-                        variant="outlined"
-                        onClick={() => handleSubscriptionStatClick('active', 'Active Monthly', undefined, 'monthly')}
-                        sx={{ cursor: 'pointer' }}
-                      />
-                      <Chip
-                        label={`Yearly: ${stats.subscriptions?.byBilling?.yearly ?? 0}`}
-                        size="small"
-                        variant="outlined"
-                        onClick={() => handleSubscriptionStatClick('active', 'Active Yearly', undefined, 'yearly')}
-                        sx={{ cursor: 'pointer' }}
-                      />
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>By Plan</Typography>
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
-                      {stats.subscriptions?.byPlan && Object.keys(stats.subscriptions.byPlan).length > 0 ? (
-                        Object.entries(stats.subscriptions.byPlan).map(([plan, count]) => (
-                          <Chip
-                            key={plan}
-                            label={`${plan}: ${count as number}`}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                            onClick={() => handleSubscriptionStatClick('active', `${plan} Plan`, plan)}
-                            sx={{ cursor: (count as number) > 0 ? 'pointer' : 'default', textTransform: 'capitalize' }}
-                          />
-                        ))
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">—</Typography>
-                      )}
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Paper>
-            </Grid>
-          </Grid>
-        </>)}
 
         <Box sx={{ display: 'flex', gap: 3 }}>
           {!isMobile ? (
@@ -1518,6 +1402,31 @@ const AdminDashboard: React.FC = () => {
                 </Button>
               </Box>
             )}
+            {activeSection === 'overview' && (
+              <AdminOverview onNavigate={handleSectionChange} onOpenUser={setHistoryUserId} checkoutEnabled={checkoutEnabled} />
+            )}
+
+            {activeSection === 'payments' && <AdminPayments onOpenUser={setHistoryUserId} />}
+
+            {activeSection === 'promotions' && (
+              <Box sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Featured artist calendar</Typography>
+                <Box sx={{ mb: 4 }}>
+                  <FeaturedArtistCalendar onOpenUser={setHistoryUserId} />
+                </Box>
+                <Typography variant="h6" sx={{ mb: 2 }}>Prices & options</Typography>
+                <Box sx={{ maxWidth: 720 }}>
+                  <PromotionSettingsCard />
+                </Box>
+              </Box>
+            )}
+
+            {activeSection === 'newsletter' && (
+              <Box sx={{ p: 3, maxWidth: 720 }}>
+                <NewsletterSettingsCard />
+              </Box>
+            )}
+
             {activeSection === 'users' && (<Box sx={{ py: 3 }}>
             <Box sx={{ mb: 2, px: 3 }}>
               <TextField
@@ -1843,6 +1752,55 @@ const AdminDashboard: React.FC = () => {
           </Box>)}
 
           {activeSection === 'orders' && (<Box sx={{ py: 3 }}>
+            {stats && (
+              <Box sx={{ px: 3, mb: 3 }}>
+              <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                  <Avatar sx={{ bgcolor: 'error.main', width: 32, height: 32 }}>
+                    <ReceiptIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                  <Typography variant="subtitle1" fontWeight={700}>Orders</Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      {stats.orders?.byStatus && Object.entries(stats.orders.byStatus).map(([status, count]) => (
+                        <Chip
+                          key={status}
+                          label={`${status}: ${count as number}`}
+                          size="small"
+                          sx={{ textTransform: 'capitalize', fontWeight: 500 }}
+                          color={status === 'delivered' ? 'success' : status === 'shipped' ? 'info' : status === 'pending' ? 'warning' : 'default'}
+                          variant="outlined"
+                        />
+                      ))}
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 0.5 }} />
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Revenue</Typography>
+                    <Typography variant="h6" fontWeight={700} color="success.main">${(stats.orders?.revenue?.total ?? 0).toFixed(2)}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Platform Fees</Typography>
+                    <Typography variant="h6" fontWeight={700}>${(stats.orders?.revenue?.platformFees ?? 0).toFixed(2)}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>This Month</Typography>
+                    <Typography variant="h6" fontWeight={700}>${(stats.orders?.revenue?.thisMonth ?? 0).toFixed(2)}</Typography>
+                    <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.thisMonthFees ?? 0).toFixed(2)}</Typography>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Year to Date</Typography>
+                    <Typography variant="h6" fontWeight={700}>${(stats.orders?.revenue?.ytd ?? 0).toFixed(2)}</Typography>
+                    <Typography variant="caption" color="text.secondary">Fees: ${(stats.orders?.revenue?.ytdFees ?? 0).toFixed(2)}</Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+              </Box>
+            )}
             <Box sx={{ mb: 2, px: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
               <TextField
                 size="small"
@@ -1970,6 +1928,86 @@ const AdminDashboard: React.FC = () => {
           </Box>)}
 
           {activeSection === 'subscriptions' && (<Box sx={{ py: 3 }}>
+            {stats && (
+              <Box sx={{ px: 3, mb: 3 }}>
+              <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                  <Avatar sx={{ bgcolor: 'info.main', width: 32, height: 32 }}>
+                    <CreditCardIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                  <Typography variant="subtitle1" fontWeight={700}>Subscriptions</Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  {[
+                    { label: 'Active', value: stats.subscriptions?.active ?? 0, color: 'success.main', filter: 'active' },
+                    { label: 'Expired', value: stats.subscriptions?.expired ?? 0, color: 'text.secondary', filter: 'expired' },
+                    { label: 'This Month', value: stats.subscriptions?.thisMonth ?? 0, color: 'info.main', filter: 'this_month' },
+                    { label: 'Year to Date', value: stats.subscriptions?.ytd ?? 0, color: 'warning.main', filter: 'ytd' },
+                  ].map((item) => (
+                    <Grid item xs={6} sm={3} key={item.label}>
+                      <Box
+                        onClick={() => handleSubscriptionStatClick(item.filter, `${item.label} Subscriptions`)}
+                        sx={{
+                          cursor: item.value > 0 ? 'pointer' : 'default',
+                          p: 1.5,
+                          borderRadius: 1.5,
+                          textAlign: 'center',
+                          bgcolor: 'action.hover',
+                          transition: 'all 0.2s',
+                          '&:hover': item.value > 0 ? { bgcolor: 'action.selected', transform: 'translateY(-1px)' } : {},
+                        }}
+                      >
+                        <Typography variant="h5" fontWeight={700} color={item.color}>{item.value}</Typography>
+                        <Typography variant="caption" color="text.secondary">{item.label}</Typography>
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+                <Divider sx={{ my: 2 }} />
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>Billing Split</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                      <Chip
+                        label={`Monthly: ${stats.subscriptions?.byBilling?.monthly ?? 0}`}
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleSubscriptionStatClick('active', 'Active Monthly', undefined, 'monthly')}
+                        sx={{ cursor: 'pointer' }}
+                      />
+                      <Chip
+                        label={`Yearly: ${stats.subscriptions?.byBilling?.yearly ?? 0}`}
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleSubscriptionStatClick('active', 'Active Yearly', undefined, 'yearly')}
+                        sx={{ cursor: 'pointer' }}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem', lineHeight: 1.5 }}>By Plan</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
+                      {stats.subscriptions?.byPlan && Object.keys(stats.subscriptions.byPlan).length > 0 ? (
+                        Object.entries(stats.subscriptions.byPlan).map(([plan, count]) => (
+                          <Chip
+                            key={plan}
+                            label={`${plan}: ${count as number}`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            onClick={() => handleSubscriptionStatClick('active', `${plan} Plan`, plan)}
+                            sx={{ cursor: (count as number) > 0 ? 'pointer' : 'default', textTransform: 'capitalize' }}
+                          />
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">—</Typography>
+                      )}
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+              </Box>
+            )}
             <Box sx={{ mb: 2, px: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
               <TextField
                 size="small"
@@ -2683,9 +2721,20 @@ const AdminDashboard: React.FC = () => {
           </Box>)}
 
           {activeSection === 'settings' && (<Box sx={{ py: 3 }}>
-            <Box sx={{ px: 3, maxWidth: 600 }}>
-              <Typography variant="h6" sx={{ mb: 3 }}>Feature Settings</Typography>
-
+            <Tabs
+              value={settingsTab}
+              onChange={(_e, v) => setSettingsTab(v)}
+              variant="scrollable"
+              allowScrollButtonsMobile
+              sx={{ px: 3, mb: 3, borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab value="marketplace" label="Marketplace & billing" />
+              <Tab value="site" label="Site & footer" />
+              <Tab value="chat" label="Chat" />
+              <Tab value="developer" label="Developer" />
+            </Tabs>
+            <Box sx={{ px: 3, maxWidth: 640 }}>
+              {settingsTab === 'marketplace' && (<>
               <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                   <Box>
@@ -2699,43 +2748,6 @@ const AdminDashboard: React.FC = () => {
                   <Switch checked={checkoutEnabled} disabled={savingCheckout} onChange={(e) => saveCheckoutEnabled(e.target.checked)} />
                 </Box>
               </Paper>
-
-              <PromotionSettingsCard />
-
-              <NewsletterSettingsCard />
-
-              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Footer: Connect With Us</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Only the links you fill in appear in the footer. Leave everything empty to hide the section.
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {[
-                    ['facebook', 'Facebook page URL'],
-                    ['instagram', 'Instagram URL'],
-                    ['twitter', 'X (Twitter) URL'],
-                    ['pinterest', 'Pinterest URL'],
-                    ['youtube', 'YouTube URL'],
-                    ['email', 'Contact email'],
-                  ].map(([field, label]) => (
-                    <TextField
-                      key={field}
-                      label={label}
-                      size="small"
-                      value={socialLinks[field] || ''}
-                      onChange={(e) => setSocialLinks((prev) => ({ ...prev, [field]: e.target.value }))}
-                      placeholder={field === 'email' ? 'hello@yourdomain.com' : 'https://'}
-                      inputProps={{ maxLength: 300 }}
-                    />
-                  ))}
-                  <Box>
-                    <Button variant="contained" disabled={savingSocial} onClick={saveSocialLinks}>
-                      {savingSocial ? 'Saving...' : 'Save footer links'}
-                    </Button>
-                  </Box>
-                </Box>
-              </Paper>
-
               <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                   <Box>
@@ -2794,35 +2806,6 @@ const AdminDashboard: React.FC = () => {
                   </Typography>
                 )}
               </Paper>
-
-              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>User-to-User Chat</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Allow users to chat with each other about listings and orders.
-                    </Typography>
-                  </Box>
-                  <Switch
-                    checked={userChatEnabled}
-                    onChange={async (e) => {
-                      setUserChatLoading(true);
-                      try {
-                        const { enabled } = await apiService.setUserChatEnabled(e.target.checked);
-                        setUserChatEnabled(enabled);
-                        setGlobalChatEnabled(enabled);
-                        enqueueSnackbar(`User chat ${enabled ? 'enabled' : 'disabled'}`, { variant: 'success' });
-                      } catch {
-                        enqueueSnackbar('Failed to update setting', { variant: 'error' });
-                      } finally {
-                        setUserChatLoading(false);
-                      }
-                    }}
-                    disabled={userChatLoading}
-                  />
-                </Box>
-              </Paper>
-
               <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>Seller Payout Commission</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -2864,7 +2847,68 @@ const AdminDashboard: React.FC = () => {
                   </Button>
                 </Box>
               </Paper>
-
+              </>)}
+              {settingsTab === 'site' && (<>
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Footer: Connect With Us</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Only the links you fill in appear in the footer. Leave everything empty to hide the section.
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {[
+                    ['facebook', 'Facebook page URL'],
+                    ['instagram', 'Instagram URL'],
+                    ['twitter', 'X (Twitter) URL'],
+                    ['pinterest', 'Pinterest URL'],
+                    ['youtube', 'YouTube URL'],
+                    ['email', 'Contact email'],
+                  ].map(([field, label]) => (
+                    <TextField
+                      key={field}
+                      label={label}
+                      size="small"
+                      value={socialLinks[field] || ''}
+                      onChange={(e) => setSocialLinks((prev) => ({ ...prev, [field]: e.target.value }))}
+                      placeholder={field === 'email' ? 'hello@yourdomain.com' : 'https://'}
+                      inputProps={{ maxLength: 300 }}
+                    />
+                  ))}
+                  <Box>
+                    <Button variant="contained" disabled={savingSocial} onClick={saveSocialLinks}>
+                      {savingSocial ? 'Saving...' : 'Save footer links'}
+                    </Button>
+                  </Box>
+                </Box>
+              </Paper>
+              </>)}
+              {settingsTab === 'chat' && (<>
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>User-to-User Chat</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Allow users to chat with each other about listings and orders.
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={userChatEnabled}
+                    onChange={async (e) => {
+                      setUserChatLoading(true);
+                      try {
+                        const { enabled } = await apiService.setUserChatEnabled(e.target.checked);
+                        setUserChatEnabled(enabled);
+                        setGlobalChatEnabled(enabled);
+                        enqueueSnackbar(`User chat ${enabled ? 'enabled' : 'disabled'}`, { variant: 'success' });
+                      } catch {
+                        enqueueSnackbar('Failed to update setting', { variant: 'error' });
+                      } finally {
+                        setUserChatLoading(false);
+                      }
+                    }}
+                    disabled={userChatLoading}
+                  />
+                </Box>
+              </Paper>
               <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Box>
@@ -2949,7 +2993,8 @@ const AdminDashboard: React.FC = () => {
                   </Box>
                 )}
               </Paper>
-
+              </>)}
+              {settingsTab === 'developer' && (<>
               <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Box>
@@ -2977,6 +3022,7 @@ const AdminDashboard: React.FC = () => {
                   />
                 </Box>
               </Paper>
+              </>)}
             </Box>
           </Box>)}
           </Paper>

@@ -52,9 +52,20 @@ export async function extendSubscriptionFromInvoice(invoice) {
   const [result] = await pool.execute(
     `UPDATE user_subscriptions
      SET end_date = GREATEST(end_date, (to_timestamp(?) AT TIME ZONE 'UTC')::date), status = 'active', auto_renew = TRUE
-     WHERE payment_intent_id = ?`,
+     WHERE payment_intent_id = ?
+     RETURNING id, user_id`,
     [periodEnd, subscriptionId]
   );
+  const sub = result.rows?.[0];
+  if (sub && invoice.id) {
+    // Revenue record for the renewal; the invoice id makes a redelivered event a no-op.
+    await pool.execute(
+      `INSERT INTO subscription_payments (user_id, subscription_id, stripe_invoice_id, amount, period_end)
+       VALUES (?, ?, ?, ?, (to_timestamp(?) AT TIME ZONE 'UTC')::date)
+       ON CONFLICT (stripe_invoice_id) DO NOTHING`,
+      [sub.user_id, sub.id, invoice.id, (invoice.amount_paid ?? 0) / 100, periodEnd]
+    );
+  }
   return result.affectedRows ? 'subscription extended' : 'subscription not found';
 }
 
