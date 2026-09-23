@@ -92,6 +92,7 @@ export async function getArtistOverview(userId) {
       ending_soon: endingSoon.map((l) => ({ id: l.id, title: l.title, pass_ends: iso(l.pass_ends), feature_ends: iso(l.feature_ends) })),
       next_featured_week: nextFeatured[0] ? dateKey(nextFeatured[0].week_start) : null,
       feature_credits_left: credits.remaining,
+      feature_credit_days: credits.days,
     },
     active_listings: n(t.active_listings),
     username: p.username || null,

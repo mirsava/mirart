@@ -54,6 +54,7 @@ import {
   Star as StarIcon,
   AutoAwesome as SpotlightIcon,
   Link as LinkIcon,
+  PauseCircleOutline as PauseIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -114,6 +115,9 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const CATEGORY_COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
+
+// Listings in these states can be put live again from the grid (sold ones can't).
+const ACTIVATABLE_STATUSES = ['draft', 'inactive', 'archived'];
 
 // Tab values are numbers internally; the URL uses these names (?tab=overview), so refresh and links keep the tab.
 const TAB_KEYS: Record<number, string> = { 0: 'listings', 1: 'orders', 2: 'analytics', 3: 'plan', 4: 'profile', 5: 'settings', 6: 'overview', 7: 'saved' };
@@ -930,6 +934,23 @@ const AccountDashboard: React.FC = () => {
     }
   };
 
+  // Takes a live listing offline; it keeps its details and can be activated again from the grid.
+  const handleDeactivateListing = async (listing: Listing) => {
+    if (!user?.id) return;
+    setActivatingListing(listing.id);
+    try {
+      await apiService.updateListing(listing.id, { auth_user_id: user.id, status: 'inactive' });
+      enqueueSnackbar(`"${listing.title}" is offline. Activate it again any time.`, { variant: 'success' });
+      await fetchListings();
+      await fetchDashboardData();
+      await fetchSubscription();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Could not take the listing offline', { variant: 'error' });
+    } finally {
+      setActivatingListing(null);
+    }
+  };
+
   const handleActivateListing = async (listingId: number) => {
     if (!user?.id) return;
     const listing = recentListings.find((l) => l.id === listingId);
@@ -1462,7 +1483,7 @@ const AccountDashboard: React.FC = () => {
                             </TableCell>
                             <TableCell align="right">
                               <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                                {listing.status === 'draft' && (
+                                {ACTIVATABLE_STATUSES.includes(listing.status) && (
                                   <Button
                                     variant="outlined"
                                     color="primary"
@@ -1473,6 +1494,13 @@ const AccountDashboard: React.FC = () => {
                                   >
                                     {activatingListing === listing.id ? '...' : 'Activate'}
                                   </Button>
+                                )}
+                                {listing.status === 'active' && (
+                                  <Tooltip title="Take offline (frees a plan slot)">
+                                    <IconButton size="small" onClick={() => handleDeactivateListing(listing)} disabled={activatingListing === listing.id} aria-label="Take offline">
+                                      <PauseIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
                                 )}
                                 {listing.status === 'active' && (
                                   <Tooltip title="Promote">
@@ -1554,7 +1582,7 @@ const AccountDashboard: React.FC = () => {
                             {hasLivePass(listing) && (
                               <Chip label="Pass" color="info" size="small" variant="outlined" sx={{ ml: 0.5, height: 20, fontSize: '0.7rem' }} />
                             )}
-                            {listing.status === 'draft' && (
+                            {ACTIVATABLE_STATUSES.includes(listing.status) && (
                               <Button
                                 variant="outlined"
                                 color="primary"
@@ -1568,6 +1596,13 @@ const AccountDashboard: React.FC = () => {
                               </Button>
                             )}
                             <Box sx={{ display: 'flex', gap: 0.5, mt: 1 }}>
+                              {listing.status === 'active' && (
+                                <Tooltip title="Take offline (frees a plan slot)">
+                                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDeactivateListing(listing); }} disabled={activatingListing === listing.id} aria-label="Take offline">
+                                    <PauseIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                               {listing.status === 'active' && (
                                 <Tooltip title="Promote">
                                   <IconButton size="small" color="warning" onClick={(e) => { e.stopPropagation(); setPromoteListing(listing); }}>

@@ -31,6 +31,7 @@ import { useSnackbar } from 'notistack';
 import apiService, { ArtistOverviewData } from '../../services/api';
 import NewsletterPreference from './NewsletterPreference';
 import RecentActivity from './RecentActivity';
+import FeatureCreditDialog from './FeatureCreditDialog';
 
 interface ArtistOverviewProps {
   authUserId: string;
@@ -73,9 +74,14 @@ const ArtistOverview: React.FC<ArtistOverviewProps> = ({ authUserId, onGoToTab, 
   const { enqueueSnackbar } = useSnackbar();
   const [data, setData] = useState<ArtistOverviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [creditDialogOpen, setCreditDialogOpen] = useState(false);
+
+  const load = () =>
+    apiService.getArtistOverview(authUserId).then(setData).catch((err) => setError(err.message || 'Failed to load overview'));
 
   useEffect(() => {
-    apiService.getArtistOverview(authUserId).then(setData).catch((err) => setError(err.message || 'Failed to load overview'));
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUserId]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
@@ -122,8 +128,13 @@ const ArtistOverview: React.FC<ArtistOverviewProps> = ({ authUserId, onGoToTab, 
     todoItems.push({
       key: 'credits',
       icon: <StarIcon color="warning" />,
-      text: <>{todo.feature_credits_left} free {todo.feature_credits_left === 1 ? 'feature' : 'features'} left on your plan this month</>,
-      action: { label: 'Use one', onClick: () => onGoToTab('listings') },
+      text: (
+        <>
+          <strong>Your plan includes {todo.feature_credits_left === 1 ? 'a free featured listing' : `${todo.feature_credits_left} free featured listings`}.</strong>{' '}
+          Put a piece at the top of the gallery and on the homepage for {todo.feature_credit_days} days, at no cost.
+        </>
+      ),
+      action: { label: 'Feature a listing', onClick: () => setCreditDialogOpen(true) },
     });
   }
 
@@ -139,6 +150,14 @@ const ArtistOverview: React.FC<ArtistOverviewProps> = ({ authUserId, onGoToTab, 
 
   return (
     <Box>
+      <FeatureCreditDialog
+        open={creditDialogOpen}
+        authUserId={authUserId}
+        days={todo.feature_credit_days}
+        onClose={() => setCreditDialogOpen(false)}
+        onUsed={load}
+      />
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, mb: 3 }}>
         <WeekStat label="Views" icon={<ViewsIcon fontSize="small" />} value={week.views.this_week} last={week.views.last_week} />
         <WeekStat label="Likes" icon={<LikesIcon fontSize="small" />} value={week.likes.this_week} last={week.likes.last_week} />

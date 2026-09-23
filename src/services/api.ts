@@ -267,6 +267,7 @@ export interface ArtistOverviewData {
     ending_soon: Array<{ id: number; title: string; pass_ends: string | null; feature_ends: string | null }>;
     next_featured_week: string | null;
     feature_credits_left: number;
+    feature_credit_days: number;
   };
   active_listings: number;
   username: string | null;
