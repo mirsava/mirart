@@ -42,6 +42,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/userRoles';
 import apiService from '../services/api';
 import PageHeader from '../components/PageHeader';
+import ActivateListingDialog from '../components/ActivateListingDialog';
 
 const TEST_DATA = {
   title: 'Sunset Over the Pacific',
@@ -58,7 +59,7 @@ const TEST_DATA = {
   height_in: '2',
   in_stock: true,
   quantity_available: '1',
-  status: 'draft' as 'draft',
+  status: 'draft' as 'draft' | 'active',
   shipping_info: 'Ships within 3-5 business days. Carefully packed in custom protective packaging.',
   returns_info: 'Returns accepted within 14 days of delivery if artwork is in original condition.',
   special_instructions: '',
@@ -76,6 +77,8 @@ const CreateListing: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set when the artist chose "Active" but has no free slot: offer a listing pass or a plan for the new draft.
+  const [blockedActivation, setBlockedActivation] = useState<{ listing: { id: number; title: string }; message?: string } | null>(null);
   const [fieldErrors, setFieldErrors] = useState({
     title: '',
     category: '',
@@ -100,7 +103,7 @@ const CreateListing: React.FC = () => {
     height_in: '',
     in_stock: true,
     quantity_available: '1',
-    status: 'draft' as 'draft',
+    status: 'draft' as 'draft' | 'active',
     shipping_info: '',
     returns_info: '',
     special_instructions: '',
@@ -377,7 +380,8 @@ const CreateListing: React.FC = () => {
 
       const data = await response.json();
       return data.files.map((file: any) => {
-        // Convert relative URL to absolute URL
+        // Uploads return full Supabase Storage URLs; only legacy server paths need the API host
+        if (/^https?:\/\//.test(file.url)) return file.url;
         const baseUrl = API_BASE_URL.replace('/api', '');
         return baseUrl + file.url;
       });
@@ -448,7 +452,25 @@ const CreateListing: React.FC = () => {
 
       listingData.price = parseFloat(formData.price);
 
-      await apiService.createListing(listingData);
+      const created = await apiService.createListing(listingData);
+
+      // New listings are saved as drafts; "Active" then goes through the normal activation check.
+      if (formData.status === 'active') {
+        try {
+          await apiService.activateListing(created.id, user.id);
+          enqueueSnackbar('Listing created and live!', { variant: 'success' });
+          navigate('/dashboard');
+        } catch (activationErr: any) {
+          if (activationErr?.details?.code === 'activation_blocked') {
+            setBlockedActivation({ listing: { id: created.id, title: created.title }, message: activationErr.details.message });
+          } else {
+            enqueueSnackbar(`Listing saved as a draft, but it could not be activated: ${activationErr.message}`, { variant: 'warning' });
+            navigate('/dashboard');
+          }
+        }
+        return;
+      }
+
       enqueueSnackbar('Listing created successfully!', { variant: 'success' });
       navigate('/dashboard');
     } catch (err: any) {
@@ -1097,6 +1119,11 @@ const CreateListing: React.FC = () => {
                           <MenuItem value="draft">Draft</MenuItem>
                           <MenuItem value="active">Active</MenuItem>
                         </Select>
+                        {formData.status === 'active' && (
+                          <FormHelperText>
+                            Goes live when you create it. If your plan has no free slot, you can pay once for this listing or subscribe.
+                          </FormHelperText>
+                        )}
                       </FormControl>
                     </Grid>
 
@@ -1176,6 +1203,15 @@ const CreateListing: React.FC = () => {
             </Grid>
           </form>
         </Paper>
+        <ActivateListingDialog
+          open={Boolean(blockedActivation)}
+          listing={blockedActivation?.listing ?? null}
+          message={blockedActivation?.message ? `Your listing was saved as a draft. ${blockedActivation.message}` : 'Your listing was saved as a draft.'}
+          onClose={() => {
+            setBlockedActivation(null);
+            navigate('/dashboard');
+          }}
+        />
       </Box>
     </Box>
   );

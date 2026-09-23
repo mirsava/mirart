@@ -15,9 +15,9 @@ import {
   RadioGroup,
   Typography,
 } from '@mui/material';
-import { Star as StarIcon, ArrowUpward as ArrowUpwardIcon } from '@mui/icons-material';
+import { Star as StarIcon, ArrowUpward as ArrowUpwardIcon, ConfirmationNumber as PassIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
-import apiService, { FeatureCredits, Listing, ListingPromotionState, PromotionConfig } from '../services/api';
+import apiService, { FeatureCredits, Listing, ListingPromotionState, PromotionConfig, PromotionType } from '../services/api';
 
 interface PromoteListingDialogProps {
   open: boolean;
@@ -36,12 +36,16 @@ const formatDate = (value: string | Date) =>
 export const isListingFeatured = (listing: Pick<Listing, 'featured_until'>) =>
   Boolean(listing.featured_until && new Date(listing.featured_until) > new Date());
 
+// The listing is live on a paid single-listing pass (not using a plan slot).
+export const hasLivePass = (listing: Pick<Listing, 'paid_until'>) =>
+  Boolean(listing.paid_until && new Date(listing.paid_until) > new Date());
+
 const PromoteListingDialog: React.FC<PromoteListingDialogProps> = ({ open, listing, onClose, onPromoted }) => {
   const { enqueueSnackbar } = useSnackbar();
   const [options, setOptions] = useState<(PromotionConfig & { credits: FeatureCredits | null }) | null>(null);
   const [loading, setLoading] = useState(false);
   const [featureChoice, setFeatureChoice] = useState<string>('');
-  const [submitting, setSubmitting] = useState<'feature' | 'bump' | null>(null);
+  const [submitting, setSubmitting] = useState<PromotionType | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -71,7 +75,7 @@ const PromoteListingDialog: React.FC<PromoteListingDialogProps> = ({ open, listi
   const credits = options?.credits;
   const selectedOption = options?.feature_options.find((o) => String(o.days) === featureChoice);
 
-  const startCheckout = async (type: 'feature' | 'bump', days?: number) => {
+  const startCheckout = async (type: PromotionType, days?: number) => {
     setSubmitting(type);
     try {
       const { url } = await apiService.createPromotionCheckout(listing.id, type, days);
@@ -175,6 +179,29 @@ const PromoteListingDialog: React.FC<PromoteListingDialogProps> = ({ open, listi
             >
               {bumpBlocked && nextBump ? `Available again ${formatDate(nextBump)}` : `Bump for ${formatPrice(options.bump_price)}`}
             </Button>
+
+            {hasLivePass(listing) && options.listing_pass_enabled && (
+              <>
+                <Divider sx={{ my: 3 }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <PassIcon color="info" fontSize="small" />
+                  <Typography variant="subtitle1" fontWeight={600}>Listing pass</Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Live on its pass until {formatDate(listing.paid_until as string)}. Afterwards it uses one of your plan slots, or goes inactive if none are free.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  color="info"
+                  startIcon={submitting === 'listing_pass' ? <CircularProgress size={16} color="inherit" /> : <PassIcon />}
+                  disabled={Boolean(submitting)}
+                  onClick={() => startCheckout('listing_pass')}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Extend {options.listing_pass_days} days for {formatPrice(options.listing_pass_price)}
+                </Button>
+              </>
+            )}
           </>
         )}
       </DialogContent>

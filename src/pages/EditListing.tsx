@@ -28,6 +28,7 @@ import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 import PageHeader from '../components/PageHeader';
+import ActivateListingDialog from '../components/ActivateListingDialog';
 
 const EditListing: React.FC = () => {
   const { user } = useAuth();
@@ -38,6 +39,9 @@ const EditListing: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Status as last saved, so a refused activation can still save the other edits.
+  const [savedStatus, setSavedStatus] = useState<string>('draft');
+  const [blockedActivation, setBlockedActivation] = useState<{ listing: { id: number; title: string }; message?: string } | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -131,6 +135,7 @@ const EditListing: React.FC = () => {
 
     try {
       const listing = await apiService.getListing(parseInt(id));
+      setSavedStatus(listing.status || 'draft');
       
       setFormData({
         title: listing.title || '',
@@ -457,8 +462,16 @@ const EditListing: React.FC = () => {
         listingData.image_urls = additionalImages;
       }
 
-      await apiService.updateListing(parseInt(id), listingData);
-      enqueueSnackbar('Listing updated successfully!', { variant: 'success' });
+      try {
+        await apiService.updateListing(parseInt(id), listingData);
+        enqueueSnackbar('Listing updated successfully!', { variant: 'success' });
+      } catch (updateErr: any) {
+        if (updateErr?.details?.code !== 'activation_blocked') throw updateErr;
+        // No free slot to go live: keep the other edits, then offer a listing pass or a plan
+        await apiService.updateListing(parseInt(id), { ...listingData, status: savedStatus });
+        enqueueSnackbar('Your changes were saved, but the listing is not live yet.', { variant: 'info' });
+        setBlockedActivation({ listing: { id: parseInt(id), title: formData.title }, message: updateErr.message });
+      }
       await fetchListing();
     } catch (err: any) {
       setError(err.message || 'Failed to update listing. Please try again.');
@@ -973,6 +986,12 @@ const EditListing: React.FC = () => {
               </Grid>
             </Grid>
           </form>
+          <ActivateListingDialog
+            open={Boolean(blockedActivation)}
+            listing={blockedActivation?.listing ?? null}
+            message={blockedActivation?.message}
+            onClose={() => setBlockedActivation(null)}
+          />
         </Paper>
       </Box>
     </Box>

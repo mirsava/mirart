@@ -5,7 +5,7 @@ vi.mock('../config/database.js', () => ({
   default: { execute: (...args) => mockExecute(...args) },
 }));
 
-const { describeAccess, getBillingConfig, saveBillingConfig, getListingAccess, DEFAULT_BILLING_CONFIG } = await import('./billing.js');
+const { describeAccess, getBillingConfig, saveBillingConfig, getListingAccess, checkActivation, DEFAULT_BILLING_CONFIG } = await import('./billing.js');
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -102,5 +102,30 @@ describe('getListingAccess', () => {
       .mockResolvedValueOnce([[{ id: 1, max_listings: 5 }]])
       .mockResolvedValueOnce([[{ setting_value: { enabled: true, grace_days: 0, billing_started_at: '2020-01-01T00:00:00Z' } }]]);
     expect(await getListingAccess(1)).toMatchObject({ allowed: true, source: 'subscription', maxListings: 5 });
+  });
+});
+
+describe('checkActivation', () => {
+  beforeEach(() => mockExecute.mockReset());
+
+  it('lets a listing with a live pass go active without checking the plan', async () => {
+    const result = await checkActivation({ user_id: 1, paid_until: new Date(Date.now() + DAY).toISOString() });
+    expect(result).toEqual({ ok: true });
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it('refuses once the free-launch slots are used up', async () => {
+    mockExecute
+      .mockResolvedValueOnce([[]]) // no subscription
+      .mockResolvedValueOnce([[]]) // default billing config: off, 25 free
+      .mockResolvedValueOnce([[{ count: 25 }]]);
+    expect(await checkActivation({ user_id: 1, paid_until: null })).toMatchObject({ ok: false, reason: 'limit' });
+  });
+
+  it('refuses when billing is on and the artist has no plan', async () => {
+    mockExecute
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ setting_value: { enabled: true, grace_days: 0, billing_started_at: '2026-01-01T00:00:00Z' } }]]);
+    expect(await checkActivation({ user_id: 1, paid_until: '2020-01-01T00:00:00Z' })).toMatchObject({ ok: false, reason: 'no_access' });
   });
 });

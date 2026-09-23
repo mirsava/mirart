@@ -120,6 +120,8 @@ CREATE INDEX IF NOT EXISTS idx_listings_created_at ON listings (created_at);
 -- Paid promotions: featured_until pins a listing above the rest until it passes; bumped_at moves it back to the top of "newest".
 ALTER TABLE listings ADD COLUMN IF NOT EXISTS featured_until TIMESTAMPTZ;
 ALTER TABLE listings ADD COLUMN IF NOT EXISTS bumped_at TIMESTAMPTZ;
+-- Pay-per-listing: while paid_until is in the future the listing may be active without using a plan slot.
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS paid_until TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_listings_featured_until ON listings (featured_until);
 
 CREATE TABLE IF NOT EXISTS likes (
@@ -347,7 +349,7 @@ CREATE TABLE IF NOT EXISTS listing_promotions (
   id SERIAL PRIMARY KEY,
   listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  promotion_type VARCHAR(20) NOT NULL CHECK (promotion_type IN ('feature','bump')),
+  promotion_type VARCHAR(20) NOT NULL,
   days INTEGER,
   amount NUMERIC(10,2) NOT NULL DEFAULT 0,
   source VARCHAR(20) NOT NULL CHECK (source IN ('stripe','plan','admin')),
@@ -355,6 +357,9 @@ CREATE TABLE IF NOT EXISTS listing_promotions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_listing_promotions_listing ON listing_promotions (listing_id);
+ALTER TABLE listing_promotions DROP CONSTRAINT IF EXISTS listing_promotions_promotion_type_check;
+ALTER TABLE listing_promotions ADD CONSTRAINT listing_promotions_promotion_type_check
+  CHECK (promotion_type IN ('feature','bump','listing_pass'));
 CREATE INDEX IF NOT EXISTS idx_listing_promotions_user_source ON listing_promotions (user_id, source, created_at);
 
 -- Keep updated_at fresh on every UPDATE (replaces MySQL's ON UPDATE CURRENT_TIMESTAMP)

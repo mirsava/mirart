@@ -441,7 +441,7 @@ const SignUp: React.FC = () => {
               The setup keeps everything simple so you can focus on creating and selling.
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              <Chip icon={<CheckIcon />} label="No activation fees" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
+              <Chip icon={<CheckIcon />} label="No commission on sales" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
               <Chip icon={<CheckIcon />} label={billingOff ? 'Free to list' : 'Flexible subscription timing'} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
               <Chip icon={<CheckIcon />} label="Direct buyer connection" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)' }} />
             </Box>

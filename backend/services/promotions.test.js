@@ -12,6 +12,7 @@ const {
   nextBumpAt,
   getFeatureCredits,
   applyPromotion,
+  runListingPassExpirationJob,
 } = await import('./promotions.js');
 
 describe('promotions service', () => {
@@ -40,6 +41,11 @@ describe('promotions service', () => {
     it('prices a configured feature option and a bump', () => {
       expect(quotePromotion(DEFAULT_PROMOTION_CONFIG, 'feature', '30')).toEqual({ type: 'feature', days: 30, price: 15 });
       expect(quotePromotion(DEFAULT_PROMOTION_CONFIG, 'bump')).toEqual({ type: 'bump', days: null, price: 1 });
+    });
+
+    it('prices a listing pass, unless passes are switched off', () => {
+      expect(quotePromotion(DEFAULT_PROMOTION_CONFIG, 'listing_pass')).toEqual({ type: 'listing_pass', days: 60, price: 3 });
+      expect(quotePromotion({ ...DEFAULT_PROMOTION_CONFIG, listing_pass_enabled: false }, 'listing_pass')).toBeNull();
     });
 
     it('rejects options that are not configured', () => {
@@ -89,6 +95,38 @@ describe('promotions service', () => {
       const result = await applyPromotion(executor, { listingId: 5, userId: 1, type: 'bump', source: 'stripe', stripeSessionId: 'cs_1' });
       expect(result).toEqual({ applied: false });
       expect(mockExecute).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('listing passes', () => {
+    const executor = { execute: (...args) => mockExecute(...args) };
+
+    it('extends paid_until and puts a draft listing live', async () => {
+      mockExecute
+        .mockResolvedValueOnce([{ affectedRows: 1 }]) // ledger
+        .mockResolvedValueOnce([[{ status: 'draft' }]])
+        .mockResolvedValueOnce([{ affectedRows: 1 }]) // listing update
+        .mockResolvedValueOnce([{ affectedRows: 1 }]); // dashboard stats
+      await applyPromotion(executor, { listingId: 5, userId: 1, type: 'listing_pass', days: 60, amount: 3, source: 'stripe', stripeSessionId: 'cs_2' });
+      expect(mockExecute.mock.calls[2][0]).toMatch(/paid_until = GREATEST[\s\S]*status = CASE/);
+      expect(mockExecute.mock.calls[3][0]).toMatch(/active_listings \+ 1/);
+    });
+
+    it('when passes end, keeps what fits in the plan and deactivates the rest with a notification', async () => {
+      mockExecute
+        .mockResolvedValueOnce([[{ id: 1, user_id: 7, title: 'A' }, { id: 2, user_id: 7, title: 'B' }]])
+        .mockResolvedValueOnce([[]]) // no subscription
+        .mockResolvedValueOnce([[]]) // billing off, 25 free
+        .mockResolvedValueOnce([[{ count: 26 }]]) // one over the limit
+        .mockResolvedValue([{ affectedRows: 1 }]);
+
+      expect(await runListingPassExpirationJob()).toEqual({ kept: 1, deactivated: 1 });
+      const sql = mockExecute.mock.calls.map((c) => c[0]);
+      expect(sql[4]).toMatch(/paid_until = NULL/);
+      expect(mockExecute.mock.calls[4][1]).toEqual([[2]]);
+      expect(sql[5]).toMatch(/status = 'inactive'/);
+      expect(mockExecute.mock.calls[5][1]).toEqual([[1]]);
+      expect(sql.some((q) => /INSERT INTO notifications/.test(q))).toBe(true);
     });
   });
 });

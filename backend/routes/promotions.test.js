@@ -88,6 +88,20 @@ describe('Promotions API', () => {
       expect(res.body.next_bump_at).toBeDefined();
     });
 
+    it('sells a listing pass for a draft listing', async () => {
+      mockExecute.mockResolvedValueOnce(noSettings).mockResolvedValueOnce(activeListing({ status: 'draft' }));
+      mockCreateSession.mockResolvedValueOnce({ id: 'cs_pass', url: 'https://stripe.test/cs_pass' });
+      await request(app).post('/api/promotions/checkout').set('x-test-auth', asArtist).send({ listing_id: 5, type: 'listing_pass' }).expect(200);
+      const session = mockCreateSession.mock.calls[0][0];
+      expect(session.line_items[0].price_data.unit_amount).toBe(300);
+      expect(session.metadata).toMatchObject({ type: 'listing_pass', days: '60' });
+    });
+
+    it('does not feature a draft listing', async () => {
+      mockExecute.mockResolvedValueOnce(noSettings).mockResolvedValueOnce(activeListing({ status: 'draft' }));
+      await request(app).post('/api/promotions/checkout').set('x-test-auth', asArtist).send({ listing_id: 5, type: 'feature', days: 7 }).expect(400);
+    });
+
     it('rejects an unknown feature length', async () => {
       mockExecute.mockResolvedValueOnce(noSettings);
       await request(app).post('/api/promotions/checkout').set('x-test-auth', asArtist).send({ listing_id: 5, type: 'feature', days: 2 }).expect(400);

@@ -2,7 +2,7 @@ import express from 'express';
 import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
 import { requireAdmin, requireSelf } from '../middleware/auth.js';
-import { getBillingConfig, saveBillingConfig, describeAccess } from '../services/billing.js';
+import { getBillingConfig, saveBillingConfig, describeAccess, countPlanListings } from '../services/billing.js';
 
 const router = express.Router();
 
@@ -333,10 +333,7 @@ router.get('/user/:authUserId', requireSelf(), async (req, res) => {
       if (req.query.free_access === '1') {
         const access = describeAccess(await getBillingConfig());
         if (access.free_access) {
-          const [active] = await pool.execute(
-            "SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = 'active'",
-            [userId]
-          );
+          const activeCount = await countPlanListings(userId);
           return res.json({
             subscription: {
               id: 0,
@@ -350,8 +347,8 @@ router.get('/user/:authUserId', requireSelf(), async (req, res) => {
               plan_name: 'Free Plan',
               tier: 'free',
               max_listings: access.free_listing_limit,
-              current_listings: active[0].count,
-              listings_remaining: Math.max(0, access.free_listing_limit - active[0].count),
+              current_listings: activeCount,
+              listings_remaining: Math.max(0, access.free_listing_limit - activeCount),
               price_monthly: 0,
               price_yearly: 0,
               is_free_access: true,
@@ -364,16 +361,13 @@ router.get('/user/:authUserId', requireSelf(), async (req, res) => {
 
     const subscription = subscriptions[0];
 
-    const [activeListings] = await pool.execute(
-      "SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = 'active'",
-      [userId]
-    );
+    const activeCount = await countPlanListings(userId);
 
     res.json({
       subscription: {
         ...subscription,
-        current_listings: activeListings[0].count,
-        listings_remaining: Math.max(0, subscription.max_listings - activeListings[0].count),
+        current_listings: activeCount,
+        listings_remaining: Math.max(0, subscription.max_listings - activeCount),
       },
     });
   } catch (error) {

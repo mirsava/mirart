@@ -108,6 +108,20 @@ describe('Listings API', () => {
     });
   });
 
+  describe('activating from the edit form', () => {
+    it('refuses to set a listing active when the artist has no free slot', async () => {
+      mockExecute
+        .mockResolvedValueOnce([[{ user_id: 1 }]]) // ownership check
+        .mockResolvedValueOnce([[{ user_id: 1, status: 'draft', paid_until: null }]])
+        .mockResolvedValueOnce([[]]) // no subscription
+        .mockResolvedValueOnce([[]]) // billing off, 25 free
+        .mockResolvedValueOnce([[{ count: 25 }]]);
+      const res = await request(app).put('/api/listings/1').set('x-test-auth', asUser).send({ status: 'active' }).expect(403);
+      expect(res.body).toMatchObject({ code: 'activation_blocked', reason: 'limit' });
+      expect(mockExecute).toHaveBeenCalledTimes(5);
+    });
+  });
+
   describe('write access', () => {
     it('requires a session to create a listing', async () => {
       await request(app)

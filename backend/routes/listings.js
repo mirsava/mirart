@@ -2,7 +2,7 @@ import express from 'express';
 import pool from '../config/database.js';
 import { requireAuth, isUuid } from '../middleware/auth.js';
 import { parseImageUrls } from '../utils/json.js';
-import { getListingAccess } from '../services/billing.js';
+import { checkActivation } from '../services/billing.js';
 import { deleteImages } from '../services/storage.js';
 
 const router = express.Router();
@@ -640,28 +640,10 @@ router.post('/:id/activate', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Cannot activate a sold listing' });
     }
 
-    // Check plan limits (or the free-launch limit while billing is off / in its grace period)
-    const access = await getListingAccess(listing.user_id);
-
-    if (!access.allowed) {
-      return res.status(403).json({
-        error: 'No active subscription found',
-        message: 'You need an active subscription to activate listings. Please subscribe to a plan first.'
-      });
-    }
-
-    const [activeCount] = await pool.execute(
-      "SELECT COUNT(*) as count FROM listings WHERE user_id = ? AND status = 'active'",
-      [listing.user_id]
-    );
-
-    if (activeCount[0].count >= access.maxListings) {
-      return res.status(403).json({
-        error: 'Listing limit reached',
-        message: access.source === 'free'
-          ? `You have reached the free plan limit of ${access.maxListings} active listings. Please deactivate an existing listing to activate another.`
-          : `You have reached your subscription limit of ${access.maxListings} active listings. Please upgrade your plan or deactivate existing listings.`
-      });
+    // Check plan limits (or the free-launch limit while billing is off / in its grace period), unless the listing has a pass
+    const activation = await checkActivation(listing);
+    if (!activation.ok) {
+      return res.status(403).json({ error: activation.error, message: activation.message, code: 'activation_blocked', reason: activation.reason });
     }
 
     // Update listing status to active
@@ -738,14 +720,22 @@ router.put('/:id', requireAuth, async (req, res) => {
     
     // Get current listing to check status change
     const [current] = await pool.execute(
-      'SELECT user_id, status, shipping_preference, fixed_shipping_fee FROM listings WHERE id = ?',
+      'SELECT user_id, status, shipping_preference, fixed_shipping_fee, paid_until FROM listings WHERE id = ?',
       [id]
     );
     
     if (current.length === 0) {
       return res.status(404).json({ error: 'Listing not found' });
     }
-    
+
+    // Going live from the edit form follows the same rules as the Activate button (admins are exempt)
+    if (status === 'active' && current[0].status !== 'active' && !req.auth.isAdmin) {
+      const activation = await checkActivation(current[0]);
+      if (!activation.ok) {
+        return res.status(403).json({ error: activation.message, code: 'activation_blocked', reason: activation.reason });
+      }
+    }
+
     const updateFields = [];
     const updateValues = [];
     

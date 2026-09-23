@@ -718,7 +718,7 @@ const Home: React.FC = () => {
             >
               {freeLaunch && billing
                 ? `List up to ${billing.free_listing_limit} artworks at no cost, with no subscription and no card needed.`
-                : 'Choose a subscription plan that fits your needs. No hidden fees, no per-listing charges.'}
+                : 'Choose a subscription plan that fits your needs, or pay once for a single listing. No hidden fees and no commission on sales.'}
             </Typography>
           </Box>
 

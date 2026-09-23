@@ -31,9 +31,24 @@ const PromotionSuccess: React.FC = () => {
     );
   }
 
-  const featuredUntil = result?.listing?.featured_until
-    ? new Date(result.listing.featured_until).toLocaleString(undefined, { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-    : null;
+  const formatDate = (value?: string | null) =>
+    value ? new Date(value).toLocaleString(undefined, { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : null;
+  const featuredUntil = formatDate(result?.listing?.featured_until);
+  const paidUntil = formatDate(result?.listing?.paid_until);
+  const copy = {
+    feature: {
+      title: 'Your listing is featured',
+      body: `It now appears above other listings in the Gallery and in the homepage spotlight${featuredUntil ? ` until ${featuredUntil}` : ''}.`,
+    },
+    bump: {
+      title: 'Your listing was bumped',
+      body: 'It is back at the top of the newest listings in the Gallery.',
+    },
+    listing_pass: {
+      title: 'Your listing is live',
+      body: `It stays live${paidUntil ? ` until ${paidUntil}` : ''} without using a plan slot. You can extend it from your dashboard.`,
+    },
+  }[result?.type ?? 'bump'];
 
   return (
     <Box sx={{ py: 8 }}>
@@ -54,12 +69,10 @@ const PromotionSuccess: React.FC = () => {
             <>
               <CheckCircleIcon sx={{ fontSize: 72, color: 'success.main', mb: 2 }} />
               <Typography variant="h5" component="h1" gutterBottom>
-                {result?.type === 'feature' ? 'Your listing is featured' : 'Your listing was bumped'}
+                {copy.title}
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-                {result?.type === 'feature'
-                  ? `It now appears above other listings in the Gallery and in the homepage spotlight${featuredUntil ? ` until ${featuredUntil}` : ''}.`
-                  : 'It is back at the top of the newest listings in the Gallery.'}
+                {copy.body}
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <Button variant="contained" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>

@@ -79,3 +79,38 @@ export async function getListingAccess(userId) {
   }
   return { allowed: false, source: 'none', maxListings: 0, subscription: null, access };
 }
+
+// Active listings that use up plan (or free-launch) slots. Listings with a live single-listing pass do not.
+export async function countPlanListings(userId, executor = pool) {
+  const [rows] = await executor.execute(
+    "SELECT COUNT(*) AS count FROM listings WHERE user_id = ? AND status = 'active' AND (paid_until IS NULL OR paid_until <= now())",
+    [userId]
+  );
+  return Number(rows[0]?.count || 0);
+}
+
+// Whether a listing may be made active: a live listing pass always allows it; otherwise it needs a free plan slot.
+// A refusal carries code 'activation_blocked' so the dashboard can offer a subscription or a listing pass.
+export async function checkActivation(listing) {
+  if (listing.paid_until && new Date(listing.paid_until) > new Date()) return { ok: true };
+  const access = await getListingAccess(listing.user_id);
+  if (!access.allowed) {
+    return {
+      ok: false,
+      error: 'No active subscription found',
+      message: 'You need an active subscription or a single-listing pass to activate this listing.',
+      reason: 'no_access',
+    };
+  }
+  if ((await countPlanListings(listing.user_id)) >= access.maxListings) {
+    return {
+      ok: false,
+      error: 'Listing limit reached',
+      message: access.source === 'free'
+        ? `You have reached the free plan limit of ${access.maxListings} active listings. Deactivate a listing, subscribe, or buy a pass for this one.`
+        : `You have reached your subscription limit of ${access.maxListings} active listings. Upgrade your plan, deactivate a listing, or buy a pass for this one.`,
+      reason: 'limit',
+    };
+  }
+  return { ok: true };
+}

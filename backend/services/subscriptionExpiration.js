@@ -1,5 +1,6 @@
 import pool from '../config/database.js';
 import { getBillingConfig, describeAccess } from './billing.js';
+import { runListingPassExpirationJob } from './promotions.js';
 
 /**
  * Expires subscriptions that have passed their end_date. Artists lose their active
@@ -25,6 +26,9 @@ export async function runSubscriptionExpirationJob() {
       );
     }
 
+    // Ended listing passes first, so those artists get a notification rather than a silent bulk deactivation.
+    const passes = await runListingPassExpirationJob();
+
     let totalDeactivated = 0;
     if (!freeAccess) {
       // Billing is on and the grace period is over: artists without a live subscription cannot keep listings active.
@@ -33,6 +37,7 @@ export async function runSubscriptionExpirationJob() {
          SET status = 'inactive'
          WHERE status = 'active'
            AND user_id IN (SELECT id FROM users WHERE user_type = 'artist')
+           AND (paid_until IS NULL OR paid_until <= now())
            AND NOT EXISTS (
              SELECT 1 FROM user_subscriptions us
              WHERE us.user_id = listings.user_id AND us.status = 'active' AND us.end_date >= CURRENT_DATE
@@ -47,7 +52,7 @@ export async function runSubscriptionExpirationJob() {
       );
     }
 
-    return { expired: expiredSubs.length, listingsDeactivated: totalDeactivated };
+    return { expired: expiredSubs.length, listingsDeactivated: totalDeactivated, passes };
   } catch (error) {
     console.error('[Subscription expiration] Job failed:', error.message);
     throw error;

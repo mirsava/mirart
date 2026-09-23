@@ -1,10 +1,13 @@
 import pool from '../config/database.js';
+import { getListingAccess, countPlanListings } from './billing.js';
+import { createNotification } from './notificationService.js';
 
 const SETTING_KEY = 'promotions_config';
 const CREDIT_WINDOW_DAYS = 30;
 
 // Artists pay to feature a listing (pinned above the rest, plus the homepage spotlight) or to bump it
 // back to the top of "newest". Plans that advertise "Featured listings" include free features every 30 days.
+// A listing pass (pay-per-listing) keeps one listing live for listing_pass_days without a plan slot.
 export const DEFAULT_PROMOTION_CONFIG = {
   enabled: true,
   feature_options: [
@@ -15,6 +18,9 @@ export const DEFAULT_PROMOTION_CONFIG = {
   bump_cooldown_hours: 24,
   plan_feature_credits: { professional: 1, enterprise: 3 },
   plan_feature_days: 7,
+  listing_pass_enabled: true,
+  listing_pass_price: 3,
+  listing_pass_days: 60,
 };
 
 const toNumber = (value, fallback, min, max) => {
@@ -54,6 +60,9 @@ export const normalizePromotionConfig = (raw = {}) => ({
   bump_cooldown_hours: Math.round(toNumber(raw.bump_cooldown_hours, DEFAULT_PROMOTION_CONFIG.bump_cooldown_hours, 0, 720)),
   plan_feature_credits: normalizeCredits(raw.plan_feature_credits),
   plan_feature_days: Math.round(toNumber(raw.plan_feature_days, DEFAULT_PROMOTION_CONFIG.plan_feature_days, 1, 90)),
+  listing_pass_enabled: raw.listing_pass_enabled === undefined ? DEFAULT_PROMOTION_CONFIG.listing_pass_enabled : raw.listing_pass_enabled === true,
+  listing_pass_price: toPrice(raw.listing_pass_price, DEFAULT_PROMOTION_CONFIG.listing_pass_price),
+  listing_pass_days: Math.round(toNumber(raw.listing_pass_days, DEFAULT_PROMOTION_CONFIG.listing_pass_days, 1, 365)),
 });
 
 export async function getPromotionConfig() {
@@ -73,6 +82,9 @@ export async function savePromotionConfig(patch) {
 // Server-side price for a promotion; null when the requested option does not exist.
 export function quotePromotion(config, type, days) {
   if (type === 'bump') return { type, days: null, price: config.bump_price };
+  if (type === 'listing_pass') {
+    return config.listing_pass_enabled ? { type, days: config.listing_pass_days, price: config.listing_pass_price } : null;
+  }
   if (type === 'feature') {
     const option = config.feature_options.find((o) => o.days === Number(days));
     return option ? { type, days: option.days, price: option.price } : null;
@@ -125,6 +137,20 @@ export async function applyPromotion(executor, { listingId, userId, type, days =
        WHERE id = ?`,
       [days, listingId]
     );
+  } else if (type === 'listing_pass') {
+    // Paying for a pass also puts the listing live (a sold listing stays sold).
+    const [before] = await executor.execute('SELECT status FROM listings WHERE id = ?', [listingId]);
+    await executor.execute(
+      `UPDATE listings
+       SET paid_until = GREATEST(COALESCE(paid_until, now()), now()) + make_interval(days => ?::int),
+           status = CASE WHEN status = 'sold' THEN status ELSE 'active' END
+       WHERE id = ?`,
+      [days, listingId]
+    );
+    const wasLive = ['active', 'sold'].includes(before[0]?.status);
+    if (!wasLive) {
+      await executor.execute('UPDATE dashboard_stats SET active_listings = active_listings + 1 WHERE user_id = ?', [userId]);
+    }
   } else {
     await executor.execute('UPDATE listings SET bumped_at = now() WHERE id = ?', [listingId]);
   }
@@ -132,6 +158,64 @@ export async function applyPromotion(executor, { listingId, userId, type, days =
 }
 
 export async function getListingPromotionState(listingId) {
-  const [rows] = await pool.execute('SELECT id, featured_until, bumped_at FROM listings WHERE id = ?', [listingId]);
+  const [rows] = await pool.execute('SELECT id, status, featured_until, bumped_at, paid_until FROM listings WHERE id = ?', [listingId]);
   return rows[0] || null;
+}
+
+// When a listing pass ends, the listing falls back on the artist's plan (or free-launch) slots. It stays live if
+// a slot is free; otherwise it is deactivated and the artist is told how to renew. Runs with the daily subscription job.
+export async function runListingPassExpirationJob() {
+  const [expired] = await pool.execute(
+    `SELECT id, user_id, title FROM listings
+     WHERE status = 'active' AND paid_until IS NOT NULL AND paid_until <= now()
+     ORDER BY user_id, paid_until`
+  );
+  const byUser = new Map();
+  for (const listing of expired) {
+    if (!byUser.has(listing.user_id)) byUser.set(listing.user_id, []);
+    byUser.get(listing.user_id).push(listing);
+  }
+
+  let kept = 0;
+  let deactivated = 0;
+  for (const [userId, listings] of byUser) {
+    const access = await getListingAccess(userId);
+    // countPlanListings already includes these listings, since their passes have ended.
+    const overflow = access.allowed ? Math.max(0, (await countPlanListings(userId)) - access.maxListings) : listings.length;
+    const toDeactivate = listings.slice(0, Math.min(overflow, listings.length));
+    const toKeep = listings.slice(toDeactivate.length);
+
+    if (toKeep.length) {
+      await pool.execute('UPDATE listings SET paid_until = NULL WHERE id = ANY(?::int[])', [toKeep.map((l) => l.id)]);
+      kept += toKeep.length;
+    }
+    if (toDeactivate.length) {
+      await pool.execute("UPDATE listings SET status = 'inactive' WHERE id = ANY(?::int[])", [toDeactivate.map((l) => l.id)]);
+      await pool.execute(
+        'UPDATE dashboard_stats SET active_listings = GREATEST(active_listings - ?, 0) WHERE user_id = ?',
+        [toDeactivate.length, userId]
+      );
+      deactivated += toDeactivate.length;
+      for (const listing of toDeactivate) {
+        try {
+          await createNotification({
+            userId,
+            type: 'listing',
+            title: 'Listing pass ended',
+            body: `"${listing.title}" is no longer live. Renew its pass or subscribe to activate it again.`,
+            link: '/dashboard',
+            referenceId: listing.id,
+            severity: 'warning',
+          });
+        } catch (err) {
+          console.warn('Could not create notification:', err.message);
+        }
+      }
+    }
+  }
+
+  if (kept || deactivated) {
+    console.log(`[Listing passes] ${kept} ended and kept live on plan slots, ${deactivated} deactivated`);
+  }
+  return { kept, deactivated };
 }

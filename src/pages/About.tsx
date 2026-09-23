@@ -30,7 +30,7 @@ const About: React.FC = () => {
     {
       icon: <PaletteIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
       title: 'Flexible Pricing',
-      description: 'Choose a subscription plan that fits your business needs. List your work at a fixed price and keep the full sale amount. No activation fees per listing.',
+      description: 'Choose a subscription plan that fits your business needs, or pay once to list a single piece. List your work at a fixed price and keep the full sale amount, with no commission on sales.',
     },
     {
       icon: <BuildIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
@@ -106,9 +106,9 @@ const About: React.FC = () => {
                 to showcase and sell their work directly to art lovers worldwide.
               </Typography>
               <Typography variant="body1" paragraph>
-                Our mission is to support independent artists by offering transparent, affordable subscription-based pricing. 
-                Artists choose a subscription plan that fits their needs, list their work at a fixed price, and 
-                activate listings within their plan limits. No per-listing activation fees or surprise charges—artists 
+                Our mission is to support independent artists by offering transparent, affordable pricing. 
+                Artists choose a subscription plan that fits their needs, or pay a small one-time fee to keep a single 
+                listing live, and list their work at a fixed price. No commission or surprise charges—artists 
                 keep the full sale price and maintain control over their business.
               </Typography>
               <Typography variant="body1">

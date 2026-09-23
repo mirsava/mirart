@@ -76,6 +76,7 @@ export interface Listing {
   return_days?: number | null;
   featured_until?: string | null;
   bumped_at?: string | null;
+  paid_until?: string | null;
   is_featured?: boolean;
 }
 
@@ -183,7 +184,12 @@ export interface PromotionConfig {
   bump_cooldown_hours: number;
   plan_feature_credits: Record<string, number>;
   plan_feature_days: number;
+  listing_pass_enabled: boolean;
+  listing_pass_price: number;
+  listing_pass_days: number;
 }
+
+export type PromotionType = 'feature' | 'bump' | 'listing_pass';
 
 export interface FeatureCredits {
   allowance: number;
@@ -200,7 +206,7 @@ export interface PromotionStats {
   featured_now: number;
 }
 
-export type ListingPromotionState = Pick<Listing, 'id' | 'featured_until' | 'bumped_at'>;
+export type ListingPromotionState = Pick<Listing, 'id' | 'status' | 'featured_until' | 'bumped_at' | 'paid_until'>;
 
 export interface UserSubscription {
   id: number;
@@ -1039,7 +1045,7 @@ class ApiService {
     return this.request<PromotionConfig & { credits: FeatureCredits | null }>('/promotions/options');
   }
 
-  async createPromotionCheckout(listingId: number, type: 'feature' | 'bump', days?: number): Promise<{ url: string; sessionId: string }> {
+  async createPromotionCheckout(listingId: number, type: PromotionType, days?: number): Promise<{ url: string; sessionId: string }> {
     return this.request<{ url: string; sessionId: string }>('/promotions/checkout', {
       method: 'POST',
       body: JSON.stringify({
@@ -1051,7 +1057,7 @@ class ApiService {
     });
   }
 
-  async confirmPromotion(sessionId: string): Promise<{ success: boolean; applied: boolean; type: 'feature' | 'bump'; days: number | null; listing: ListingPromotionState | null }> {
+  async confirmPromotion(sessionId: string): Promise<{ success: boolean; applied: boolean; type: PromotionType; days: number | null; listing: ListingPromotionState | null }> {
     return this.request(`/promotions/confirm?session_id=${encodeURIComponent(sessionId)}`);
   }
 

@@ -1,5 +1,6 @@
 import { authFetch } from '../lib/supabase';
 import React, { useRef, useState, useEffect } from 'react';
+import { useSnackbar } from 'notistack';
 import {
   Box,
   Button,
@@ -15,6 +16,10 @@ import {
   Download as DownloadIcon,
 } from '@mui/icons-material';
 
+// Uploads return full Supabase Storage URLs; only legacy server paths need the API host.
+const resolveImageUrl = (url: string) =>
+  /^(https?:|data:)/.test(url) ? url : ((import.meta as any).env?.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001') + url;
+
 interface SignatureInputProps {
   value?: string;
   onChange: (signatureUrl: string | null) => void;
@@ -22,6 +27,7 @@ interface SignatureInputProps {
 }
 
 const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabled = false }) => {
+  const { enqueueSnackbar } = useSnackbar();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -164,7 +170,7 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      enqueueSnackbar('Please upload an image file', { variant: 'warning' });
       return;
     }
 
@@ -188,7 +194,7 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
       onChange(signatureUrl);
     } catch (error) {
       console.error('Error uploading signature:', error);
-      alert('Failed to upload signature');
+      enqueueSnackbar('Failed to upload signature', { variant: 'error' });
     }
   };
 
@@ -220,8 +226,7 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
       };
-      const baseUrl = (import.meta as any).env?.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001';
-      img.src = baseUrl + drawnSignature;
+      img.src = resolveImageUrl(drawnSignature);
     } else if (!drawnSignature) {
       ctx.clearRect(0, 0, w, h);
     }
@@ -248,7 +253,7 @@ const SignatureInput: React.FC<SignatureInputProps> = ({ value, onChange, disabl
                   component="img"
                   src={currentSignature.startsWith('data:') 
                     ? currentSignature 
-                    : ((import.meta as any).env?.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001') + currentSignature}
+                    : resolveImageUrl(currentSignature)}
                   alt="Signature"
                   sx={{
                     maxWidth: '100%',

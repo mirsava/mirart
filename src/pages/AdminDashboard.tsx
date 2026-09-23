@@ -95,6 +95,7 @@ import { useSnackbar } from 'notistack';
 import { useChat } from '../contexts/ChatContext';
 import PageHeader from '../components/PageHeader';
 import PromotionSettingsCard from '../components/PromotionSettingsCard';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const SIDEBAR_WIDTH = 240;
@@ -103,6 +104,7 @@ const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
+  const { confirm, prompt } = useConfirm();
   const { setChatEnabled: setGlobalChatEnabled, setSupportChatEnabled: setGlobalSupportChatEnabled } = useChat();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -281,10 +283,18 @@ const AdminDashboard: React.FC = () => {
   };
 
   const saveCheckoutEnabled = async (enabled: boolean) => {
-    const message = enabled
-      ? 'Turn ON online checkout? Buyers will pay through ArtZyla, sellers must complete Stripe payout setup, and ArtZyla becomes involved in payments and shipping.'
-      : 'Turn OFF online checkout? Cart and checkout will be hidden and buyers will contact sellers directly. Existing orders stay available.';
-    if (!window.confirm(message)) return;
+    const confirmed = await confirm(enabled
+      ? {
+          title: 'Turn on online checkout?',
+          message: 'Buyers will pay through ArtZyla, sellers must complete Stripe payout setup, and ArtZyla becomes involved in payments and shipping.',
+          confirmText: 'Turn on',
+        }
+      : {
+          title: 'Turn off online checkout?',
+          message: 'Cart and checkout will be hidden and buyers will contact sellers directly. Existing orders stay available.',
+          confirmText: 'Turn off',
+        });
+    if (!confirmed) return;
     setSavingCheckout(true);
     try {
       const settings = await apiService.updateMarketplaceSettings(enabled);
@@ -563,11 +573,24 @@ const AdminDashboard: React.FC = () => {
     const featured = Boolean(listing.featured_until && new Date(listing.featured_until) > new Date());
     let days = 0;
     if (!featured) {
-      const answer = window.prompt('Feature this listing for how many days? (free, no charge to the artist)', '7');
+      const answer = await prompt({
+        title: 'Feature this listing',
+        message: 'Free: the artist is not charged.',
+        label: 'Days',
+        defaultValue: '7',
+        inputType: 'number',
+        inputProps: { min: 1, max: 365, step: 1 },
+        confirmText: 'Feature',
+      });
       if (answer === null) return;
       days = parseInt(answer, 10);
       if (!Number.isFinite(days) || days < 1) return;
-    } else if (!window.confirm('Remove this listing from featured? Any time the artist paid for is lost.')) {
+    } else if (!(await confirm({
+      title: 'Remove from featured?',
+      message: 'Any featured time the artist paid for is lost.',
+      confirmText: 'Remove',
+      destructive: true,
+    }))) {
       return;
     }
     try {
@@ -2714,9 +2737,14 @@ const AdminDashboard: React.FC = () => {
                   <Switch
                     checked={billingConfig.enabled}
                     disabled={savingBilling}
-                    onChange={(e) => {
-                      if (e.target.checked && !window.confirm(`Turn on billing? Artists without a subscription will keep free access for ${billingConfig.grace_days} days, then need a paid plan to keep listings active.`)) return;
-                      saveBilling({ enabled: e.target.checked });
+                    onChange={async (e) => {
+                      const enabled = e.target.checked;
+                      if (enabled && !(await confirm({
+                        title: 'Turn on billing?',
+                        message: `Artists without a subscription will keep free access for ${billingConfig.grace_days} days, then need a paid plan to keep listings active.`,
+                        confirmText: 'Turn on billing',
+                      }))) return;
+                      saveBilling({ enabled });
                     }}
                   />
                 </Box>

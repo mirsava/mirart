@@ -23,10 +23,14 @@ const publicConfig = (config) => ({
   bump_cooldown_hours: config.bump_cooldown_hours,
   plan_feature_credits: config.plan_feature_credits,
   plan_feature_days: config.plan_feature_days,
+  listing_pass_enabled: config.listing_pass_enabled,
+  listing_pass_price: config.listing_pass_price,
+  listing_pass_days: config.listing_pass_days,
 });
 
-// Loads a listing the caller may promote: they own it and it is live.
-async function loadPromotableListing(listingId, auth) {
+// Loads a listing the caller may promote: they own it and it is live. A listing pass may also be bought for a
+// draft or inactive listing, since paying for it is what puts the listing live.
+async function loadPromotableListing(listingId, auth, { requireActive = true } = {}) {
   if (!/^\d+$/.test(String(listingId))) return { status: 404, error: 'Listing not found' };
   const [rows] = await pool.execute(
     'SELECT id, user_id, title, status, featured_until, bumped_at FROM listings WHERE id = ?',
@@ -37,7 +41,10 @@ async function loadPromotableListing(listingId, auth) {
   if (listing.user_id !== auth.userId && !auth.isAdmin) {
     return { status: 403, error: 'You can only promote your own listings' };
   }
-  if (listing.status !== 'active') return { status: 400, error: 'Only active listings can be promoted' };
+  if (requireActive && listing.status !== 'active') return { status: 400, error: 'Only active listings can be promoted' };
+  if (!requireActive && !['draft', 'inactive', 'active'].includes(listing.status)) {
+    return { status: 400, error: `A ${listing.status} listing cannot be put live` };
+  }
   return { listing };
 }
 
@@ -59,13 +66,15 @@ router.post('/checkout', requireAuth, async (req, res) => {
       return res.status(503).json({ error: 'Stripe not configured', details: 'Add STRIPE_SECRET_KEY to .env' });
     }
     const config = await getPromotionConfig();
-    if (!config.enabled) return res.status(403).json({ error: 'Listing promotions are not available right now' });
-
     const { listing_id, type, days, return_url_base } = req.body || {};
+    // The on/off switch covers features and bumps; listing passes have their own switch (checked by quotePromotion).
+    if (!config.enabled && type !== 'listing_pass') {
+      return res.status(403).json({ error: 'Listing promotions are not available right now' });
+    }
     const quote = quotePromotion(config, type, days);
     if (!quote) return res.status(400).json({ error: 'Choose a valid promotion option' });
 
-    const { listing, status, error } = await loadPromotableListing(listing_id, req.auth);
+    const { listing, status, error } = await loadPromotableListing(listing_id, req.auth, { requireActive: type !== 'listing_pass' });
     if (!listing) return res.status(status).json({ error });
 
     if (type === 'bump') {
@@ -76,9 +85,11 @@ router.post('/checkout', requireAuth, async (req, res) => {
     }
 
     const baseUrl = (return_url_base || FRONTEND_URL).replace(/\/$/, '');
-    const name = type === 'feature'
-      ? `Feature listing for ${quote.days} days`
-      : 'Bump listing to the top';
+    const name = {
+      feature: `Feature listing for ${quote.days} days`,
+      bump: 'Bump listing to the top',
+      listing_pass: `Keep listing live for ${quote.days} days`,
+    }[type];
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [{
@@ -132,8 +143,8 @@ router.get('/confirm', requireAuth, async (req, res) => {
     }
 
     const listingId = parseInt(metadata.listing_id, 10);
-    const type = metadata.type === 'feature' ? 'feature' : 'bump';
-    const days = type === 'feature' ? parseInt(metadata.days, 10) : null;
+    const type = ['feature', 'bump', 'listing_pass'].includes(metadata.type) ? metadata.type : 'bump';
+    const days = type === 'bump' ? null : parseInt(metadata.days, 10);
     const { applied } = await applyPromotion(pool, {
       listingId,
       userId: parseInt(metadata.user_id, 10),

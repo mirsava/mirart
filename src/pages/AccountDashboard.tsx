@@ -71,7 +71,8 @@ import { Lock as LockIcon, AttachMoney as AttachMoneyIcon, CalendarMonth as Cale
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
 import ImagePlaceholder from '../components/ImagePlaceholder';
-import PromoteListingDialog, { isListingFeatured } from '../components/PromoteListingDialog';
+import PromoteListingDialog, { isListingFeatured, hasLivePass } from '../components/PromoteListingDialog';
+import ActivateListingDialog from '../components/ActivateListingDialog';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const dataURLtoBlob = (dataURL: string): Promise<Blob> => {
@@ -200,6 +201,7 @@ const AccountDashboard: React.FC = () => {
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [activatingListing, setActivatingListing] = useState<number | null>(null);
   const [promoteListing, setPromoteListing] = useState<Listing | null>(null);
+  const [blockedActivation, setBlockedActivation] = useState<{ listing: Pick<Listing, 'id' | 'title'>; message?: string } | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
@@ -1014,8 +1016,10 @@ const AccountDashboard: React.FC = () => {
 
   const handleActivateListing = async (listingId: number) => {
     if (!user?.id) return;
-    if (!subscription) {
-      navigate('/subscription-plans', { state: { listingIdToActivate: listingId } });
+    const listing = recentListings.find((l) => l.id === listingId);
+    const title = listing?.title || 'Listing';
+    if (!subscription && !(listing && hasLivePass(listing))) {
+      setBlockedActivation({ listing: { id: listingId, title } });
       return;
     }
     setActivatingListing(listingId);
@@ -1026,7 +1030,12 @@ const AccountDashboard: React.FC = () => {
       await fetchDashboardData();
       await fetchSubscription();
     } catch (err: any) {
-      enqueueSnackbar(err.message || 'Failed to activate listing', { variant: 'error' });
+      if (err?.details?.code === 'activation_blocked') {
+        // Out of plan slots (or no plan): offer a one-off listing pass or a subscription
+        setBlockedActivation({ listing: { id: listingId, title }, message: err.details.message });
+      } else {
+        enqueueSnackbar(err.message || 'Failed to activate listing', { variant: 'error' });
+      }
     } finally {
       setActivatingListing(null);
     }
@@ -1492,6 +1501,11 @@ const AccountDashboard: React.FC = () => {
                                   <Chip icon={<StarIcon />} label="Featured" color="warning" size="small" sx={{ ml: 0.5 }} />
                                 </Tooltip>
                               )}
+                              {hasLivePass(listing) && (
+                                <Tooltip title={`Paid listing: live until ${new Date(listing.paid_until as string).toLocaleString()} without using a plan slot`}>
+                                  <Chip label="Pass" color="info" size="small" variant="outlined" sx={{ ml: 0.5 }} />
+                                </Tooltip>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">{listing.views}</Typography>
@@ -1579,6 +1593,9 @@ const AccountDashboard: React.FC = () => {
                             <Typography variant="caption" color="text.secondary">{listing.views} views</Typography>
                             {isListingFeatured(listing) && (
                               <Chip icon={<StarIcon />} label="Featured" color="warning" size="small" sx={{ ml: 0.5, height: 20, fontSize: '0.7rem' }} />
+                            )}
+                            {hasLivePass(listing) && (
+                              <Chip label="Pass" color="info" size="small" variant="outlined" sx={{ ml: 0.5, height: 20, fontSize: '0.7rem' }} />
                             )}
                             {listing.status === 'draft' && (
                               <Button
@@ -3481,6 +3498,13 @@ const AccountDashboard: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <ActivateListingDialog
+          open={Boolean(blockedActivation)}
+          listing={blockedActivation?.listing ?? null}
+          message={blockedActivation?.message}
+          onClose={() => setBlockedActivation(null)}
+        />
 
         <PromoteListingDialog
           open={Boolean(promoteListing)}
