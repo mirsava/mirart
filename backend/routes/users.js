@@ -322,13 +322,35 @@ router.put('/:authUserId/settings', requireSelf(), async (req, res) => {
 });
 
 // Update user profile
+const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,64}$/;
+
+// Partial update: only the fields present in the body change, so a form that doesn't send a field
+// (e.g. the profile photo) never wipes it.
 router.put('/:authUserId', requireSelf(), async (req, res) => {
   try {
-    const assignments = PROFILE_FIELDS.map(([name]) => `${name} = ?`).join(', ');
+    const body = req.body || {};
+    const fields = PROFILE_FIELDS.filter(([name]) => Object.prototype.hasOwnProperty.call(body, name));
+    const assignments = fields.map(([name]) => `${name} = ?`);
+    const values = fields.map(([name, transform]) => transform(body[name]));
+
+    if (Object.prototype.hasOwnProperty.call(body, 'username')) {
+      const username = String(body.username || '').trim();
+      if (!USERNAME_PATTERN.test(username)) {
+        return res.status(400).json({ error: 'Usernames are 3-64 letters, numbers or underscores' });
+      }
+      assignments.push('username = ?');
+      values.push(username);
+    }
+
+    if (assignments.length === 0) {
+      const [rows] = await pool.execute('SELECT * FROM users WHERE auth_user_id = ?', [req.params.authUserId]);
+      if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+      return res.json(rows[0]);
+    }
 
     const [result] = await pool.execute(
-      `UPDATE users SET ${assignments} WHERE auth_user_id = ? RETURNING *`,
-      [...profileValues(req.body), req.params.authUserId]
+      `UPDATE users SET ${assignments.join(', ')} WHERE auth_user_id = ? RETURNING *`,
+      [...values, req.params.authUserId]
     );
 
     if (result.rows.length === 0) {
@@ -337,6 +359,9 @@ router.put('/:authUserId', requireSelf(), async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (error) {
+    if (error.code === '23505' && /username/.test(error.constraint || error.detail || '')) {
+      return res.status(409).json({ error: 'That username is already taken' });
+    }
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
