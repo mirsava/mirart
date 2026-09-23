@@ -129,6 +129,7 @@ const Gallery: React.FC = () => {
       fixed_shipping_fee: listing.fixed_shipping_fee,
       avgRating: listing.avg_rating ? parseFloat(Number(listing.avg_rating).toFixed(1)) : null,
       reviewCount: listing.review_count || 0,
+      isFeatured: listing.is_featured === true,
     };
   };
 

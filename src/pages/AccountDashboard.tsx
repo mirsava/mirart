@@ -53,6 +53,8 @@ import {
   FilterList as FilterListIcon,
   ViewList as ViewListIcon,
   ViewModule as ViewModuleIcon,
+  Campaign as CampaignIcon,
+  Star as StarIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -69,6 +71,7 @@ import { Lock as LockIcon, AttachMoney as AttachMoneyIcon, CalendarMonth as Cale
 import SignatureInput from '../components/SignatureInput';
 import PageHeader from '../components/PageHeader';
 import ImagePlaceholder from '../components/ImagePlaceholder';
+import PromoteListingDialog, { isListingFeatured } from '../components/PromoteListingDialog';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const dataURLtoBlob = (dataURL: string): Promise<Blob> => {
@@ -196,6 +199,7 @@ const AccountDashboard: React.FC = () => {
   const { checkoutEnabled, loaded: marketplaceLoaded } = useMarketplaceSettings();
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [activatingListing, setActivatingListing] = useState<number | null>(null);
+  const [promoteListing, setPromoteListing] = useState<Listing | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
@@ -1483,6 +1487,11 @@ const AccountDashboard: React.FC = () => {
                                 size="small"
                                 sx={{ textTransform: 'capitalize' }}
                               />
+                              {isListingFeatured(listing) && (
+                                <Tooltip title={`Featured until ${new Date(listing.featured_until as string).toLocaleString()}`}>
+                                  <Chip icon={<StarIcon />} label="Featured" color="warning" size="small" sx={{ ml: 0.5 }} />
+                                </Tooltip>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">{listing.views}</Typography>
@@ -1500,6 +1509,13 @@ const AccountDashboard: React.FC = () => {
                                   >
                                     {activatingListing === listing.id ? '...' : 'Activate'}
                                   </Button>
+                                )}
+                                {listing.status === 'active' && (
+                                  <Tooltip title="Promote">
+                                    <IconButton size="small" color="warning" onClick={() => setPromoteListing(listing)}>
+                                      <CampaignIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
                                 )}
                                 <Tooltip title="Edit">
                                   <IconButton size="small" onClick={() => navigate(`/edit-listing/${listing.id}`)}>
@@ -1561,6 +1577,9 @@ const AccountDashboard: React.FC = () => {
                               />
                             </Box>
                             <Typography variant="caption" color="text.secondary">{listing.views} views</Typography>
+                            {isListingFeatured(listing) && (
+                              <Chip icon={<StarIcon />} label="Featured" color="warning" size="small" sx={{ ml: 0.5, height: 20, fontSize: '0.7rem' }} />
+                            )}
                             {listing.status === 'draft' && (
                               <Button
                                 variant="outlined"
@@ -1575,6 +1594,13 @@ const AccountDashboard: React.FC = () => {
                               </Button>
                             )}
                             <Box sx={{ display: 'flex', gap: 0.5, mt: 1 }}>
+                              {listing.status === 'active' && (
+                                <Tooltip title="Promote">
+                                  <IconButton size="small" color="warning" onClick={(e) => { e.stopPropagation(); setPromoteListing(listing); }}>
+                                    <CampaignIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                               <Tooltip title="Edit">
                                 <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/edit-listing/${listing.id}`); }}>
                                   <EditIcon sx={{ fontSize: 16 }} />
@@ -3455,6 +3481,13 @@ const AccountDashboard: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <PromoteListingDialog
+          open={Boolean(promoteListing)}
+          listing={promoteListing}
+          onClose={() => setPromoteListing(null)}
+          onPromoted={(state) => setRecentListings((prev) => prev.map((l) => (l.id === state.id ? { ...l, ...state } : l)))}
+        />
 
         <Dialog
           open={deleteDialogOpen}

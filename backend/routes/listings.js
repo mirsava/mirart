@@ -18,7 +18,7 @@ const canModifyListing = async (listingId, auth) => {
 // Get all listings (with optional filters and pagination)
 router.get('/', async (req, res) => {
   try {
-    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC', authUserId, minPrice, maxPrice, minYear, maxYear, medium, inStock } = req.query;
+    const { category, subcategory, status, userId, search, page = 1, limit = 12, sortBy = 'created_at', sortOrder = 'DESC', authUserId, minPrice, maxPrice, minYear, maxYear, medium, inStock, featured } = req.query;
     
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 12;
@@ -53,6 +53,7 @@ router.get('/', async (req, res) => {
         ) as artist_name,
         u.auth_user_id,
         u.signature_url,
+        (l.featured_until IS NOT NULL AND l.featured_until > now()) as is_featured,
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count,
         (SELECT AVG(rating) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as avg_rating,
         (SELECT COUNT(*) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as review_count
@@ -164,6 +165,12 @@ router.get('/', async (req, res) => {
     if (inStock === 'true' || inStock === true || inStock === '1') {
       baseQuery += ' AND l.in_stock = TRUE';
     }
+
+    // featured=only powers the homepage spotlight; featured=exclude keeps those listings out of the rows below it
+    const featuredClause = featured === 'only'
+      ? ' AND l.featured_until > now()'
+      : featured === 'exclude' ? ' AND (l.featured_until IS NULL OR l.featured_until <= now())' : '';
+    baseQuery += featuredClause;
     
     // Get total count (before adding ORDER BY, LIMIT, OFFSET)
     // Build count query with same WHERE conditions but COUNT instead of SELECT
@@ -270,12 +277,13 @@ router.get('/', async (req, res) => {
     if (inStock === 'true' || inStock === true || inStock === '1') {
       countQuery += ' AND l.in_stock = TRUE';
     }
+    countQuery += featuredClause;
     
     const [countResult] = await pool.execute(countQuery, countParams);
     const total = Number(countResult[0].total);
     
-    // Add sorting
-    let orderBy = 'l.created_at DESC';
+    // Add sorting. "Newest" counts a paid bump as the listing's date.
+    let orderBy = 'COALESCE(l.bumped_at, l.created_at) DESC';
     const validSortFields = ['created_at', 'title', 'price', 'year', 'views'];
     const validSortOrders = ['ASC', 'DESC'];
     
@@ -290,8 +298,13 @@ router.get('/', async (req, res) => {
       } else if (sortBy === 'views') {
         orderBy = `l.views ${order}`;
       } else {
-        orderBy = `l.created_at ${order}`;
+        orderBy = `COALESCE(l.bumped_at, l.created_at) ${order}`;
       }
+    }
+    // Public "newest" views show featured listings first. Artists' own listing views stay chronological.
+    const isDefaultSort = !validSortFields.includes(sortBy) || (sortBy === 'created_at' && String(sortOrder).toUpperCase() !== 'ASC');
+    if (isDefaultSort && !isFetchingOwnListings) {
+      orderBy = `(l.featured_until IS NOT NULL AND l.featured_until > now()) DESC, ${orderBy}`;
     }
     
     // Add pagination to main query - rebuild query cleanly
@@ -378,6 +391,7 @@ router.get('/:id', async (req, res) => {
         u.auth_user_id,
         u.signature_url,
         u.default_special_instructions as artist_default_special_instructions,
+        (l.featured_until IS NOT NULL AND l.featured_until > now()) as is_featured,
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count,
         (SELECT AVG(rating) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as avg_rating,
         (SELECT COUNT(*) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as review_count

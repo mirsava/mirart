@@ -23,6 +23,7 @@ export interface Artwork {
   fixed_shipping_fee?: number;
   avgRating?: number | null;
   reviewCount?: number;
+  isFeatured?: boolean;
 }
 
 export interface Painting extends Artwork {

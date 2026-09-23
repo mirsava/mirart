@@ -74,6 +74,9 @@ export interface Listing {
   shipping_carrier?: 'shippo' | 'own';
   fixed_shipping_fee?: number;
   return_days?: number | null;
+  featured_until?: string | null;
+  bumped_at?: string | null;
+  is_featured?: boolean;
 }
 
 export interface Order {
@@ -172,6 +175,32 @@ export interface BillingConfig {
   grace_days: number;
   billing_started_at: string | null;
 }
+
+export interface PromotionConfig {
+  enabled: boolean;
+  feature_options: Array<{ days: number; price: number }>;
+  bump_price: number;
+  bump_cooldown_hours: number;
+  plan_feature_credits: Record<string, number>;
+  plan_feature_days: number;
+}
+
+export interface FeatureCredits {
+  allowance: number;
+  used: number;
+  remaining: number;
+  days: number;
+}
+
+export interface PromotionStats {
+  revenue_total: number;
+  revenue_30d: number;
+  paid_count: number;
+  paid_count_30d: number;
+  featured_now: number;
+}
+
+export type ListingPromotionState = Pick<Listing, 'id' | 'featured_until' | 'bumped_at'>;
 
 export interface UserSubscription {
   id: number;
@@ -315,6 +344,7 @@ class ApiService {
     maxYear?: number;
     medium?: string;
     inStock?: boolean;
+    featured?: 'only' | 'exclude';
   }): Promise<{ listings: Listing[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } }> {
     const params = new URLSearchParams();
     if (filters) {
@@ -1002,6 +1032,48 @@ class ApiService {
     return this.request<SocialLinks>('/settings/social', {
       method: 'PUT',
       body: JSON.stringify(links),
+    });
+  }
+
+  async getPromotionOptions(): Promise<PromotionConfig & { credits: FeatureCredits | null }> {
+    return this.request<PromotionConfig & { credits: FeatureCredits | null }>('/promotions/options');
+  }
+
+  async createPromotionCheckout(listingId: number, type: 'feature' | 'bump', days?: number): Promise<{ url: string; sessionId: string }> {
+    return this.request<{ url: string; sessionId: string }>('/promotions/checkout', {
+      method: 'POST',
+      body: JSON.stringify({
+        listing_id: listingId,
+        type,
+        days,
+        return_url_base: typeof window !== 'undefined' ? window.location.origin : undefined,
+      }),
+    });
+  }
+
+  async confirmPromotion(sessionId: string): Promise<{ success: boolean; applied: boolean; type: 'feature' | 'bump'; days: number | null; listing: ListingPromotionState | null }> {
+    return this.request(`/promotions/confirm?session_id=${encodeURIComponent(sessionId)}`);
+  }
+
+  async useFeatureCredit(listingId: number): Promise<{ success: boolean; listing: ListingPromotionState; credits: FeatureCredits }> {
+    return this.request(`/promotions/listings/${listingId}/use-credit`, { method: 'POST' });
+  }
+
+  async getPromotionAdminConfig(): Promise<{ config: PromotionConfig; stats: PromotionStats }> {
+    return this.request<{ config: PromotionConfig; stats: PromotionStats }>('/promotions/admin/config');
+  }
+
+  async updatePromotionConfig(patch: Partial<PromotionConfig>): Promise<{ config: PromotionConfig }> {
+    return this.request<{ config: PromotionConfig }>('/promotions/admin/config', {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    });
+  }
+
+  async setListingFeatured(listingId: number, days: number): Promise<{ success: boolean; listing: ListingPromotionState }> {
+    return this.request(`/promotions/admin/listings/${listingId}/feature`, {
+      method: 'PUT',
+      body: JSON.stringify({ days }),
     });
   }
 

@@ -117,6 +117,10 @@ CREATE INDEX IF NOT EXISTS idx_listings_user_id ON listings (user_id);
 CREATE INDEX IF NOT EXISTS idx_listings_category ON listings (category);
 CREATE INDEX IF NOT EXISTS idx_listings_status ON listings (status);
 CREATE INDEX IF NOT EXISTS idx_listings_created_at ON listings (created_at);
+-- Paid promotions: featured_until pins a listing above the rest until it passes; bumped_at moves it back to the top of "newest".
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS featured_until TIMESTAMPTZ;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS bumped_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_listings_featured_until ON listings (featured_until);
 
 CREATE TABLE IF NOT EXISTS likes (
   id SERIAL PRIMARY KEY,
@@ -338,6 +342,21 @@ CREATE INDEX IF NOT EXISTS idx_user_subscriptions_plan ON user_subscriptions (pl
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_status ON user_subscriptions (user_id, status);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_end_date ON user_subscriptions (end_date);
 
+-- One row per applied promotion. stripe_session_id is unique so confirming a payment twice applies it once.
+CREATE TABLE IF NOT EXISTS listing_promotions (
+  id SERIAL PRIMARY KEY,
+  listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  promotion_type VARCHAR(20) NOT NULL CHECK (promotion_type IN ('feature','bump')),
+  days INTEGER,
+  amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+  source VARCHAR(20) NOT NULL CHECK (source IN ('stripe','plan','admin')),
+  stripe_session_id VARCHAR(255) UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_listing_promotions_listing ON listing_promotions (listing_id);
+CREATE INDEX IF NOT EXISTS idx_listing_promotions_user_source ON listing_promotions (user_id, source, created_at);
+
 -- Keep updated_at fresh on every UPDATE (replaces MySQL's ON UPDATE CURRENT_TIMESTAMP)
 DO $$
 DECLARE t TEXT;
@@ -358,7 +377,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'users','listings','likes','listing_comments','messages','chat_conversations','chat_messages',
     'support_chat_messages','notifications','admin_announcements','site_settings','dashboard_stats',
-    'orders','subscription_plans','user_subscriptions'
+    'orders','subscription_plans','user_subscriptions','listing_promotions'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;

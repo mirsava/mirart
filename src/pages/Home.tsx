@@ -30,7 +30,7 @@ import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
 import apiService, { Listing, SubscriptionPlan } from '../services/api';
 import { getListingImageCount } from '../utils/listingUtils';
-import { Painting } from '../types';
+import { Artwork, Painting } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useBillingStatus } from '../hooks/useBillingStatus';
 import { Check as CheckIcon, Star as StarIcon } from '@mui/icons-material';
@@ -47,6 +47,7 @@ const Home: React.FC = () => {
   const theme = useTheme();
   const [featuredPaintings, setFeaturedPaintings] = useState<Painting[]>([]);
   const [featuredWoodworking, setFeaturedWoodworking] = useState<Painting[]>([]);
+  const [spotlight, setSpotlight] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
   const [paintingPlaceholders, setPaintingPlaceholders] = useState(0);
   const [woodworkingPlaceholders, setWoodworkingPlaceholders] = useState(0);
@@ -108,6 +109,7 @@ const Home: React.FC = () => {
       fixed_shipping_fee: listing.fixed_shipping_fee,
       avgRating: listing.avg_rating ? parseFloat(Number(listing.avg_rating).toFixed(1)) : null,
       reviewCount: listing.review_count || 0,
+      isFeatured: listing.is_featured === true,
     };
   };
 
@@ -116,14 +118,20 @@ const Home: React.FC = () => {
       try {
         // Featured listings must show ALL artists - do NOT pass authUserId
         const listingFilters = (category: string) => {
-          const f: { status: string; category: string; limit: number; requestingUser?: string } = { status: 'active', category, limit: 3 };
+          // Paid featured listings go in the spotlight above, so the category rows leave them out.
+          const f: { status: string; category: string; limit: number; featured: 'exclude'; requestingUser?: string } = { status: 'active', category, limit: 3, featured: 'exclude' };
           if (user?.id) f.requestingUser = user.id;
           return f;
         };
-        const [paintingsResponse, woodworkingResponse] = await Promise.all([
+        const [paintingsResponse, woodworkingResponse, spotlightResponse] = await Promise.all([
           apiService.getListings(listingFilters('Painting')),
           apiService.getListings(listingFilters('Woodworking')),
+          apiService.getListings({ status: 'active', featured: 'only', limit: 6 }).catch(() => ({ listings: [] as Listing[] })),
         ]);
+        setSpotlight(spotlightResponse.listings.map((listing) => ({
+          ...convertListingToPainting(listing),
+          category: listing.category === 'Woodworking' || listing.category === 'Prints' ? listing.category : 'Painting',
+        })));
         
         const dbPaintings = paintingsResponse.listings.map(listing => convertListingToPainting(listing, 'Painting'));
         const dbWoodworking = woodworkingResponse.listings.map(listing => convertListingToPainting(listing, 'Woodworking'));
@@ -212,7 +220,7 @@ const Home: React.FC = () => {
     ],
   };
 
-  const heroPieces = [...featuredPaintings, ...featuredWoodworking].filter((piece) => piece.image).slice(0, 3);
+  const heroPieces = [...spotlight, ...featuredPaintings, ...featuredWoodworking].filter((piece) => piece.image).slice(0, 3);
 
   return (
     <Box>
@@ -415,6 +423,33 @@ const Home: React.FC = () => {
           </Grid>
         </Box>
       </Box>
+
+      {spotlight.length > 0 && (
+        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pt: 8 }}>
+          <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+            <StarIcon sx={{ color: 'warning.main', fontSize: { xs: 32, md: 40 }, mt: 0.5 }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography
+                variant="h4"
+                component="h2"
+                sx={{ fontWeight: 600, color: 'text.primary', fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' }, mb: 1 }}
+              >
+                Artist Spotlight
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '800px', lineHeight: 1.6 }}>
+                Featured pieces from artists across every category.
+              </Typography>
+            </Box>
+          </Box>
+          <Grid container spacing={4}>
+            {spotlight.map((piece) => (
+              <Grid item xs={12} sm={6} md={4} key={piece.id}>
+                <PaintingCard painting={piece} />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      )}
 
       <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8 }}>
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', gap: 2 }}>

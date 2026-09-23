@@ -16,6 +16,7 @@ import PaintingDetail from './pages/PaintingDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import OrderSuccess from './pages/OrderSuccess';
+import PromotionSuccess from './pages/PromotionSuccess';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import FAQ from './pages/FAQ';
@@ -101,6 +102,11 @@ function AppContent(): JSX.Element {
               }
             />
             <Route path="/order-success" element={<OrderSuccess />} />
+            <Route path="/promotion-success" element={
+              <ProtectedRoute requiredUserType={UserRole.ARTIST}>
+                <PromotionSuccess />
+              </ProtectedRoute>
+            } />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/:id" element={
               <ProtectedRoute>

@@ -56,6 +56,8 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon,
   OpenInNew as OpenInNewIcon,
+  Star as StarIcon,
+  StarBorder as StarBorderIcon,
   Block as BlockIcon,
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
@@ -92,6 +94,7 @@ import apiService, { SubscriptionPlan } from '../services/api';
 import { useSnackbar } from 'notistack';
 import { useChat } from '../contexts/ChatContext';
 import PageHeader from '../components/PageHeader';
+import PromotionSettingsCard from '../components/PromotionSettingsCard';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const SIDEBAR_WIDTH = 240;
@@ -552,6 +555,27 @@ const AdminDashboard: React.FC = () => {
       const errorMessage = error.message || error.error || 'Failed to fetch listings';
       enqueueSnackbar(errorMessage, { variant: 'error' });
       console.error('Error fetching listings:', error);
+    }
+  };
+
+  // Free curation: feature a listing for a number of days, or take away its featured spot.
+  const toggleListingFeatured = async (listing: { id: number; featured_until?: string | null }) => {
+    const featured = Boolean(listing.featured_until && new Date(listing.featured_until) > new Date());
+    let days = 0;
+    if (!featured) {
+      const answer = window.prompt('Feature this listing for how many days? (free, no charge to the artist)', '7');
+      if (answer === null) return;
+      days = parseInt(answer, 10);
+      if (!Number.isFinite(days) || days < 1) return;
+    } else if (!window.confirm('Remove this listing from featured? Any time the artist paid for is lost.')) {
+      return;
+    }
+    try {
+      const { listing: state } = await apiService.setListingFeatured(listing.id, days);
+      setListings((prev) => prev.map((l) => (l.id === state.id ? { ...l, ...state } : l)));
+      enqueueSnackbar(days ? `Featured for ${days} days` : 'Removed from featured', { variant: 'success' });
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Failed to update featured listing', { variant: 'error' });
     }
   };
 
@@ -1683,6 +1707,17 @@ const AdminDashboard: React.FC = () => {
                       <TableCell align="right">
                         <IconButton
                           size="small"
+                          color="warning"
+                          onClick={() => toggleListingFeatured(listing)}
+                          title={listing.featured_until && new Date(listing.featured_until) > new Date()
+                            ? `Featured until ${new Date(listing.featured_until).toLocaleString()} (click to remove)`
+                            : 'Feature listing'}
+                          sx={{ mr: 1 }}
+                        >
+                          {listing.featured_until && new Date(listing.featured_until) > new Date() ? <StarIcon /> : <StarBorderIcon />}
+                        </IconButton>
+                        <IconButton
+                          size="small"
                           color="primary"
                           onClick={() => navigate(`/edit-listing/${listing.id}`)}
                           title="Edit listing"
@@ -2631,6 +2666,8 @@ const AdminDashboard: React.FC = () => {
                   <Switch checked={checkoutEnabled} disabled={savingCheckout} onChange={(e) => saveCheckoutEnabled(e.target.checked)} />
                 </Box>
               </Paper>
+
+              <PromotionSettingsCard />
 
               <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Footer: Connect With Us</Typography>

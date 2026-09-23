@@ -25,6 +25,7 @@ import notificationsRouter from './routes/notifications.js';
 import supportChatRouter from './routes/supportChat.js';
 import authRouter from './routes/auth.js';
 import settingsRouter from './routes/settings.js';
+import promotionsRouter from './routes/promotions.js';
 import { attachAuth } from './middleware/auth.js';
 import { securityHeaders, apiLimiter } from './middleware/security.js';
 
@@ -219,6 +220,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/listings', listingsRouter);
+app.use('/api/promotions', promotionsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/orders', ordersRouter);

@@ -185,6 +185,20 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
             }}
           />
         )}
+        {painting.isFeatured && painting.inStock && (
+          <Chip
+            icon={<StarIcon sx={{ fontSize: 16 }} />}
+            label="Featured"
+            size="small"
+            color="warning"
+            sx={{
+              position: 'absolute',
+              bottom: 8,
+              left: 8,
+              fontWeight: 600,
+            }}
+          />
+        )}
         {painting.shippingInfo && /free\s+shipping/i.test(painting.shippingInfo) && (
           <Chip
             label="Free shipping"
