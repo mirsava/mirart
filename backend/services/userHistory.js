@@ -25,21 +25,27 @@ const ACTION_LABELS = {
 
 const PROMOTION_LABELS = { feature: 'Featured a listing', bump: 'Bumped a listing', listing_pass: 'Bought a listing pass' };
 
-function describeActivity(row) {
+// Admin-only actions that never appear in a user's own activity feed.
+const HIDDEN_FROM_SELF = new Set(['user_blocked', 'user_unblocked', 'user_deleted']);
+
+function describeActivity(row, audience = 'admin') {
   const d = row.details || {};
   const parts = [];
   if (d.title) parts.push(`"${d.title}"`);
   if (d.from || d.to) parts.push(`${d.from ?? '?'} → ${d.to ?? '?'}`);
-  if (d.fields?.length) parts.push(`fields: ${d.fields.join(', ')}`);
+  if (d.fields?.length && audience === 'admin') parts.push(`fields: ${d.fields.join(', ')}`);
   if (d.days) parts.push(`+${d.days} days`);
   if (d.week_start) parts.push(`week of ${d.week_start}`);
   if (d.reason) parts.push(d.reason);
-  if (d.email) parts.push(d.email);
+  if (d.email && audience === 'admin') parts.push(d.email);
   return parts.join(' · ') || null;
 }
 
 // Everything the admin "User details" panel shows: profile, stats, payments, listings and one merged timeline.
-export async function getUserHistory(userId) {
+// With audience 'self' (the user's own dashboard) the timeline drops messages, sign-ins, admin-only actions and
+// internal details, and credits staff actions to "ArtZyla team".
+export async function getUserHistory(userId, { audience = 'admin' } = {}) {
+  const forSelf = audience === 'self';
   const [users] = await pool.execute(
     `SELECT id, auth_user_id, username, email, first_name, last_name, business_name, user_type, active, blocked,
        country, bio, profile_image_url, created_at
@@ -149,7 +155,7 @@ export async function getUserHistory(userId) {
   const existingListingIds = new Set(listings.map((l) => l.id));
   const timeline = [
     { at: iso(user.created_at), type: 'account', title: 'Joined ArtZyla', detail: `as ${user.user_type}` },
-    ...(lastSignIn ? [{ at: iso(lastSignIn), type: 'account', title: 'Last signed in' }] : []),
+    ...(lastSignIn && !forSelf ? [{ at: iso(lastSignIn), type: 'account', title: 'Last signed in' }] : []),
     ...listings.map((l) => ({ at: iso(l.created_at), type: 'listing', title: 'Created listing', detail: `"${l.title}" · now ${l.status}` })),
     ...subscriptions.map((s) => ({
       at: iso(s.created_at),
@@ -169,7 +175,7 @@ export async function getUserHistory(userId) {
       title: 'Booked featured artist week',
       detail: `week of ${iso(b.week_start)?.slice(0, 10)} · $${num(b.amount).toFixed(2)}`,
     })),
-    ...recentMessages.map((m) => ({
+    ...(forSelf ? [] : recentMessages).map((m) => ({
       at: iso(m.created_at),
       type: 'message',
       title: m.sender_id === Number(userId) ? 'Sent a message' : 'Received a message',
@@ -190,12 +196,17 @@ export async function getUserHistory(userId) {
     // Logged events. Creation of listings that still exist is already covered above.
     ...activity
       .filter((a) => !(a.action === 'listing_created' && existingListingIds.has(a.entity_id)))
+      .filter((a) => !(forSelf && HIDDEN_FROM_SELF.has(a.action)))
       .map((a) => ({
         at: iso(a.created_at),
         type: a.entity_type === 'listing' ? 'listing' : a.action.startsWith('subscription') ? 'subscription' : 'account',
         title: ACTION_LABELS[a.action] || a.action,
-        detail: describeActivity(a),
-        actor: a.actor_id == null ? 'System' : a.actor_id === Number(userId) ? null : `${a.actor_name || `User #${a.actor_id}`}${a.actor_type === 'admin' ? ' (admin)' : ''}`,
+        detail: describeActivity(a, audience),
+        actor: a.actor_id == null
+          ? (forSelf ? 'Automatic' : 'System')
+          : a.actor_id === Number(userId)
+            ? null
+            : forSelf ? 'ArtZyla team' : `${a.actor_name || `User #${a.actor_id}`}${a.actor_type === 'admin' ? ' (admin)' : ''}`,
       })),
   ]
     .filter((e) => e.at)
@@ -221,4 +232,10 @@ export async function getUserHistory(userId) {
     timeline,
     history_logged_since: activity.length ? iso(activity[activity.length - 1].created_at) : null,
   };
+}
+
+// The signed-in user's own activity feed (see getUserHistory's 'self' audience).
+export async function getUserActivity(userId) {
+  const history = await getUserHistory(userId, { audience: 'self' });
+  return history ? { timeline: history.timeline.slice(0, 200) } : null;
 }

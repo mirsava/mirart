@@ -3,10 +3,35 @@ import pool from '../config/database.js';
 import { requireSelf } from '../middleware/auth.js';
 import { getBillingConfig, describeAccess } from '../services/billing.js';
 import { parseImageUrls } from '../utils/json.js';
+import { getArtistOverview, getArtistEngagement, getArtistPlan } from '../services/artistDashboard.js';
+import { getUserActivity } from '../services/userHistory.js';
 
 const router = express.Router();
 
 // Get dashboard stats for a user
+// Resolves the dashboard owner's numeric id (requireSelf has already checked it is the caller or an admin).
+const ownerId = async (authUserId) => {
+  const [rows] = await pool.execute('SELECT id FROM users WHERE auth_user_id = ?', [authUserId]);
+  return rows[0]?.id ?? null;
+};
+
+const dashboardRoute = (load) => async (req, res) => {
+  try {
+    const userId = await ownerId(req.params.authUserId);
+    if (!userId) return res.status(404).json({ error: 'User not found' });
+    res.json(await load(userId, req));
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Artist dashboard tabs: overview, analytics (views, likes, messages) and plan & billing.
+router.get('/:authUserId/overview', requireSelf(), dashboardRoute((userId) => getArtistOverview(userId)));
+router.get('/:authUserId/engagement', requireSelf(), dashboardRoute((userId, req) => getArtistEngagement(userId, req.query.days)));
+router.get('/:authUserId/plan', requireSelf(), dashboardRoute((userId) => getArtistPlan(userId)));
+router.get('/:authUserId/activity', requireSelf(), dashboardRoute((userId) => getUserActivity(userId)));
+
 router.get('/:authUserId', requireSelf(), async (req, res) => {
   try {
     const { authUserId } = req.params;

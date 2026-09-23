@@ -32,9 +32,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Visibility as VisibilityIcon,
-  Favorite as FavoriteIcon,
   Email as EmailIcon,
-  Description as DraftIcon,
   Person as PersonIcon,
   Logout as LogoutIcon,
   Settings as SettingsIcon,
@@ -56,10 +54,11 @@ import {
   Campaign as CampaignIcon,
   Star as StarIcon,
   AutoAwesome as SpotlightIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import { useBillingStatus } from '../hooks/useBillingStatus';
 import DashboardMessagesCard from '../components/DashboardMessagesCard';
@@ -75,6 +74,11 @@ import ImagePlaceholder from '../components/ImagePlaceholder';
 import PromoteListingDialog, { isListingFeatured, hasLivePass } from '../components/PromoteListingDialog';
 import ActivateListingDialog from '../components/ActivateListingDialog';
 import FeaturedArtistDialog from '../components/FeaturedArtistDialog';
+import ArtistOverview from '../components/dashboard/ArtistOverview';
+import ArtistAnalytics from '../components/dashboard/ArtistAnalytics';
+import ArtistPlanPanel from '../components/dashboard/ArtistPlanPanel';
+import BuyerSaved from '../components/dashboard/BuyerSaved';
+import NewsletterPreference from '../components/dashboard/NewsletterPreference';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const dataURLtoBlob = (dataURL: string): Promise<Blob> => {
@@ -125,6 +129,10 @@ function TabPanel(props: TabPanelProps) {
 
 const CATEGORY_COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
 
+// Tab values are numbers internally; the URL uses these names (?tab=overview), so refresh and links keep the tab.
+const TAB_KEYS: Record<number, string> = { 0: 'listings', 1: 'orders', 2: 'analytics', 3: 'plan', 4: 'profile', 5: 'settings', 6: 'overview', 7: 'saved' };
+const TAB_VALUES: Record<string, number> = Object.fromEntries(Object.entries(TAB_KEYS).map(([value, key]) => [key, Number(value)]));
+
 const AccountDashboard: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -132,7 +140,14 @@ const AccountDashboard: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
   const { addToCart } = useCart();
   const theme = useTheme();
-  const [tabValue, setTabValue] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') || '';
+  const tabValue = tabParam in TAB_VALUES ? TAB_VALUES[tabParam] : 6;
+  const setTabValue = (value: number, replace = false) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', TAB_KEYS[value] || 'overview');
+    setSearchParams(next, { replace });
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [artistStats, setArtistStats] = useState({
@@ -430,7 +445,7 @@ const AccountDashboard: React.FC = () => {
     if (user?.id) {
       fetchDashboardData();
       fetchSubscription();
-      if (tabValue === 2 && (subscription?.tier === 'enterprise' || subscription?.is_free_access)) {
+      if (tabValue === 2 && checkoutEnabled && (subscription?.tier === 'enterprise' || subscription?.is_free_access)) {
         fetchAnalytics();
       }
       if (tabValue === 4 || tabValue === 5) {
@@ -529,9 +544,9 @@ const AccountDashboard: React.FC = () => {
 
   useEffect(() => {
     if (!marketplaceLoaded) return;
-    const allowedTabs = isBuyerDashboard ? (checkoutEnabled ? [1, 4] : [4]) : (checkoutEnabled ? [0, 1, 2, 3, 4, 5] : [0, 2, 3, 4, 5]);
+    const allowedTabs = isBuyerDashboard ? (checkoutEnabled ? [7, 1, 4] : [7, 4]) : (checkoutEnabled ? [6, 0, 1, 2, 3, 4, 5] : [6, 0, 2, 3, 4, 5]);
     if (!allowedTabs.includes(tabValue)) {
-      setTabValue(allowedTabs[0]);
+      setTabValue(allowedTabs[0], true);
     }
   }, [isBuyerDashboard, tabValue, checkoutEnabled, marketplaceLoaded]);
 
@@ -544,8 +559,7 @@ const AccountDashboard: React.FC = () => {
   useEffect(() => {
     const state = location.state as { tab?: string } | null;
     if (state?.tab === 'subscription' && !isBuyerDashboard) {
-      setTabValue(3);
-      navigate(location.pathname, { replace: true, state: {} });
+      setSearchParams({ tab: 'plan' }, { replace: true, state: {} });
     }
   }, [location.state, isBuyerDashboard]);
 
@@ -1022,8 +1036,7 @@ const AccountDashboard: React.FC = () => {
   useEffect(() => {
     const promoteId = parseInt(new URLSearchParams(location.search).get('promote') || '', 10);
     if (!promoteId || !user?.id) return;
-    navigate(location.pathname, { replace: true, state: location.state });
-    setTabValue(0);
+    setSearchParams({ tab: 'listings' }, { replace: true, state: location.state });
     apiService.getListings({ authUserId: user.id, limit: 100 })
       .then(({ listings }) => {
         const listing = listings.find((l) => l.id === promoteId);
@@ -1055,6 +1068,16 @@ const AccountDashboard: React.FC = () => {
   const myFeaturedWeeks = featuredArtistBooking?.myWeeks ?? [];
   const featuredThisWeek = Boolean(featuredArtistBooking && myFeaturedWeeks.includes(featuredArtistBooking.currentWeek));
   const upcomingFeaturedWeeks = myFeaturedWeeks.filter((w) => w !== featuredArtistBooking?.currentWeek);
+
+  const copyListingLink = async (listing: Listing) => {
+    const url = `${window.location.origin}${getPaintingDetailPath(listing.id, listing.title)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      enqueueSnackbar('Link copied', { variant: 'success' });
+    } catch {
+      enqueueSnackbar(url, { variant: 'info' });
+    }
+  };
 
   const handleActivateListing = async (listingId: number) => {
     if (!user?.id) return;
@@ -1306,37 +1329,6 @@ const AccountDashboard: React.FC = () => {
               </Alert>
             )}
 
-            {!isBuyerDashboard && (
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              {[
-                { label: 'Total Listings', value: artistStats.totalListings, icon: <ArtTrackIcon />, color: '#6366f1' },
-                { label: 'Active', value: artistStats.activeListings, icon: <CheckCircleIcon />, color: '#10b981' },
-                { label: 'Drafts', value: artistStats.draftListings, icon: <DraftIcon />, color: '#f59e0b' },
-                { label: 'Total Views', value: artistStats.totalViews, icon: <VisibilityIcon />, color: '#3b82f6' },
-                { label: 'Messages', value: artistStats.messagesReceived, icon: <EmailIcon />, color: '#ef4444' },
-                { label: 'Likes', value: artistStats.totalLikes, icon: <FavoriteIcon />, color: '#ec4899' },
-              ].map((stat) => (
-                <Grid item xs={4} sm={4} md={2} key={stat.label}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 2,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      borderRadius: 2,
-                      textAlign: 'center',
-                    }}
-                  >
-                    <Avatar sx={{ bgcolor: `${stat.color}15`, color: stat.color, width: 40, height: 40, mx: 'auto', mb: 1 }}>
-                      {stat.icon}
-                    </Avatar>
-                    <Typography variant="h5" fontWeight={700}>{stat.value}</Typography>
-                    <Typography variant="caption" color="text.secondary">{stat.label}</Typography>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-            )}
 
             {!isBuyerDashboard && (subscription ? (
               <Paper
@@ -1389,21 +1381,47 @@ const AccountDashboard: React.FC = () => {
             <Tabs value={tabValue} onChange={handleTabChange} variant="scrollable" scrollButtons="auto">
               {isBuyerDashboard ? (
                 [
+                  <Tab key="saved" value={7} label="Saved" />,
                   ...(checkoutEnabled ? [<Tab key="orders" value={1} label="Orders" />] : []),
                   <Tab key="profile" value={4} label="Profile" />,
                 ]
               ) : (
                 [
+                  <Tab key="overview" value={6} label="Overview" />,
                   <Tab key="listings" value={0} label="My Listings" />,
                   ...(checkoutEnabled ? [<Tab key="orders" value={1} label="Orders" />] : []),
                   <Tab key="analytics" value={2} label="Analytics" />,
-                  <Tab key="subscription" value={3} label="Subscription" />,
+                  <Tab key="subscription" value={3} label="Plan & billing" />,
                   <Tab key="profile" value={4} label="Profile" />,
                   <Tab key="settings" value={5} label="Settings" />,
                 ]
               )}
             </Tabs>
           </Box>
+
+          <TabPanel value={tabValue} index={6}>
+            {user?.id && (
+              <ArtistOverview
+                authUserId={user.id}
+                onGoToTab={(tab) => setTabValue(TAB_VALUES[tab] ?? 6)}
+                onPromoteListing={async (listingId) => {
+                  const found = recentListings.find((l) => l.id === listingId)
+                    || (await apiService.getListings({ authUserId: user.id, limit: 100 })).listings.find((l) => l.id === listingId);
+                  if (found) setPromoteListing(found);
+                }}
+                onFeatureShop={() => setFeaturedArtistOpen(true)}
+              />
+            )}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={7}>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>Saved pieces</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Artwork you've liked. Message the artist from any listing to ask about it.</Typography>
+              <Box sx={{ mb: 3, maxWidth: 560 }}><NewsletterPreference /></Box>
+              <BuyerSaved />
+            </Box>
+          </TabPanel>
 
           <TabPanel value={tabValue} index={0}>
             <Box sx={{ mb: 3 }}>
@@ -1536,6 +1554,7 @@ const AccountDashboard: React.FC = () => {
                           <TableCell sx={{ fontWeight: 600 }}>Price</TableCell>
                           <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                           <TableCell sx={{ fontWeight: 600 }}>Views</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Likes</TableCell>
                           <TableCell sx={{ fontWeight: 600 }} align="right">Actions</TableCell>
                         </TableRow>
                       </TableHead>
@@ -1587,6 +1606,9 @@ const AccountDashboard: React.FC = () => {
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">{listing.views}</Typography>
                             </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color="text.secondary">{listing.like_count ?? 0}</Typography>
+                            </TableCell>
                             <TableCell align="right">
                               <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                                 {listing.status === 'draft' && (
@@ -1618,6 +1640,13 @@ const AccountDashboard: React.FC = () => {
                                     <VisibilityIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
+                                {listing.status === 'active' && (
+                                  <Tooltip title="Copy link to share">
+                                    <IconButton size="small" onClick={() => copyListingLink(listing)}>
+                                      <LinkIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                                 <Tooltip title="Delete">
                                   <IconButton size="small" color="error" onClick={() => handleDeleteClick(listing)}>
                                     <DeleteIcon fontSize="small" />
@@ -1916,6 +1945,10 @@ const AccountDashboard: React.FC = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={2}>
+            {user?.id && <ArtistAnalytics authUserId={user.id} />}
+            {checkoutEnabled && (
+              <Box sx={{ mt: 5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Sales</Typography>
             {subscription?.tier !== 'enterprise' && !subscription?.is_free_access ? (
               <Box sx={{ textAlign: 'center', py: 8 }}>
                 <LockIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
@@ -2328,6 +2361,8 @@ const AccountDashboard: React.FC = () => {
                 </Paper>
               </Box>
             )}
+              </Box>
+            )}
           </TabPanel>
 
           <TabPanel value={tabValue} index={3}>
@@ -2592,6 +2627,11 @@ const AccountDashboard: React.FC = () => {
                   View Subscription Plans
                 </Button>
               </Paper>
+            )}
+            {user?.id && (
+              <Box sx={{ mt: 4 }}>
+                <ArtistPlanPanel authUserId={user.id} onPromoteListing={(id) => { const l = recentListings.find((x) => x.id === id); if (l) setPromoteListing(l); }} />
+              </Box>
             )}
           </TabPanel>
 
@@ -3289,6 +3329,7 @@ const AccountDashboard: React.FC = () => {
               <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
                 <form onSubmit={handleSettingsSubmit} noValidate>
                   <Grid container spacing={2.5}>
+                    {checkoutEnabled && (
                     <Grid item xs={12}>
                       <Card variant="outlined" sx={{ borderRadius: 2 }}>
                         <CardContent sx={{ p: 2.5 }}>
@@ -3314,6 +3355,7 @@ const AccountDashboard: React.FC = () => {
                         </CardContent>
                       </Card>
                     </Grid>
+                    )}
 
                     {checkoutEnabled && (
 <Grid item xs={12} md={7}>

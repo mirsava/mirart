@@ -7,7 +7,7 @@ dotenv.config();
 pg.types.setTypeParser(20, (value) => parseInt(value, 10));
 
 // Tables whose primary key is not an `id` column, so INSERT must not append RETURNING id.
-const TABLES_WITHOUT_ID = new Set(['site_settings']);
+const TABLES_WITHOUT_ID = new Set(['site_settings', 'listing_view_daily']);
 
 const isWriteCommand = (command) => command === 'INSERT' || command === 'UPDATE' || command === 'DELETE';
 

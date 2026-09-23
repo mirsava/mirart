@@ -1,8 +1,10 @@
 import express from 'express';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import {
   subscribe,
   unsubscribe,
+  unsubscribeEmail,
+  isSubscribed,
   countSubscribers,
   getNewsletterConfig,
   setNewsletterEnabled,
@@ -20,6 +22,28 @@ router.post('/subscribe', async (req, res) => {
   } catch (error) {
     if (error instanceof NewsletterError) return res.status(400).json({ error: error.message });
     console.error('Error subscribing to newsletter:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// The signed-in user's weekly email preference (by their account email).
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    res.json({ subscribed: await isSubscribed(req.auth.email) });
+  } catch (error) {
+    console.error('Error reading newsletter preference:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/me', requireAuth, async (req, res) => {
+  try {
+    if (!req.auth.email) return res.status(400).json({ error: 'Your account has no email address' });
+    if (req.body?.subscribed === true) await subscribe(req.auth.email, req.auth.userId);
+    else await unsubscribeEmail(req.auth.email);
+    res.json({ subscribed: await isSubscribed(req.auth.email) });
+  } catch (error) {
+    console.error('Error saving newsletter preference:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

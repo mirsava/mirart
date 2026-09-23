@@ -440,6 +440,18 @@ router.get('/:id', async (req, res) => {
       'UPDATE listings SET views = views + 1 WHERE id = ?',
       [id]
     );
+    // Daily count for the artist's analytics (the artist looking at their own listing doesn't count)
+    if (req.auth?.userId !== rows[0].user_id) {
+      try {
+        await pool.execute(
+          `INSERT INTO listing_view_daily (listing_id, day, views) VALUES (?, CURRENT_DATE, 1)
+           ON CONFLICT (listing_id, day) DO UPDATE SET views = listing_view_daily.views + 1`,
+          [id]
+        );
+      } catch (err) {
+        console.warn('Could not record daily view:', err.message);
+      }
+    }
     
     const responseData = {
       ...rows[0],

@@ -47,6 +47,21 @@ export async function unsubscribe(token) {
   return result.affectedRows > 0;
 }
 
+export async function unsubscribeEmail(email) {
+  await pool.execute(
+    'UPDATE newsletter_subscribers SET unsubscribed_at = COALESCE(unsubscribed_at, now()) WHERE lower(email) = lower(?)',
+    [String(email || '')]
+  );
+}
+
+export async function isSubscribed(email) {
+  const [rows] = await pool.execute(
+    'SELECT 1 FROM newsletter_subscribers WHERE lower(email) = lower(?) AND unsubscribed_at IS NULL',
+    [String(email || '')]
+  );
+  return rows.length > 0;
+}
+
 export async function countSubscribers() {
   const [rows] = await pool.execute('SELECT COUNT(*) AS count FROM newsletter_subscribers WHERE unsubscribed_at IS NULL');
   return Number(rows[0]?.count || 0);

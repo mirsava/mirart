@@ -400,6 +400,15 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
   unsubscribed_at TIMESTAMPTZ
 );
 
+-- Listing views per day, for the artist analytics charts (listings.views keeps the all-time total).
+CREATE TABLE IF NOT EXISTS listing_view_daily (
+  listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (listing_id, day)
+);
+CREATE INDEX IF NOT EXISTS idx_listing_view_daily_day ON listing_view_daily (day);
+
 -- Subscription renewal charges, recorded by the Stripe webhook (the first charge is the user_subscriptions row).
 CREATE TABLE IF NOT EXISTS subscription_payments (
   id SERIAL PRIMARY KEY,
@@ -447,7 +456,7 @@ BEGIN
     'users','listings','likes','listing_comments','messages','chat_conversations','chat_messages',
     'support_chat_messages','notifications','admin_announcements','site_settings','dashboard_stats',
     'orders','subscription_plans','user_subscriptions','listing_promotions',
-    'featured_artist_bookings','listing_reminders','newsletter_subscribers','activity_log','subscription_payments'
+    'featured_artist_bookings','listing_reminders','newsletter_subscribers','activity_log','subscription_payments','listing_view_daily'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;

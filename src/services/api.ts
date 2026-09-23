@@ -257,6 +257,62 @@ export interface FeaturedArtistCalendarWeek {
   booking: { user_id: number; artist_name: string; email: string; amount: number; source: 'stripe' | 'admin' } | null;
 }
 
+type WeekPair = { this_week: number; last_week: number };
+
+export interface ArtistOverviewData {
+  week: { views: WeekPair; likes: WeekPair; messages: WeekPair };
+  todo: {
+    unread_messages: number;
+    drafts: number;
+    ending_soon: Array<{ id: number; title: string; pass_ends: string | null; feature_ends: string | null }>;
+    next_featured_week: string | null;
+    feature_credits_left: number;
+  };
+  active_listings: number;
+  username: string | null;
+  checklist: Array<{ key: string; label: string; done: boolean }>;
+}
+
+export interface ArtistEngagementData {
+  tier: 'basic' | 'full';
+  days: number;
+  summary: { views: number; likes: number; messages: number };
+  series: Array<{ day: string; views: number }>;
+  message_rate?: number;
+  listings?: Array<{
+    id: number;
+    title: string;
+    status: string;
+    primary_image_url?: string | null;
+    is_featured: boolean;
+    views: number;
+    views_total: number;
+    likes: number;
+    likes_total: number;
+    messages: number;
+  }>;
+  promotions?: Array<{
+    listing_id: number;
+    title: string;
+    type: 'feature' | 'bump';
+    started_at: string;
+    avg_views_before: number;
+    avg_views_during: number;
+  }>;
+}
+
+export interface ArtistPlanData {
+  plan: { name: string | null; tier: string; billing_period: string; end_date: string; auto_renew: boolean } | null;
+  access_source: 'subscription' | 'free' | 'none';
+  slots: { used: number; max: number };
+  credits: FeatureCredits;
+  listing_pass: { enabled: boolean; price: number; days: number };
+  passes: Array<{ id: number; title: string; status: string; paid_until: string }>;
+  featured_listings: Array<{ id: number; title: string; featured_until: string }>;
+  featured_weeks: Array<{ week_start: string; amount: number; source: string }>;
+  payments: Array<{ at: string; type: string; description: string; amount: number; source: string }>;
+}
+
 export interface UserDirectoryParams {
   search?: string;
   type?: '' | 'artist' | 'buyer' | 'admin';
@@ -1279,6 +1335,30 @@ class ApiService {
     link.download = `artzyla-users-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  async getArtistOverview(authUserId: string): Promise<ArtistOverviewData> {
+    return this.request<ArtistOverviewData>(`/dashboard/${authUserId}/overview`);
+  }
+
+  async getArtistEngagement(authUserId: string, days: 7 | 30 | 90): Promise<ArtistEngagementData> {
+    return this.request<ArtistEngagementData>(`/dashboard/${authUserId}/engagement?days=${days}`);
+  }
+
+  async getArtistPlan(authUserId: string): Promise<ArtistPlanData> {
+    return this.request<ArtistPlanData>(`/dashboard/${authUserId}/plan`);
+  }
+
+  async getMyActivity(authUserId: string): Promise<{ timeline: UserHistoryEvent[] }> {
+    return this.request<{ timeline: UserHistoryEvent[] }>(`/dashboard/${authUserId}/activity`);
+  }
+
+  async getNewsletterPreference(): Promise<{ subscribed: boolean }> {
+    return this.request<{ subscribed: boolean }>('/newsletter/me');
+  }
+
+  async setNewsletterPreference(subscribed: boolean): Promise<{ subscribed: boolean }> {
+    return this.request<{ subscribed: boolean }>('/newsletter/me', { method: 'PUT', body: JSON.stringify({ subscribed }) });
   }
 
   async getUserHistory(userId: number): Promise<UserHistory> {
