@@ -16,8 +16,10 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from 'notistack';
 
 const ConfirmSignup: React.FC = () => {
+  const { enqueueSnackbar } = useSnackbar();
   const navigate = useNavigate();
   const location = useLocation();
   const { confirmSignUp, resendConfirmationCode, refreshUser, isAuthenticated, loading: authLoading } = useAuth();
@@ -115,10 +117,10 @@ const ConfirmSignup: React.FC = () => {
     try {
       await resendConfirmationCode(email);
       setErrors({});
-      alert('A new verification email has been sent!');
+      enqueueSnackbar('A new verification email has been sent!', { variant: 'success' });
     } catch (error: any) {
       // Show helpful message instead of error
-      alert('If you did not receive the code, please check your spam folder or try signing up again. The code is valid for 24 hours.');
+      enqueueSnackbar('If you did not receive the code, please check your spam folder or try signing up again. The code is valid for 24 hours.', { variant: 'info', autoHideDuration: 8000 });
     } finally {
       setIsResending(false);
     }
