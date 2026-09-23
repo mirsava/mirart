@@ -1,6 +1,7 @@
 import pool from '../config/database.js';
 import { getListingAccess, countPlanListings } from './billing.js';
 import { createNotification } from './notificationService.js';
+import { logActivity } from './activityLog.js';
 
 const SETTING_KEY = 'promotions_config';
 const CREDIT_WINDOW_DAYS = 30;
@@ -203,6 +204,13 @@ export async function runListingPassExpirationJob() {
       );
       deactivated += toDeactivate.length;
       for (const listing of toDeactivate) {
+        await logActivity({
+          userId,
+          action: 'listing_status_changed',
+          entityType: 'listing',
+          entityId: listing.id,
+          details: { title: listing.title, from: 'active', to: 'inactive', reason: 'Listing pass ended' },
+        });
         try {
           await createNotification({
             userId,

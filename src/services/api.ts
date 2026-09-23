@@ -208,6 +208,61 @@ export interface FeaturedArtist {
   listings: Array<{ id: number; title: string; price: number | null; primary_image_url?: string | null; category: string }>;
 }
 
+export interface UserHistoryEvent {
+  at: string;
+  type: 'account' | 'listing' | 'subscription' | 'payment' | 'message' | 'notice';
+  title: string;
+  detail?: string | null;
+  actor?: string | null;
+}
+
+export interface UserHistory {
+  user: {
+    id: number;
+    auth_user_id: string;
+    username?: string | null;
+    email: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    business_name?: string | null;
+    user_type: 'artist' | 'buyer' | 'admin';
+    active: boolean;
+    blocked: boolean;
+    country?: string | null;
+    bio?: string | null;
+    profile_image_url?: string | null;
+    created_at: string;
+    last_sign_in_at: string | null;
+  };
+  stats: {
+    listings_total: number;
+    listings_active: number;
+    total_views: number;
+    one_time_spent: number;
+    subscriptions_count: number;
+    messages_sent: number;
+    messages_received: number;
+    support_messages: number;
+    newsletter: 'subscribed' | 'unsubscribed' | 'no';
+  };
+  current_subscription: { plan_name: string; billing_period: string; end_date: string; auto_renew: boolean } | null;
+  payments: Array<{ at: string; description: string; amount: number; source: 'stripe' | 'plan' | 'admin' | 'subscription' }>;
+  listings: Array<{
+    id: number;
+    title: string;
+    status: string;
+    category: string;
+    price: number | null;
+    views: number;
+    created_at: string;
+    featured_until?: string | null;
+    paid_until?: string | null;
+    primary_image_url?: string | null;
+  }>;
+  timeline: UserHistoryEvent[];
+  history_logged_since: string | null;
+}
+
 export interface ShowcaseArtist {
   id: number;
   username?: string | null;
@@ -1085,6 +1140,10 @@ class ApiService {
 
   async getArtistShowcase(): Promise<{ artists: ShowcaseArtist[] }> {
     return this.request<{ artists: ShowcaseArtist[] }>('/users/artists/showcase');
+  }
+
+  async getUserHistory(userId: number): Promise<UserHistory> {
+    return this.request<UserHistory>(`/admin/users/${userId}/history`);
   }
 
   async getCategoryCounts(): Promise<{ categories: Array<{ category: string; total: number; non_featured: number }> }> {

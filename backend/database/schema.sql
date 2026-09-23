@@ -347,7 +347,7 @@ CREATE INDEX IF NOT EXISTS idx_user_subscriptions_end_date ON user_subscriptions
 -- One row per applied promotion. stripe_session_id is unique so confirming a payment twice applies it once.
 CREATE TABLE IF NOT EXISTS listing_promotions (
   id SERIAL PRIMARY KEY,
-  listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  listing_id INTEGER REFERENCES listings(id) ON DELETE SET NULL,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   promotion_type VARCHAR(20) NOT NULL,
   days INTEGER,
@@ -357,6 +357,11 @@ CREATE TABLE IF NOT EXISTS listing_promotions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_listing_promotions_listing ON listing_promotions (listing_id);
+-- Keep payment records when a listing is deleted (the row just loses its listing link).
+ALTER TABLE listing_promotions ALTER COLUMN listing_id DROP NOT NULL;
+ALTER TABLE listing_promotions DROP CONSTRAINT IF EXISTS listing_promotions_listing_id_fkey;
+ALTER TABLE listing_promotions ADD CONSTRAINT listing_promotions_listing_id_fkey
+  FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE SET NULL;
 ALTER TABLE listing_promotions DROP CONSTRAINT IF EXISTS listing_promotions_promotion_type_check;
 ALTER TABLE listing_promotions ADD CONSTRAINT listing_promotions_promotion_type_check
   CHECK (promotion_type IN ('feature','bump','listing_pass'));
@@ -395,6 +400,20 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
   unsubscribed_at TIMESTAMPTZ
 );
 
+-- Account and listing history for the admin "User details" timeline. user_id is whose history it is (no foreign
+-- key, so entries survive a deleted account); actor_id is who did it (the user, an admin, or NULL for the system).
+CREATE TABLE IF NOT EXISTS activity_log (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER,
+  actor_id INTEGER,
+  action VARCHAR(50) NOT NULL,
+  entity_type VARCHAR(30),
+  entity_id INTEGER,
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_activity_log_user ON activity_log (user_id, created_at DESC);
+
 -- Keep updated_at fresh on every UPDATE (replaces MySQL's ON UPDATE CURRENT_TIMESTAMP)
 DO $$
 DECLARE t TEXT;
@@ -416,7 +435,7 @@ BEGIN
     'users','listings','likes','listing_comments','messages','chat_conversations','chat_messages',
     'support_chat_messages','notifications','admin_announcements','site_settings','dashboard_stats',
     'orders','subscription_plans','user_subscriptions','listing_promotions',
-    'featured_artist_bookings','listing_reminders','newsletter_subscribers'
+    'featured_artist_bookings','listing_reminders','newsletter_subscribers','activity_log'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;

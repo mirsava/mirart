@@ -3,6 +3,7 @@ import pool from '../config/database.js';
 import { stripe } from '../config/stripe.js';
 import { requireAdmin, requireSelf } from '../middleware/auth.js';
 import { getBillingConfig, saveBillingConfig, describeAccess, countPlanListings } from '../services/billing.js';
+import { logActivity } from '../services/activityLog.js';
 
 const router = express.Router();
 
@@ -121,6 +122,7 @@ router.put('/admin/subscriptions/:userId/cancel', requireAdmin, async (req, res)
       `UPDATE user_subscriptions SET auto_renew = FALSE WHERE user_id = ? AND status = 'active'`,
       [userId]
     );
+    await logActivity({ userId: Number(userId), actorId: req.auth.userId, action: 'subscription_cancelled', entityType: 'subscription', entityId: subs[0].id, details: { by_admin: true } });
 
     res.json({ message: 'Subscription cancelled. User retains access until end of billing period.' });
   } catch (error) {
@@ -157,6 +159,7 @@ router.put('/admin/subscriptions/:userId/resume', requireAdmin, async (req, res)
       `UPDATE user_subscriptions SET auto_renew = TRUE WHERE user_id = ? AND status = 'active'`,
       [userId]
     );
+    await logActivity({ userId: Number(userId), actorId: req.auth.userId, action: 'subscription_resumed', entityType: 'subscription', entityId: subs[0].id, details: { by_admin: true } });
 
     res.json({ message: 'Subscription resumed. Auto-renewal enabled.' });
   } catch (error) {
@@ -179,6 +182,7 @@ router.put('/admin/subscriptions/:userId/expire', requireAdmin, async (req, res)
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'No active subscription found' });
     }
+    await logActivity({ userId: Number(userId), actorId: req.auth.userId, action: 'subscription_expired', entityType: 'subscription', details: { by_admin: true } });
 
     res.json({ message: 'Subscription expired immediately.' });
   } catch (error) {
@@ -213,6 +217,8 @@ router.put('/admin/subscriptions/:userId/extend', requireAdmin, async (req, res)
       `UPDATE user_subscriptions SET end_date = ? WHERE id = ?`,
       [newEndStr, subs[0].id]
     );
+
+    await logActivity({ userId: Number(userId), actorId: req.auth.userId, action: 'subscription_extended', entityType: 'subscription', entityId: subs[0].id, details: { days: extendDays, new_end_date: newEndStr, by_admin: true } });
 
     res.json({ message: `Subscription extended by ${extendDays} days. New end date: ${newEndStr}` });
   } catch (error) {
@@ -546,6 +552,8 @@ router.put('/user/:authUserId/cancel', requireSelf(), async (req, res) => {
       [userId]
     );
 
+    await logActivity({ userId, actorId: req.auth.userId, action: 'subscription_cancelled', entityType: 'subscription', entityId: subs[0]?.id });
+
     res.json({ message: 'Subscription cancelled. You will retain access until the end of your billing period.' });
   } catch (error) {
     console.error('Error cancelling subscription:', error);
@@ -597,6 +605,8 @@ router.put('/user/:authUserId/resume', requireSelf(), async (req, res) => {
        WHERE user_id = ? AND status = 'active'`,
       [userId]
     );
+
+    await logActivity({ userId, actorId: req.auth.userId, action: 'subscription_resumed', entityType: 'subscription', entityId: subs[0]?.id });
 
     res.json({ message: 'Subscription resumed. Your subscription will renew automatically at the end of your billing period.' });
   } catch (error) {

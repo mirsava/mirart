@@ -3,6 +3,7 @@ import {
   Box,
   Typography,
   Paper,
+  Tooltip,
   Grid,
   Card,
   CardContent,
@@ -57,6 +58,7 @@ import {
   Edit as EditIcon,
   OpenInNew as OpenInNewIcon,
   Star as StarIcon,
+  History as HistoryIcon,
   StarBorder as StarBorderIcon,
   Block as BlockIcon,
   Lock as LockIcon,
@@ -96,6 +98,7 @@ import { useChat } from '../contexts/ChatContext';
 import PageHeader from '../components/PageHeader';
 import PromotionSettingsCard from '../components/PromotionSettingsCard';
 import NewsletterSettingsCard from '../components/NewsletterSettingsCard';
+import UserHistoryDialog from '../components/UserHistoryDialog';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
@@ -129,6 +132,7 @@ const AdminDashboard: React.FC = () => {
   const [listingsSearch, setListingsSearch] = useState('');
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [historyUserId, setHistoryUserId] = useState<number | null>(null);
   const [userTypeDialogOpen, setUserTypeDialogOpen] = useState(false);
   const [newUserType, setNewUserType] = useState<'artist' | 'buyer' | 'admin'>('artist');
   const [inactivateConfirmOpen, setInactivateConfirmOpen] = useState(false);
@@ -1612,7 +1616,12 @@ const AdminDashboard: React.FC = () => {
                       <TableCell>
                         {new Date(userData.created_at).toLocaleDateString()}
                       </TableCell>
-                      <TableCell align="right">
+                      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                        <Tooltip title="User details & history">
+                          <IconButton size="small" onClick={() => setHistoryUserId(userData.id)}>
+                            <HistoryIcon />
+                          </IconButton>
+                        </Tooltip>
                         <IconButton
                           size="small"
                           onClick={(e) => handleUserMenuOpen(e, userData)}
@@ -3271,11 +3280,23 @@ const AdminDashboard: React.FC = () => {
           </DialogActions>
         </Dialog>
 
+        <UserHistoryDialog userId={historyUserId} onClose={() => setHistoryUserId(null)} />
+
         <Menu
           anchorEl={userMenuAnchor}
           open={Boolean(userMenuAnchor)}
           onClose={handleUserMenuClose}
         >
+          <MenuItem
+            onClick={() => {
+              const id = selectedUser?.id;
+              handleUserMenuClose();
+              if (id) setHistoryUserId(id);
+            }}
+          >
+            <HistoryIcon sx={{ mr: 1 }} />
+            View history
+          </MenuItem>
           <MenuItem
             onClick={() => {
               setNewUserType(selectedUser?.user_type || 'artist');

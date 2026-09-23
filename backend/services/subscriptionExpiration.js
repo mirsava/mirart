@@ -1,6 +1,7 @@
 import pool from '../config/database.js';
 import { getBillingConfig, describeAccess } from './billing.js';
 import { runListingPassExpirationJob } from './promotions.js';
+import { logActivity } from './activityLog.js';
 
 /**
  * Expires subscriptions that have passed their end_date. Artists lose their active
@@ -41,9 +42,19 @@ export async function runSubscriptionExpirationJob() {
            AND NOT EXISTS (
              SELECT 1 FROM user_subscriptions us
              WHERE us.user_id = listings.user_id AND us.status = 'active' AND us.end_date >= CURRENT_DATE
-           )`
+           )
+         RETURNING id, user_id, title`
       );
       totalDeactivated = result.affectedRows || 0;
+      for (const listing of result.rows || []) {
+        await logActivity({
+          userId: listing.user_id,
+          action: 'listing_status_changed',
+          entityType: 'listing',
+          entityId: listing.id,
+          details: { title: listing.title, from: 'active', to: 'inactive', reason: 'No active subscription' },
+        });
+      }
     }
 
     if (expiredSubs.length > 0 || totalDeactivated > 0) {

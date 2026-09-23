@@ -4,6 +4,8 @@ import { createNotification } from '../services/notificationService.js';
 import { getSupabaseAdmin } from '../config/supabase.js';
 import { requireAdmin, clearAuthCache } from '../middleware/auth.js';
 import { parseImageUrls } from '../utils/json.js';
+import { logActivity, logListingActivity } from '../services/activityLog.js';
+import { getUserHistory } from '../services/userHistory.js';
 
 const router = express.Router();
 
@@ -179,6 +181,19 @@ router.get('/stats', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching admin stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Full history for the admin "User details" panel.
+router.get('/users/:id/history', async (req, res) => {
+  try {
+    if (!/^\d+$/.test(req.params.id)) return res.status(404).json({ error: 'User not found' });
+    const history = await getUserHistory(Number(req.params.id));
+    if (!history) return res.status(404).json({ error: 'User not found' });
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching user history:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -613,11 +628,15 @@ router.put('/users/:authUserId/user-type', async (req, res) => {
       return res.status(400).json({ error: 'You cannot remove your own admin role' });
     }
 
+    const [before] = await pool.execute('SELECT id, user_type FROM users WHERE auth_user_id = ?', [authUserId]);
     await pool.execute(
       'UPDATE users SET user_type = ? WHERE auth_user_id = ?',
       [dbType, authUserId]
     );
     clearAuthCache();
+    if (before[0] && before[0].user_type !== dbType) {
+      await logActivity({ userId: before[0].id, actorId: req.auth.userId, action: 'user_type_changed', details: { from: before[0].user_type, to: dbType } });
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -631,6 +650,7 @@ router.put('/listings/:id/inactivate', async (req, res) => {
     const { id } = req.params;
 
     await pool.execute('UPDATE listings SET status = ? WHERE id = ?', ['archived', id]);
+    await logListingActivity(id, { actorId: req.auth.userId, action: 'listing_status_changed', details: { to: 'archived', by_admin: true } });
 
     res.json({ success: true, message: 'Listing inactivated successfully' });
   } catch (error) {
@@ -649,7 +669,11 @@ router.put('/listings/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status. Must be one of: draft, active, inactive, sold, archived' });
     }
 
+    const [before] = await pool.execute('SELECT user_id, title, status FROM listings WHERE id = ?', [id]);
     await pool.execute('UPDATE listings SET status = ? WHERE id = ?', [status, id]);
+    if (before[0] && before[0].status !== status) {
+      await logListingActivity(id, { actorId: req.auth.userId, action: 'listing_status_changed', listing: before[0], details: { from: before[0].status, to: status, by_admin: true } });
+    }
 
     res.json({ success: true, message: `Listing status updated to ${status} successfully` });
   } catch (error) {
@@ -662,7 +686,9 @@ router.delete('/listings/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
+    const [before] = await pool.execute('SELECT user_id, title FROM listings WHERE id = ?', [id]);
     await pool.execute('DELETE FROM listings WHERE id = ?', [id]);
+    if (before[0]) await logListingActivity(id, { actorId: req.auth.userId, action: 'listing_deleted', listing: before[0], details: { by_admin: true } });
 
     res.json({ success: true, message: 'Listing deleted successfully' });
   } catch (error) {
@@ -675,7 +701,7 @@ router.delete('/users/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const [users] = await pool.execute('SELECT auth_user_id FROM users WHERE id = ?', [userId]);
+    const [users] = await pool.execute('SELECT auth_user_id, email FROM users WHERE id = ?', [userId]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -694,6 +720,8 @@ router.delete('/users/:userId', async (req, res) => {
       return res.status(502).json({ error: 'Failed to delete user from Supabase Auth', details: authError.message });
     }
     await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
+    // Kept after deletion (activity_log has no foreign key), so there is a record of who removed the account.
+    await logActivity({ userId: Number(userId), actorId: req.auth.userId, action: 'user_deleted', details: { email: users[0].email } });
 
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
@@ -712,6 +740,7 @@ router.delete('/users/:userId', async (req, res) => {
 router.put('/users/:userId/activate', async (req, res) => {
   try {
     await pool.execute('UPDATE users SET active = TRUE WHERE id = ?', [req.params.userId]);
+    await logActivity({ userId: Number(req.params.userId), actorId: req.auth.userId, action: 'user_activated' });
     res.json({ success: true, message: 'User activated successfully' });
   } catch (error) {
     console.error('Error activating user:', error);
@@ -722,6 +751,7 @@ router.put('/users/:userId/activate', async (req, res) => {
 router.put('/users/:userId/deactivate', async (req, res) => {
   try {
     await pool.execute('UPDATE users SET active = FALSE WHERE id = ?', [req.params.userId]);
+    await logActivity({ userId: Number(req.params.userId), actorId: req.auth.userId, action: 'user_deactivated' });
     res.json({ success: true, message: 'User deactivated successfully' });
   } catch (error) {
     console.error('Error deactivating user:', error);
@@ -759,6 +789,7 @@ router.put('/users/:userId/block', async (req, res) => {
 
     await pool.execute('UPDATE users SET active = FALSE, blocked = TRUE WHERE id = ?', [userId]);
     clearAuthCache();
+    await logActivity({ userId: Number(userId), actorId: req.auth.userId, action: 'user_blocked' });
 
     res.json({ success: true, message: 'User blocked successfully. They cannot sign in.' });
   } catch (error) {
@@ -786,6 +817,7 @@ router.put('/users/:userId/unblock', async (req, res) => {
 
     await pool.execute('UPDATE users SET active = TRUE, blocked = FALSE WHERE id = ?', [userId]);
     clearAuthCache();
+    await logActivity({ userId: Number(userId), actorId: req.auth.userId, action: 'user_unblocked' });
 
     res.json({ success: true, message: 'User unblocked successfully' });
   } catch (error) {

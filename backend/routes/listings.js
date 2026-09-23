@@ -4,6 +4,7 @@ import { requireAuth, isUuid } from '../middleware/auth.js';
 import { parseImageUrls } from '../utils/json.js';
 import { checkActivation } from '../services/billing.js';
 import { deleteImages } from '../services/storage.js';
+import { logListingActivity } from '../services/activityLog.js';
 
 const router = express.Router();
 
@@ -617,7 +618,8 @@ router.post('/', requireAuth, async (req, res) => {
       );
       
       const parsedImageUrls = parseImageUrls(newListing[0].image_urls);
-      
+      await logListingActivity(newListing[0].id, { actorId: req.auth.userId, action: 'listing_created', listing: newListing[0] });
+
       res.status(201).json({
         ...newListing[0],
         price: newListing[0].price ? parseFloat(newListing[0].price) : null,
@@ -677,6 +679,8 @@ router.post('/:id/activate', requireAuth, async (req, res) => {
       'UPDATE dashboard_stats SET active_listings = active_listings + 1 WHERE user_id = ?',
       [listing.user_id]
     );
+
+    await logListingActivity(id, { actorId: req.auth.userId, action: 'listing_activated', listing });
 
     // Get updated listing
     const [updated] = await pool.execute(
@@ -826,6 +830,17 @@ router.put('/:id', requireAuth, async (req, res) => {
       updateValues
     );
     
+    const changedFields = updateFields.map((f) => f.split(' ')[0]).filter((f) => f !== 'status');
+    if (status && status !== current[0].status) {
+      await logListingActivity(id, {
+        actorId: req.auth.userId,
+        action: 'listing_status_changed',
+        details: { from: current[0].status, to: status, ...(changedFields.length ? { fields: changedFields } : {}) },
+      });
+    } else if (changedFields.length) {
+      await logListingActivity(id, { actorId: req.auth.userId, action: 'listing_edited', details: { fields: changedFields } });
+    }
+
     // Update dashboard stats if status changed
     if (status && status !== current[0].status) {
       if (status === 'active' && current[0].status !== 'active') {
@@ -869,7 +884,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     
     // Get listing info including image URLs before deletion
     const [listing] = await pool.execute(
-      'SELECT user_id, status, primary_image_url, image_urls FROM listings WHERE id = ?',
+      'SELECT user_id, title, status, primary_image_url, image_urls FROM listings WHERE id = ?',
       [id]
     );
     
@@ -888,6 +903,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     // Delete listing from database
     await pool.execute('DELETE FROM listings WHERE id = ?', [id]);
+    await logListingActivity(id, { actorId: req.auth.userId, action: 'listing_deleted', listing: listing[0] });
     
     // Update dashboard stats
     await pool.execute(
