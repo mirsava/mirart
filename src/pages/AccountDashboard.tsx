@@ -204,6 +204,8 @@ const AccountDashboard: React.FC = () => {
   const [activatingListing, setActivatingListing] = useState<number | null>(null);
   const [promoteListing, setPromoteListing] = useState<Listing | null>(null);
   const [featuredArtistOpen, setFeaturedArtistOpen] = useState(false);
+  // Weeks this artist has booked as Featured Artist (from the current week on), and which week is current.
+  const [featuredArtistBooking, setFeaturedArtistBooking] = useState<{ currentWeek: string; myWeeks: string[] } | null>(null);
   const [blockedActivation, setBlockedActivation] = useState<{ listing: Pick<Listing, 'id' | 'title'>; message?: string } | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
@@ -1031,6 +1033,29 @@ const AccountDashboard: React.FC = () => {
       .catch(() => {});
   }, [location.search, user?.id]);
 
+  const fetchFeaturedArtistBooking = () => {
+    apiService.getFeaturedArtistWeeks()
+      .then(({ weeks }) => setFeaturedArtistBooking({
+        currentWeek: weeks[0]?.week_start ?? '',
+        myWeeks: weeks.filter((w) => w.mine).map((w) => w.week_start),
+      }))
+      .catch(() => setFeaturedArtistBooking(null));
+  };
+
+  useEffect(() => {
+    if (user?.id && !isBuyerDashboard) fetchFeaturedArtistBooking();
+  }, [user?.id, isBuyerDashboard]);
+
+  const formatWeekRange = (weekStart: string) => {
+    const start = new Date(`${weekStart}T00:00:00Z`);
+    const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000);
+    const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    return `${fmt(start)} – ${fmt(end)}`;
+  };
+  const myFeaturedWeeks = featuredArtistBooking?.myWeeks ?? [];
+  const featuredThisWeek = Boolean(featuredArtistBooking && myFeaturedWeeks.includes(featuredArtistBooking.currentWeek));
+  const upcomingFeaturedWeeks = myFeaturedWeeks.filter((w) => w !== featuredArtistBooking?.currentWeek);
+
   const handleActivateListing = async (listingId: number) => {
     if (!user?.id) return;
     const listing = recentListings.find((l) => l.id === listingId);
@@ -1397,11 +1422,12 @@ const AccountDashboard: React.FC = () => {
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <Button
                   variant="outlined"
+                  color={myFeaturedWeeks.length ? 'success' : 'primary'}
                   startIcon={<SpotlightIcon />}
                   onClick={() => setFeaturedArtistOpen(true)}
                   sx={{ borderRadius: 1, fontWeight: 600, textTransform: 'none' }}
                 >
-                  Feature my shop
+                  {myFeaturedWeeks.length ? 'Featured Artist: booked' : 'Feature my shop'}
                 </Button>
                 <Button
                   variant="contained"
@@ -1420,6 +1446,30 @@ const AccountDashboard: React.FC = () => {
               </Box>
             </Box>
             
+            {myFeaturedWeeks.length > 0 && (
+              <Alert
+                severity="success"
+                icon={<SpotlightIcon />}
+                sx={{ mb: 3 }}
+                action={
+                  <Button color="inherit" size="small" onClick={() => setFeaturedArtistOpen(true)} sx={{ textTransform: 'none' }}>
+                    Book more
+                  </Button>
+                }
+              >
+                {featuredThisWeek ? (
+                  <>
+                    <strong>You're the Featured Artist this week</strong> ({formatWeekRange(featuredArtistBooking!.currentWeek)}). Your profile and work are at the top of the homepage now.
+                    {upcomingFeaturedWeeks.length > 0 && <> Also booked: {upcomingFeaturedWeeks.map(formatWeekRange).join(', ')}.</>}
+                  </>
+                ) : (
+                  <>
+                    <strong>You're booked as Featured Artist</strong> for {upcomingFeaturedWeeks.map(formatWeekRange).join(', ')}. You'll be at the top of the homepage and in the weekly email that week.
+                  </>
+                )}
+              </Alert>
+            )}
+
             {/* Filter Controls */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -3526,7 +3576,13 @@ const AccountDashboard: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        <FeaturedArtistDialog open={featuredArtistOpen} onClose={() => setFeaturedArtistOpen(false)} />
+        <FeaturedArtistDialog
+          open={featuredArtistOpen}
+          onClose={() => {
+            setFeaturedArtistOpen(false);
+            fetchFeaturedArtistBooking();
+          }}
+        />
 
         <ActivateListingDialog
           open={Boolean(blockedActivation)}
