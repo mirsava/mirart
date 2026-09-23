@@ -13,6 +13,7 @@ import {
   ListItemIcon,
   Box,
   useMediaQuery,
+  Switch,
   useTheme,
   Fade,
   Menu,
@@ -49,6 +50,10 @@ import {
   Favorite as FavoriteIcon,
   FavoriteBorder as FavoriteBorderIcon,
   Delete as DeleteIcon,
+  DarkModeOutlined as DarkModeMenuIcon,
+  Dashboard as DashboardIcon,
+  WorkspacePremium as PlanIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
@@ -91,9 +96,15 @@ const Header: React.FC = () => {
   const galleryCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [artists, setArtists] = useState<Array<{ id: number; auth_user_id: string; artist_name: string; profile_image_url?: string }>>([]);
   const [headerUserType, setHeaderUserType] = useState<'artist' | 'buyer' | 'admin' | null>(null);
+  // Photo, username and display name for the avatar button and account menu
+  const [headerProfile, setHeaderProfile] = useState<{ photo: string | null; username: string | null; name: string | null }>({ photo: null, username: null, name: null });
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isMediumScreen = useMediaQuery(theme.breakpoints.between('md', 'lg'));
   const showSellerMessages = headerUserType !== 'buyer';
+  const headerIconSx = { color: 'text.secondary', '&:hover': { color: 'primary.main' } } as const;
+  const headerBadgeSx = { '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } } as const;
+  const accountName = headerProfile.name || user?.name || headerProfile.username || user?.email || 'Account';
+  const accountInitial = accountName.charAt(0).toUpperCase();
 
   const gallerySubcategories = {
     'Painting': ['Abstract', 'Figurative', 'Impressionism', 'Realism', 'Pop Art'],
@@ -211,11 +222,19 @@ const Header: React.FC = () => {
       try {
         const profile = await apiService.getUser(user.id);
         setHeaderUserType((profile?.user_type as 'artist' | 'buyer' | 'admin') || 'artist');
+        setHeaderProfile({
+          photo: profile?.profile_image_url || null,
+          username: profile?.username || null,
+          name: profile?.business_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || null,
+        });
       } catch {
         setHeaderUserType('artist');
       }
     };
     fetchUserType();
+    // The Profile tab fires this after saving, so a new photo or name shows up straight away
+    window.addEventListener('profileUpdated', fetchUserType);
+    return () => window.removeEventListener('profileUpdated', fetchUserType);
   }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
@@ -966,141 +985,127 @@ const Header: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, md: 1, lg: 1.25 }, flexShrink: 0 }}>
               {isAuthenticated && user ? (
                 <>
-                  {!isMobile && (
-                    <>
-                      <Button
-                        variant="outlined"
+                  {!isMobile && headerUserType !== 'buyer' && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disableElevation
+                      startIcon={<AddIcon />}
+                      onClick={() => navigate('/create-listing')}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, px: 1.75, whiteSpace: 'nowrap', mr: 0.5 }}
+                    >
+                      New listing
+                    </Button>
+                  )}
+                  {!isMobile && headerUserType === 'buyer' && (
+                    <Tooltip title="Saved pieces">
+                      <IconButton
                         size="small"
-                        startIcon={<AddIcon />}
-                        onClick={() => navigate('/create-listing')}
-                        sx={{
-                          textTransform: 'none',
-                          fontWeight: 500,
-                          fontSize: '0.8rem',
-                          px: 1.5,
-                          py: 0.25,
-                          borderRadius: 1.5,
-                          whiteSpace: 'nowrap',
-                        }}
+                        aria-label={`Saved pieces${favorites.length ? `, ${favorites.length}` : ''}`}
+                        onClick={() => { closeAllDrawers(); setFavoritesDrawerOpen(true); fetchFavorites(); }}
+                        sx={headerIconSx}
                       >
-                        Create Listing
-                      </Button>
-                      {showSellerMessages && (
-                        <Tooltip title={unreadMessages > 0 ? `${unreadMessages} unread` : 'Messages'}>
-                          <IconButton
-                            size="small"
-                            onClick={() => navigate('/messages')}
-                            sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-                          >
-                            <Badge badgeContent={unreadMessages} color="error" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
-                              <EmailIcon sx={{ fontSize: 20 }} />
-                            </Badge>
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      <Tooltip title="Favorites">
-                        <IconButton
-                          size="small"
-                          onClick={() => { closeAllDrawers(); setFavoritesDrawerOpen(true); fetchFavorites(); }}
-                          sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-                        >
-                          <Badge
-                            badgeContent={favorites.length}
-                            color="error"
-                            sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}
-                          >
-                            <FavoriteIcon sx={{ fontSize: 20 }} />
-                          </Badge>
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Notifications">
-                        <IconButton
-                          size="small"
-                          onClick={() => { closeAllDrawers(); setNotificationDrawerOpen(true); fetchNotifications(); }}
-                          sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-                        >
-                          <Badge badgeContent={unreadCount} color="error" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
-                            <NotificationsIcon sx={{ fontSize: 20 }} />
-                          </Badge>
-                        </IconButton>
-                      </Tooltip>
-                    </>
+                        <Badge badgeContent={favorites.length} color="error" sx={headerBadgeSx}>
+                          <FavoriteIcon sx={{ fontSize: 20 }} />
+                        </Badge>
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {!isMobile && showSellerMessages && (
+                    <Tooltip title={unreadMessages > 0 ? `Messages (${unreadMessages} unread)` : 'Messages'}>
+                      <IconButton
+                        size="small"
+                        aria-label={`Messages${unreadMessages ? `, ${unreadMessages} unread` : ''}`}
+                        onClick={() => navigate('/messages')}
+                        sx={headerIconSx}
+                      >
+                        <Badge badgeContent={unreadMessages} color="error" sx={headerBadgeSx}>
+                          <EmailIcon sx={{ fontSize: 20 }} />
+                        </Badge>
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {!isMobile && (
+                    <Tooltip title={unreadCount > 0 ? `Notifications (${unreadCount} new)` : 'Notifications'}>
+                      <IconButton
+                        size="small"
+                        aria-label={`Notifications${unreadCount ? `, ${unreadCount} new` : ''}`}
+                        onClick={() => { closeAllDrawers(); setNotificationDrawerOpen(true); fetchNotifications(); }}
+                        sx={headerIconSx}
+                      >
+                        <Badge badgeContent={unreadCount} color="error" sx={headerBadgeSx}>
+                          <NotificationsIcon sx={{ fontSize: 20 }} />
+                        </Badge>
+                      </IconButton>
+                    </Tooltip>
                   )}
                   {checkoutEnabled && (
-                  <Tooltip title="Cart">
+                    <Tooltip title="Cart">
+                      <IconButton
+                        size="small"
+                        aria-label={`Cart${getTotalItems() ? `, ${getTotalItems()} items` : ''}`}
+                        onClick={() => { closeAllDrawers(); setCartDrawerOpen(true); }}
+                        sx={headerIconSx}
+                      >
+                        <Badge badgeContent={getTotalItems()} color="primary" sx={headerBadgeSx}>
+                          <ShoppingCartIcon sx={{ fontSize: 20 }} />
+                        </Badge>
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  <Tooltip title="Account">
                     <IconButton
-                      size="small"
-                      onClick={() => { closeAllDrawers(); setCartDrawerOpen(true); }}
-                      sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                      onClick={handleUserMenuOpen}
+                      aria-label="Account menu"
+                      aria-haspopup="menu"
+                      aria-expanded={Boolean(userMenuAnchor)}
+                      sx={{ p: 0.5, ml: 0.5 }}
                     >
-                      <Badge badgeContent={getTotalItems()} color="primary" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
-                        <ShoppingCartIcon sx={{ fontSize: 20 }} />
-                      </Badge>
+                      <Avatar
+                        src={headerProfile.photo || undefined}
+                        alt=""
+                        sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.875rem', border: '2px solid', borderColor: Boolean(userMenuAnchor) ? 'primary.main' : 'transparent' }}
+                      >
+                        {accountInitial}
+                      </Avatar>
                     </IconButton>
                   </Tooltip>
-                  )}
-                  <IconButton
-                    size="small"
-                    onClick={toggleTheme}
-                    sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-                  >
-                    {isDarkMode ? <LightModeIcon sx={{ fontSize: 20 }} /> : <DarkModeIcon sx={{ fontSize: 20 }} />}
-                  </IconButton>
-                  <Divider orientation="vertical" flexItem sx={{ mx: 0.25, display: { xs: 'none', md: 'block' } }} />
-                  <Button
-                    onClick={handleUserMenuOpen}
-                    startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
-                      {(user.name || user.username || user.email)?.charAt(0).toUpperCase() || 'U'}
-                    </Avatar>}
-                    endIcon={<ExpandMoreIcon sx={{ fontSize: 16 }} />}
-                    sx={{
-                      color: isDarkMode ? 'white' : brandNavy,
-                      fontWeight: 500,
-                      borderRadius: 2,
-                      px: 1.5,
-                      py: 0.5,
-                      textTransform: 'none',
-                      display: { xs: 'none', md: 'flex' },
-                      whiteSpace: 'nowrap',
-                      fontSize: '0.8125rem',
-                      '&:hover': { bgcolor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'action.hover' },
-                    }}
-                  >
-                    {user.name || user.username || user.email || 'User'}
-                  </Button>
-                  <IconButton
-                    onClick={handleUserMenuOpen}
-                    sx={{
-                      display: { xs: 'flex', md: 'none' },
-                      color: isDarkMode ? 'white' : brandNavy,
-                    }}
-                    aria-label="User menu"
-                  >
-                    <Avatar sx={{ width: 26, height: 26, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
-                      {(user.name || user.username || user.email)?.charAt(0).toUpperCase() || 'U'}
-                    </Avatar>
-                  </IconButton>
                 </>
               ) : (
                 <>
                   {checkoutEnabled && (
-                  <IconButton
-                    size="small"
-                    onClick={() => { closeAllDrawers(); setCartDrawerOpen(true); }}
-                    sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-                  >
-                    <Badge badgeContent={getTotalItems()} color="primary" sx={{ '& .MuiBadge-badge': { fontWeight: 600, fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
-                      <ShoppingCartIcon sx={{ fontSize: 20 }} />
-                    </Badge>
-                  </IconButton>
+                    <Tooltip title="Cart">
+                      <IconButton size="small" aria-label="Cart" onClick={() => { closeAllDrawers(); setCartDrawerOpen(true); }} sx={headerIconSx}>
+                        <Badge badgeContent={getTotalItems()} color="primary" sx={headerBadgeSx}>
+                          <ShoppingCartIcon sx={{ fontSize: 20 }} />
+                        </Badge>
+                      </IconButton>
+                    </Tooltip>
                   )}
-                  <IconButton 
-                    size="small"
-                    onClick={toggleTheme}
-                    sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-                  >
-                    {isDarkMode ? <LightModeIcon sx={{ fontSize: 20 }} /> : <DarkModeIcon sx={{ fontSize: 20 }} />}
-                  </IconButton>
+                  <Tooltip title={isDarkMode ? 'Light mode' : 'Dark mode'}>
+                    <IconButton size="small" aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'} onClick={toggleTheme} sx={headerIconSx}>
+                      {isDarkMode ? <LightModeIcon sx={{ fontSize: 20 }} /> : <DarkModeIcon sx={{ fontSize: 20 }} />}
+                    </IconButton>
+                  </Tooltip>
+                  {!isMobile && (
+                    <>
+                      <Button
+                        onClick={() => navigate('/signin')}
+                        sx={{ textTransform: 'none', fontWeight: 600, color: isDarkMode ? 'white' : brandNavy, whiteSpace: 'nowrap' }}
+                      >
+                        Sign in
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disableElevation
+                        onClick={() => navigate('/signup')}
+                        sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, px: 1.75, whiteSpace: 'nowrap' }}
+                      >
+                        Start selling
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
             </Box>
@@ -1505,108 +1510,81 @@ const Header: React.FC = () => {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Typography variant="subtitle2" fontWeight={600}>
-            {user?.name || 'User'}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {user?.username ? `@${user.username}` : user?.email}
-          </Typography>
+        <Box sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Avatar src={headerProfile.photo || undefined} alt="" sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>{accountInitial}</Avatar>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle2" fontWeight={600} noWrap>{accountName}</Typography>
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {headerProfile.username ? `@${headerProfile.username}` : user?.email}
+            </Typography>
+            {headerUserType !== 'buyer' && headerProfile.username && (
+              <Box
+                component="button"
+                type="button"
+                onClick={() => { handleUserMenuClose(); navigate(`/artist/${headerProfile.username}`); }}
+                sx={{ p: 0, border: 0, bgcolor: 'transparent', cursor: 'pointer', color: 'primary.main', font: 'inherit', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
+              >
+                View public page <OpenInNewIcon sx={{ fontSize: 14 }} />
+              </Box>
+            )}
+          </Box>
         </Box>
         <Divider />
-        <MenuItem 
-          onClick={() => {
-            handleUserMenuClose();
-            navigate('/dashboard');
-          }}
-          sx={{ 
-            py: 1.5,
-            px: 2,
-            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
-          }}
-        >
-          <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
-          My Dashboard
+        <MenuItem onClick={() => { handleUserMenuClose(); navigate(headerUserType === 'buyer' ? '/dashboard?tab=saved' : '/dashboard?tab=overview'); }}>
+          <DashboardIcon sx={{ mr: 2, fontSize: 20 }} />
+          Dashboard
         </MenuItem>
-        {showSellerMessages && (
-          <MenuItem
-            onClick={() => {
-              handleUserMenuClose();
-              navigate('/messages');
-            }}
-            sx={{
-              py: 1.5,
-              px: 2,
-              '&:hover': { bgcolor: 'secondary.main', color: 'white' },
-            }}
-          >
+        <MenuItem onClick={() => { handleUserMenuClose(); navigate('/dashboard?tab=profile'); }}>
+          <PersonIcon sx={{ mr: 2, fontSize: 20 }} />
+          Profile
+        </MenuItem>
+        {headerUserType !== 'buyer' && (
+          <MenuItem onClick={() => { handleUserMenuClose(); navigate('/dashboard?tab=plan'); }}>
+            <PlanIcon sx={{ mr: 2, fontSize: 20 }} />
+            Plan &amp; billing
+          </MenuItem>
+        )}
+        {headerUserType !== 'buyer' && (
+          <MenuItem onClick={() => { handleUserMenuClose(); setFavoritesDrawerOpen(true); fetchFavorites(); }}>
+            <Badge badgeContent={favorites.length} color="error" sx={{ mr: 2 }}>
+              <FavoriteIcon sx={{ fontSize: 20 }} />
+            </Badge>
+            Saved pieces
+          </MenuItem>
+        )}
+        {isMobile && showSellerMessages && (
+          <MenuItem onClick={() => { handleUserMenuClose(); navigate('/messages'); }}>
             <Badge badgeContent={unreadMessages} color="error" sx={{ mr: 2 }}><EmailIcon sx={{ fontSize: 20 }} /></Badge>
             Messages
           </MenuItem>
         )}
-        {checkoutEnabled && (
-        <MenuItem 
-          onClick={() => {
-            handleUserMenuClose();
-            navigate('/orders');
-          }}
-          sx={{ 
-            py: 1.5,
-            px: 2,
-            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
-          }}
-        >
-          <ReceiptIcon sx={{ mr: 2, fontSize: 20 }} />
-          Orders
-        </MenuItem>
+        {isMobile && (
+          <MenuItem onClick={() => { handleUserMenuClose(); closeAllDrawers(); setNotificationDrawerOpen(true); fetchNotifications(); }}>
+            <Badge badgeContent={unreadCount} color="error" sx={{ mr: 2 }}><NotificationsIcon sx={{ fontSize: 20 }} /></Badge>
+            Notifications
+          </MenuItem>
         )}
-        <MenuItem 
-          onClick={() => {
-            handleUserMenuClose();
-            setFavoritesDrawerOpen(true);
-            fetchFavorites();
-          }}
-          sx={{ 
-            py: 1.5,
-            px: 2,
-            '&:hover': { bgcolor: 'secondary.main', color: 'white' },
-          }}
-        >
-          <Badge badgeContent={favorites.length} color="error" sx={{ mr: 2 }}>
-            <FavoriteIcon sx={{ fontSize: 20 }} />
-          </Badge>
-          Favorites
-        </MenuItem>
+        {checkoutEnabled && (
+          <MenuItem onClick={() => { handleUserMenuClose(); navigate('/orders'); }}>
+            <ReceiptIcon sx={{ mr: 2, fontSize: 20 }} />
+            Orders
+          </MenuItem>
+        )}
         {user?.userRole === UserRole.SITE_ADMIN && (
-          <>
-            <Divider />
-            <MenuItem 
-              onClick={() => {
-                handleUserMenuClose();
-                navigate('/admin');
-              }}
-              sx={{ 
-                py: 1.5,
-                px: 2,
-                '&:hover': { bgcolor: 'error.light', color: 'white' },
-              }}
-            >
-              <AdminIcon sx={{ mr: 2, fontSize: 20 }} />
-              Admin Dashboard
-            </MenuItem>
-          </>
+          <MenuItem onClick={() => { handleUserMenuClose(); navigate('/admin'); }}>
+            <AdminIcon sx={{ mr: 2, fontSize: 20 }} />
+            Admin dashboard
+          </MenuItem>
         )}
         <Divider />
-        <MenuItem 
-          onClick={handleSignOut}
-          sx={{ 
-            py: 1.5,
-            px: 2,
-            '&:hover': { bgcolor: 'error.light', color: 'white' },
-          }}
-        >
+        <MenuItem onClick={toggleTheme} role="menuitemcheckbox" aria-checked={isDarkMode}>
+          <DarkModeMenuIcon sx={{ mr: 2, fontSize: 20 }} />
+          <Box sx={{ flex: 1 }}>Dark mode</Box>
+          <Switch size="small" checked={isDarkMode} tabIndex={-1} inputProps={{ 'aria-hidden': true }} sx={{ ml: 1, pointerEvents: 'none' }} />
+        </MenuItem>
+        <MenuItem onClick={handleSignOut}>
           <LogoutIcon sx={{ mr: 2, fontSize: 20 }} />
-          Sign Out
+          Sign out
         </MenuItem>
       </Menu>
 

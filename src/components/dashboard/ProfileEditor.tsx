@@ -291,6 +291,8 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({ authUserId, isBuyer, chec
       setInitial(next);
       setForm(next);
       enqueueSnackbar('Profile saved', { variant: 'success' });
+      // Lets the header refresh the avatar and name
+      window.dispatchEvent(new Event('profileUpdated'));
       onSaved?.(saved);
     } catch (err: any) {
       enqueueSnackbar(err.message || 'Could not save your profile', { variant: 'error' });
