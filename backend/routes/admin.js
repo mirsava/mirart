@@ -9,6 +9,7 @@ import { getUserHistory } from '../services/userHistory.js';
 import { getAdminOverview, listPayments, getFeaturedArtistCalendar } from '../services/adminRevenue.js';
 import { getPromotionConfig } from '../services/promotions.js';
 import { weekStartOf } from '../services/featuredArtist.js';
+import { getUserDirectory, exportUserDirectoryCsv } from '../services/userDirectory.js';
 
 const router = express.Router();
 
@@ -264,6 +265,28 @@ router.delete('/featured-artist/bookings/:weekStart', async (req, res) => {
   }
 });
 
+// Admin users table: one query with plan, listing counts, last sign-in and total paid; filterable and sortable.
+router.get('/user-directory', async (req, res) => {
+  try {
+    res.json(await getUserDirectory(req.query));
+  } catch (error) {
+    console.error('Error fetching user directory:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/user-directory/export', async (req, res) => {
+  try {
+    const csv = await exportUserDirectoryCsv(req.query);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="artzyla-users-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Error exporting users:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Full history for the admin "User details" panel.
 router.get('/users/:id/history', async (req, res) => {
   try {
@@ -308,7 +331,7 @@ router.get('/users', async (req, res) => {
     const countParams = [];
 
     if (subscriptionFilter || subscriptionPlan || subscriptionBilling) {
-      query = `SELECT DISTINCT u.* FROM users u
+      query = `SELECT DISTINCT u.id, u.auth_user_id, u.username, u.email, u.first_name, u.last_name, u.business_name, u.user_type, u.active, u.blocked, u.profile_image_url, u.country, u.created_at FROM users u
         JOIN user_subscriptions us ON u.id = us.user_id
         JOIN subscription_plans sp ON us.plan_id = sp.id
         WHERE 1=1`;
@@ -342,7 +365,7 @@ router.get('/users', async (req, res) => {
         countParams.push(subscriptionBilling);
       }
     } else {
-      query = 'SELECT * FROM users WHERE 1=1';
+      query = 'SELECT id, auth_user_id, username, email, first_name, last_name, business_name, user_type, active, blocked, profile_image_url, country, created_at FROM users WHERE 1=1';
       countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
     }
 

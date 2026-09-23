@@ -7,7 +7,7 @@ const displayName = (alias) =>
 
 // Every purchase as one row: { at, type, description, amount, source, user_id }. Subscriptions count their first
 // charge at the plan price (the user_subscriptions row) plus renewals the webhook recorded.
-const PAYMENTS_SQL = `
+export const PAYMENTS_SQL = `
   SELECT lp.created_at AS at, lp.promotion_type AS type,
     CASE lp.promotion_type
       WHEN 'feature' THEN 'Featured listing' || COALESCE(' (' || lp.days || ' days)', '')

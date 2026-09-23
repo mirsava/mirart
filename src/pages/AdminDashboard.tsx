@@ -3,7 +3,6 @@ import {
   Box,
   Typography,
   Paper,
-  Tooltip,
   Badge,
   Tabs,
   Tab,
@@ -56,7 +55,6 @@ import {
   People as PeopleIcon,
   Inventory as InventoryIcon,
   Email as EmailIcon,
-  MoreVert as MoreVertIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
   OpenInNew as OpenInNewIcon,
@@ -106,6 +104,7 @@ import NewsletterSettingsCard from '../components/NewsletterSettingsCard';
 import UserHistoryDialog from '../components/UserHistoryDialog';
 import AdminOverview from '../components/admin/AdminOverview';
 import AdminPayments from '../components/admin/AdminPayments';
+import AdminUsersTable from '../components/admin/AdminUsersTable';
 import FeaturedArtistCalendar from '../components/admin/FeaturedArtistCalendar';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { getPaintingDetailPath } from '../utils/seoPaths';
@@ -139,17 +138,13 @@ const AdminDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
-  const [users, setUsers] = useState<any[]>([]);
   const [listings, setListings] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
-  const [userSubscriptions, setUserSubscriptions] = useState<Record<number, any>>({});
-  const [usersPage, setUsersPage] = useState(1);
+  const [usersRefreshKey, setUsersRefreshKey] = useState(0);
   const [listingsPage, setListingsPage] = useState(1);
   const [messagesPage, setMessagesPage] = useState(1);
-  const [usersPagination, setUsersPagination] = useState<any>(null);
   const [listingsPagination, setListingsPagination] = useState<any>(null);
   const [messagesPagination, setMessagesPagination] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [listingsSearch, setListingsSearch] = useState('');
@@ -520,13 +515,6 @@ const AdminDashboard: React.FC = () => {
     fetchOrders();
   }, [user?.id, activeSection, ordersPage, ordersSearch, ordersStatusFilter]);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    const timeoutId = setTimeout(() => {
-      fetchUsers();
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, usersPage, user?.id]);
 
   const fetchStats = async (): Promise<void> => {
     if (!user?.id) return;
@@ -542,40 +530,8 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const fetchUsers = async (): Promise<void> => {
-    if (!user?.id) return;
-    try {
-      const response = await apiService.getAdminUsers(user.id, {
-        page: usersPage,
-        limit: 20,
-        search: searchTerm || undefined,
-      }, user.groups);
-      const fetchedUsers = response.users || [];
-      setUsers(fetchedUsers);
-      setUsersPagination(response.pagination);
-      
-      const subscriptions: Record<number, any> = {};
-      const subscriptionPromises = fetchedUsers
-        .filter(userData => userData.auth_user_id)
-        .map(async (userData) => {
-          try {
-            const subResponse = await apiService.getUserSubscription(userData.auth_user_id);
-            if (subResponse.subscription) {
-              subscriptions[userData.id] = subResponse.subscription;
-            }
-          } catch (err) {
-            console.error(`Error fetching subscription for user ${userData.id}:`, err);
-          }
-        });
-      
-      await Promise.all(subscriptionPromises);
-      setUserSubscriptions(subscriptions);
-    } catch (error: any) {
-      const errorMessage = error.message || error.error || 'Failed to fetch users';
-      enqueueSnackbar(errorMessage, { variant: 'error' });
-      console.error('Error fetching users:', error);
-    }
-  };
+  // Reloads the users table after an action (block, delete, change type...)
+  const fetchUsers = (): void => setUsersRefreshKey((k) => k + 1);
 
   const fetchListings = async (): Promise<void> => {
     if (!user?.id) return;
@@ -1427,132 +1383,9 @@ const AdminDashboard: React.FC = () => {
               </Box>
             )}
 
-            {activeSection === 'users' && (<Box sx={{ py: 3 }}>
-            <Box sx={{ mb: 2, px: 3 }}>
-              <TextField
-                fullWidth
-                placeholder="Search users by email, username, or name..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setUsersPage(1);
-                }}
-                sx={{ maxWidth: 400 }}
-              />
-            </Box>
-            <TableContainer sx={{ px: 3 }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>User</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Subscription</TableCell>
-                    <TableCell>Created</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {users.map((userData) => (
-                    <TableRow key={userData.id}>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
-                            {userData.first_name?.charAt(0) || userData.email?.charAt(0) || 'U'}
-                          </Avatar>
-                          <Box>
-                            <Typography variant="body2">
-                              {userData.business_name || 
-                               (userData.first_name && userData.last_name 
-                                 ? `${userData.first_name} ${userData.last_name}`
-                                 : (userData.username || userData.email))}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {userData.username ? `@${userData.username}` : userData.email}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>{userData.email}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={userData.user_type || 'artist'} 
-                          size="small"
-                          color={userData.user_type === 'admin' ? 'error' : userData.user_type === 'buyer' ? 'info' : 'primary'}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={
-                            (userData.blocked === 1 || userData.blocked === true || userData.blocked === '1') ? 'Blocked' :
-                            !userData.active || userData.active === 0 || userData.active === false ? 'Inactive' : 'Active'
-                          } 
-                          size="small"
-                          color={
-                            (userData.blocked === 1 || userData.blocked === true || userData.blocked === '1') ? 'error' :
-                            !userData.active || userData.active === 0 || userData.active === false ? 'warning' : 'success'
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {userSubscriptions[userData.id] ? (
-                          <Box>
-                            <Chip 
-                              label={userSubscriptions[userData.id].plan_name || 'Unknown Plan'} 
-                              size="small"
-                              color="primary"
-                              sx={{ mb: 0.5 }}
-                            />
-                            <Typography variant="caption" display="block" color="text.secondary">
-                              {userSubscriptions[userData.id].billing_period === 'monthly' ? 'Monthly' : 'Yearly'}
-                              {userSubscriptions[userData.id].current_listings !== undefined && (
-                                ` • ${userSubscriptions[userData.id].current_listings}/${userSubscriptions[userData.id].max_listings} listings`
-                              )}
-                            </Typography>
-                            {userSubscriptions[userData.id].end_date && (
-                              <Typography variant="caption" display="block" color="text.secondary">
-                                Expires: {new Date(userSubscriptions[userData.id].end_date).toLocaleDateString()}
-                              </Typography>
-                            )}
-                          </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            No subscription
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(userData.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                        <Tooltip title="User details & history">
-                          <IconButton size="small" onClick={() => setHistoryUserId(userData.id)}>
-                            <HistoryIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleUserMenuOpen(e, userData)}
-                        >
-                          <MoreVertIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            {usersPagination && usersPagination.totalPages > 1 && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-                <Pagination
-                  count={usersPagination.totalPages}
-                  page={usersPagination.page}
-                  onChange={(_e, value) => setUsersPage(value)}
-                />
-              </Box>
+            {activeSection === 'users' && (
+              <AdminUsersTable onOpenUser={setHistoryUserId} onOpenMenu={handleUserMenuOpen} refreshKey={usersRefreshKey} />
             )}
-          </Box>)}
 
           {activeSection === 'listings' && (<Box sx={{ py: 3 }}>
             <Box sx={{ mb: 2, px: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>

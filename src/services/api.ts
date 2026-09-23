@@ -1,4 +1,4 @@
-import { getAccessToken } from '../lib/supabase';
+import { getAccessToken, authFetch } from '../lib/supabase';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -255,6 +255,48 @@ export interface FeaturedArtistCalendarWeek {
   week_start: string;
   status: 'past' | 'current' | 'upcoming';
   booking: { user_id: number; artist_name: string; email: string; amount: number; source: 'stripe' | 'admin' } | null;
+}
+
+export interface UserDirectoryParams {
+  search?: string;
+  type?: '' | 'artist' | 'buyer' | 'admin';
+  status?: '' | 'active' | 'inactive' | 'blocked';
+  plan?: string;
+  sort?: 'newest' | 'active' | 'listings' | 'spend' | 'name';
+  page?: number;
+  limit?: number;
+}
+
+const directoryQuery = (params: UserDirectoryParams) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== '') query.append(k, String(v));
+  });
+  return query.toString();
+};
+
+export interface DirectoryUser {
+  id: number;
+  auth_user_id: string;
+  username?: string | null;
+  email: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  business_name?: string | null;
+  user_type: 'artist' | 'buyer' | 'admin';
+  active: boolean;
+  blocked: boolean;
+  profile_image_url?: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+  display_name: string;
+  plan_name: string | null;
+  billing_period: string | null;
+  plan_end_date: string | null;
+  plan_auto_renew: boolean | null;
+  listings_total: number;
+  listings_active: number;
+  paid_total: number;
 }
 
 export interface UserHistoryEvent {
@@ -1217,6 +1259,26 @@ class ApiService {
 
   async removeFeaturedArtistWeek(weekStart: string): Promise<{ success: boolean; was_paid: boolean }> {
     return this.request(`/admin/featured-artist/bookings/${weekStart}`, { method: 'DELETE' });
+  }
+
+  async getUserDirectory(params: UserDirectoryParams): Promise<{
+    users: DirectoryUser[];
+    counts: { all_users: number; artists: number; buyers: number; admins: number; blocked: number };
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    return this.request(`/admin/user-directory?${directoryQuery(params)}`);
+  }
+
+  // Downloads the filtered user list as a CSV file.
+  async downloadUserDirectoryCsv(params: UserDirectoryParams): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/admin/user-directory/export?${directoryQuery(params)}`);
+    if (!response.ok) throw new Error('Export failed');
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `artzyla-users-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async getUserHistory(userId: number): Promise<UserHistory> {
