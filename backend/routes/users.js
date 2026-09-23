@@ -127,6 +127,55 @@ router.get('/artists/list', async (req, res) => {
   }
 });
 
+const parseSpecialties = (value) => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+  } catch {
+    // stored as plain comma-separated text
+  }
+  return String(value).split(',').map((s) => s.trim()).filter(Boolean);
+};
+
+// Public: artists with live work for the homepage "Meet the artists" strip, most active first.
+router.get('/artists/showcase', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT u.id, u.username, u.profile_image_url, u.specialties, u.country,
+         COALESCE(
+           u.business_name,
+           NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+           u.username
+         ) AS artist_name,
+         COUNT(l.id) AS listing_count,
+         (ARRAY_AGG(l.primary_image_url ORDER BY COALESCE(l.bumped_at, l.created_at) DESC)
+            FILTER (WHERE l.primary_image_url IS NOT NULL))[1] AS cover_image_url
+       FROM users u
+       JOIN listings l ON l.user_id = u.id AND l.status = 'active'
+       WHERE COALESCE(u.blocked, FALSE) = FALSE AND COALESCE(u.active, TRUE) = TRUE
+       GROUP BY u.id
+       ORDER BY COUNT(l.id) DESC, MAX(COALESCE(l.bumped_at, l.created_at)) DESC
+       LIMIT 12`
+    );
+    res.json({
+      artists: rows.map((r) => ({
+        id: r.id,
+        username: r.username,
+        artist_name: r.artist_name,
+        profile_image_url: r.profile_image_url,
+        country: r.country,
+        specialties: parseSpecialties(r.specialties).slice(0, 3),
+        listing_count: Number(r.listing_count),
+        cover_image_url: r.cover_image_url,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching artist showcase:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get user by auth id (uuid) or username
 router.get('/:authUserId', async (req, res) => {
   try {

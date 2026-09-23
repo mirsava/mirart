@@ -10,8 +10,6 @@ import {
   Slide,
   Chip,
   Avatar,
-  Card,
-  CardContent,
   IconButton,
   Divider,
   alpha,
@@ -20,15 +18,16 @@ import {
   PlayArrow as PlayIcon,
   Add as AddIcon,
   ArrowForward as ArrowForwardIcon,
-  Palette as PaletteIcon,
   Build as BuildIcon,
   CreditCard as CreditCardIcon,
-  Category as CategoryIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
 import FeaturedArtistSection from '../components/FeaturedArtistSection';
+import ShopByCategory from '../components/home/ShopByCategory';
+import MeetTheArtists from '../components/home/MeetTheArtists';
+import HowBuyingWorks from '../components/home/HowBuyingWorks';
 import apiService, { Listing, SubscriptionPlan } from '../services/api';
 import { getListingImageCount } from '../utils/listingUtils';
 import { Artwork, Painting } from '../types';
@@ -39,6 +38,28 @@ import SEO from '../components/SEO';
 import { brandNavy } from '../theme';
 import { useFaqItems } from '../hooks/useFaqItems';
 
+// Homepage rows are chosen from the categories that actually have live art (busiest first).
+const MAX_CATEGORY_ROWS = 3;
+const CATEGORY_ROWS: Record<string, { title: string; description: string; viewAll: string }> = {
+  Painting: { title: 'Featured Paintings', description: 'Discover original paintings from talented artists in our community.', viewAll: 'View All Paintings' },
+  Woodworking: { title: 'Featured Woodworking', description: 'Handcrafted woodworking pieces from skilled artisans in our marketplace.', viewAll: 'View All Woodworking' },
+  Prints: { title: 'Featured Prints', description: 'Fine art prints, from giclée to screen print.', viewAll: 'View All Prints' },
+  Sculpture: { title: 'Featured Sculpture', description: 'Three-dimensional work in stone, metal, clay and more.', viewAll: 'View All Sculpture' },
+  Photography: { title: 'Featured Photography', description: 'Fine art photography from independent photographers.', viewAll: 'View All Photography' },
+  'Digital Art': { title: 'Featured Digital Art', description: 'Original digital artwork and illustration.', viewAll: 'View All Digital Art' },
+  Ceramics: { title: 'Featured Ceramics', description: 'Handmade pottery and ceramic art.', viewAll: 'View All Ceramics' },
+  Textiles: { title: 'Featured Textiles', description: 'Woven, stitched and dyed work by textile artists.', viewAll: 'View All Textiles' },
+  Jewelry: { title: 'Featured Jewelry', description: 'Handmade jewelry from independent makers.', viewAll: 'View All Jewelry' },
+  'Mixed Media': { title: 'Featured Mixed Media', description: 'Work that combines materials and techniques.', viewAll: 'View All Mixed Media' },
+  Other: { title: 'More Original Art', description: 'One-of-a-kind pieces that defy categories.', viewAll: 'View More Art' },
+};
+// While no category has a full row, the homepage shows one mixed grid of the newest work instead.
+const MIXED_ROW = '__mixed';
+const rowCopy = (category: string) =>
+  category === MIXED_ROW
+    ? { title: 'Fresh on ArtZyla', description: 'The newest original work from our artists.', viewAll: 'Browse the Gallery' }
+    : CATEGORY_ROWS[category] || { title: `Featured ${category}`, description: '', viewAll: `View All ${category}` };
+
 const Home: React.FC = () => {
   const faqItems = useFaqItems();
   const navigate = useNavigate();
@@ -46,12 +67,9 @@ const Home: React.FC = () => {
   const billing = useBillingStatus();
   const freeLaunch = billing ? !billing.billing_enabled : false;
   const theme = useTheme();
-  const [featuredPaintings, setFeaturedPaintings] = useState<Painting[]>([]);
-  const [featuredWoodworking, setFeaturedWoodworking] = useState<Painting[]>([]);
+  const [categoryRows, setCategoryRows] = useState<Array<{ category: string; items: Artwork[] }>>([]);
   const [spotlight, setSpotlight] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
-  const [paintingPlaceholders, setPaintingPlaceholders] = useState(0);
-  const [woodworkingPlaceholders, setWoodworkingPlaceholders] = useState(0);
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
 
@@ -117,41 +135,49 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchFeaturedListings = async () => {
       try {
-        // Featured listings must show ALL artists - do NOT pass authUserId
-        const listingFilters = (category: string) => {
-          // Paid featured listings go in the spotlight above, so the category rows leave them out.
-          const f: { status: string; category: string; limit: number; featured: 'exclude'; requestingUser?: string } = { status: 'active', category, limit: 3, featured: 'exclude' };
-          if (user?.id) f.requestingUser = user.id;
-          return f;
-        };
-        const [paintingsResponse, woodworkingResponse, spotlightResponse] = await Promise.all([
-          apiService.getListings(listingFilters('Painting')),
-          apiService.getListings(listingFilters('Woodworking')),
-          apiService.getListings({ status: 'active', featured: 'only', limit: 6 }).catch(() => ({ listings: [] as Listing[] })),
-        ]);
-        setSpotlight(spotlightResponse.listings.map((listing) => ({
+        // Show every artist's work - do NOT pass authUserId
+        const toArtwork = (listing: Listing): Artwork => ({
           ...convertListingToPainting(listing),
-          category: listing.category === 'Woodworking' || listing.category === 'Prints' ? listing.category : 'Painting',
+          // The card shows the real category (the Artwork type only names the original three)
+          category: listing.category as Artwork['category'],
+        });
+        const [spotlightResponse, { categories }] = await Promise.all([
+          apiService.getListings({ status: 'active', featured: 'only', limit: 6 }).catch(() => ({ listings: [] as Listing[] })),
+          apiService.getCategoryCounts(),
+        ]);
+        setSpotlight(spotlightResponse.listings.map(toArtwork));
+
+        const withArt = categories.filter((c) => c.total > 0);
+        if (withArt.length > 0 && Math.max(...withArt.map((c) => c.total)) < 3) {
+          // Thin inventory: one full grid reads better than several half-empty rows
+          const nonFeatured = withArt.reduce((sum, c) => sum + c.non_featured, 0);
+          const { listings } = await apiService.getListings({
+            status: 'active',
+            limit: 8,
+            ...(nonFeatured >= 4 ? { featured: 'exclude' as const } : {}),
+            ...(user?.id ? { requestingUser: user.id } : {}),
+          });
+          setCategoryRows(listings.length ? [{ category: MIXED_ROW, items: listings.map(toArtwork) }] : []);
+          return;
+        }
+
+        const chosen = withArt.slice(0, MAX_CATEGORY_ROWS);
+        const responses = await Promise.all(chosen.map((c) => apiService.getListings({
+          status: 'active',
+          category: c.category,
+          limit: 3,
+          // Leave out pieces already in the spotlight, unless that would leave the row short
+          ...(c.non_featured >= 3 ? { featured: 'exclude' as const } : {}),
+          ...(user?.id ? { requestingUser: user.id } : {}),
         })));
-        
-        const dbPaintings = paintingsResponse.listings.map(listing => convertListingToPainting(listing, 'Painting'));
-        const dbWoodworking = woodworkingResponse.listings.map(listing => convertListingToPainting(listing, 'Woodworking'));
-        
-        // Calculate how many placeholders are needed (up to 3 total items)
-        const remainingPaintingSlots = Math.max(0, 3 - dbPaintings.length);
-        const remainingWoodworkingSlots = Math.max(0, 3 - dbWoodworking.length);
-        
-        setFeaturedPaintings(dbPaintings.slice(0, 3));
-        setFeaturedWoodworking(dbWoodworking.slice(0, 3));
-        setPaintingPlaceholders(remainingPaintingSlots);
-        setWoodworkingPlaceholders(remainingWoodworkingSlots);
+        setCategoryRows(
+          chosen
+            .map((c, i) => ({ category: c.category, items: responses[i].listings.map(toArtwork) }))
+            .filter((row) => row.items.length > 0)
+        );
       } catch (error) {
-        console.error('Error fetching featured listings:', error);
-        // On error, show all placeholders
-        setFeaturedPaintings([]);
-        setFeaturedWoodworking([]);
-        setPaintingPlaceholders(3);
-        setWoodworkingPlaceholders(3);
+        console.error('Error fetching homepage listings:', error);
+        setCategoryRows([]);
       } finally {
         setLoading(false);
       }
@@ -221,7 +247,7 @@ const Home: React.FC = () => {
     ],
   };
 
-  const heroPieces = [...spotlight, ...featuredPaintings, ...featuredWoodworking].filter((piece) => piece.image).slice(0, 3);
+  const heroPieces = [...spotlight, ...categoryRows.flatMap((row) => row.items)].filter((piece) => piece.image).slice(0, 3);
 
   return (
     <Box>
@@ -454,243 +480,94 @@ const Home: React.FC = () => {
         </Box>
       )}
 
-      <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 8 }}>
-        <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-          <PaletteIcon sx={{ color: 'primary.main', fontSize: { xs: 32, md: 40 }, mt: 0.5 }} />
-          <Box sx={{ flex: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography 
-                variant="h4" 
-                component="h2" 
-                sx={{ 
-                  fontWeight: 600,
-                  color: 'text.primary',
-                  fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
-                }}
-              >
-                Featured Paintings
-              </Typography>
-              <ArrowForwardIcon sx={{ color: 'primary.main', fontSize: { xs: 20, md: 24 }, opacity: 0.7 }} />
-            </Box>
-            <Typography 
-              variant="body1" 
-              color="text.secondary" 
-              sx={{ 
-                maxWidth: '800px',
-                lineHeight: 1.6,
-              }}
-            >
-              Discover original paintings from talented artists in our community.
-            </Typography>
-          </Box>
-        </Box>
+      <ShopByCategory />
 
-        {loading ? (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="body1" color="text.secondary">
-              Loading featured paintings...
-            </Typography>
-          </Box>
-        ) : (
-          <Grid container spacing={4}>
-            {featuredPaintings.map((painting) => (
-              <Grid item xs={12} sm={6} md={4} key={painting.id}>
-                <PaintingCard 
-                  painting={painting} 
-                  artistEmail={(painting as any).artistEmail}
-                />
-              </Grid>
-            ))}
-            {Array.from({ length: paintingPlaceholders }).map((_, index) => (
-              <Grid item xs={12} sm={6} md={4} key={`placeholder-${index}`}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    border: '2px dashed',
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      borderColor: 'primary.main',
-                      bgcolor: 'action.hover',
-                      transform: 'translateY(-4px)',
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      height: 300,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      bgcolor: 'grey.50',
-                    }}
+      {categoryRows.map((row, index) => {
+        const copy = rowCopy(row.category);
+        return (
+          <Box key={row.category} sx={{ bgcolor: index % 2 === 1 ? 'background.paper' : 'transparent', py: 8 }}>
+            <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
+              <Box sx={{ mb: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Typography
+                    variant="h4"
+                    component="h2"
+                    sx={{ fontWeight: 600, color: 'text.primary', fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' } }}
                   >
-                    <AddIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5 }} />
-                  </Box>
-                  <CardContent sx={{ flexGrow: 1, textAlign: 'center', py: 4 }}>
-                    <Typography variant="h6" gutterBottom color="text.secondary">
-                      Your Artwork Here
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                      Share your paintings with our community
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={() => navigate('/signup')}
-                      sx={{
-                        textTransform: 'none',
-                      }}
-                    >
-                      Add Your Listing
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        )}
-
-        <Box sx={{ textAlign: 'center', mt: 6 }}>
-          <Button
-            variant="contained"
-            size="large"
-            sx={{
-              bgcolor: 'primary.main',
-              color: 'white',
-              px: 4,
-              py: 1.5,
-              borderRadius: 1,
-              textTransform: 'none',
-              fontWeight: 600,
-              '&:focus': {
-                bgcolor: 'primary.dark',
-              },
-            }}
-            onClick={() => navigate('/gallery?category=Painting')}
-          >
-            View All Paintings
-          </Button>
-        </Box>
-      </Box>
-
-      <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
-        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
-          <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-            <CategoryIcon sx={{ color: 'primary.main', fontSize: { xs: 32, md: 40 }, mt: 0.5 }} />
-            <Box sx={{ flex: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Typography 
-                  variant="h4" 
-                  component="h2" 
-                  sx={{ 
-                    fontWeight: 600,
-                    color: 'text.primary',
-                    fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
-                  }}
-                >
-                  Featured Woodworking
-                </Typography>
-                <ArrowForwardIcon sx={{ color: 'primary.main', fontSize: { xs: 20, md: 24 }, opacity: 0.7 }} />
+                    {copy.title}
+                  </Typography>
+                  <ArrowForwardIcon sx={{ color: 'primary.main', fontSize: { xs: 20, md: 24 }, opacity: 0.7 }} />
+                </Box>
+                {copy.description && (
+                  <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '800px', lineHeight: 1.6 }}>
+                    {copy.description}
+                  </Typography>
+                )}
               </Box>
-              <Typography 
-                variant="body1" 
-                color="text.secondary" 
-                sx={{ 
-                  maxWidth: '800px',
-                  lineHeight: 1.6,
-                }}
-              >
-                Handcrafted woodworking pieces from skilled artisans in our marketplace.
-              </Typography>
+
+              <Grid container spacing={4}>
+                {row.items.map((item) => (
+                  <Grid item xs={12} sm={6} md={row.category === MIXED_ROW ? 3 : 4} key={item.id}>
+                    <PaintingCard painting={item} />
+                  </Grid>
+                ))}
+              </Grid>
+
+              <Box sx={{ textAlign: 'center', mt: 6 }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  sx={{ px: 4, py: 1.5, borderRadius: 1, textTransform: 'none', fontWeight: 600 }}
+                  onClick={() => navigate(row.category === MIXED_ROW ? '/gallery' : `/gallery?category=${encodeURIComponent(row.category)}`)}
+                >
+                  {copy.viewAll}
+                </Button>
+              </Box>
             </Box>
           </Box>
+        );
+      })}
 
-          <Grid container spacing={4}>
-            {featuredWoodworking.map((item) => (
-              <Grid item xs={12} sm={6} md={4} key={item.id}>
-                <PaintingCard painting={item} />
-              </Grid>
-            ))}
-            {Array.from({ length: woodworkingPlaceholders }).map((_, index) => (
-              <Grid item xs={12} sm={6} md={4} key={`placeholder-woodworking-${index}`}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    border: '2px dashed',
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      borderColor: 'primary.main',
-                      bgcolor: 'action.hover',
-                      transform: 'translateY(-4px)',
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      height: 300,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      bgcolor: 'grey.50',
-                    }}
-                  >
-                    <AddIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5 }} />
-                  </Box>
-                  <CardContent sx={{ flexGrow: 1, textAlign: 'center', py: 4 }}>
-                    <Typography variant="h6" gutterBottom color="text.secondary">
-                      Your Woodworking Here
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                      Showcase your handcrafted pieces
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={() => navigate('/signup')}
-                      sx={{
-                        textTransform: 'none',
-                      }}
-                    >
-                      Add Your Listing
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-
-          <Box sx={{ textAlign: 'center', mt: 6 }}>
+      {!loading && categoryRows.reduce((sum, row) => sum + row.items.length, 0) < 6 && (
+        <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2.5, md: 3 },
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Box>
+              <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+                Are you an artist?
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Show your work to collectors on ArtZyla. It only takes a few minutes to list a piece.
+              </Typography>
+            </Box>
             <Button
               variant="contained"
-              size="large"
-              sx={{
-                bgcolor: 'primary.main',
-                color: 'white',
-                px: 4,
-                py: 1.5,
-                borderRadius: 1,
-                textTransform: 'none',
-                fontWeight: 600,
-                '&:focus': {
-                  bgcolor: 'primary.dark',
-                },
-                transition: 'all 0.3s ease',
-              }}
-              onClick={() => navigate('/gallery?category=Woodworking')}
+              startIcon={<AddIcon />}
+              onClick={() => navigate(user ? '/create-listing' : '/signup')}
+              sx={{ textTransform: 'none', fontWeight: 600, flexShrink: 0 }}
             >
-              View All Woodworking
+              {user ? 'Add a listing' : 'Start selling'}
             </Button>
-          </Box>
+          </Paper>
         </Box>
-      </Box>
+      )}
+
+      <HowBuyingWorks />
+
+      <MeetTheArtists />
+
 
       <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
         <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 } }}>

@@ -372,6 +372,26 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Public: active listings per category (busiest first), so the homepage only shows rows that have art.
+// `non_featured` lets it decide whether a row can leave out pieces already in the featured spotlight.
+router.get('/category-counts', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT l.category,
+         COUNT(*) AS total,
+         COUNT(*) FILTER (WHERE l.featured_until IS NULL OR l.featured_until <= now()) AS non_featured
+       FROM listings l JOIN users u ON l.user_id = u.id
+       WHERE l.status = 'active' AND COALESCE(u.blocked, FALSE) = FALSE
+       GROUP BY l.category
+       ORDER BY total DESC, l.category`
+    );
+    res.json({ categories: rows.map((r) => ({ category: r.category, total: Number(r.total), non_featured: Number(r.non_featured) })) });
+  } catch (error) {
+    console.error('Error fetching category counts:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get single listing by ID
 router.get('/:id', async (req, res) => {
   try {

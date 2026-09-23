@@ -35,7 +35,8 @@ export async function listFeaturedArtistWeeks(config, userId = null, now = new D
 // This week's featured artist with a few of their live listings, or null when the slot is empty.
 export async function getCurrentFeaturedArtist(now = new Date()) {
   const [rows] = await pool.execute(
-    `SELECT b.week_start, u.id, u.auth_user_id, u.username, u.profile_image_url, u.bio,
+    `SELECT b.week_start, u.id, u.auth_user_id, u.username, u.profile_image_url, u.bio, u.country,
+       (SELECT COUNT(*) FROM listings WHERE user_id = u.id AND status = 'active') AS listing_count,
        COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.username) AS artist_name
      FROM featured_artist_bookings b JOIN users u ON u.id = b.user_id
      WHERE b.week_start = ?::date AND COALESCE(u.blocked, FALSE) = FALSE AND COALESCE(u.active, TRUE) = TRUE`,
@@ -54,6 +55,7 @@ export async function getCurrentFeaturedArtist(now = new Date()) {
     ...artist,
     week_start: toDateString(artist.week_start),
     week_end: addWeeks(toDateString(artist.week_start), 1),
+    listing_count: Number(artist.listing_count || 0),
     listings: listings.map((l) => ({ ...l, price: l.price != null ? parseFloat(l.price) : null })),
   };
 }

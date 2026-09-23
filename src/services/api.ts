@@ -201,9 +201,22 @@ export interface FeaturedArtist {
   artist_name: string;
   profile_image_url?: string | null;
   bio?: string | null;
+  country?: string | null;
+  listing_count: number;
   week_start: string;
   week_end: string;
   listings: Array<{ id: number; title: string; price: number | null; primary_image_url?: string | null; category: string }>;
+}
+
+export interface ShowcaseArtist {
+  id: number;
+  username?: string | null;
+  artist_name: string;
+  profile_image_url?: string | null;
+  country?: string | null;
+  specialties: string[];
+  listing_count: number;
+  cover_image_url?: string | null;
 }
 
 export interface FeaturedArtistWeek {
@@ -1068,6 +1081,14 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(links),
     });
+  }
+
+  async getArtistShowcase(): Promise<{ artists: ShowcaseArtist[] }> {
+    return this.request<{ artists: ShowcaseArtist[] }>('/users/artists/showcase');
+  }
+
+  async getCategoryCounts(): Promise<{ categories: Array<{ category: string; total: number; non_featured: number }> }> {
+    return this.request<{ categories: Array<{ category: string; total: number; non_featured: number }> }>('/listings/category-counts');
   }
 
   async getPromotionOptions(): Promise<PromotionConfig & { credits: FeatureCredits | null }> {
