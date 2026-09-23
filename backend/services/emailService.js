@@ -312,6 +312,123 @@ Reply directly to this email to continue the conversation.`,
   }),
 };
 
+/** Escapes text for use inside email HTML. */
+export const escapeHtml = (value) =>
+  String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const button = (href, label) =>
+  `<p style="text-align: center; margin: 24px 0;"><a href="${href}" style="display: inline-block; background: linear-gradient(135deg, #b5573a 0%, #c97a5f 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">${label}</a></p>`;
+
+/** A listing pass or featured spot is about to end. */
+templates.renewalReminder = ({ userName, listingTitle, kind, expiresAt, renewUrl }) => {
+  const when = new Date(expiresAt).toLocaleString('en-US', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' });
+  const isPass = kind === 'listing_pass';
+  const headline = isPass
+    ? `"${listingTitle}" stays live until ${when}.`
+    : `"${listingTitle}" is featured until ${when}.`;
+  const detail = isPass
+    ? 'After that it needs a free slot on your plan, otherwise it goes offline. Extend it to keep it live.'
+    : 'After that it drops back to its normal place in the gallery. Renew to keep it at the top and in the homepage spotlight.';
+  return {
+    headerSubtitle: isPass ? 'Your listing pass is ending soon' : 'Your featured spot is ending soon',
+    contentHtml: `
+      <p>Hi ${escapeHtml(userName || 'there')},</p>
+      <p><strong>${escapeHtml(headline)}</strong></p>
+      <p>${detail}</p>
+      ${button(renewUrl, isPass ? 'Extend listing' : 'Renew feature')}
+    `,
+    contentText: `Hi ${userName || 'there'},
+
+${headline}
+
+${detail}
+
+Renew: ${renewUrl}`,
+    source: 'Account',
+    sourceDetail: isPass ? 'Listing pass reminder' : 'Featured listing reminder',
+  };
+};
+
+const listingCard = (listing) => `
+  <td style="width: 50%; padding: 8px; vertical-align: top;">
+    <a href="${listing.url}" style="text-decoration: none; color: #333;">
+      ${listing.image ? `<img src="${listing.image}" alt="${escapeHtml(listing.title)}" width="260" style="width: 100%; max-width: 260px; height: auto; border-radius: 6px; display: block;">` : ''}
+      <div style="font-weight: 600; margin-top: 6px;">${escapeHtml(listing.title)}</div>
+      <div style="color: #666; font-size: 13px;">${escapeHtml(listing.artist || '')}${listing.price != null ? ` &middot; $${Number(listing.price).toLocaleString('en-US')}` : ''}</div>
+    </a>
+  </td>`;
+
+const listingGrid = (listings) => {
+  const rows = [];
+  for (let i = 0; i < listings.length; i += 2) rows.push(`<tr>${listingCard(listings[i])}${listings[i + 1] ? listingCard(listings[i + 1]) : '<td></td>'}</tr>`);
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0">${rows.join('')}</table>`;
+};
+
+/** Weekly "new art" digest. Sections are skipped when empty. */
+templates.weeklyDigest = ({ featuredArtist, featuredListings, newListings, galleryUrl, unsubscribeUrl }) => {
+  const sections = [];
+  const text = [];
+  if (featuredArtist) {
+    sections.push(`
+      <h2 style="color: #b5573a; font-size: 18px; margin: 0 0 8px;">Featured artist: ${escapeHtml(featuredArtist.name)}</h2>
+      ${featuredArtist.bio ? `<p style="margin: 0 0 8px;">${escapeHtml(featuredArtist.bio.slice(0, 280))}${featuredArtist.bio.length > 280 ? '…' : ''}</p>` : ''}
+      ${featuredArtist.listings.length ? listingGrid(featuredArtist.listings) : ''}
+      ${featuredArtist.url ? `<p><a href="${featuredArtist.url}">See all work by ${escapeHtml(featuredArtist.name)}</a></p>` : ''}`);
+    text.push(`FEATURED ARTIST: ${featuredArtist.name}${featuredArtist.url ? `\n${featuredArtist.url}` : ''}`);
+  }
+  if (featuredListings.length) {
+    sections.push(`<h2 style="color: #b5573a; font-size: 18px; margin: 24px 0 8px;">Spotlight</h2>${listingGrid(featuredListings)}`);
+    text.push(`SPOTLIGHT\n${featuredListings.map((l) => `- ${l.title} (${l.url})`).join('\n')}`);
+  }
+  if (newListings.length) {
+    sections.push(`<h2 style="color: #b5573a; font-size: 18px; margin: 24px 0 8px;">New this week</h2>${listingGrid(newListings)}`);
+    text.push(`NEW THIS WEEK\n${newListings.map((l) => `- ${l.title} (${l.url})`).join('\n')}`);
+  }
+  return {
+    headerSubtitle: 'New art this week',
+    contentHtml: `
+      ${sections.join('')}
+      ${button(galleryUrl, 'Browse the gallery')}
+      <p style="font-size: 12px; color: #888; text-align: center;">You are getting this because you subscribed to the ${SITE_NAME} weekly email. <a href="${unsubscribeUrl}">Unsubscribe</a></p>
+    `,
+    contentText: `${text.join('\n\n')}\n\nBrowse the gallery: ${galleryUrl}\n\nUnsubscribe: ${unsubscribeUrl}`,
+    source: 'Newsletter',
+    sourceDetail: 'Weekly digest',
+  };
+};
+
+/**
+ * Sends up to 100 emails per request through Resend's batch API. Each message:
+ * { to, subject, template, headers? }. Without RESEND_API_KEY the batch is logged instead of sent.
+ */
+export const sendEmailBatch = async (messages) => {
+  const { apiKey, from } = getEmailConfig();
+  let sent = 0;
+  for (let i = 0; i < messages.length; i += 100) {
+    const chunk = messages.slice(i, i + 100).map(({ to, subject, template, headers }) => {
+      const { html, text } = buildTemplate(template);
+      return { from, to: [to], subject, html, text, ...(headers ? { headers } : {}) };
+    });
+    if (!apiKey) {
+      console.log(`=== MOCK EMAIL BATCH (RESEND_API_KEY not configured): ${chunk.length} x "${chunk[0]?.subject}" ===`);
+      sent += chunk.length;
+      continue;
+    }
+    const response = await fetch(`${RESEND_API_URL}/emails/batch`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(chunk),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS * 3),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(`Failed to send email batch after ${sent} sent: ${body.message || body.error || `HTTP ${response.status}`}`);
+    }
+    sent += chunk.length;
+  }
+  return { sent, mocked: !apiKey };
+};
+
 /**
  * Convenience: send welcome email after account creation.
  */

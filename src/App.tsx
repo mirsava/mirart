@@ -18,6 +18,7 @@ import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import OrderSuccess from './pages/OrderSuccess';
 import PromotionSuccess from './pages/PromotionSuccess';
+import Unsubscribe from './pages/Unsubscribe';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import FAQ from './pages/FAQ';
@@ -104,6 +105,7 @@ function AppContent(): JSX.Element {
               }
             />
             <Route path="/order-success" element={<OrderSuccess />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/promotion-success" element={
               <ProtectedRoute requiredUserType={UserRole.ARTIST}>
                 <PromotionSuccess />

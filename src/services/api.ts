@@ -187,9 +187,37 @@ export interface PromotionConfig {
   listing_pass_enabled: boolean;
   listing_pass_price: number;
   listing_pass_days: number;
+  featured_artist_enabled: boolean;
+  featured_artist_price: number;
+  featured_artist_weeks_ahead: number;
 }
 
 export type PromotionType = 'feature' | 'bump' | 'listing_pass';
+
+export interface FeaturedArtist {
+  id: number;
+  auth_user_id: string;
+  username?: string | null;
+  artist_name: string;
+  profile_image_url?: string | null;
+  bio?: string | null;
+  week_start: string;
+  week_end: string;
+  listings: Array<{ id: number; title: string; price: number | null; primary_image_url?: string | null; category: string }>;
+}
+
+export interface FeaturedArtistWeek {
+  week_start: string;
+  taken: boolean;
+  mine: boolean;
+}
+
+export interface NewsletterStatus {
+  enabled: boolean;
+  last_sent_week: string | null;
+  last_sent_count: number;
+  subscribers: number;
+}
 
 export interface FeatureCredits {
   allowance: number;
@@ -204,6 +232,7 @@ export interface PromotionStats {
   paid_count: number;
   paid_count_30d: number;
   featured_now: number;
+  featured_artist_weeks_booked?: number;
 }
 
 export type ListingPromotionState = Pick<Listing, 'id' | 'status' | 'featured_until' | 'bumped_at' | 'paid_until'>;
@@ -1057,8 +1086,58 @@ class ApiService {
     });
   }
 
-  async confirmPromotion(sessionId: string): Promise<{ success: boolean; applied: boolean; type: PromotionType; days: number | null; listing: ListingPromotionState | null }> {
+  async confirmPromotion(sessionId: string): Promise<{
+    success: boolean;
+    applied: boolean;
+    type: PromotionType | 'featured_artist';
+    days?: number | null;
+    week_start?: string;
+    moved?: boolean;
+    listing: ListingPromotionState | null;
+  }> {
     return this.request(`/promotions/confirm?session_id=${encodeURIComponent(sessionId)}`);
+  }
+
+  async getFeaturedArtist(): Promise<{ artist: FeaturedArtist | null }> {
+    return this.request<{ artist: FeaturedArtist | null }>('/promotions/featured-artist');
+  }
+
+  async getFeaturedArtistWeeks(): Promise<{ enabled: boolean; price: number; weeks: FeaturedArtistWeek[] }> {
+    return this.request<{ enabled: boolean; price: number; weeks: FeaturedArtistWeek[] }>('/promotions/featured-artist/weeks');
+  }
+
+  async createFeaturedArtistCheckout(weekStart: string): Promise<{ url: string; sessionId: string }> {
+    return this.request<{ url: string; sessionId: string }>('/promotions/featured-artist/checkout', {
+      method: 'POST',
+      body: JSON.stringify({
+        week_start: weekStart,
+        return_url_base: typeof window !== 'undefined' ? window.location.origin : undefined,
+      }),
+    });
+  }
+
+  async subscribeToNewsletter(email: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>('/newsletter/subscribe', { method: 'POST', body: JSON.stringify({ email }) });
+  }
+
+  async unsubscribeFromNewsletter(token: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>('/newsletter/unsubscribe', { method: 'POST', body: JSON.stringify({ token }) });
+  }
+
+  async getNewsletterStatus(): Promise<NewsletterStatus> {
+    return this.request<NewsletterStatus>('/newsletter/admin/status');
+  }
+
+  async setNewsletterEnabled(enabled: boolean): Promise<NewsletterStatus> {
+    return this.request<NewsletterStatus>('/newsletter/admin/config', { method: 'PUT', body: JSON.stringify({ enabled }) });
+  }
+
+  async sendTestNewsletter(): Promise<{ success: boolean; to: string }> {
+    return this.request<{ success: boolean; to: string }>('/newsletter/admin/send-test', { method: 'POST' });
+  }
+
+  async sendNewsletterNow(): Promise<{ success: boolean; sent: number }> {
+    return this.request<{ success: boolean; sent: number }>('/newsletter/admin/send-now', { method: 'POST' });
   }
 
   async useFeatureCredit(listingId: number): Promise<{ success: boolean; listing: ListingPromotionState; credits: FeatureCredits }> {

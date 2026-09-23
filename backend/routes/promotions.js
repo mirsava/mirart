@@ -11,10 +11,26 @@ import {
   applyPromotion,
   getListingPromotionState,
 } from '../services/promotions.js';
+import {
+  listFeaturedArtistWeeks,
+  getCurrentFeaturedArtist,
+  applyFeaturedArtistBooking,
+  weekStartOf,
+} from '../services/featuredArtist.js';
 
 const router = express.Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const PROMOTION_KIND = 'listing_promotion';
+const FEATURED_ARTIST_KIND = 'featured_artist';
+
+const stripeErrorResponse = (res, error, label) => {
+  if (error.type === 'StripeAuthenticationError') {
+    console.error('Stripe rejected STRIPE_SECRET_KEY (expired or revoked). Replace it in backend/.env and restart:', error.message);
+    return res.status(503).json({ error: 'Payments are temporarily unavailable. Please try again later.' });
+  }
+  console.error(`${label}:`, error);
+  return res.status(500).json({ error: 'Failed to start payment', details: error.message });
+};
 
 const publicConfig = (config) => ({
   enabled: config.enabled,
@@ -26,6 +42,9 @@ const publicConfig = (config) => ({
   listing_pass_enabled: config.listing_pass_enabled,
   listing_pass_price: config.listing_pass_price,
   listing_pass_days: config.listing_pass_days,
+  featured_artist_enabled: config.featured_artist_enabled,
+  featured_artist_price: config.featured_artist_price,
+  featured_artist_weeks_ahead: config.featured_artist_weeks_ahead,
 });
 
 // Loads a listing the caller may promote: they own it and it is live. A listing pass may also be bought for a
@@ -116,12 +135,76 @@ router.post('/checkout', requireAuth, async (req, res) => {
 
     res.json({ url: session.url, sessionId: session.id });
   } catch (error) {
-    if (error.type === 'StripeAuthenticationError') {
-      console.error('Stripe rejected STRIPE_SECRET_KEY (expired or revoked). Replace it in backend/.env and restart:', error.message);
-      return res.status(503).json({ error: 'Payments are temporarily unavailable. Please try again later.' });
+    stripeErrorResponse(res, error, 'Error creating promotion checkout');
+  }
+});
+
+// Public: this week's featured artist for the homepage (null when the slot is empty).
+router.get('/featured-artist', async (req, res) => {
+  try {
+    const config = await getPromotionConfig();
+    res.json({ artist: config.featured_artist_enabled ? await getCurrentFeaturedArtist() : null });
+  } catch (error) {
+    console.error('Error fetching featured artist:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/featured-artist/weeks', requireAuth, async (req, res) => {
+  try {
+    const config = await getPromotionConfig();
+    res.json({
+      enabled: config.featured_artist_enabled,
+      price: config.featured_artist_price,
+      weeks: await listFeaturedArtistWeeks(config, req.auth.userId),
+    });
+  } catch (error) {
+    console.error('Error listing featured artist weeks:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/featured-artist/checkout', requireAuth, async (req, res) => {
+  try {
+    if (!stripe) return res.status(503).json({ error: 'Stripe not configured', details: 'Add STRIPE_SECRET_KEY to .env' });
+    const config = await getPromotionConfig();
+    if (!config.featured_artist_enabled) return res.status(403).json({ error: 'Featured artist spots are not available right now' });
+    if (!req.auth.userId) return res.status(400).json({ error: 'User profile not found' });
+
+    const { week_start, return_url_base } = req.body || {};
+    const week = (await listFeaturedArtistWeeks(config, req.auth.userId)).find((w) => w.week_start === week_start);
+    if (!week) return res.status(400).json({ error: 'Choose one of the listed weeks' });
+    if (week.taken) return res.status(409).json({ error: 'That week is already booked. Please pick another.' });
+
+    const [active] = await pool.execute("SELECT COUNT(*) AS count FROM listings WHERE user_id = ? AND status = 'active'", [req.auth.userId]);
+    if (!Number(active[0]?.count)) {
+      return res.status(400).json({ error: 'You need at least one active listing to be the featured artist' });
     }
-    console.error('Error creating promotion checkout:', error);
-    res.status(500).json({ error: 'Failed to start payment', details: error.message });
+
+    const baseUrl = (return_url_base || FRONTEND_URL).replace(/\/$/, '');
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: `Featured artist: week of ${week_start}`, description: 'Homepage spotlight and the weekly email' },
+          unit_amount: Math.round(config.featured_artist_price * 100),
+        },
+        quantity: 1,
+      }],
+      customer_email: req.auth.email || undefined,
+      metadata: {
+        kind: FEATURED_ARTIST_KIND,
+        user_id: String(req.auth.userId),
+        auth_user_id: req.auth.authUserId,
+        week_start,
+      },
+      success_url: `${baseUrl}/promotion-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/dashboard`,
+    });
+    res.json({ url: session.url, sessionId: session.id });
+  } catch (error) {
+    stripeErrorResponse(res, error, 'Error creating featured artist checkout');
   }
 });
 
@@ -134,12 +217,19 @@ router.get('/confirm', requireAuth, async (req, res) => {
 
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     const metadata = session.metadata || {};
-    if (metadata.kind !== PROMOTION_KIND) return res.status(400).json({ error: 'This payment is not a listing promotion' });
+    if (metadata.kind !== PROMOTION_KIND && metadata.kind !== FEATURED_ARTIST_KIND) {
+      return res.status(400).json({ error: 'This payment is not a listing promotion' });
+    }
     if (metadata.auth_user_id !== req.auth.authUserId && !req.auth.isAdmin) {
       return res.status(403).json({ error: 'This payment belongs to another account' });
     }
     if (session.payment_status !== 'paid') {
       return res.status(400).json({ error: 'Payment not completed yet. Please wait a moment and refresh the page.' });
+    }
+
+    if (metadata.kind === FEATURED_ARTIST_KIND) {
+      const booking = await applyFeaturedArtistBooking(session);
+      return res.json({ success: true, applied: booking.applied, type: 'featured_artist', week_start: booking.week_start, moved: Boolean(booking.moved), listing: null });
     }
 
     const listingId = parseInt(metadata.listing_id, 10);
@@ -212,15 +302,26 @@ router.get('/admin/config', requireAdmin, async (req, res) => {
     const [featured] = await pool.execute(
       `SELECT COUNT(*) AS featured_now FROM listings WHERE status = 'active' AND featured_until > now()`
     );
+    const [artistStats] = await pool.execute(
+      `SELECT
+         COALESCE(SUM(amount), 0) AS revenue_total,
+         COALESCE(SUM(CASE WHEN created_at > now() - interval '30 days' THEN amount ELSE 0 END), 0) AS revenue_30d,
+         COUNT(*) FILTER (WHERE created_at > now() - interval '30 days') AS paid_count_30d,
+         COUNT(*) FILTER (WHERE week_start >= ?::date) AS upcoming_weeks
+       FROM featured_artist_bookings WHERE source = 'stripe'`,
+      [weekStartOf()]
+    );
     const s = stats[0] || {};
+    const a = artistStats[0] || {};
     res.json({
       config,
       stats: {
-        revenue_total: parseFloat(s.revenue_total || 0),
-        revenue_30d: parseFloat(s.revenue_30d || 0),
+        revenue_total: parseFloat(s.revenue_total || 0) + parseFloat(a.revenue_total || 0),
+        revenue_30d: parseFloat(s.revenue_30d || 0) + parseFloat(a.revenue_30d || 0),
         paid_count: Number(s.paid_count || 0),
-        paid_count_30d: Number(s.paid_count_30d || 0),
+        paid_count_30d: Number(s.paid_count_30d || 0) + Number(a.paid_count_30d || 0),
         featured_now: Number(featured[0]?.featured_now || 0),
+        featured_artist_weeks_booked: Number(a.upcoming_weeks || 0),
       },
     });
   } catch (error) {

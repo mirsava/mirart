@@ -28,6 +28,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { artworks } from '../data/paintings';
 import PaintingCard from '../components/PaintingCard';
+import FeaturedArtistSection from '../components/FeaturedArtistSection';
 import apiService, { Listing, SubscriptionPlan } from '../services/api';
 import { getListingImageCount } from '../utils/listingUtils';
 import { Artwork, Painting } from '../types';
@@ -423,6 +424,8 @@ const Home: React.FC = () => {
           </Grid>
         </Box>
       </Box>
+
+      <FeaturedArtistSection />
 
       {spotlight.length > 0 && (
         <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, pt: 8 }}>

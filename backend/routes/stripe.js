@@ -5,6 +5,7 @@ import { createNotification } from '../services/notificationService.js';
 import { requireAuth, isUuid } from '../middleware/auth.js';
 import { getBillingConfig } from '../services/billing.js';
 import { isCheckoutEnabled, requireCheckoutEnabled } from '../services/marketplace.js';
+import { activateSubscriptionFromSession } from '../services/subscriptionCheckout.js';
 
 const router = express.Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -414,62 +415,14 @@ router.get('/confirm-session', async (req, res) => {
     const payerName = session.customer_details?.name || '';
 
     if (metadata.is_subscription === 'true' && metadata.plan_id && metadata.billing_period) {
-      const authUserId = metadata.auth_user_id;
-      const plan_id = parseInt(metadata.plan_id, 10);
-
-      if (!isUuid(authUserId)) {
-        return res.status(400).json({ error: 'User information is required' });
-      }
-
-      const [users] = await pool.execute('SELECT id FROM users WHERE auth_user_id = ?', [authUserId]);
-
-      if (users.length === 0) {
-        return res.json({
-          success: true,
-          transactionId,
-          requiresUserCreation: true,
-          subscriptionData: { plan_id, billing_period: metadata.billing_period },
-          payer: { email: payerEmail, name: payerName },
-        });
-      }
-
-      const userId = users[0].id;
-
-      const [plans] = await pool.execute('SELECT * FROM subscription_plans WHERE id = ? AND is_active = TRUE', [plan_id]);
-      if (plans.length === 0) {
-        return res.status(404).json({ error: 'Subscription plan not found' });
-      }
-
-      const startDate = new Date();
-      const endDate = new Date();
-      if (metadata.billing_period === 'monthly') {
-        endDate.setMonth(endDate.getMonth() + 1);
-      } else {
-        endDate.setFullYear(endDate.getFullYear() + 1);
-      }
-
-      await pool.execute(
-        `UPDATE user_subscriptions SET status = 'expired' WHERE user_id = ? AND status = 'active'`,
-        [userId]
-      );
-
-      const [result] = await pool.execute(
-        `INSERT INTO user_subscriptions (user_id, plan_id, billing_period, start_date, end_date, auto_renew, payment_intent_id, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
-        [userId, plan_id, metadata.billing_period, startDate, endDate, true, transactionId]
-      );
-
-      const [newSubscription] = await pool.execute(
-        `SELECT us.*, sp.name as plan_name, sp.tier, sp.max_listings
-         FROM user_subscriptions us JOIN subscription_plans sp ON us.plan_id = sp.id
-         WHERE us.id = ?`,
-        [result.insertId]
-      );
-
+      const result = await activateSubscriptionFromSession(session);
+      if (result.error) return res.status(result.status).json({ error: result.error });
       return res.json({
         success: true,
         transactionId,
-        subscription: newSubscription[0],
+        ...(result.requiresUserCreation
+          ? { requiresUserCreation: true, subscriptionData: result.subscriptionData }
+          : { subscription: result.subscription }),
         payer: { email: payerEmail, name: payerName },
       });
     }

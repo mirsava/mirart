@@ -21,6 +21,9 @@ export const DEFAULT_PROMOTION_CONFIG = {
   listing_pass_enabled: true,
   listing_pass_price: 3,
   listing_pass_days: 60,
+  featured_artist_enabled: true,
+  featured_artist_price: 25,
+  featured_artist_weeks_ahead: 8,
 };
 
 const toNumber = (value, fallback, min, max) => {
@@ -63,6 +66,9 @@ export const normalizePromotionConfig = (raw = {}) => ({
   listing_pass_enabled: raw.listing_pass_enabled === undefined ? DEFAULT_PROMOTION_CONFIG.listing_pass_enabled : raw.listing_pass_enabled === true,
   listing_pass_price: toPrice(raw.listing_pass_price, DEFAULT_PROMOTION_CONFIG.listing_pass_price),
   listing_pass_days: Math.round(toNumber(raw.listing_pass_days, DEFAULT_PROMOTION_CONFIG.listing_pass_days, 1, 365)),
+  featured_artist_enabled: raw.featured_artist_enabled === undefined ? DEFAULT_PROMOTION_CONFIG.featured_artist_enabled : raw.featured_artist_enabled === true,
+  featured_artist_price: toPrice(raw.featured_artist_price, DEFAULT_PROMOTION_CONFIG.featured_artist_price),
+  featured_artist_weeks_ahead: Math.round(toNumber(raw.featured_artist_weeks_ahead, DEFAULT_PROMOTION_CONFIG.featured_artist_weeks_ahead, 1, 26)),
 });
 
 export async function getPromotionConfig() {

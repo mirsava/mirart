@@ -95,6 +95,7 @@ import { useSnackbar } from 'notistack';
 import { useChat } from '../contexts/ChatContext';
 import PageHeader from '../components/PageHeader';
 import PromotionSettingsCard from '../components/PromotionSettingsCard';
+import NewsletterSettingsCard from '../components/NewsletterSettingsCard';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
@@ -2691,6 +2692,8 @@ const AdminDashboard: React.FC = () => {
               </Paper>
 
               <PromotionSettingsCard />
+
+              <NewsletterSettingsCard />
 
               <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Footer: Connect With Us</Typography>

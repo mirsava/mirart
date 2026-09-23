@@ -55,6 +55,7 @@ import {
   ViewModule as ViewModuleIcon,
   Campaign as CampaignIcon,
   Star as StarIcon,
+  AutoAwesome as SpotlightIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -73,6 +74,7 @@ import PageHeader from '../components/PageHeader';
 import ImagePlaceholder from '../components/ImagePlaceholder';
 import PromoteListingDialog, { isListingFeatured, hasLivePass } from '../components/PromoteListingDialog';
 import ActivateListingDialog from '../components/ActivateListingDialog';
+import FeaturedArtistDialog from '../components/FeaturedArtistDialog';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
 const dataURLtoBlob = (dataURL: string): Promise<Blob> => {
@@ -201,6 +203,7 @@ const AccountDashboard: React.FC = () => {
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [activatingListing, setActivatingListing] = useState<number | null>(null);
   const [promoteListing, setPromoteListing] = useState<Listing | null>(null);
+  const [featuredArtistOpen, setFeaturedArtistOpen] = useState(false);
   const [blockedActivation, setBlockedActivation] = useState<{ listing: Pick<Listing, 'id' | 'title'>; message?: string } | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
@@ -1014,6 +1017,20 @@ const AccountDashboard: React.FC = () => {
     setListingToDelete(null);
   };
 
+  useEffect(() => {
+    const promoteId = parseInt(new URLSearchParams(location.search).get('promote') || '', 10);
+    if (!promoteId || !user?.id) return;
+    navigate(location.pathname, { replace: true, state: location.state });
+    setTabValue(0);
+    apiService.getListings({ authUserId: user.id, limit: 100 })
+      .then(({ listings }) => {
+        const listing = listings.find((l) => l.id === promoteId);
+        if (listing) setPromoteListing(listing);
+        else enqueueSnackbar('That listing could not be found', { variant: 'warning' });
+      })
+      .catch(() => {});
+  }, [location.search, user?.id]);
+
   const handleActivateListing = async (listingId: number) => {
     if (!user?.id) return;
     const listing = recentListings.find((l) => l.id === listingId);
@@ -1377,8 +1394,17 @@ const AccountDashboard: React.FC = () => {
                     </Typography>
                   </Box>
                 </Box>
-                <Button 
-                  variant="contained" 
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<SpotlightIcon />}
+                  onClick={() => setFeaturedArtistOpen(true)}
+                  sx={{ borderRadius: 1, fontWeight: 600, textTransform: 'none' }}
+                >
+                  Feature my shop
+                </Button>
+                <Button
+                  variant="contained"
                   startIcon={<AddIcon />}
                   onClick={() => navigate('/create-listing')}
                   sx={{
@@ -1390,6 +1416,7 @@ const AccountDashboard: React.FC = () => {
                 >
                   Add New Listing
                 </Button>
+                </Box>
               </Box>
             </Box>
             
@@ -3498,6 +3525,8 @@ const AccountDashboard: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <FeaturedArtistDialog open={featuredArtistOpen} onClose={() => setFeaturedArtistOpen(false)} />
 
         <ActivateListingDialog
           open={Boolean(blockedActivation)}

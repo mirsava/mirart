@@ -26,6 +26,8 @@ import supportChatRouter from './routes/supportChat.js';
 import authRouter from './routes/auth.js';
 import settingsRouter from './routes/settings.js';
 import promotionsRouter from './routes/promotions.js';
+import newsletterRouter from './routes/newsletter.js';
+import { stripeWebhookHandler } from './routes/stripeWebhook.js';
 import { attachAuth } from './middleware/auth.js';
 import { securityHeaders, apiLimiter } from './middleware/security.js';
 
@@ -55,6 +57,8 @@ app.use(cors({
   },
   credentials: true
 }));
+// Stripe webhooks need the raw body for signature checks, and must not be rate limited, so they come first.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
 app.use('/api', apiLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -221,6 +225,7 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/listings', listingsRouter);
 app.use('/api/promotions', promotionsRouter);
+app.use('/api/newsletter', newsletterRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/orders', ordersRouter);
@@ -292,6 +297,24 @@ app.listen(PORT, async () => {
       console.warn('[Daily] Subscription expiration job failed:', err?.message || err);
     }
   }, 24 * 60 * 60 * 1000);
+
+  // Hourly: renewal reminders for passes and featured spots, and the Monday newsletter (sent once per week)
+  const runHourlyJobs = async () => {
+    try {
+      const { runRenewalReminderJob } = await import('./services/renewalReminders.js');
+      await runRenewalReminderJob();
+    } catch (err) {
+      console.warn('[Hourly] Renewal reminder job failed:', err?.message || err);
+    }
+    try {
+      const { runWeeklyNewsletterJob } = await import('./services/newsletter.js');
+      await runWeeklyNewsletterJob();
+    } catch (err) {
+      console.warn('[Hourly] Newsletter job failed:', err?.message || err);
+    }
+  };
+  runHourlyJobs();
+  setInterval(runHourlyJobs, 60 * 60 * 1000);
 
   const TRACKING_POLL_INTERVAL = 30 * 60 * 1000;
   async function pollShippedOrders() {

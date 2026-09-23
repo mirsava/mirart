@@ -35,6 +35,9 @@ const PromotionSuccess: React.FC = () => {
     value ? new Date(value).toLocaleString(undefined, { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : null;
   const featuredUntil = formatDate(result?.listing?.featured_until);
   const paidUntil = formatDate(result?.listing?.paid_until);
+  const weekOf = result?.week_start
+    ? new Date(`${result.week_start}T00:00:00Z`).toLocaleDateString(undefined, { month: 'long', day: 'numeric', timeZone: 'UTC' })
+    : null;
   const copy = {
     feature: {
       title: 'Your listing is featured',
@@ -47,6 +50,10 @@ const PromotionSuccess: React.FC = () => {
     listing_pass: {
       title: 'Your listing is live',
       body: `It stays live${paidUntil ? ` until ${paidUntil}` : ''} without using a plan slot. You can extend it from your dashboard.`,
+    },
+    featured_artist: {
+      title: "You're booked as Featured Artist",
+      body: `${result?.moved ? 'The week you picked was taken moments before your payment, so we booked the next free one. ' : ''}You'll be on the homepage and in the weekly email for the week of ${weekOf ?? 'your booking'}.`,
     },
   }[result?.type ?? 'bump'];
 

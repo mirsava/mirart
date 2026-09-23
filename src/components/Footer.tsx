@@ -20,6 +20,7 @@ import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
 import { useBillingStatus } from '../hooks/useBillingStatus';
 import { useSocialLinks } from '../hooks/useSocialLinks';
+import NewsletterSignup from './NewsletterSignup';
 import logoLight from '../assets/images/logo.svg';
 import logoDark from '../assets/images/logo-dark.svg';
 
@@ -86,6 +87,7 @@ const Footer: React.FC = () => {
               A marketplace connecting talented artists with art lovers worldwide. Discover 
               unique paintings, woodworking, and handmade art from independent creators.
             </Typography>
+            <NewsletterSignup />
           </Grid>
 
           <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex', flexDirection: 'column' }}>

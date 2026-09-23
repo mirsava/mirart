@@ -65,6 +65,7 @@ const PromotionSettingsCard: React.FC = () => {
       {stats && (
         <Typography variant="body2" sx={{ mt: 2 }}>
           Last 30 days: <strong>{money(stats.revenue_30d)}</strong> from {stats.paid_count_30d} purchases · All time: {money(stats.revenue_total)} · Featured now: {stats.featured_now}
+          {stats.featured_artist_weeks_booked ? ` · Featured artist weeks booked: ${stats.featured_artist_weeks_booked}` : ''}
         </Typography>
       )}
 
@@ -101,6 +102,42 @@ const PromotionSettingsCard: React.FC = () => {
           onChange={(e) => setConfig({ ...config, listing_pass_days: Number(e.target.value) })}
           inputProps={{ min: 1, max: 365, step: 1 }}
           sx={{ width: 130 }}
+        />
+      </Box>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mt: 3 }}>
+        <Box>
+          <Typography variant="subtitle2">Featured artist of the week</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {config.featured_artist_enabled
+              ? 'ON: one artist per week can book the homepage spotlight, which also leads the weekly email.'
+              : 'OFF: artists cannot book new weeks. Weeks already booked still run.'}
+          </Typography>
+        </Box>
+        <Switch
+          checked={config.featured_artist_enabled}
+          disabled={saving}
+          onChange={(e) => save({ featured_artist_enabled: e.target.checked })}
+        />
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 1.5 }}>
+        <TextField
+          label="Price per week ($)"
+          type="number"
+          size="small"
+          value={config.featured_artist_price}
+          onChange={(e) => setConfig({ ...config, featured_artist_price: Number(e.target.value) })}
+          inputProps={{ min: 0.5, step: 1 }}
+          sx={{ width: 170 }}
+        />
+        <TextField
+          label="Weeks bookable ahead"
+          type="number"
+          size="small"
+          value={config.featured_artist_weeks_ahead}
+          onChange={(e) => setConfig({ ...config, featured_artist_weeks_ahead: Number(e.target.value) })}
+          inputProps={{ min: 1, max: 26, step: 1 }}
+          sx={{ width: 190 }}
         />
       </Box>
 

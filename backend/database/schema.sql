@@ -362,6 +362,39 @@ ALTER TABLE listing_promotions ADD CONSTRAINT listing_promotions_promotion_type_
   CHECK (promotion_type IN ('feature','bump','listing_pass'));
 CREATE INDEX IF NOT EXISTS idx_listing_promotions_user_source ON listing_promotions (user_id, source, created_at);
 
+-- Paid homepage "Featured Artist" slot: one artist per week (Monday to Sunday, UTC).
+CREATE TABLE IF NOT EXISTS featured_artist_bookings (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  week_start DATE NOT NULL UNIQUE,
+  amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+  source VARCHAR(20) NOT NULL CHECK (source IN ('stripe','admin')),
+  stripe_session_id VARCHAR(255) UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_featured_artist_bookings_user ON featured_artist_bookings (user_id);
+
+-- One row per renewal reminder sent. expires_at is part of the key, so extending a pass or feature re-arms reminders.
+CREATE TABLE IF NOT EXISTS listing_reminders (
+  id SERIAL PRIMARY KEY,
+  listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  kind VARCHAR(20) NOT NULL CHECK (kind IN ('listing_pass','feature')),
+  expires_at TIMESTAMPTZ NOT NULL,
+  stage VARCHAR(10) NOT NULL CHECK (stage IN ('7d','1d')),
+  sent_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT unique_listing_reminder UNIQUE (listing_id, kind, expires_at, stage)
+);
+
+-- Weekly "new art" email. Anyone can subscribe from the footer; every email carries a one-click unsubscribe link.
+CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  token UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+  subscribed_at TIMESTAMPTZ DEFAULT now(),
+  unsubscribed_at TIMESTAMPTZ
+);
+
 -- Keep updated_at fresh on every UPDATE (replaces MySQL's ON UPDATE CURRENT_TIMESTAMP)
 DO $$
 DECLARE t TEXT;
@@ -382,7 +415,8 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'users','listings','likes','listing_comments','messages','chat_conversations','chat_messages',
     'support_chat_messages','notifications','admin_announcements','site_settings','dashboard_stats',
-    'orders','subscription_plans','user_subscriptions','listing_promotions'
+    'orders','subscription_plans','user_subscriptions','listing_promotions',
+    'featured_artist_bookings','listing_reminders','newsletter_subscribers'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;
