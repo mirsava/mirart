@@ -31,6 +31,7 @@ import { useSnackbar } from 'notistack';
 import apiService, { ArtistOverviewData } from '../../services/api';
 import NewsletterPreference from './NewsletterPreference';
 import RecentActivity from './RecentActivity';
+import BumpResults from './BumpResults';
 import FeatureCreditDialog from './FeatureCreditDialog';
 
 interface ArtistOverviewProps {
@@ -204,6 +205,10 @@ const ArtistOverview: React.FC<ArtistOverviewProps> = ({ authUserId, onGoToTab, 
             </Button>
           </Box>
         </Paper>
+      </Box>
+
+      <Box sx={{ mb: 2 }}>
+        <BumpResults authUserId={authUserId} />
       </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '3fr 2fr' }, gap: 2, alignItems: 'start' }}>

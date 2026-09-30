@@ -11,7 +11,8 @@ export const PAYMENTS_SQL = `
   SELECT lp.created_at AS at, lp.promotion_type AS type,
     CASE lp.promotion_type
       WHEN 'feature' THEN 'Featured listing' || COALESCE(' (' || lp.days || ' days)', '')
-      WHEN 'bump' THEN 'Bumped listing'
+      WHEN 'bump' THEN CASE WHEN lp.source = 'credit' THEN 'Bumped listing (pack credit)' ELSE 'Bumped listing' END
+      WHEN 'bump_pack' THEN 'Bump pack (' || lp.days || ' bumps)'
       ELSE 'Listing pass' || COALESCE(' (' || lp.days || ' days)', '')
     END || COALESCE(': ' || l.title, '') AS description,
     lp.amount, lp.source, lp.user_id
@@ -32,7 +33,7 @@ export const PAYMENTS_SQL = `
   FROM orders o WHERE o.status IN ('paid', 'shipped', 'delivered')
 `;
 
-export const PAYMENT_TYPES = ['subscription', 'feature', 'bump', 'listing_pass', 'featured_artist', 'order_fee'];
+export const PAYMENT_TYPES = ['subscription', 'feature', 'bump', 'bump_pack', 'listing_pass', 'featured_artist', 'order_fee'];
 
 export async function getAdminOverview(now = new Date()) {
   const [[byType], [monthly], [growth], [attention], [upcoming]] = await Promise.all([

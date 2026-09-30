@@ -82,6 +82,11 @@ const ArtistPlanPanel: React.FC<ArtistPlanPanelProps> = ({ authUserId, onPromote
           ) : (
             <Typography variant="body2" color="text.secondary">Your plan doesn't include free features. Professional and Enterprise do.</Typography>
           )}
+          {data.bump_credits > 0 && (
+            <Typography variant="body2" sx={{ mt: 1.5 }}>
+              <strong>{data.bump_credits}</strong> prepaid {data.bump_credits === 1 ? 'bump' : 'bumps'} left from a bump pack.
+            </Typography>
+          )}
         </Paper>
       </Box>
 
@@ -136,7 +141,7 @@ const ArtistPlanPanel: React.FC<ArtistPlanPanelProps> = ({ authUserId, onPromote
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{dateOnly(p.at)}</TableCell>
                     <TableCell>{p.description}</TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                      {p.source === 'plan' ? 'Included' : p.source === 'admin' ? 'Free' : money(p.amount)}
+                      {p.source === 'plan' ? 'Included' : p.source === 'admin' ? 'Free' : p.source === 'credit' ? 'Pack credit' : money(p.amount)}
                     </TableCell>
                   </TableRow>
                 ))}

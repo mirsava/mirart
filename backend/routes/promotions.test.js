@@ -102,6 +102,36 @@ describe('Promotions API', () => {
       await request(app).post('/api/promotions/checkout').set('x-test-auth', asArtist).send({ listing_id: 5, type: 'feature', days: 7 }).expect(400);
     });
 
+    it("refuses a bump once the artist has used today's bumps", async () => {
+      mockExecute
+        .mockResolvedValueOnce(noSettings)
+        .mockResolvedValueOnce(activeListing())
+        .mockResolvedValueOnce([[{ count: 3 }]]); // bumps in the last 24h
+      const res = await request(app).post('/api/promotions/checkout').set('x-test-auth', asArtist).send({ listing_id: 5, type: 'bump' }).expect(400);
+      expect(res.body.error).toMatch(/up to 3 listings a day/);
+      expect(mockCreateSession).not.toHaveBeenCalled();
+    });
+
+    it('pauses bumps while too many are active, so it never sells one that would barely be seen', async () => {
+      mockExecute
+        .mockResolvedValueOnce(noSettings)
+        .mockResolvedValueOnce(activeListing())
+        .mockResolvedValueOnce([[{ count: 0 }]]) // artist's bumps today
+        .mockResolvedValueOnce([[{ count: 30 }]]); // active bumps site-wide = default cap
+      const res = await request(app).post('/api/promotions/checkout').set('x-test-auth', asArtist).send({ listing_id: 5, type: 'bump' }).expect(409);
+      expect(res.body.code).toBe('bumps_busy');
+      expect(mockCreateSession).not.toHaveBeenCalled();
+    });
+
+    it('sells a bump pack without a listing', async () => {
+      mockExecute.mockResolvedValueOnce(noSettings);
+      mockCreateSession.mockResolvedValueOnce({ id: 'cs_pack', url: 'https://stripe.test/cs_pack' });
+      await request(app).post('/api/promotions/checkout').set('x-test-auth', asArtist).send({ type: 'bump_pack' }).expect(200);
+      const session = mockCreateSession.mock.calls[0][0];
+      expect(session.line_items[0].price_data.unit_amount).toBe(400);
+      expect(session.metadata).toMatchObject({ type: 'bump_pack', days: '5', listing_id: '', user_id: '1' });
+    });
+
     it('rejects an unknown feature length', async () => {
       mockExecute.mockResolvedValueOnce(noSettings);
       await request(app).post('/api/promotions/checkout').set('x-test-auth', asArtist).send({ listing_id: 5, type: 'feature', days: 2 }).expect(400);
@@ -148,6 +178,37 @@ describe('Promotions API', () => {
     it('refuses an unpaid session', async () => {
       mockRetrieveSession.mockResolvedValueOnce({ ...paidSession(), payment_status: 'unpaid' });
       await request(app).get('/api/promotions/confirm?session_id=cs_test').set('x-test-auth', asArtist).expect(400);
+    });
+  });
+
+  describe('POST /api/promotions/listings/:id/bump-credit', () => {
+    it('spends one prepaid bump', async () => {
+      mockExecute
+        .mockResolvedValueOnce(noSettings)
+        .mockResolvedValueOnce(activeListing())
+        .mockResolvedValueOnce([[{ count: 2 }]]) // active bumps site-wide
+        .mockResolvedValueOnce([[{ id: 1 }]]) // row lock
+        .mockResolvedValueOnce([[{ count: 0 }]]) // bumps today
+        .mockResolvedValueOnce([{ affectedRows: 1, rows: [{ bump_credits: 4 }] }]) // spend credit
+        .mockResolvedValueOnce([{ affectedRows: 1 }]) // ledger
+        .mockResolvedValueOnce([{ affectedRows: 1 }]) // bumped_at
+        .mockResolvedValueOnce([[{ id: 5, bumped_at: new Date().toISOString() }]]);
+      const res = await request(app).post('/api/promotions/listings/5/bump-credit').set('x-test-auth', asArtist).expect(200);
+      expect(res.body.bump_credits).toBe(4);
+      expect(mockExecute.mock.calls[6][1]).toEqual([5, 1, 'bump', null, 0, 'credit', null]);
+      expect(mockConn.commit).toHaveBeenCalled();
+    });
+
+    it('refuses when there are no credits left', async () => {
+      mockExecute
+        .mockResolvedValueOnce(noSettings)
+        .mockResolvedValueOnce(activeListing())
+        .mockResolvedValueOnce([[{ count: 2 }]])
+        .mockResolvedValueOnce([[{ id: 1 }]])
+        .mockResolvedValueOnce([[{ count: 0 }]])
+        .mockResolvedValueOnce([{ affectedRows: 0, rows: [] }]);
+      await request(app).post('/api/promotions/listings/5/bump-credit').set('x-test-auth', asArtist).expect(400);
+      expect(mockConn.rollback).toHaveBeenCalled();
     });
   });
 

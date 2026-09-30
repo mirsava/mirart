@@ -24,6 +24,7 @@ export interface Artwork {
   avgRating?: number | null;
   reviewCount?: number;
   isFeatured?: boolean;
+  isBumped?: boolean;
 }
 
 export interface Painting extends Artwork {

@@ -129,6 +129,7 @@ const Home: React.FC = () => {
       avgRating: listing.avg_rating ? parseFloat(Number(listing.avg_rating).toFixed(1)) : null,
       reviewCount: listing.review_count || 0,
       isFeatured: listing.is_featured === true,
+      isBumped: listing.is_bumped === true,
     };
   };
 
@@ -154,6 +155,7 @@ const Home: React.FC = () => {
           const { listings } = await apiService.getListings({
             status: 'active',
             limit: 8,
+            sortBy: 'listed', // by when first listed, so bumped older pieces don't count as fresh
             ...(nonFeatured >= 4 ? { featured: 'exclude' as const } : {}),
             ...(user?.id ? { requestingUser: user.id } : {}),
           });

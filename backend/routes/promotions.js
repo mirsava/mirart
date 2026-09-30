@@ -8,6 +8,9 @@ import {
   quotePromotion,
   nextBumpAt,
   getFeatureCredits,
+  bumpsInLastDay,
+  getBumpCredits,
+  countActiveBumps,
   applyPromotion,
   getListingPromotionState,
 } from '../services/promotions.js';
@@ -37,6 +40,10 @@ const publicConfig = (config) => ({
   feature_options: config.feature_options,
   bump_price: config.bump_price,
   bump_cooldown_hours: config.bump_cooldown_hours,
+  bump_daily_limit: config.bump_daily_limit,
+  bump_pack_enabled: config.bump_pack_enabled,
+  bump_pack_size: config.bump_pack_size,
+  bump_pack_price: config.bump_pack_price,
   plan_feature_credits: config.plan_feature_credits,
   plan_feature_days: config.plan_feature_days,
   listing_pass_enabled: config.listing_pass_enabled,
@@ -67,12 +74,21 @@ async function loadPromotableListing(listingId, auth, { requireActive = true } =
   return { listing };
 }
 
-// Prices and options, plus the caller's free plan features when signed in.
+// Prices and options, plus the caller's free plan features, bump credits and bumps left today when signed in.
 router.get('/options', async (req, res) => {
   try {
     const config = await getPromotionConfig();
-    const credits = req.auth?.userId ? await getFeatureCredits(req.auth.userId, config) : null;
-    res.json({ ...publicConfig(config), credits });
+    const userId = req.auth?.userId;
+    const [credits, bumpCredits, bumpsToday, activeBumps] = userId
+      ? await Promise.all([getFeatureCredits(userId, config), getBumpCredits(userId), bumpsInLastDay(userId), countActiveBumps()])
+      : [null, 0, 0, await countActiveBumps()];
+    res.json({
+      ...publicConfig(config),
+      credits,
+      bump_credits: bumpCredits,
+      bumps_left_today: Math.max(0, config.bump_daily_limit - bumpsToday),
+      bumps_busy: activeBumps >= config.bump_max_active,
+    });
   } catch (error) {
     console.error('Error fetching promotion options:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -93,13 +109,25 @@ router.post('/checkout', requireAuth, async (req, res) => {
     const quote = quotePromotion(config, type, days);
     if (!quote) return res.status(400).json({ error: 'Choose a valid promotion option' });
 
-    const { listing, status, error } = await loadPromotableListing(listing_id, req.auth, { requireActive: type !== 'listing_pass' });
-    if (!listing) return res.status(status).json({ error });
+    // A bump pack is bought for the account, not for one listing
+    let listing = null;
+    if (type !== 'bump_pack') {
+      const loaded = await loadPromotableListing(listing_id, req.auth, { requireActive: type !== 'listing_pass' });
+      if (!loaded.listing) return res.status(loaded.status).json({ error: loaded.error });
+      listing = loaded.listing;
+    }
 
     if (type === 'bump') {
       const next = nextBumpAt(listing, config);
       if (next) {
         return res.status(400).json({ error: 'This listing was bumped recently', next_bump_at: next.toISOString() });
+      }
+      if ((await bumpsInLastDay(listing.user_id)) >= config.bump_daily_limit) {
+        return res.status(400).json({ error: `You can bump up to ${config.bump_daily_limit} listings a day. Try again tomorrow.` });
+      }
+      // Don't sell a bump that couldn't be seen
+      if ((await countActiveBumps()) >= config.bump_max_active) {
+        return res.status(409).json({ code: 'bumps_busy', error: 'Bumps are busy right now: enough listings are already bumped that another one would barely be seen. Please try again in a day or two.' });
       }
     }
 
@@ -108,13 +136,14 @@ router.post('/checkout', requireAuth, async (req, res) => {
       feature: `Feature listing for ${quote.days} days`,
       bump: 'Bump listing to the top',
       listing_pass: `Keep listing live for ${quote.days} days`,
+      bump_pack: `${quote.days} listing bumps`,
     }[type];
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [{
         price_data: {
           currency: 'usd',
-          product_data: { name, description: String(listing.title).slice(0, 200) },
+          product_data: { name, description: listing ? String(listing.title).slice(0, 200) : 'Use one any time from Promote on a listing' },
           unit_amount: Math.round(quote.price * 100),
         },
         quantity: 1,
@@ -122,8 +151,8 @@ router.post('/checkout', requireAuth, async (req, res) => {
       customer_email: req.auth.email || undefined,
       metadata: {
         kind: PROMOTION_KIND,
-        listing_id: String(listing.id),
-        user_id: String(listing.user_id),
+        listing_id: listing ? String(listing.id) : '',
+        user_id: String(listing ? listing.user_id : req.auth.userId),
         auth_user_id: req.auth.authUserId,
         type,
         days: quote.days ? String(quote.days) : '',
@@ -232,8 +261,8 @@ router.get('/confirm', requireAuth, async (req, res) => {
       return res.json({ success: true, applied: booking.applied, type: 'featured_artist', week_start: booking.week_start, moved: Boolean(booking.moved), listing: null });
     }
 
-    const listingId = parseInt(metadata.listing_id, 10);
-    const type = ['feature', 'bump', 'listing_pass'].includes(metadata.type) ? metadata.type : 'bump';
+    const listingId = parseInt(metadata.listing_id, 10) || null;
+    const type = ['feature', 'bump', 'listing_pass', 'bump_pack'].includes(metadata.type) ? metadata.type : 'bump';
     const days = type === 'bump' ? null : parseInt(metadata.days, 10);
     const { applied } = await applyPromotion(pool, {
       listingId,
@@ -245,7 +274,7 @@ router.get('/confirm', requireAuth, async (req, res) => {
       stripeSessionId: session.id,
     });
 
-    const listing = await getListingPromotionState(listingId);
+    const listing = listingId ? await getListingPromotionState(listingId) : null;
     res.json({ success: true, applied, type, days, listing });
   } catch (error) {
     console.error('Error confirming promotion:', error);
@@ -282,6 +311,49 @@ router.post('/listings/:id/use-credit', requireAuth, async (req, res) => {
   } catch (error) {
     await conn.rollback().catch(() => {});
     console.error('Error using feature credit:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Bump a listing with a prepaid credit from a bump pack (same daily limit and cooldown as a paid bump).
+router.post('/listings/:id/bump-credit', requireAuth, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const config = await getPromotionConfig();
+    if (!config.enabled) return res.status(403).json({ error: 'Listing promotions are not available right now' });
+
+    const { listing, status, error } = await loadPromotableListing(req.params.id, req.auth);
+    if (!listing) return res.status(status).json({ error });
+    const next = nextBumpAt(listing, config);
+    if (next) return res.status(400).json({ error: 'This listing was bumped recently', next_bump_at: next.toISOString() });
+    if ((await countActiveBumps()) >= config.bump_max_active) {
+      return res.status(409).json({ code: 'bumps_busy', error: 'Bumps are busy right now: enough listings are already bumped that another one would barely be seen. Please try again in a day or two.' });
+    }
+
+    await conn.beginTransaction();
+    // Lock the owner's row so two quick clicks can't spend the same credit or pass the daily limit
+    await conn.execute('SELECT id FROM users WHERE id = ? FOR UPDATE', [listing.user_id]);
+    if ((await bumpsInLastDay(listing.user_id, conn)) >= config.bump_daily_limit) {
+      await conn.rollback();
+      return res.status(400).json({ error: `You can bump up to ${config.bump_daily_limit} listings a day. Try again tomorrow.` });
+    }
+    const [spent] = await conn.execute(
+      'UPDATE users SET bump_credits = bump_credits - 1 WHERE id = ? AND bump_credits > 0 RETURNING bump_credits',
+      [listing.user_id]
+    );
+    if (!spent.affectedRows) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'You have no bump credits left' });
+    }
+    await applyPromotion(conn, { listingId: listing.id, userId: listing.user_id, type: 'bump', source: 'credit' });
+    await conn.commit();
+
+    res.json({ success: true, listing: await getListingPromotionState(listing.id), bump_credits: Number(spent.rows?.[0]?.bump_credits ?? 0) });
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    console.error('Error using bump credit:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     conn.release();

@@ -49,6 +49,20 @@ import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/PageHeader';
 import SEO from '../components/SEO';
 
+// Bumped pieces take turns in "Newest". One seed per browsing session keeps paging stable for this visitor
+// while other visitors (and later sessions) see a different bumped piece first.
+const getRotationSeed = (): number => {
+  try {
+    const saved = Number(sessionStorage.getItem('galleryRotationSeed'));
+    if (saved > 0) return saved;
+    const seed = Math.floor(Math.random() * 999999) + 1;
+    sessionStorage.setItem('galleryRotationSeed', String(seed));
+    return seed;
+  } catch {
+    return Math.floor(Math.random() * 999999) + 1;
+  }
+};
+
 const Gallery: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -130,6 +144,7 @@ const Gallery: React.FC = () => {
       avgRating: listing.avg_rating ? parseFloat(Number(listing.avg_rating).toFixed(1)) : null,
       reviewCount: listing.review_count || 0,
       isFeatured: listing.is_featured === true,
+      isBumped: listing.is_bumped === true,
     };
   };
 
@@ -199,6 +214,7 @@ const Gallery: React.FC = () => {
         limit: itemsPerPage,
         sortBy,
         sortOrder,
+        seed: getRotationSeed(),
       };
       
       const catsToUse = filterValues.categories !== undefined ? filterValues.categories : selectedCategories;

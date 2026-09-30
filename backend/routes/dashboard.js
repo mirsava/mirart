@@ -5,6 +5,7 @@ import { getBillingConfig, describeAccess } from '../services/billing.js';
 import { parseImageUrls } from '../utils/json.js';
 import { getArtistOverview, getArtistEngagement, getArtistPlan } from '../services/artistDashboard.js';
 import { getUserActivity } from '../services/userHistory.js';
+import { getBumpResults } from '../services/promotions.js';
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ router.get('/:authUserId/overview', requireSelf(), dashboardRoute((userId) => ge
 router.get('/:authUserId/engagement', requireSelf(), dashboardRoute((userId, req) => getArtistEngagement(userId, req.query.days)));
 router.get('/:authUserId/plan', requireSelf(), dashboardRoute((userId) => getArtistPlan(userId)));
 router.get('/:authUserId/activity', requireSelf(), dashboardRoute((userId) => getUserActivity(userId)));
+router.get('/:authUserId/bump-results', requireSelf(), dashboardRoute(async (userId) => ({ results: await getBumpResults(userId) })));
 
 router.get('/:authUserId', requireSelf(), async (req, res) => {
   try {

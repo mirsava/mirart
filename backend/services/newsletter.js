@@ -81,14 +81,15 @@ export async function buildWeeklyDigest(now = new Date()) {
      WHERE l.status = 'active' AND l.featured_until > now() AND COALESCE(u.blocked, FALSE) = FALSE
      ORDER BY l.featured_until DESC LIMIT 6`
   );
+  // Genuinely new work only: a bumped older piece is not "new this week"
   const [fresh] = await pool.execute(
     `SELECT l.id, l.title, l.price, l.primary_image_url,
        COALESCE(u.business_name, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')), u.username) AS artist_name
      FROM listings l JOIN users u ON u.id = l.user_id
      WHERE l.status = 'active' AND COALESCE(u.blocked, FALSE) = FALSE
-       AND COALESCE(l.bumped_at, l.created_at) > now() - interval '7 days'
+       AND l.created_at > now() - interval '7 days'
        AND (l.featured_until IS NULL OR l.featured_until <= now())
-     ORDER BY COALESCE(l.bumped_at, l.created_at) DESC LIMIT 6`
+     ORDER BY l.created_at DESC LIMIT 6`
   );
   if (!artist && !featured.length && !fresh.length) return null;
   return {

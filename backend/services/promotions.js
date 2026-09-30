@@ -15,8 +15,15 @@ export const DEFAULT_PROMOTION_CONFIG = {
     { days: 7, price: 5 },
     { days: 30, price: 15 },
   ],
-  bump_price: 1,
+  // $2 covers Stripe's ~30c fixed fee; a pack of 5 for $4 is one payment instead of five
+  bump_price: 2,
   bump_cooldown_hours: 24,
+  bump_daily_limit: 3, // bumps per artist per 24 hours, across all their listings
+  bump_slot_every: 4, // in "Newest", at most 1 in every N places goes to a bumped listing
+  bump_max_active: 30, // bumps stop selling while this many are active, so each one still gets seen
+  bump_pack_enabled: true,
+  bump_pack_size: 5,
+  bump_pack_price: 4,
   plan_feature_credits: { professional: 1, enterprise: 3 },
   plan_feature_days: 7,
   listing_pass_enabled: true,
@@ -62,6 +69,12 @@ export const normalizePromotionConfig = (raw = {}) => ({
   feature_options: normalizeFeatureOptions(raw.feature_options),
   bump_price: toPrice(raw.bump_price, DEFAULT_PROMOTION_CONFIG.bump_price),
   bump_cooldown_hours: Math.round(toNumber(raw.bump_cooldown_hours, DEFAULT_PROMOTION_CONFIG.bump_cooldown_hours, 0, 720)),
+  bump_daily_limit: Math.round(toNumber(raw.bump_daily_limit, DEFAULT_PROMOTION_CONFIG.bump_daily_limit, 1, 50)),
+  bump_slot_every: Math.round(toNumber(raw.bump_slot_every, DEFAULT_PROMOTION_CONFIG.bump_slot_every, 2, 10)),
+  bump_max_active: Math.round(toNumber(raw.bump_max_active, DEFAULT_PROMOTION_CONFIG.bump_max_active, 3, 1000)),
+  bump_pack_enabled: raw.bump_pack_enabled === undefined ? DEFAULT_PROMOTION_CONFIG.bump_pack_enabled : raw.bump_pack_enabled === true,
+  bump_pack_size: Math.round(toNumber(raw.bump_pack_size, DEFAULT_PROMOTION_CONFIG.bump_pack_size, 2, 50)),
+  bump_pack_price: toPrice(raw.bump_pack_price, DEFAULT_PROMOTION_CONFIG.bump_pack_price),
   plan_feature_credits: normalizeCredits(raw.plan_feature_credits),
   plan_feature_days: Math.round(toNumber(raw.plan_feature_days, DEFAULT_PROMOTION_CONFIG.plan_feature_days, 1, 90)),
   listing_pass_enabled: raw.listing_pass_enabled === undefined ? DEFAULT_PROMOTION_CONFIG.listing_pass_enabled : raw.listing_pass_enabled === true,
@@ -89,6 +102,10 @@ export async function savePromotionConfig(patch) {
 // Server-side price for a promotion; null when the requested option does not exist.
 export function quotePromotion(config, type, days) {
   if (type === 'bump') return { type, days: null, price: config.bump_price };
+  // For a pack, `days` carries the number of bumps it adds
+  if (type === 'bump_pack') {
+    return config.bump_pack_enabled ? { type, days: config.bump_pack_size, price: config.bump_pack_price } : null;
+  }
   if (type === 'listing_pass') {
     return config.listing_pass_enabled ? { type, days: config.listing_pass_days, price: config.listing_pass_price } : null;
   }
@@ -97,6 +114,62 @@ export function quotePromotion(config, type, days) {
     return option ? { type, days: option.days, price: option.price } : null;
   }
   return null;
+}
+
+// Bumps this artist has made in the last 24 hours (paid or from pack credits), for the daily limit.
+export async function bumpsInLastDay(userId, executor = pool) {
+  const [rows] = await executor.execute(
+    `SELECT COUNT(*) AS count FROM listing_promotions
+     WHERE user_id = ? AND promotion_type = 'bump' AND created_at > now() - interval '24 hours'`,
+    [userId]
+  );
+  return Number(rows[0]?.count || 0);
+}
+
+// Live listings currently benefiting from a bump (a bump counts for 7 days), across the whole site.
+export async function countActiveBumps(executor = pool) {
+  const [rows] = await executor.execute(
+    `SELECT COUNT(*) AS count FROM listings
+     WHERE status = 'active' AND bumped_at IS NOT NULL AND bumped_at > created_at AND bumped_at > now() - interval '7 days'`
+  );
+  return Number(rows[0]?.count || 0);
+}
+
+// Views each recent bump brought: the listing's views in the 7 days after the bump (so far), compared with what
+// its usual daily views (the 7 days before) would have given over the same number of days.
+export async function getBumpResults(userId, executor = pool) {
+  const [rows] = await executor.execute(
+    `SELECT lp.listing_id, l.title, lp.created_at,
+       LEAST(7, GREATEST(1, CURRENT_DATE - lp.created_at::date + 1)) AS days_so_far,
+       (SELECT COALESCE(SUM(views), 0) FROM listing_view_daily
+          WHERE listing_id = lp.listing_id AND day >= lp.created_at::date AND day < lp.created_at::date + 7) AS views_during,
+       (SELECT COALESCE(SUM(views), 0) FROM listing_view_daily
+          WHERE listing_id = lp.listing_id AND day >= lp.created_at::date - 7 AND day < lp.created_at::date) AS views_before
+     FROM listing_promotions lp JOIN listings l ON l.id = lp.listing_id
+     WHERE lp.user_id = ? AND lp.promotion_type = 'bump' AND lp.created_at > now() - interval '30 days'
+     ORDER BY lp.created_at DESC LIMIT 20`,
+    [userId]
+  );
+  return rows.map((r) => {
+    const daysSoFar = Number(r.days_so_far);
+    const during = Number(r.views_during);
+    const expected = (Number(r.views_before) / 7) * daysSoFar;
+    return {
+      listing_id: r.listing_id,
+      title: r.title,
+      bumped_at: new Date(r.created_at).toISOString(),
+      days_so_far: daysSoFar,
+      active: daysSoFar < 7 || Date.now() - new Date(r.created_at).getTime() < 7 * 86400000,
+      views: during,
+      usual_views: Math.round(expected),
+      extra_views: Math.max(0, Math.round(during - expected)),
+    };
+  });
+}
+
+export async function getBumpCredits(userId, executor = pool) {
+  const [rows] = await executor.execute('SELECT bump_credits FROM users WHERE id = ?', [userId]);
+  return Number(rows[0]?.bump_credits || 0);
 }
 
 // When the listing may next be bumped, or null if it may be bumped now.
@@ -144,6 +217,9 @@ export async function applyPromotion(executor, { listingId, userId, type, days =
        WHERE id = ?`,
       [days, listingId]
     );
+  } else if (type === 'bump_pack') {
+    // Prepaid bumps: no listing involved, `days` is the number of bumps bought
+    await executor.execute('UPDATE users SET bump_credits = bump_credits + ? WHERE id = ?', [days, userId]);
   } else if (type === 'listing_pass') {
     // Paying for a pass also puts the listing live (a sold listing stays sold).
     const [before] = await executor.execute('SELECT status FROM listings WHERE id = ?', [listingId]);

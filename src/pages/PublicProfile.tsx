@@ -111,6 +111,7 @@ const toArtwork = (l: Listing): Artwork => ({
   avgRating: l.avg_rating ? parseFloat(Number(l.avg_rating).toFixed(1)) : null,
   reviewCount: l.review_count || 0,
   isFeatured: l.is_featured === true,
+  isBumped: l.is_bumped === true,
 });
 
 const SORTS: Record<string, { label: string; sortBy: string; sortOrder: 'ASC' | 'DESC' }> = {

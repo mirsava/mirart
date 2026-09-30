@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Box, Button, IconButton, Paper, Switch, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, FormControlLabel, IconButton, Paper, Switch, TextField, Typography } from '@mui/material';
 import { Add as AddIcon, Close as CloseIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import apiService, { PromotionConfig, PromotionStats } from '../services/api';
@@ -198,13 +198,69 @@ const PromotionSettingsCard: React.FC = () => {
           sx={{ width: 130 }}
         />
         <TextField
-          label="Hours between bumps"
+          label="Hours between bumps (per listing)"
           type="number"
           size="small"
           value={config.bump_cooldown_hours}
           onChange={(e) => setConfig({ ...config, bump_cooldown_hours: Number(e.target.value) })}
           inputProps={{ min: 0, max: 720, step: 1 }}
-          sx={{ width: 190 }}
+          sx={{ width: 240 }}
+        />
+        <TextField
+          label="Bumps per artist per day"
+          type="number"
+          size="small"
+          value={config.bump_daily_limit}
+          onChange={(e) => setConfig({ ...config, bump_daily_limit: Number(e.target.value) })}
+          inputProps={{ min: 1, max: 50, step: 1 }}
+          helperText="Across all their listings"
+          sx={{ width: 210 }}
+        />
+        <TextField
+          label="1 bumped listing in every"
+          type="number"
+          size="small"
+          value={config.bump_slot_every}
+          onChange={(e) => setConfig({ ...config, bump_slot_every: Number(e.target.value) })}
+          inputProps={{ min: 2, max: 10, step: 1 }}
+          helperText='places in "Newest"'
+          sx={{ width: 210 }}
+        />
+        <TextField
+          label="Max bumps active at once"
+          type="number"
+          size="small"
+          value={config.bump_max_active}
+          onChange={(e) => setConfig({ ...config, bump_max_active: Number(e.target.value) })}
+          inputProps={{ min: 3, max: 1000, step: 1 }}
+          helperText="Bumps pause above this, so each is seen"
+          sx={{ width: 230 }}
+        />
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mt: 1.5 }}>
+        <FormControlLabel
+          control={<Switch checked={config.bump_pack_enabled} onChange={(e) => setConfig({ ...config, bump_pack_enabled: e.target.checked })} />}
+          label="Sell bump packs"
+        />
+        <TextField
+          label="Bumps in a pack"
+          type="number"
+          size="small"
+          value={config.bump_pack_size}
+          disabled={!config.bump_pack_enabled}
+          onChange={(e) => setConfig({ ...config, bump_pack_size: Number(e.target.value) })}
+          inputProps={{ min: 2, max: 50, step: 1 }}
+          sx={{ width: 150 }}
+        />
+        <TextField
+          label="Pack price ($)"
+          type="number"
+          size="small"
+          value={config.bump_pack_price}
+          disabled={!config.bump_pack_enabled}
+          onChange={(e) => setConfig({ ...config, bump_pack_price: Number(e.target.value) })}
+          inputProps={{ min: 0.5, step: 0.5 }}
+          sx={{ width: 150 }}
         />
       </Box>
 

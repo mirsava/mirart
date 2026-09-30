@@ -110,7 +110,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ onOpenUser }) => {
                     <TableCell><Chip size="small" label={PAYMENT_TYPE_LABELS[p.type] || p.type} /></TableCell>
                     <TableCell>{p.description}</TableCell>
                     <TableCell align="right" sx={{ pr: 3, whiteSpace: 'nowrap' }}>
-                      {p.source === 'plan' ? 'Included in plan' : p.source === 'admin' ? 'Free (admin)' : money(p.amount)}
+                      {p.source === 'plan' ? 'Included in plan' : p.source === 'admin' ? 'Free (admin)' : p.source === 'credit' ? 'Pack credit' : money(p.amount)}
                     </TableCell>
                   </TableRow>
                 ))}

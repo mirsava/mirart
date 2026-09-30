@@ -201,6 +201,23 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
             }}
           />
         )}
+        {!painting.isFeatured && painting.isBumped && painting.inStock && (
+          <Tooltip title="The artist moved this piece back up the gallery. It was first listed earlier.">
+            <Chip
+              label="Bumped"
+              size="small"
+              sx={{
+                position: 'absolute',
+                bottom: 8,
+                left: 8,
+                bgcolor: 'rgba(0,0,0,0.55)',
+                color: 'white',
+                fontSize: '0.7rem',
+                height: 22,
+              }}
+            />
+          </Tooltip>
+        )}
         {painting.shippingInfo && /free\s+shipping/i.test(painting.shippingInfo) && (
           <Chip
             label="Free shipping"

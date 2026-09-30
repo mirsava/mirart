@@ -78,6 +78,7 @@ export interface Listing {
   bumped_at?: string | null;
   paid_until?: string | null;
   is_featured?: boolean;
+  is_bumped?: boolean;
 }
 
 export interface Order {
@@ -190,9 +191,28 @@ export interface PromotionConfig {
   featured_artist_enabled: boolean;
   featured_artist_price: number;
   featured_artist_weeks_ahead: number;
+  bump_daily_limit: number;
+  bump_slot_every?: number;
+  bump_max_active?: number;
+  bump_pack_enabled: boolean;
+  bump_pack_size: number;
+  bump_pack_price: number;
 }
 
-export type PromotionType = 'feature' | 'bump' | 'listing_pass';
+export type PromotionType = 'feature' | 'bump' | 'listing_pass' | 'bump_pack';
+
+export type PromotionOptions = PromotionConfig & { credits: FeatureCredits | null; bump_credits: number; bumps_left_today: number; bumps_busy: boolean };
+
+export interface BumpResult {
+  listing_id: number;
+  title: string;
+  bumped_at: string;
+  days_so_far: number;
+  active: boolean;
+  views: number;
+  usual_views: number;
+  extra_views: number;
+}
 
 export interface FeaturedArtist {
   id: number;
@@ -208,7 +228,7 @@ export interface FeaturedArtist {
   listings: Array<{ id: number; title: string; price: number | null; primary_image_url?: string | null; category: string }>;
 }
 
-export type AdminPaymentType = 'subscription' | 'feature' | 'bump' | 'listing_pass' | 'featured_artist' | 'order_fee';
+export type AdminPaymentType = 'subscription' | 'feature' | 'bump' | 'bump_pack' | 'listing_pass' | 'featured_artist' | 'order_fee';
 
 export interface AdminOverview {
   revenue: {
@@ -245,7 +265,7 @@ export interface AdminPayment {
   type: AdminPaymentType;
   description: string;
   amount: number;
-  source: 'stripe' | 'plan' | 'admin';
+  source: 'stripe' | 'plan' | 'admin' | 'credit';
   user_id: number | null;
   user_email?: string | null;
   user_name?: string | null;
@@ -303,6 +323,7 @@ export interface ArtistEngagementData {
 }
 
 export interface ArtistPlanData {
+  bump_credits: number;
   plan: { name: string | null; tier: string; billing_period: string; end_date: string; auto_renew: boolean } | null;
   access_source: 'subscription' | 'free' | 'none';
   slots: { used: number; max: number };
@@ -596,6 +617,7 @@ class ApiService {
     medium?: string;
     inStock?: boolean;
     featured?: 'only' | 'exclude';
+    seed?: number;
   }): Promise<{ listings: Listing[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } }> {
     const params = new URLSearchParams();
     if (filters) {
@@ -1350,6 +1372,10 @@ class ApiService {
     return this.request<ArtistPlanData>(`/dashboard/${authUserId}/plan`);
   }
 
+  async getBumpResults(authUserId: string): Promise<{ results: BumpResult[] }> {
+    return this.request<{ results: BumpResult[] }>(`/dashboard/${authUserId}/bump-results`);
+  }
+
   async getMyActivity(authUserId: string): Promise<{ timeline: UserHistoryEvent[] }> {
     return this.request<{ timeline: UserHistoryEvent[] }>(`/dashboard/${authUserId}/activity`);
   }
@@ -1370,8 +1396,8 @@ class ApiService {
     return this.request<{ categories: Array<{ category: string; total: number; non_featured: number }> }>('/listings/category-counts');
   }
 
-  async getPromotionOptions(): Promise<PromotionConfig & { credits: FeatureCredits | null }> {
-    return this.request<PromotionConfig & { credits: FeatureCredits | null }>('/promotions/options');
+  async getPromotionOptions(): Promise<PromotionOptions> {
+    return this.request<PromotionOptions>('/promotions/options');
   }
 
   async createPromotionCheckout(listingId: number, type: PromotionType, days?: number): Promise<{ url: string; sessionId: string }> {
@@ -1438,6 +1464,10 @@ class ApiService {
 
   async sendNewsletterNow(): Promise<{ success: boolean; sent: number }> {
     return this.request<{ success: boolean; sent: number }>('/newsletter/admin/send-now', { method: 'POST' });
+  }
+
+  async useBumpCredit(listingId: number): Promise<{ success: boolean; listing: ListingPromotionState; bump_credits: number }> {
+    return this.request(`/promotions/listings/${listingId}/bump-credit`, { method: 'POST' });
   }
 
   async useFeatureCredit(listingId: number): Promise<{ success: boolean; listing: ListingPromotionState; credits: FeatureCredits }> {

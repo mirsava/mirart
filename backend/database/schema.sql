@@ -123,6 +123,10 @@ ALTER TABLE listings ADD COLUMN IF NOT EXISTS bumped_at TIMESTAMPTZ;
 -- Pay-per-listing: while paid_until is in the future the listing may be active without using a plan slot.
 ALTER TABLE listings ADD COLUMN IF NOT EXISTS paid_until TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_listings_featured_until ON listings (featured_until);
+CREATE INDEX IF NOT EXISTS idx_listings_bumped_at ON listings (bumped_at);
+CREATE INDEX IF NOT EXISTS idx_listings_status_created ON listings (status, created_at DESC);
+-- Prepaid bumps from a bump pack
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bump_credits INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS likes (
   id SERIAL PRIMARY KEY,
@@ -364,7 +368,11 @@ ALTER TABLE listing_promotions ADD CONSTRAINT listing_promotions_listing_id_fkey
   FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE SET NULL;
 ALTER TABLE listing_promotions DROP CONSTRAINT IF EXISTS listing_promotions_promotion_type_check;
 ALTER TABLE listing_promotions ADD CONSTRAINT listing_promotions_promotion_type_check
-  CHECK (promotion_type IN ('feature','bump','listing_pass'));
+  CHECK (promotion_type IN ('feature','bump','listing_pass','bump_pack'));
+-- 'credit' = a bump paid for with a prepaid bump-pack credit
+ALTER TABLE listing_promotions DROP CONSTRAINT IF EXISTS listing_promotions_source_check;
+ALTER TABLE listing_promotions ADD CONSTRAINT listing_promotions_source_check
+  CHECK (source IN ('stripe','plan','admin','credit'));
 CREATE INDEX IF NOT EXISTS idx_listing_promotions_user_source ON listing_promotions (user_id, source, created_at);
 
 -- Paid homepage "Featured Artist" slot: one artist per week (Monday to Sunday, UTC).

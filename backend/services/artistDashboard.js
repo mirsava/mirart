@@ -240,7 +240,9 @@ export async function getArtistPlan(userId) {
     planName = plans[0]?.name || null;
     sub.tier = plans[0]?.tier;
   }
+  const [bumpRows] = await pool.execute('SELECT bump_credits FROM users WHERE id = ?', [userId]);
   return {
+    bump_credits: Number(bumpRows[0]?.bump_credits || 0),
     plan: sub
       ? { name: planName, tier: sub.tier, billing_period: sub.billing_period, end_date: dateKey(sub.end_date), auto_renew: Boolean(sub.auto_renew) }
       : null,

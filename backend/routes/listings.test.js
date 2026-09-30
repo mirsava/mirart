@@ -54,9 +54,10 @@ describe('Listings API', () => {
 
   describe('GET /api/listings', () => {
     it('returns listings with pagination', async () => {
-      // 1) count query, 2) main listings query
+      // 1) count query, 2) promotion settings (bump ordering), 3) main listings query
       mockExecute
         .mockResolvedValueOnce([[{ total: 1 }]])
+        .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[listingRow({ title: 'Test Painting', views: 0 })]]);
       const res = await request(app)
         .get('/api/listings')
@@ -69,6 +70,7 @@ describe('Listings API', () => {
     it("does not treat someone else's authUserId as 'my listings' (drafts stay private)", async () => {
       mockExecute
         .mockResolvedValueOnce([[{ total: 0 }]])
+        .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[]]);
       await request(app)
         .get('/api/listings')
@@ -77,6 +79,29 @@ describe('Listings API', () => {
         .expect(200);
       const countSql = mockExecute.mock.calls[0][0];
       expect(countSql).toContain("l.status = 'active'");
+    });
+
+    it('limits bumped listings to 1 in every N places in the public Newest order', async () => {
+      mockExecute
+        .mockResolvedValueOnce([[{ total: 0 }]])
+        .mockResolvedValueOnce([[{ setting_value: { bump_slot_every: 5 } }]])
+        .mockResolvedValueOnce([[]]);
+      await request(app).get('/api/listings').expect(200);
+      const sql = mockExecute.mock.calls[2][0];
+      expect(sql).toMatch(/THEN 5 \* \(ROW_NUMBER\(\) OVER/);
+      expect(sql).toMatch(/\/ 4\s+END/);
+    });
+
+    it("rotates bumped listings with the visitor's seed so paging stays stable", async () => {
+      mockExecute.mockResolvedValueOnce([[{ total: 0 }]]).mockResolvedValueOnce([[]]).mockResolvedValueOnce([[]]);
+      await request(app).get('/api/listings').query({ seed: '4242' }).expect(200);
+      expect(mockExecute.mock.calls[2][0]).toContain("md5(l.id::text || ':4242')");
+    });
+
+    it('sorts by first-listed date with sortBy=listed, ignoring bumps', async () => {
+      mockExecute.mockResolvedValueOnce([[{ total: 0 }]]).mockResolvedValueOnce([[]]);
+      await request(app).get('/api/listings').query({ sortBy: 'listed' }).expect(200);
+      expect(mockExecute.mock.calls[1][0]).toMatch(/ORDER BY l\.created_at DESC LIMIT/);
     });
   });
 

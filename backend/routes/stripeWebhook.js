@@ -15,9 +15,9 @@ export async function fulfillCheckoutSession(session) {
   const metadata = session.metadata || {};
 
   if (metadata.kind === PROMOTION_KIND) {
-    const type = ['feature', 'bump', 'listing_pass'].includes(metadata.type) ? metadata.type : 'bump';
+    const type = ['feature', 'bump', 'listing_pass', 'bump_pack'].includes(metadata.type) ? metadata.type : 'bump';
     const { applied } = await applyPromotion(pool, {
-      listingId: parseInt(metadata.listing_id, 10),
+      listingId: parseInt(metadata.listing_id, 10) || null,
       userId: parseInt(metadata.user_id, 10),
       type,
       days: type === 'bump' ? null : parseInt(metadata.days, 10),

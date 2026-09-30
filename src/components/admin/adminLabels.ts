@@ -5,6 +5,7 @@ export const PAYMENT_TYPE_LABELS: Record<AdminPaymentType, string> = {
   listing_pass: 'Listing passes',
   feature: 'Featured listings',
   bump: 'Bumps',
+  bump_pack: 'Bump packs',
   featured_artist: 'Featured artist weeks',
   order_fee: 'Order fees',
 };

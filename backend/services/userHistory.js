@@ -23,7 +23,8 @@ const ACTION_LABELS = {
   featured_artist_removed: 'Featured artist week removed',
 };
 
-const PROMOTION_LABELS = { feature: 'Featured a listing', bump: 'Bumped a listing', listing_pass: 'Bought a listing pass' };
+const PROMOTION_LABELS = { feature: 'Featured a listing', bump: 'Bumped a listing', listing_pass: 'Bought a listing pass', bump_pack: 'Bought a bump pack' };
+const SOURCE_LABELS = { plan: 'included with plan', admin: 'free (admin)', credit: 'bump pack credit' };
 
 // Admin-only actions that never appear in a user's own activity feed.
 const HIDDEN_FROM_SELF = new Set(['user_blocked', 'user_unblocked', 'user_deleted']);
@@ -134,7 +135,9 @@ export async function getUserHistory(userId, { audience = 'admin' } = {}) {
   const payments = [
     ...promotions.map((p) => ({
       at: iso(p.created_at),
-      description: `${PROMOTION_LABELS[p.promotion_type] || p.promotion_type}${p.days ? ` (${p.days} days)` : ''}: ${p.title ? `"${p.title}"` : 'a listing that was later deleted'}`,
+      description: p.promotion_type === 'bump_pack'
+        ? `Bump pack (${p.days} bumps)`
+        : `${PROMOTION_LABELS[p.promotion_type] || p.promotion_type}${p.days ? ` (${p.days} days)` : ''}: ${p.title ? `"${p.title}"` : 'a listing that was later deleted'}`,
       amount: num(p.amount),
       source: p.source,
     })),
@@ -167,7 +170,9 @@ export async function getUserHistory(userId, { audience = 'admin' } = {}) {
       at: iso(p.created_at),
       type: 'payment',
       title: PROMOTION_LABELS[p.promotion_type] || p.promotion_type,
-      detail: `${p.title ? `"${p.title}"` : 'deleted listing'}${p.days ? ` · ${p.days} days` : ''} · ${p.source === 'stripe' ? `$${num(p.amount).toFixed(2)}` : p.source === 'plan' ? 'included with plan' : 'free (admin)'}`,
+      detail: p.promotion_type === 'bump_pack'
+        ? `${p.days} bumps · $${num(p.amount).toFixed(2)}`
+        : `${p.title ? `"${p.title}"` : 'deleted listing'}${p.days ? ` · ${p.days} days` : ''} · ${p.source === 'stripe' ? `$${num(p.amount).toFixed(2)}` : SOURCE_LABELS[p.source] || p.source}`,
     })),
     ...bookings.map((b) => ({
       at: iso(b.created_at),

@@ -13,6 +13,7 @@ const {
   getFeatureCredits,
   applyPromotion,
   runListingPassExpirationJob,
+  getBumpResults,
 } = await import('./promotions.js');
 
 describe('promotions service', () => {
@@ -40,7 +41,9 @@ describe('promotions service', () => {
   describe('quotePromotion', () => {
     it('prices a configured feature option and a bump', () => {
       expect(quotePromotion(DEFAULT_PROMOTION_CONFIG, 'feature', '30')).toEqual({ type: 'feature', days: 30, price: 15 });
-      expect(quotePromotion(DEFAULT_PROMOTION_CONFIG, 'bump')).toEqual({ type: 'bump', days: null, price: 1 });
+      expect(quotePromotion(DEFAULT_PROMOTION_CONFIG, 'bump')).toEqual({ type: 'bump', days: null, price: 2 });
+      expect(quotePromotion(DEFAULT_PROMOTION_CONFIG, 'bump_pack')).toEqual({ type: 'bump_pack', days: 5, price: 4 });
+      expect(quotePromotion({ ...DEFAULT_PROMOTION_CONFIG, bump_pack_enabled: false }, 'bump_pack')).toBeNull();
     });
 
     it('prices a listing pass, unless passes are switched off', () => {
@@ -90,11 +93,30 @@ describe('promotions service', () => {
       expect(mockExecute.mock.calls[1][1]).toEqual([7, 5]);
     });
 
+    it('adds prepaid bumps to the account for a bump pack', async () => {
+      mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+      await applyPromotion(executor, { listingId: null, userId: 3, type: 'bump_pack', days: 5, amount: 4, source: 'stripe', stripeSessionId: 'cs_pack' });
+      expect(mockExecute.mock.calls[1][0]).toMatch(/bump_credits = bump_credits \+ \?/);
+      expect(mockExecute.mock.calls[1][1]).toEqual([5, 3]);
+    });
+
     it('does nothing when the Stripe session was already applied', async () => {
       mockExecute.mockResolvedValueOnce([{ affectedRows: 0 }]);
       const result = await applyPromotion(executor, { listingId: 5, userId: 1, type: 'bump', source: 'stripe', stripeSessionId: 'cs_1' });
       expect(result).toEqual({ applied: false });
       expect(mockExecute).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('bump results', () => {
+    it("compares views after a bump with the listing's usual views over the same days", async () => {
+      mockExecute.mockResolvedValueOnce([[
+        { listing_id: 5, title: 'Sunset', created_at: new Date(Date.now() - 2 * 86400000), days_so_far: 3, views_during: 30, views_before: 14 },
+        { listing_id: 6, title: 'Dawn', created_at: new Date(Date.now() - 10 * 86400000), days_so_far: 7, views_during: 5, views_before: 7 },
+      ]]);
+      const [a, b] = await getBumpResults(1);
+      expect(a).toMatchObject({ listing_id: 5, active: true, views: 30, usual_views: 6, extra_views: 24 });
+      expect(b).toMatchObject({ listing_id: 6, active: false, views: 5, usual_views: 7, extra_views: 0 });
     });
   });
 

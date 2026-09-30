@@ -55,6 +55,7 @@ import {
   AutoAwesome as SpotlightIcon,
   Link as LinkIcon,
   PauseCircleOutline as PauseIcon,
+  ArrowUpward as ArrowUpwardIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -63,7 +64,7 @@ import { useSnackbar } from 'notistack';
 import { useBillingStatus } from '../hooks/useBillingStatus';
 import DashboardMessagesCard from '../components/DashboardMessagesCard';
 import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings';
-import apiService, { DashboardData, Listing, Order, SubscriptionPlan, User, UserSubscription } from '../services/api';
+import apiService, { BumpResult, DashboardData, Listing, Order, SubscriptionPlan, User, UserSubscription } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import OrderCardComponent from '../components/OrderCard';
 import { CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem, TextField, Switch, FormControlLabel, Divider, RadioGroup, Radio, FormLabel, InputAdornment, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButtonGroup, ToggleButton, useTheme, LinearProgress, Collapse } from '@mui/material';
@@ -79,6 +80,7 @@ import ArtistPlanPanel from '../components/dashboard/ArtistPlanPanel';
 import BuyerSaved from '../components/dashboard/BuyerSaved';
 import NewsletterPreference from '../components/dashboard/NewsletterPreference';
 import ProfileEditor from '../components/dashboard/ProfileEditor';
+import { describeBumpResult } from '../components/dashboard/BumpResults';
 import { getPaintingDetailPath } from '../utils/seoPaths';
 
 
@@ -115,6 +117,14 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const CATEGORY_COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
+
+// A bump keeps a listing moved up in "Newest" for 7 days (matches the server's BUMP_ACTIVE_SQL).
+const bumpTooltip = (bumpedAt: string, result?: BumpResult) => {
+  const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const at = new Date(bumpedAt);
+  const base = `Bumped ${fmt(at)}. Moved up in the gallery until ${fmt(new Date(at.getTime() + 7 * 86400000))}.`;
+  return result ? `${base} ${describeBumpResult(result)}` : base;
+};
 
 // Listings in these states can be put live again from the grid (sold ones can't).
 const ACTIVATABLE_STATUSES = ['draft', 'inactive', 'archived'];
@@ -206,6 +216,8 @@ const AccountDashboard: React.FC = () => {
   const [activatingListing, setActivatingListing] = useState<number | null>(null);
   const [promoteListing, setPromoteListing] = useState<Listing | null>(null);
   const [featuredArtistOpen, setFeaturedArtistOpen] = useState(false);
+  // Latest bump result per listing, for the "Bumped" chip
+  const [bumpResults, setBumpResults] = useState<Record<number, BumpResult>>({});
   // Weeks this artist has booked as Featured Artist (from the current week on), and which week is current.
   const [featuredArtistBooking, setFeaturedArtistBooking] = useState<{ currentWeek: string; myWeeks: string[] } | null>(null);
   const [blockedActivation, setBlockedActivation] = useState<{ listing: Pick<Listing, 'id' | 'title'>; message?: string } | null>(null);
@@ -924,6 +936,17 @@ const AccountDashboard: React.FC = () => {
   const featuredThisWeek = Boolean(featuredArtistBooking && myFeaturedWeeks.includes(featuredArtistBooking.currentWeek));
   const upcomingFeaturedWeeks = myFeaturedWeeks.filter((w) => w !== featuredArtistBooking?.currentWeek);
 
+  useEffect(() => {
+    if (!user?.id || isBuyerDashboard || tabValue !== 0) return;
+    apiService.getBumpResults(user.id)
+      .then(({ results }) => {
+        const byListing: Record<number, BumpResult> = {};
+        for (const r of results) if (!byListing[r.listing_id]) byListing[r.listing_id] = r; // newest first
+        setBumpResults(byListing);
+      })
+      .catch(() => {});
+  }, [user?.id, isBuyerDashboard, tabValue, recentListings]);
+
   const copyListingLink = async (listing: Listing) => {
     const url = `${window.location.origin}${getPaintingDetailPath(listing.id, listing.title)}`;
     try {
@@ -1474,6 +1497,11 @@ const AccountDashboard: React.FC = () => {
                                   <Chip label="Pass" color="info" size="small" variant="outlined" sx={{ ml: 0.5 }} />
                                 </Tooltip>
                               )}
+                              {listing.is_bumped && listing.bumped_at && (
+                                <Tooltip title={bumpTooltip(listing.bumped_at, bumpResults[listing.id])}>
+                                  <Chip icon={<ArrowUpwardIcon />} label="Bumped" color="primary" size="small" variant="outlined" sx={{ ml: 0.5 }} />
+                                </Tooltip>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">{listing.views}</Typography>
@@ -1581,6 +1609,11 @@ const AccountDashboard: React.FC = () => {
                             )}
                             {hasLivePass(listing) && (
                               <Chip label="Pass" color="info" size="small" variant="outlined" sx={{ ml: 0.5, height: 20, fontSize: '0.7rem' }} />
+                            )}
+                            {listing.is_bumped && listing.bumped_at && (
+                              <Tooltip title={bumpTooltip(listing.bumped_at, bumpResults[listing.id])}>
+                                <Chip label="Bumped" color="primary" size="small" variant="outlined" sx={{ ml: 0.5, height: 20, fontSize: '0.7rem' }} />
+                              </Tooltip>
                             )}
                             {ACTIVATABLE_STATUSES.includes(listing.status) && (
                               <Button
@@ -2880,7 +2913,9 @@ const AccountDashboard: React.FC = () => {
           open={Boolean(promoteListing)}
           listing={promoteListing}
           onClose={() => setPromoteListing(null)}
-          onPromoted={(state) => setRecentListings((prev) => prev.map((l) => (l.id === state.id ? { ...l, ...state } : l)))}
+          onPromoted={(state) => setRecentListings((prev) => prev.map((l) => (l.id === state.id
+            ? { ...l, ...state, is_bumped: state.bumped_at ? Date.now() - new Date(state.bumped_at).getTime() < 7 * 86400000 : l.is_bumped }
+            : l)))}
         />
 
         <Dialog

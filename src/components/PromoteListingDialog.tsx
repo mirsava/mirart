@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import { Star as StarIcon, ArrowUpward as ArrowUpwardIcon, ConfirmationNumber as PassIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
-import apiService, { FeatureCredits, Listing, ListingPromotionState, PromotionConfig, PromotionType } from '../services/api';
+import apiService, { Listing, ListingPromotionState, PromotionOptions, PromotionType } from '../services/api';
 
 interface PromoteListingDialogProps {
   open: boolean;
@@ -42,10 +42,10 @@ export const hasLivePass = (listing: Pick<Listing, 'paid_until'>) =>
 
 const PromoteListingDialog: React.FC<PromoteListingDialogProps> = ({ open, listing, onClose, onPromoted }) => {
   const { enqueueSnackbar } = useSnackbar();
-  const [options, setOptions] = useState<(PromotionConfig & { credits: FeatureCredits | null }) | null>(null);
+  const [options, setOptions] = useState<PromotionOptions | null>(null);
   const [loading, setLoading] = useState(false);
   const [featureChoice, setFeatureChoice] = useState<string>('');
-  const [submitting, setSubmitting] = useState<PromotionType | null>(null);
+  const [submitting, setSubmitting] = useState<PromotionType | 'bump_credit' | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -82,6 +82,20 @@ const PromoteListingDialog: React.FC<PromoteListingDialogProps> = ({ open, listi
       window.location.href = url;
     } catch (err: any) {
       enqueueSnackbar(err.message || 'Failed to start payment', { variant: 'error' });
+      setSubmitting(null);
+    }
+  };
+
+  const useBumpCredit = async () => {
+    setSubmitting('bump_credit');
+    try {
+      const result = await apiService.useBumpCredit(listing.id);
+      enqueueSnackbar(`Bumped. ${result.bump_credits} bump ${result.bump_credits === 1 ? 'credit' : 'credits'} left.`, { variant: 'success' });
+      onPromoted?.(result.listing);
+      onClose();
+    } catch (err: any) {
+      enqueueSnackbar(err.message || 'Could not bump the listing', { variant: 'error' });
+    } finally {
       setSubmitting(null);
     }
   };
@@ -167,18 +181,60 @@ const PromoteListingDialog: React.FC<PromoteListingDialogProps> = ({ open, listi
               <Typography variant="subtitle1" fontWeight={600}>Bump to the top</Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              Move this listing back to the top of "Newest", as if you had just posted it.
-              {options.bump_cooldown_hours > 0 && ` You can bump a listing once every ${options.bump_cooldown_hours} hours.`}
+              Move this listing back near the top of "Newest" for a week. To keep room for new work, bumped listings share the
+              top of the gallery with new ones.
+              {options.bump_cooldown_hours > 0 && ` Each listing can be bumped once every ${options.bump_cooldown_hours} hours,`}
+              {` and you can bump up to ${options.bump_daily_limit} listings a day`}
+              {options.bumps_left_today < options.bump_daily_limit && ` (${options.bumps_left_today} left today)`}.
             </Typography>
-            <Button
-              variant="outlined"
-              startIcon={submitting === 'bump' ? <CircularProgress size={16} color="inherit" /> : <ArrowUpwardIcon />}
-              disabled={Boolean(submitting) || bumpBlocked}
-              onClick={() => startCheckout('bump')}
-              sx={{ textTransform: 'none' }}
-            >
-              {bumpBlocked && nextBump ? `Available again ${formatDate(nextBump)}` : `Bump for ${formatPrice(options.bump_price)}`}
-            </Button>
+            {options.bumps_busy ? (
+              <Alert severity="info" sx={{ mb: 1 }}>
+                Bumps are busy right now: enough listings are already bumped that another one would barely be seen, so
+                we've paused them. Please try again in a day or two.
+              </Alert>
+            ) : options.bumps_left_today <= 0 ? (
+              <Alert severity="info" sx={{ mb: 1 }}>You've used today's bumps. You can bump again tomorrow.</Alert>
+            ) : bumpBlocked && nextBump ? (
+              <Alert severity="info" sx={{ mb: 1 }}>This listing was bumped recently. You can bump it again {formatDate(nextBump)}.</Alert>
+            ) : (
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {options.bump_credits > 0 && (
+                  <Button
+                    variant="contained"
+                    startIcon={submitting === 'bump_credit' ? <CircularProgress size={16} color="inherit" /> : <ArrowUpwardIcon />}
+                    disabled={Boolean(submitting)}
+                    onClick={useBumpCredit}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Use a bump credit ({options.bump_credits} left)
+                  </Button>
+                )}
+                <Button
+                  variant="outlined"
+                  startIcon={submitting === 'bump' ? <CircularProgress size={16} color="inherit" /> : <ArrowUpwardIcon />}
+                  disabled={Boolean(submitting)}
+                  onClick={() => startCheckout('bump')}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Bump for {formatPrice(options.bump_price)}
+                </Button>
+              </Box>
+            )}
+            {options.bump_pack_enabled && (
+              <Box sx={{ mt: 1.5 }}>
+                <Button
+                  size="small"
+                  disabled={Boolean(submitting)}
+                  onClick={() => startCheckout('bump_pack')}
+                  startIcon={submitting === 'bump_pack' ? <CircularProgress size={14} color="inherit" /> : undefined}
+                  sx={{ textTransform: 'none', px: 0 }}
+                >
+                  Save with a pack: {options.bump_pack_size} bumps for {formatPrice(options.bump_pack_price)}
+                  {` (${formatPrice(options.bump_pack_price / options.bump_pack_size)} each)`}
+                  {options.bumps_busy && ', to use once bumps reopen'}
+                </Button>
+              </Box>
+            )}
 
             {hasLivePass(listing) && options.listing_pass_enabled && (
               <>

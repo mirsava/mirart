@@ -51,6 +51,10 @@ const PromotionSuccess: React.FC = () => {
       title: 'Your listing is live',
       body: `It stays live${paidUntil ? ` until ${paidUntil}` : ''} without using a plan slot. You can extend it from your dashboard.`,
     },
+    bump_pack: {
+      title: 'Your bump pack is ready',
+      body: `You have ${result?.days ?? ''} bumps to use. Bump any live listing from Promote on your dashboard, with no extra payment.`,
+    },
     featured_artist: {
       title: "You're booked as Featured Artist",
       body: `${result?.moved ? 'The week you picked was taken moments before your payment, so we booked the next free one. ' : ''}You'll be on the homepage and in the weekly email for the week of ${weekOf ?? 'your booking'}.`,

@@ -5,6 +5,11 @@ import { parseImageUrls } from '../utils/json.js';
 import { checkActivation } from '../services/billing.js';
 import { deleteImages } from '../services/storage.js';
 import { logListingActivity } from '../services/activityLog.js';
+import { getPromotionConfig } from '../services/promotions.js';
+
+// A bump counts for a week: after that the listing sorts by when it was first listed again.
+const BUMP_ACTIVE_SQL = "(l.bumped_at IS NOT NULL AND l.bumped_at > l.created_at AND l.bumped_at > now() - interval '7 days')";
+const FEATURED_SQL = '(l.featured_until IS NOT NULL AND l.featured_until > now())';
 
 const router = express.Router();
 
@@ -55,6 +60,7 @@ router.get('/', async (req, res) => {
         u.auth_user_id,
         u.signature_url,
         (l.featured_until IS NOT NULL AND l.featured_until > now()) as is_featured,
+        ${BUMP_ACTIVE_SQL} as is_bumped,
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count,
         (SELECT AVG(rating) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as avg_rating,
         (SELECT COUNT(*) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as review_count
@@ -283,9 +289,9 @@ router.get('/', async (req, res) => {
     const [countResult] = await pool.execute(countQuery, countParams);
     const total = Number(countResult[0].total);
     
-    // Add sorting. "Newest" counts a paid bump as the listing's date.
+    // Add sorting. "Newest" counts a paid bump as the listing's date; "listed" is when it was first listed.
     let orderBy = 'COALESCE(l.bumped_at, l.created_at) DESC';
-    const validSortFields = ['created_at', 'title', 'price', 'year', 'views'];
+    const validSortFields = ['created_at', 'listed', 'title', 'price', 'year', 'views'];
     const validSortOrders = ['ASC', 'DESC'];
     
     if (validSortFields.includes(sortBy)) {
@@ -298,6 +304,8 @@ router.get('/', async (req, res) => {
         orderBy = `l.year ${order}`;
       } else if (sortBy === 'views') {
         orderBy = `l.views ${order}`;
+      } else if (sortBy === 'listed') {
+        orderBy = `l.created_at ${order}`;
       } else {
         orderBy = `COALESCE(l.bumped_at, l.created_at) ${order}`;
       }
@@ -305,7 +313,21 @@ router.get('/', async (req, res) => {
     // Public "newest" views show featured listings first. Artists' own listing views stay chronological.
     const isDefaultSort = !validSortFields.includes(sortBy) || (sortBy === 'created_at' && String(sortOrder).toUpperCase() !== 'ASC');
     if (isDefaultSort && !isFetchingOwnListings) {
-      orderBy = `(l.featured_until IS NOT NULL AND l.featured_until > now()) DESC, ${orderBy}`;
+      // Featured first. Below that, bumped listings get at most 1 in every N places so new work always has room:
+      // the k-th bumped listing takes place N*k + (N-1); new listings fill the places in between.
+      const every = (await getPromotionConfig()).bump_slot_every;
+      // Bumped listings take turns: a shuffle seeded per browsing session (the gallery sends ?seed=), so paging
+      // is stable for one visitor while different visitors see different bumped pieces first. Without a seed
+      // the order changes every 10 minutes.
+      const seedParam = parseInt(req.query.seed, 10);
+      const seed = Number.isFinite(seedParam) ? Math.abs(seedParam) % 1000000 : Math.floor(Date.now() / 600000);
+      const window = (order) => `ROW_NUMBER() OVER (PARTITION BY ${FEATURED_SQL}, ${BUMP_ACTIVE_SQL} ORDER BY ${order}) - 1`;
+      orderBy = `${FEATURED_SQL} DESC,
+        CASE WHEN ${BUMP_ACTIVE_SQL}
+          THEN ${every} * (${window(`md5(l.id::text || ':${seed}')`)}) + ${every - 1}
+          ELSE (${window('l.created_at DESC')}) + (${window('l.created_at DESC')}) / ${every - 1}
+        END,
+        l.created_at DESC`;
     }
     
     // Add pagination to main query - rebuild query cleanly
@@ -413,6 +435,7 @@ router.get('/:id', async (req, res) => {
         u.signature_url,
         u.default_special_instructions as artist_default_special_instructions,
         (l.featured_until IS NOT NULL AND l.featured_until > now()) as is_featured,
+        ${BUMP_ACTIVE_SQL} as is_bumped,
         (SELECT COUNT(*) FROM likes WHERE listing_id = l.id) as like_count,
         (SELECT AVG(rating) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as avg_rating,
         (SELECT COUNT(*) FROM listing_comments WHERE listing_id = l.id AND rating IS NOT NULL) as review_count
