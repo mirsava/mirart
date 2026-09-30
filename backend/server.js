@@ -131,7 +131,7 @@ const STATIC_SITEMAP_ENTRIES = [
   { path: '/privacy', changefreq: 'yearly', priority: '0.3' },
   { path: '/terms', changefreq: 'yearly', priority: '0.3' },
   { path: '/subscription-plans', changefreq: 'weekly', priority: '0.8' },
-  { path: '/artist-signup', changefreq: 'monthly', priority: '0.6' },
+  { path: '/signup', changefreq: 'monthly', priority: '0.6' },
 ];
 
 const sendSitemapIndex = (_req, res) => {
@@ -145,6 +145,10 @@ const sendSitemapIndex = (_req, res) => {
   </sitemap>
   <sitemap>
     <loc>${SITE_URL}/sitemap-listings.xml</loc>
+    <lastmod>${now}</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>${SITE_URL}/sitemap-artists.xml</loc>
     <lastmod>${now}</lastmod>
   </sitemap>
 </sitemapindex>`;
@@ -178,7 +182,7 @@ app.get('/api/sitemap-static.xml', sendStaticSitemap);
 const sendListingsSitemap = async (_req, res) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT l.id, l.title, l.created_at
+      `SELECT l.id, l.title, GREATEST(l.updated_at, l.created_at) AS modified_at
        FROM listings l
        JOIN users u ON l.user_id = u.id
        WHERE l.status = 'active' AND COALESCE(u.blocked, FALSE) = FALSE
@@ -188,7 +192,7 @@ const sendListingsSitemap = async (_req, res) => {
     const urls = rows
       .map((row) => {
         const loc = `${SITE_URL}${getListingPath(row.id, row.title)}`;
-        const lastmod = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
+        const lastmod = row.modified_at ? new Date(row.modified_at).toISOString() : new Date().toISOString();
         return `  <url>
     <loc>${escapeXml(loc)}</loc>
     <lastmod>${lastmod}</lastmod>
@@ -213,6 +217,38 @@ ${urls}
 
 app.get('/sitemap-listings.xml', sendListingsSitemap);
 app.get('/api/sitemap-listings.xml', sendListingsSitemap);
+
+// Public artist pages for artists who have live work (and a username, which is what the URL uses)
+const sendArtistsSitemap = async (_req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT u.username, GREATEST(u.updated_at, MAX(l.updated_at)) AS modified_at
+       FROM users u JOIN listings l ON l.user_id = u.id AND l.status = 'active'
+       WHERE u.username IS NOT NULL AND COALESCE(u.blocked, FALSE) = FALSE AND COALESCE(u.active, TRUE) = TRUE
+       GROUP BY u.id
+       ORDER BY u.username`
+    );
+    const urls = rows
+      .map((row) => `  <url>
+    <loc>${escapeXml(`${SITE_URL}/artist/${encodeURIComponent(row.username)}`)}</loc>
+    <lastmod>${new Date(row.modified_at || Date.now()).toISOString()}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`)
+      .join('\n');
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>`);
+  } catch (error) {
+    console.error('Sitemap artists generation failed:', error);
+    res.status(500).send('Failed to generate sitemap');
+  }
+};
+
+app.get('/sitemap-artists.xml', sendArtistsSitemap);
+app.get('/api/sitemap-artists.xml', sendArtistsSitemap);
 
 // Health check
 app.get('/health', (req, res) => {

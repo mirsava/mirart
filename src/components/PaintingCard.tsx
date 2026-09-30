@@ -133,6 +133,8 @@ const PaintingCard: React.FC<PaintingCardProps> = ({ painting, onLikeChange }) =
             height="300"
             image={painting.image}
             alt={painting.title}
+            loading="lazy"
+            decoding="async"
             onError={() => setImageLoadError(true)}
             sx={{
               objectFit: 'cover',

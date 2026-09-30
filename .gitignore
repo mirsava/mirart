@@ -87,7 +87,8 @@ jspm_packages/
 
 # Gatsby files
 .cache/
-public
+# (Gatsby's `public` build folder is not ignored: in this Vite app public/ holds source files
+# such as robots.txt, the favicons and the web manifest, which must be deployed.)
 
 # Storybook build outputs
 .out

@@ -5,7 +5,7 @@ dotenv.config();
 const siteUrl = (process.env.SITE_URL || process.env.FRONTEND_URL || 'https://artzyla.com').replace(/\/$/, '');
 const backendUrl = (process.env.API_PUBLIC_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/$/, '');
 
-const sitemapPaths = ['/sitemap.xml', '/sitemap-static.xml', '/sitemap-listings.xml'];
+const sitemapPaths = ['/sitemap.xml', '/sitemap-static.xml', '/sitemap-listings.xml', '/sitemap-artists.xml'];
 
 const buildCandidates = (path) => {
   const candidates = [

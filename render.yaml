@@ -41,11 +41,29 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://artzyla-api.onrender.com/api
+      # Public address of the site, used for canonical links (e.g. https://artzyla.com). Must match
+      # FRONTEND_URL on the API and the domain in public/robots.txt and index.html.
+      - key: VITE_SITE_URL
+        sync: false
       - key: VITE_SUPABASE_URL
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
     routes:
+      # Sitemaps are generated live by the API; serve them on the site's own domain (search engines require that).
+      # Replace the API URL if you use a custom domain for it.
+      - type: rewrite
+        source: /sitemap.xml
+        destination: https://artzyla-api.onrender.com/sitemap.xml
+      - type: rewrite
+        source: /sitemap-static.xml
+        destination: https://artzyla-api.onrender.com/sitemap-static.xml
+      - type: rewrite
+        source: /sitemap-listings.xml
+        destination: https://artzyla-api.onrender.com/sitemap-listings.xml
+      - type: rewrite
+        source: /sitemap-artists.xml
+        destination: https://artzyla-api.onrender.com/sitemap-artists.xml
       - type: rewrite
         source: /*
         destination: /index.html

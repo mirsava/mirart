@@ -1,0 +1,23 @@
+User-agent: *
+Allow: /
+
+# Account, checkout and admin pages: nothing for search engines here
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /artist-dashboard
+Disallow: /create-listing
+Disallow: /edit-listing/
+Disallow: /messages
+Disallow: /chat
+Disallow: /orders
+Disallow: /cart
+Disallow: /checkout
+Disallow: /order-success
+Disallow: /promotion-success
+Disallow: /unsubscribe
+Disallow: /confirm-signup
+Disallow: /forgot-password
+Disallow: /signin
+Disallow: /artist-signin
+
+Sitemap: https://artzyla.com/sitemap.xml

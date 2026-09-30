@@ -7,6 +7,16 @@ import SupportChatWidget from './SupportChatWidget';
 import DeactivatedUserBanner from './DeactivatedUserBanner';
 import AnnouncementBanner from './AnnouncementBanner';
 import { useChat } from '../contexts/ChatContext';
+import { Helmet } from 'react-helmet-async';
+import { useLocation } from 'react-router-dom';
+
+// Account, checkout and admin pages: keep them out of search results even if something links to them.
+const PRIVATE_PATHS = [
+  '/admin', '/dashboard', '/artist-dashboard', '/create-listing', '/edit-listing', '/messages', '/chat', '/orders',
+  '/cart', '/checkout', '/order-success', '/promotion-success', '/unsubscribe', '/confirm-signup', '/forgot-password',
+  '/signin', '/artist-signin',
+];
+const isPrivatePath = (pathname: string) => PRIVATE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,6 +24,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { chatOpen, closeChat, initialConversationId } = useChat();
+  const { pathname } = useLocation();
 
   return (
     <Box
@@ -24,6 +35,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         bgcolor: 'background.default',
       }}
     >
+      {isPrivatePath(pathname) && (
+        <Helmet>
+          <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
+      )}
       <Header />
       <Box sx={{ pt: { xs: '76px', md: '72px' } }}>
         <AnnouncementBanner />

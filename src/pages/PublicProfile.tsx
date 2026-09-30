@@ -285,7 +285,29 @@ const PublicProfile: React.FC = () => {
 
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', pb: 8 }}>
-      <SEO title={`${artistName} - Artist Profile`} description={seoDescription} url={`/artist/${artist.username || username}`} image={imageUrl(artist.profile_image_url) || cover} />
+      <SEO
+        title={`${artistName} - Artist Profile`}
+        description={seoDescription}
+        url={`/artist/${artist.username || username}`}
+        image={imageUrl(artist.profile_image_url) || cover}
+        type="profile"
+        structuredData={{
+          '@context': 'https://schema.org',
+          '@type': 'ProfilePage',
+          ...(artist.created_at ? { dateCreated: new Date(artist.created_at).toISOString() } : {}),
+          mainEntity: {
+            '@type': 'Person',
+            name: artistName,
+            ...(artist.username ? { alternateName: `@${artist.username}` } : {}),
+            url: pageUrl,
+            ...(bio ? { description: bio.slice(0, 500) } : {}),
+            ...(imageUrl(artist.profile_image_url) ? { image: imageUrl(artist.profile_image_url) } : {}),
+            ...(country ? { homeLocation: { '@type': 'Place', name: country } } : {}),
+            ...(specialties.length ? { knowsAbout: specialties } : {}),
+            ...(links.length ? { sameAs: links.map((l) => l.url) } : {}),
+          },
+        }}
+      />
 
       {/* Cover: the artist's latest piece, softened, behind the brand color */}
       <Box

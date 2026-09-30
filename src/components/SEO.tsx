@@ -3,7 +3,9 @@ import { Helmet } from 'react-helmet-async';
 
 const SITE_NAME = 'ArtZyla';
 const DEFAULT_DESCRIPTION = 'Discover unique paintings, woodworking, and handmade art from independent artists. ArtZyla connects talented creators with art lovers worldwide.';
-const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
+// Canonical links and share URLs use the public domain (VITE_SITE_URL) so pages served from another host
+// (e.g. the onrender.com address) don't compete with the real site in search results.
+const BASE_URL = ((import.meta.env.VITE_SITE_URL as string | undefined) || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
 
 interface SEOProps {
   title?: string;
@@ -12,7 +14,7 @@ interface SEOProps {
   url?: string;
   prevUrl?: string;
   nextUrl?: string;
-  type?: 'website' | 'article' | 'product';
+  type?: 'website' | 'article' | 'product' | 'profile';
   noindex?: boolean;
   structuredData?: object;
 }

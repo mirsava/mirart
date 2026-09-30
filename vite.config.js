@@ -23,7 +23,19 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Big libraries get their own files so browsers keep them cached between deploys
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom', 'react-helmet-async'],
+          mui: ['@mui/material', '@mui/system', '@emotion/react', '@emotion/styled'],
+          'mui-icons': ['@mui/icons-material'],
+          supabase: ['@supabase/supabase-js'],
+          charts: ['recharts'],
+        },
+      },
+    },
   },
   resolve: {
     alias: {
